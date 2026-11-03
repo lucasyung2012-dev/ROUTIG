@@ -119,11 +119,36 @@ function DrawingSurface({ strokes, height, onChange, onResize, fullscreen, onTog
 
   useEffect(() => () => window.clearTimeout(holdTimer.current), []);
 
+  // Tela cheia no iPad em pé: a folha cresce para ocupar a altura da tela (no máximo 3000).
+  useEffect(() => {
+    if (!fullscreen || !svg.current) return;
+    const box = svg.current.getBoundingClientRect();
+    if (box.width === 0) return;
+    const fits = Math.round((box.height / box.width) * BOARD_W);
+    if (fits > height + 20) onResize(Math.min(3000, fits));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fullscreen]);
+
+  /**
+   * Posição da caneta na folha. Usa a matriz real do SVG (getScreenCTM): funciona
+   * mesmo quando a folha fica centralizada com sobra em volta, como na tela cheia.
+   */
   const toBoard = (e: { clientX: number; clientY: number; pressure: number; pointerType: string }): [number, number, number] => {
-    const r = svg.current!.getBoundingClientRect();
-    const scale = BOARD_W / r.width;
+    const el = svg.current!;
     const pressure = e.pointerType === 'pen' ? e.pressure || 0.5 : 0.5;
-    return [Math.round((e.clientX - r.left) * scale * 10) / 10, Math.round((e.clientY - r.top) * scale * 10) / 10, Math.round(pressure * 100) / 100];
+    const m = el.getScreenCTM();
+    let x: number;
+    let y: number;
+    if (m) {
+      const p = new DOMPoint(e.clientX, e.clientY).matrixTransform(m.inverse());
+      x = p.x;
+      y = p.y;
+    } else {
+      const r = el.getBoundingClientRect();
+      x = ((e.clientX - r.left) * BOARD_W) / r.width;
+      y = ((e.clientY - r.top) * BOARD_W) / r.width;
+    }
+    return [Math.round(x * 10) / 10, Math.round(y * 10) / 10, Math.round(pressure * 100) / 100];
   };
 
   const allowed = (e: { pointerType: string }) => !penOnly || e.pointerType === 'pen' || e.pointerType === 'mouse';
@@ -253,8 +278,9 @@ function DrawingSurface({ strokes, height, onChange, onResize, fullscreen, onTog
           role="img"
           aria-label={t('notes.draw.area')}
           viewBox={`0 0 ${BOARD_W} ${viewH}`}
-          className={cn('select-none rounded-2xl bg-white ring-1 ring-line', fullscreen ? 'h-full max-h-full w-auto max-w-full' : 'w-full', tool === 'eraser' ? 'cursor-cell' : 'cursor-crosshair')}
-          style={{ touchAction: 'none', aspectRatio: `${BOARD_W} / ${viewH}`, WebkitUserSelect: 'none', WebkitTouchCallout: 'none' } as CSSProperties}
+          preserveAspectRatio="xMidYMin meet"
+          className={cn('select-none', fullscreen ? 'h-full w-full' : 'w-full overflow-hidden rounded-2xl ring-1 ring-line', tool === 'eraser' ? 'cursor-cell' : 'cursor-crosshair')}
+          style={{ touchAction: 'none', aspectRatio: fullscreen ? undefined : `${BOARD_W} / ${viewH}`, WebkitUserSelect: 'none', WebkitTouchCallout: 'none' } as CSSProperties}
           onPointerDown={(e) => {
             if (!allowed(e) || activePointer.current !== null) return;
             e.preventDefault();
@@ -295,6 +321,8 @@ function DrawingSurface({ strokes, height, onChange, onResize, fullscreen, onTog
             if (e.pointerId === activePointer.current) commit();
           }}
         >
+          {/* A folha: só esta área recebe traços; na tela cheia, o resto fica com a cor do app. */}
+          <rect x={0} y={0} width={BOARD_W} height={viewH} rx={fullscreen ? 12 : 0} fill="#FFFFFF" />
           {strokes.map((s, i) => (
             <path key={i} d={pathOf(s)} stroke={s.color} strokeWidth={strokeWidth(s)} fill="none" strokeLinecap="round" strokeLinejoin="round" />
           ))}

@@ -10,6 +10,7 @@ import {
   Link2,
   ListTodo,
   Mic,
+  NotebookPen,
   Paperclip,
   RotateCcw,
   Square,
@@ -22,8 +23,8 @@ import {
   captureFile,
   captureText,
   convertToEvent,
+  convertToNote,
   convertToTask,
-  getFile,
   InboxRuleError,
   reopen,
   restoreItem,
@@ -38,6 +39,10 @@ import { emptyTaskInput, normalizeTags } from '@/domain/tasks';
 import { useEventEditor } from '@/features/calendar/EventEditor';
 import { useCalendarData } from '@/features/calendar/useCalendarData';
 import { useTaskEditor } from '@/features/tasks/TaskEditor';
+import { useObjectUrl } from '@/features/files/useObjectUrl';
+import { useNavigate } from 'react-router-dom';
+import { textToBlocks, type Block } from '@/domain/notes';
+import { emptyNoteInput } from '@/data/notesRepo';
 import { formatBytes } from '@/services/storage';
 import { Badge } from '@/ui/Badge';
 import { Button } from '@/ui/Button';
@@ -260,34 +265,15 @@ function useAudioRecorder(onDone: (blob: Blob, name: string) => Promise<void>) {
 
 /* ---------- Item ---------- */
 
-function useObjectUrl(fileId: string | null): string | null {
-  const [url, setUrl] = useState<string | null>(null);
-  useEffect(() => {
-    if (!fileId) return;
-    let created: string | null = null;
-    let alive = true;
-    void getFile(fileId).then((f) => {
-      if (f && alive) {
-        created = URL.createObjectURL(f.blob);
-        setUrl(created);
-      }
-    });
-    return () => {
-      alive = false;
-      if (created) URL.revokeObjectURL(created);
-    };
-  }, [fileId]);
-  return url;
-}
-
 function ItemCard({ item, openItems }: { item: InboxItem; openItems: InboxItem[] }) {
   const { t, settings } = useSettings();
   const toast = useToast();
   const tasks = useTaskEditor();
   const events = useEventEditor();
+  const navigate = useNavigate();
   const fileUrl = useObjectUrl(item.fileId);
   const s = useMemo(() => suggest(item), [item]);
-  const [converting, setConverting] = useState<'task' | 'event' | null>(null);
+  const [converting, setConverting] = useState<'task' | 'event' | 'note' | null>(null);
   const [snoozeOpen, setSnoozeOpen] = useState(false);
   const fmt = new Intl.DateTimeFormat(settings.locale, { dateStyle: 'medium', timeStyle: 'short' });
   const KindIcon = item.kind === 'image' ? ImageIcon : item.kind === 'audio' ? Mic : item.kind === 'file' ? FileText : item.kind === 'link' ? Link2 : InboxIcon;
@@ -330,13 +316,14 @@ function ItemCard({ item, openItems }: { item: InboxItem; openItems: InboxItem[]
 
       {item.status === 'processed' && item.processedTo ? (
         <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-line/60 pt-3">
-          <Badge tone="success">{t('inbox.processedTo', { type: t(`inbox.types.${item.processedTo.type === 'event' ? 'event' : 'task'}`) })}</Badge>
+          <Badge tone="success">{t('inbox.processedTo', { type: t(`inbox.types.${item.processedTo.type === 'event' ? 'event' : item.processedTo.type === 'note' ? 'note' : 'task'}`).toLocaleLowerCase(settings.locale) })}</Badge>
           <Button
             size="sm"
             variant="ghost"
             onClick={() => {
               if (item.processedTo?.type === 'task') tasks.openTask(item.processedTo.id);
               if (item.processedTo?.type === 'event') events.openEvent(item.processedTo.id, '');
+              if (item.processedTo?.type === 'note') navigate(`/notes/${item.processedTo.id}`);
             }}
           >
             {t('inbox.open')}
@@ -356,9 +343,7 @@ function ItemCard({ item, openItems }: { item: InboxItem; openItems: InboxItem[]
               {reasons && <span className="text-xs text-subtle">{t('inbox.because', { reasons })}</span>}
             </div>
           )}
-          {(s.type === 'note' || s.type === 'idea' || s.type === 'link') && item.status === 'open' && (
-            <p className="text-xs text-subtle">{s.type === 'link' || item.kind !== 'text' ? t('inbox.libraryLater') : t('inbox.notesLater')}</p>
-          )}
+          {(s.type === 'link' || item.kind !== 'text') && item.status === 'open' && <p className="text-xs text-subtle">{t('inbox.libraryLater')}</p>}
           <div className="flex flex-wrap items-center gap-2">
             {item.status === 'open' && (
               <>
@@ -367,6 +352,9 @@ function ItemCard({ item, openItems }: { item: InboxItem; openItems: InboxItem[]
                 </Button>
                 <Button size="sm" variant={s.type === 'event' ? 'primary' : 'secondary'} icon={<CalendarPlus className="h-4 w-4" aria-hidden />} onClick={() => setConverting('event')}>
                   {t('inbox.toEvent')}
+                </Button>
+                <Button size="sm" variant={s.type === 'note' || s.type === 'idea' ? 'primary' : 'secondary'} icon={<NotebookPen className="h-4 w-4" aria-hidden />} onClick={() => setConverting('note')}>
+                  {t('inbox.toNote')}
                 </Button>
                 {item.snoozedUntil && item.snoozedUntil > todayKey() ? (
                   <Button size="sm" variant="ghost" icon={<RotateCcw className="h-4 w-4" aria-hidden />} onClick={() => void act(unsnooze(item.id), t('inbox.reopen'))}>
@@ -424,13 +412,17 @@ function ItemCard({ item, openItems }: { item: InboxItem; openItems: InboxItem[]
 
 /* ---------- Conversão com prévia e confirmação (Parte 20.2) ---------- */
 
-function ConvertDialog({ item, suggestion, type, openItems, onClose }: { item: InboxItem; suggestion: Suggestion; type: 'task' | 'event'; openItems: InboxItem[]; onClose: () => void }) {
+function ConvertDialog({ item, suggestion, type, openItems, onClose }: { item: InboxItem; suggestion: Suggestion; type: 'task' | 'event' | 'note'; openItems: InboxItem[]; onClose: () => void }) {
   const { t, settings } = useSettings();
+  const navigate = useNavigate();
   const toast = useToast();
   const cal = useCalendarData();
   const taskEditor = useTaskEditor();
   const eventEditor = useEventEditor();
-  const [title, setTitle] = useState(suggestion.title || item.text.slice(0, 120));
+  // Arquivo sem texto (ex.: áudio gravado): o nome do arquivo não serve de título; o campo começa vazio.
+  const onlyFileName = !!item.fileName && item.text === item.fileName;
+  const [title, setTitle] = useState(onlyFileName ? '' : suggestion.title || item.text.slice(0, 120));
+  const audioUrl = useObjectUrl(item.kind === 'audio' ? item.fileId : null);
   const [date, setDate] = useState<DateKey | ''>(suggestion.date ?? (type === 'event' ? todayKey() : ''));
   const [time, setTime] = useState(suggestion.time ?? (type === 'event' ? '09:00' : ''));
   const [tags, setTags] = useState(suggestion.tags.join(', '));
@@ -453,7 +445,15 @@ function ConvertDialog({ item, suggestion, type, openItems, onClose }: { item: I
     }
     const description = item.text !== title ? item.text : '';
     try {
-      if (type === 'task') {
+      if (type === 'note') {
+        // A nota leva o texto e o arquivo (foto, áudio ou documento) do item, sem copiar o arquivo.
+        const blocks: Block[] = item.kind === 'text' || item.kind === 'link' ? textToBlocks(item.text) : [];
+        if (item.fileId && item.kind === 'image') blocks.push({ id: `blk_${item.id}`, type: 'image', fileId: item.fileId, caption: '' });
+        else if (item.fileId) blocks.push({ id: `blk_${item.id}`, type: 'file', fileId: item.fileId, name: item.fileName ?? '', size: item.size ?? 0 });
+        if (item.url && item.kind !== 'link') blocks.push({ id: `lnk_${item.id}`, type: 'link', url: item.url, title: '' });
+        const id = await convertToNote(item.id, emptyNoteInput({ title: title.trim(), tags: normalizeTags(tags.split(',')), ...(blocks.length ? { blocks } : {}) }));
+        toast.show(t('inbox.convertedNote'), 'success', { label: t('inbox.open'), run: () => navigate(`/notes/${id}`) });
+      } else if (type === 'task') {
         const id = await convertToTask(
           item.id,
           emptyTaskInput({
@@ -497,7 +497,9 @@ function ConvertDialog({ item, suggestion, type, openItems, onClose }: { item: I
       }
     >
       <div className="flex flex-col gap-4">
-        <Field label={t('inbox.titleLabel')}>{(id) => <Input id={id} value={title} maxLength={300} onChange={(e) => setTitle(e.target.value)} />}</Field>
+        {audioUrl && <audio controls src={audioUrl} className="w-full" aria-label={item.fileName ?? undefined} />}
+        <Field label={t('inbox.titleLabel')}>{(id) => <Input id={id} value={title} maxLength={300} autoFocus={onlyFileName} onChange={(e) => setTitle(e.target.value)} />}</Field>
+        {type !== 'note' && (
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label={t('inbox.dateLabel')} optionalLabel={type === 'task' ? t('common.optional') : undefined}>
             {(id) => <Input id={id} type="date" value={date} onChange={(e) => setDate(e.target.value)} />}
@@ -506,7 +508,8 @@ function ConvertDialog({ item, suggestion, type, openItems, onClose }: { item: I
             {(id) => <Input id={id} type="time" value={time} onChange={(e) => setTime(e.target.value)} />}
           </Field>
         </div>
-        {type === 'task' && <Field label={t('inbox.tagsLabel')}>{(id) => <Input id={id} value={tags} onChange={(e) => setTags(e.target.value)} />}</Field>}
+        )}
+        {type !== 'event' && <Field label={t('inbox.tagsLabel')}>{(id) => <Input id={id} value={tags} onChange={(e) => setTags(e.target.value)} />}</Field>}
         {duplicates.length > 0 && (
           <div role="status" className="rounded-xl bg-warning/10 px-3 py-2.5 text-sm ring-1 ring-warning/30">
             <div className="font-medium text-fg">{t('inbox.duplicates')}</div>

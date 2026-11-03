@@ -3,6 +3,7 @@ import type { ChangeEntry, Link } from '@/domain/entity';
 import type { Task, TaskList } from '@/domain/tasks';
 import type { CalendarEvent } from '@/domain/events';
 import type { InboxItem, StoredFile } from '@/domain/inbox';
+import type { Note, NoteCollection, Notebook, NoteTemplate, NoteVersion } from '@/domain/notes';
 
 /** Registro chave-valor (configurações, estado do onboarding, metadados). */
 export interface KvRecord {
@@ -27,6 +28,11 @@ export class RoutigDB extends Dexie {
   events!: EntityTable<CalendarEvent, 'id'>;
   inbox!: EntityTable<InboxItem, 'id'>;
   files!: EntityTable<StoredFile, 'id'>;
+  notes!: EntityTable<Note, 'id'>;
+  noteVersions!: EntityTable<NoteVersion, 'id'>;
+  notebooks!: EntityTable<Notebook, 'id'>;
+  noteCollections!: EntityTable<NoteCollection, 'id'>;
+  noteTemplates!: EntityTable<NoteTemplate, 'id'>;
 
   constructor(name = 'routig') {
     super(name);
@@ -49,10 +55,18 @@ export class RoutigDB extends Dexie {
       inbox: 'id, status, snoozedUntil, createdAt',
       files: 'id, hash, createdAt',
     });
+    // Etapa 1: Notes.
+    this.version(5).stores({
+      notes: 'id, notebookId, updatedAt, favorite, *tags, *collectionIds',
+      noteVersions: 'id, noteId, at',
+      notebooks: 'id, order',
+      noteCollections: 'id',
+      noteTemplates: 'id',
+    });
   }
 }
 
-export const DB_SCHEMA_VERSION = 4;
+export const DB_SCHEMA_VERSION = 5;
 
 let instance: RoutigDB | null = null;
 

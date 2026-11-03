@@ -7,8 +7,8 @@ Leia este arquivo no começo de toda conversa nova sobre o ROUTIG. A especifica�
 ## Estado da conversa (2026-11-03)
 
 - **Etapa 0 — Fundação:** concluída. Logo vetorial e design system aprovados pelo dono do produto em 2026-11-02.
-- **Etapa 1 — Organização central:** em andamento. **Tasks, Calendar e Inbox prontos e publicados.**
-- **Próximo passo:** **Notes** e depois **Projects**; depois Dashboard completo, Profile e Settings.
+- **Etapa 1 — Organização central:** em andamento. **Tasks, Calendar, Inbox e Notes prontos e publicados.**
+- **Próximo passo:** **Projects**; depois Dashboard completo (personalização), Profile (interesses, evolução, história) e Settings.
 - **Como trabalhar:** o computador de desenvolvimento não tem Node. Escrever o código, enviar com `git push`, conferir o GitHub Actions (anotações de erro aparecem por arquivo e linha) e testar no app publicado.
 
 ## Etapa 1 — andamento
@@ -20,7 +20,7 @@ Leia este arquivo no começo de toda conversa nova sobre o ROUTIG. A especifica�
 | Calendar | ✅ Pronto (testes no CI; checagem no navegador nesta versão) |
 | Projects | A fazer |
 | Inbox | ✅ Pronto (testes no CI; checagem no navegador nesta versão) |
-| Notes | A fazer |
+| Notes | ✅ Pronto (testes no CI; checagem no navegador nesta versão) |
 | Profile | Parcial: nome e descrição. Falta interesses, Minha evolução, Minha história |
 | Settings | Parcial: seções da Etapa 0. Faltam as que dependem de módulos novos |
 
@@ -63,6 +63,7 @@ Leia este arquivo no começo de toda conversa nova sobre o ROUTIG. A especifica�
 | 0.2.0 | 2026-11-03 | Claude (Claude Code) | Etapa 1: módulo Tasks; Dashboard com resumo de tarefas; busca de tarefas; busca rolando no iPad e no celular. |
 | 0.3.0 | 2026-11-03 | Claude (Claude Code) | Etapa 1: módulo Calendar; criação rápida de evento; próximos compromissos no Dashboard; busca de eventos. |
 | 0.4.0 | 2026-11-03 | Claude (Claude Code) | Etapa 1: módulo Inbox; resumo do Inbox no Dashboard; layout do iPad (cabeçalhos e grades). |
+| 0.5.0 | 2026-11-03 | Claude (Claude Code) | Etapa 1: módulo Notes (blocos, desenho com Apple Pencil, versões); Inbox → nota; título de áudio vazio na conversão. |
 
 ## Calendar (Parte 6) — o que existe
 
@@ -84,3 +85,17 @@ Leia este arquivo no começo de toda conversa nova sobre o ROUTIG. A especifica�
 - Adiar (amanhã, próxima semana), arquivar, voltar para a entrada, excluir com desfazer.
 - Virar nota e guardar na Library aparecem como aviso até esses módulos existirem.
 - Dashboard mostra quantos itens esperam organização.
+
+## Notes (Parte 17) — o que existe
+
+- Modo rápido (texto com atalhos "# ", "- ", "1. ", "[ ] ", "> ", "---", mais imagem, arquivo e desenho) e modo por blocos (texto, título H1–H3, lista, lista numerada, checklist, citação, separador, tabela, imagem com legenda, arquivo, link e desenho). Trocar de modo não perde conteúdo.
+- Desenho com Apple Pencil: Pointer Events com pressão (traço engrossa com a força), pontos intermediários para suavizar, borracha, desfazer, cores e espessuras, opção "só a caneta desenha" (dedo e palma não riscam). Fundo branco tipo papel.
+- Organização: cadernos, coleções, categoria, tags, favoritas, busca sem acento (inclusive tabelas e legendas), modelos de fábrica (aula, resumo de capítulo, reunião de projeto, diário) e modelos próprios.
+- Salvamento automático (0,7 s depois de parar de digitar, e ao sair). Histórico: uma versão a cada 5 minutos de edição, até 50 por nota; restaurar guarda o conteúdo atual antes.
+- Ligação com tarefas e eventos (um registro só). Inbox → "Virar nota" leva o texto e o arquivo do item, sem copiar o arquivo.
+- Lixeira com restaurar e excluir de vez (apaga versões e arquivos que só a nota usava). "+ Criar" tem Nota; a busca global encontra notas.
+- Não testado no aparelho real: Apple Pencil (pressão, palma). O navegador de teste não tem caneta.
+
+## Ideias para o futuro (registradas, não fazem parte da Versão 1)
+
+- **Voz:** agora, usar o ditado do teclado do iPad; o áudio do Inbox é recado para ouvir depois. Etapa 2 (Idiomas): gravar a própria fala para treinar pronúncia. Com IA (Parte 28): capturar falando e a IA sugerir eventos/tarefas, e resumir recados de voz, sempre com confirmação. Decisão sobre botão "Ditar" pendente do dono do produto.

@@ -1,16 +1,16 @@
 import { getDb } from './db';
 import { createTask } from './tasksRepo';
 import { createEvent } from './eventsRepo';
+import { createNote, type NoteInput } from './notesRepo';
 import { newId, nowIso } from '@/domain/ids';
 import type { ChangeEntry } from '@/domain/entity';
 import type { DateKey } from '@/domain/dates';
-import { sha256Hex, type InboxItem, type InboxKind, type StoredFile } from '@/domain/inbox';
+import { MAX_FILE_BYTES, sha256Hex, type InboxItem, type InboxKind, type StoredFile } from '@/domain/inbox';
 import type { TaskInput } from '@/domain/tasks';
 import type { EventInput } from '@/domain/events';
 
 const ENTITY = 'inbox';
-/** Limite por arquivo para não estourar o armazenamento do aparelho. */
-export const MAX_FILE_BYTES = 50 * 1024 * 1024;
+export { MAX_FILE_BYTES } from '@/domain/inbox';
 
 export class InboxRuleError extends Error {
   constructor(public code: 'empty' | 'too_large' | 'not_found' | 'quota') {
@@ -149,4 +149,11 @@ export async function convertToEvent(id: string, input: EventInput): Promise<str
 
 export async function getFile(id: string): Promise<StoredFile | undefined> {
   return getDb().files.get(id);
+}
+
+/** Converte em nota do Notes. O arquivo do item é reaproveitado, não copiado. */
+export async function convertToNote(id: string, input: NoteInput): Promise<string> {
+  const note = await createNote(input);
+  await patch(id, { status: 'processed', processedTo: { type: 'note', id: note.id }, snoozedUntil: null }, { action: 'update', fields: ['status'], note: `note:${note.id}` });
+  return note.id;
 }

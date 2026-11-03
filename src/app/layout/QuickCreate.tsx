@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { CalendarPlus, ListTodo, Plus } from 'lucide-react';
+import { CalendarPlus, ListTodo, NotebookPen, Plus } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useSettings } from '@/app/SettingsProvider';
+import { createNote, emptyNoteInput } from '@/data/notesRepo';
 import { useEventEditor } from '@/features/calendar/EventEditor';
 import { useTaskEditor } from '@/features/tasks/TaskEditor';
 
@@ -12,6 +14,7 @@ export function QuickCreate() {
   const { t } = useSettings();
   const tasks = useTaskEditor();
   const events = useEventEditor();
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
 
@@ -31,6 +34,7 @@ export function QuickCreate() {
   const items = [
     { key: 'task', label: t('quick.task'), icon: ListTodo, run: () => tasks.newTask() },
     { key: 'event', label: t('quick.event'), icon: CalendarPlus, run: () => events.newEvent() },
+    { key: 'note', label: t('quick.note'), icon: NotebookPen, run: () => void createNote(emptyNoteInput()).then((n) => navigate(`/notes/${n.id}`)) },
   ];
 
   return (

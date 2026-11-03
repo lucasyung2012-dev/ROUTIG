@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useRef, useState, type ComponentType } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
-import { CalendarDays, ListTodo, Search } from 'lucide-react';
+import { CalendarDays, ListTodo, NotebookPen, Search } from 'lucide-react';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { getDb } from '@/data/db';
+import { matchesNote, notePreview } from '@/domain/notes';
 import { formatDateKey } from '@/domain/dates';
 import { taskSearchText } from '@/domain/tasks';
 import { useTaskEditor } from '@/features/tasks/TaskEditor';
@@ -17,7 +20,7 @@ import { cn } from '@/ui/cn';
 
 interface Result {
   key: string;
-  group: 'modules' | 'settings' | 'tasks' | 'events';
+  group: 'modules' | 'settings' | 'tasks' | 'events' | 'notes';
   /** Evento e data da ocorrência a abrir no editor. */
   event?: { id: string; seriesDate: string };
   /** Tarefa a abrir no editor, em vez de navegar. */
@@ -40,6 +43,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
   const editor = useTaskEditor();
   const eventEditor = useEventEditor();
   const cal = useCalendarData();
+  const allNotes = useLiveQuery(() => getDb().notes.toArray(), []);
   const [query, setQuery] = useState('');
   const [active, setActive] = useState(0);
   const input = useRef<HTMLInputElement>(null);
@@ -103,8 +107,19 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
           icon: CalendarDays,
         };
       });
-    return [...taskHits, ...eventHits, ...all.filter((r) => normalizeText(`${r.label} ${r.detail}`).includes(q))];
-  }, [all, query, tasks.active, cal.events, settings.locale, t]);
+    const noteHits: Result[] = (allNotes ?? [])
+      .filter((n) => !n.deletedAt && matchesNote(n, query))
+      .slice(0, 8)
+      .map((n) => ({
+        key: `n:${n.id}`,
+        group: 'notes' as const,
+        label: n.title || t('notes.untitled'),
+        detail: [t('modules.notes'), notePreview(n, 60)].filter(Boolean).join(' · '),
+        path: `/notes/${n.id}`,
+        icon: NotebookPen,
+      }));
+    return [...taskHits, ...eventHits, ...noteHits, ...all.filter((r) => normalizeText(`${r.label} ${r.detail}`).includes(q))];
+  }, [all, query, tasks.active, cal.events, allNotes, settings.locale, t]);
 
   useEffect(() => {
     if (open) {
@@ -147,6 +162,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
   const groups: Array<{ id: Result['group']; label: string }> = [
     { id: 'tasks', label: t('search.groupTasks') },
     { id: 'events', label: t('search.groupEvents') },
+    { id: 'notes', label: t('search.groupNotes') },
     { id: 'modules', label: t('search.groupModules') },
     { id: 'settings', label: t('search.groupSettings') },
   ];

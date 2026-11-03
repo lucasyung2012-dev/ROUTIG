@@ -36,6 +36,9 @@ export interface StoredFile {
   origin: string;
 }
 
+/** Limite por arquivo para não estourar o armazenamento do aparelho. */
+export const MAX_FILE_BYTES = 50 * 1024 * 1024;
+
 /* ---------- Sugestão (lógica local determinística, Parte 28 nível 1) ---------- */
 
 export type SuggestedType = 'task' | 'event' | 'note' | 'link' | 'idea';

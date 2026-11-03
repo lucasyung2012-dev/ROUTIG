@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { CalendarDays, Columns3, Flag, FolderKanban, List, ListTodo, Plus, Search, Settings2, Shapes, Timer, Trash2 } from 'lucide-react';
+import { CalendarDays, Columns3, Flag, FolderKanban, List, ListTodo, Plus, Search, Settings2, Shapes, SlidersHorizontal, Timer, Trash2 } from 'lucide-react';
 import { useSettings } from '@/app/SettingsProvider';
 import { createTask } from '@/data/tasksRepo';
 import { addDays, todayKey } from '@/domain/dates';
@@ -47,13 +47,13 @@ export function TasksPage() {
   const editor = useTaskEditor();
   const actions = useTaskActions(data);
   const statusName = useStatusName();
-  const groups = useGroups([], data);
   const [view, setView] = useState<ViewId>(readView);
   const [filter, setFilter] = useState<TaskFilter>(EMPTY_FILTER);
   const [quick, setQuick] = useState('');
   const [quickDue, setQuickDue] = useState<'' | 'today' | 'tomorrow'>('');
   const [trashOpen, setTrashOpen] = useState(false);
   const [configOpen, setConfigOpen] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const quickRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -84,7 +84,6 @@ export function TasksPage() {
   }, [data, filter, showClosed]);
 
   const g = useGroups(visible, data);
-  void groups;
 
   const addQuick = async () => {
     const title = quick.trim();
@@ -190,7 +189,19 @@ export function TasksPage() {
           </div>
         </div>
 
-        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-[1.6fr_1fr_1fr_1fr_auto] lg:items-center">
+        {/* No celular os filtros ficam recolhidos para não empurrar as tarefas para baixo. */}
+        <button
+          type="button"
+          aria-expanded={filtersOpen}
+          aria-controls="task-filters"
+          onClick={() => setFiltersOpen((o) => !o)}
+          className="inline-flex h-10 w-fit items-center gap-2 rounded-xl bg-surface-2 px-3.5 text-sm font-medium text-fg ring-1 ring-inset ring-line sm:hidden"
+        >
+          <SlidersHorizontal className="h-4 w-4" aria-hidden />
+          {t('tasks.filters.toggle')}
+          {filtered && <span className="h-2 w-2 rounded-full bg-accent" aria-hidden />}
+        </button>
+        <div id="task-filters" className={cn('gap-2 sm:grid sm:grid-cols-2 lg:grid-cols-[1.6fr_1fr_1fr_1fr_auto] lg:items-center', filtersOpen ? 'grid' : 'hidden')}>
           <div className="relative">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-subtle" aria-hidden />
             <Input value={filter.text} onChange={(e) => setFilter({ ...filter, text: e.target.value })} placeholder={t('tasks.filters.search')} aria-label={t('tasks.filters.search')} className="pl-9" />

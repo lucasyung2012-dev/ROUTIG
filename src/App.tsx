@@ -10,6 +10,8 @@ import { TasksPage } from '@/features/tasks/TasksPage';
 import { CalendarPage } from '@/features/calendar/CalendarPage';
 import { InboxPage } from '@/features/inbox/InboxPage';
 import { NotesPage } from '@/features/notes/NotesPage';
+import { ProjectsPage } from '@/features/projects/ProjectsPage';
+import { ProjectPage } from '@/features/projects/ProjectPage';
 import { ProfilePage } from '@/features/profile/ProfilePage';
 import { SettingsIndexPage, SettingsSectionPage } from '@/features/settings/SettingsPage';
 import { LogoComparePage } from '@/features/brand/LogoComparePage';
@@ -92,7 +94,9 @@ function Gate() {
           <Route path="inbox" element={<InboxPage />} />
           <Route path="notes" element={<NotesPage />} />
           <Route path="notes/:id" element={<NotesPage />} />
-          {NAV_MODULE_IDS.filter((id) => !['dashboard', 'tasks', 'calendar', 'inbox', 'notes'].includes(id)).map((id) => (
+          <Route path="projects" element={<ProjectsPage />} />
+          <Route path="projects/:id" element={<ProjectPage />} />
+          {NAV_MODULE_IDS.filter((id) => !['dashboard', 'tasks', 'calendar', 'inbox', 'notes', 'projects'].includes(id)).map((id) => (
             <Route key={id} path={MODULES[id].path.slice(1)} element={<ModuleRoadmapPage id={id} />} />
           ))}
           <Route path="profile" element={<ProfilePage />} />

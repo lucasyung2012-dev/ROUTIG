@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
+import { getDb } from '@/data/db';
 import { Check, Link2, Lock, Plus, Repeat, SkipForward, Trash2, X } from 'lucide-react';
 import { useSettings } from '@/app/SettingsProvider';
 import { createTask, restoreTask, skipOccurrence, softDeleteTask, taskHistory, updateTask } from '@/data/tasksRepo';
@@ -333,7 +334,8 @@ function TaskEditorDialog({ taskId, defaults, onCreated, onClose, onOpenOther }:
         </Field>
 
         <Section title={t('tasks.editor.links')}>
-          <p className="text-sm text-muted">{t('tasks.editor.linkLater')}</p>
+          <ProjectField value={draft.projectId} onChange={(projectId) => change({ projectId })} />
+          <p className="text-xs text-subtle">{t('tasks.editor.linkLater')}</p>
         </Section>
 
         {task && <HistoryList taskId={task.id} rev={task.rev} />}
@@ -344,6 +346,26 @@ function TaskEditorDialog({ taskId, defaults, onCreated, onClose, onOpenOther }:
 }
 
 /* ---------- Partes do editor ---------- */
+
+/** Projeto da tarefa (a tarefa continua sendo uma só; o projeto só aponta para ela). */
+function ProjectField({ value, onChange }: { value: string | null; onChange: (id: string | null) => void }) {
+  const { t } = useSettings();
+  const projects = useLiveQuery(() => getDb().projects.filter((p) => !p.deletedAt).toArray(), []);
+  return (
+    <Field label={t('tasks.editor.project')}>
+      {(id) => (
+        <Select id={id} value={value ?? ''} onChange={(e) => onChange(e.target.value || null)}>
+          <option value="">{t('tasks.noProject')}</option>
+          {(projects ?? []).map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name}
+            </option>
+          ))}
+        </Select>
+      )}
+    </Field>
+  );
+}
 
 function Section({ title, children, aside }: { title: string; children: ReactNode; aside?: ReactNode }) {
   return (

@@ -11,7 +11,7 @@ import { useTasksData, type TasksData } from '@/features/tasks/useTasksData';
 /** Um item no calendário: ocorrência de evento ou tarefa com prazo (o registro original, nunca uma cópia). */
 export interface CalendarItem {
   key: string;
-  kind: 'event' | 'task';
+  kind: 'event' | 'task' | 'milestone';
   date: DateKey;
   endDate: DateKey;
   allDay: boolean;
@@ -25,6 +25,8 @@ export interface CalendarItem {
   done: boolean;
   occurrence?: EventOccurrence;
   task?: Task;
+  /** Marco de projeto: abre o projeto. */
+  projectId?: string;
   conflictWith: string[];
 }
 
@@ -42,6 +44,7 @@ const TASK_DURATION = 30;
 export function useCalendarData(): CalendarData {
   const all = useLiveQuery(() => getDb().events.toArray(), []);
   const config = useLiveQuery(() => loadCalendarConfig(), []);
+  const projects = useLiveQuery(() => getDb().projects.filter((p) => !p.deletedAt).toArray(), []);
   const tasks = useTasksData();
 
   return useMemo(() => {
@@ -95,6 +98,30 @@ export function useCalendarData(): CalendarData {
           });
         }
       }
+      // Marcos de projetos (dia inteiro), lidos do próprio projeto, sem cópia.
+      if (!opts.categoryId) {
+        for (const p of projects ?? []) {
+          for (const m of p.milestones) {
+            if (!m.date || m.date < from || m.date > to) continue;
+            items.push({
+              key: `m:${p.id}:${m.id}`,
+              kind: 'milestone',
+              date: m.date,
+              endDate: m.date,
+              allDay: true,
+              start: null,
+              end: null,
+              title: `◆ ${m.title} · ${p.name}`,
+              location: '',
+              tone: 'amber',
+              categoryId: null,
+              done: m.done,
+              projectId: p.id,
+              conflictWith: [],
+            });
+          }
+        }
+      }
       // Conflitos: só entre eventos com horário (tarefas não ocupam agenda).
       const slots = items
         .filter((i) => i.kind === 'event' && i.start !== null && i.end !== null)
@@ -115,7 +142,7 @@ export function useCalendarData(): CalendarData {
       tasks,
       itemsInRange,
     };
-  }, [all, config, tasks]);
+  }, [all, config, tasks, projects]);
 }
 
 export function useCategoryName() {

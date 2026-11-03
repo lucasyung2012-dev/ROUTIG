@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { CalendarPlus, ListTodo, NotebookPen, Plus } from 'lucide-react';
+import { CalendarPlus, FolderKanban, ListTodo, NotebookPen, Plus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useSettings } from '@/app/SettingsProvider';
 import { createNote, emptyNoteInput } from '@/data/notesRepo';
@@ -35,6 +35,7 @@ export function QuickCreate() {
     { key: 'task', label: t('quick.task'), icon: ListTodo, run: () => tasks.newTask() },
     { key: 'event', label: t('quick.event'), icon: CalendarPlus, run: () => events.newEvent() },
     { key: 'note', label: t('quick.note'), icon: NotebookPen, run: () => void createNote(emptyNoteInput()).then((n) => navigate(`/notes/${n.id}`)) },
+    { key: 'project', label: t('quick.project'), icon: FolderKanban, run: () => navigate('/projects', { state: { create: true } }) },
   ];
 
   return (

@@ -1,4 +1,6 @@
 import { useState, type ReactNode } from 'react';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { getDb } from '@/data/db';
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 import { useSettings } from '@/app/SettingsProvider';
 import { updateTask } from '@/data/tasksRepo';
@@ -60,6 +62,8 @@ export function GroupedView({ groups, data, onOpen, onToggle }: { groups: Group[
 
 export function useGroups(tasks: Task[], data: TasksData) {
   const { t } = useSettings();
+  const projects = useLiveQuery(() => getDb().projects.toArray(), []);
+  const projectName = (id: string) => projects?.find((p) => p.id === id)?.name ?? t('tasks.noProject');
   const today = todayKey();
   return {
     priority: (): Group[] =>
@@ -75,7 +79,9 @@ export function useGroups(tasks: Task[], data: TasksData) {
       })),
     project: (): Group[] => {
       const ids = [...new Set(tasks.map((x) => x.projectId))];
-      return ids.map((id) => ({ key: id ?? 'none', label: id ?? t('tasks.noProject'), tasks: tasks.filter((x) => x.projectId === id) }));
+      return ids
+        .sort((a, b) => (a === null ? 1 : b === null ? -1 : projectName(a).localeCompare(projectName(b))))
+        .map((id) => ({ key: id ?? 'none', label: id ? projectName(id) : t('tasks.noProject'), tasks: tasks.filter((x) => x.projectId === id) }));
     },
     category: (): Group[] => {
       const cats = [...new Set(tasks.map((x) => x.category))].sort((a, b) => (a === '' ? 1 : b === '' ? -1 : a.localeCompare(b)));

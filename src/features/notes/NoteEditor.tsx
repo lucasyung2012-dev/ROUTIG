@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { CalendarDays, History, ImagePlus, LayoutTemplate, ListTodo, Paperclip, PenTool, Star, Trash2, X } from 'lucide-react';
+import { CalendarDays, FolderKanban, History, ImagePlus, LayoutTemplate, ListTodo, Paperclip, PenTool, Star, Trash2, X } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { getDb } from '@/data/db';
 import { useSettings } from '@/app/SettingsProvider';
 import { noteVersions, restoreNote, restoreVersion, saveAsTemplate, saveNote, softDeleteNote, type NoteInput } from '@/data/notesRepo';
 import { blocksToText, newBlock, noteText, textToBlocks, type Block, type Note } from '@/domain/notes';
@@ -173,8 +175,21 @@ function MetaRow({ draft, data, onChange }: { draft: NoteInput; data: NotesData;
   const [tags, setTags] = useState(draft.tags.join(', '));
   useEffect(() => setTags(draft.tags.join(', ')), [draft.tags]);
 
+  const navigate = useNavigate();
+  const projects = useLiveQuery(() => getDb().projects.filter((p) => !p.deletedAt).toArray(), []);
   const linkLabel = (type: string, id: string) =>
-    type === 'task' ? cal.tasks.byId.get(id)?.title : type === 'event' ? cal.events.find((e) => e.id === id)?.title : undefined;
+    type === 'task'
+      ? cal.tasks.byId.get(id)?.title
+      : type === 'event'
+        ? cal.events.find((e) => e.id === id)?.title
+        : type === 'project'
+          ? projects?.find((p) => p.id === id)?.name
+          : undefined;
+  const openLink = (type: string, id: string) => {
+    if (type === 'task') tasks.openTask(id);
+    else if (type === 'event') events.openEvent(id, cal.events.find((e) => e.id === id)?.start ?? '');
+    else if (type === 'project') navigate(`/projects/${id}`);
+  };
 
   return (
     <details className="group rounded-2xl bg-surface-2/50 ring-1 ring-line/60 open:bg-surface-2/70">
@@ -244,9 +259,15 @@ function MetaRow({ draft, data, onChange }: { draft: NoteInput; data: NotesData;
                 <button
                   type="button"
                   className="inline-flex items-center gap-1.5 text-fg hover:text-accent"
-                  onClick={() => (l.type === 'task' ? tasks.openTask(l.id) : events.openEvent(l.id, cal.events.find((e) => e.id === l.id)?.start ?? ''))}
+                  onClick={() => openLink(l.type, l.id)}
                 >
-                  {l.type === 'task' ? <ListTodo className="h-3.5 w-3.5 text-violet" aria-hidden /> : <CalendarDays className="h-3.5 w-3.5 text-blue" aria-hidden />}
+                  {l.type === 'task' ? (
+                    <ListTodo className="h-3.5 w-3.5 text-violet" aria-hidden />
+                  ) : l.type === 'project' ? (
+                    <FolderKanban className="h-3.5 w-3.5 text-amber" aria-hidden />
+                  ) : (
+                    <CalendarDays className="h-3.5 w-3.5 text-blue" aria-hidden />
+                  )}
                   {linkLabel(l.type, l.id) ?? '—'}
                 </button>
                 <button type="button" aria-label={t('notes.removeLink')} className="text-subtle hover:text-danger" onClick={() => onChange({ links: draft.links.filter((x) => x !== l) })}>
@@ -264,6 +285,11 @@ function MetaRow({ draft, data, onChange }: { draft: NoteInput; data: NotesData;
             }}
           >
             <option value="">{t('notes.addLink')}</option>
+            {(projects ?? []).map((x) => (
+              <option key={x.id} value={`project:${x.id}`}>
+                {t('quick.project')}: {x.name}
+              </option>
+            ))}
             {cal.tasks.active.map((x) => (
               <option key={x.id} value={`task:${x.id}`}>
                 {t('calendar.kindTask')}: {x.title}

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ComponentType } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
-import { CalendarDays, ListTodo, NotebookPen, Search } from 'lucide-react';
+import { CalendarDays, FolderKanban, ListTodo, NotebookPen, Search } from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { getDb } from '@/data/db';
 import { matchesNote, notePreview } from '@/domain/notes';
@@ -20,7 +20,7 @@ import { cn } from '@/ui/cn';
 
 interface Result {
   key: string;
-  group: 'modules' | 'settings' | 'tasks' | 'events' | 'notes';
+  group: 'modules' | 'settings' | 'tasks' | 'events' | 'notes' | 'projects';
   /** Evento e data da ocorrência a abrir no editor. */
   event?: { id: string; seriesDate: string };
   /** Tarefa a abrir no editor, em vez de navegar. */
@@ -44,6 +44,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
   const eventEditor = useEventEditor();
   const cal = useCalendarData();
   const allNotes = useLiveQuery(() => getDb().notes.toArray(), []);
+  const allProjects = useLiveQuery(() => getDb().projects.toArray(), []);
   const [query, setQuery] = useState('');
   const [active, setActive] = useState(0);
   const input = useRef<HTMLInputElement>(null);
@@ -118,8 +119,16 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
         path: `/notes/${n.id}`,
         icon: NotebookPen,
       }));
-    return [...taskHits, ...eventHits, ...noteHits, ...all.filter((r) => normalizeText(`${r.label} ${r.detail}`).includes(q))];
-  }, [all, query, tasks.active, cal.events, allNotes, settings.locale, t]);
+    const projectHits: Result[] = (allProjects ?? [])
+      .filter((p) => {
+        if (p.deletedAt) return false;
+        const hay = normalizeText(`${p.name} ${p.description} ${p.tags.join(' ')} ${p.milestones.map((m) => m.title).join(' ')}`);
+        return words.every((w) => hay.includes(w));
+      })
+      .slice(0, 6)
+      .map((p) => ({ key: `p:${p.id}`, group: 'projects' as const, label: p.name, detail: t('modules.projects'), path: `/projects/${p.id}`, icon: FolderKanban }));
+    return [...projectHits, ...taskHits, ...eventHits, ...noteHits, ...all.filter((r) => normalizeText(`${r.label} ${r.detail}`).includes(q))];
+  }, [all, query, tasks.active, cal.events, allNotes, allProjects, settings.locale, t]);
 
   useEffect(() => {
     if (open) {
@@ -160,6 +169,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
   };
 
   const groups: Array<{ id: Result['group']; label: string }> = [
+    { id: 'projects', label: t('search.groupProjects') },
     { id: 'tasks', label: t('search.groupTasks') },
     { id: 'events', label: t('search.groupEvents') },
     { id: 'notes', label: t('search.groupNotes') },

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { CalendarDays, CalendarRange, ChevronLeft, ChevronRight, Columns3, Grid3x3, List, Plus, Rows3, Tags, Trash2 } from 'lucide-react';
 import { useSettings } from '@/app/SettingsProvider';
 import { addDays, addMonths, addYears, capitalizeFirst, formatDateKey, monthGrid, startOfMonth, startOfWeek, todayKey, type DateKey } from '@/domain/dates';
@@ -75,6 +76,7 @@ export function CalendarPage() {
   const events = useEventEditor();
   const tasks = useTaskEditor();
   const categoryName = useCategoryName();
+  const navigate = useNavigate();
   const [view, setView] = useState<ViewId>(readView);
   const [anchor, setAnchor] = useState<DateKey>(todayKey());
   const [showTasks, setShowTasks] = useState(true);
@@ -96,6 +98,7 @@ export function CalendarPage() {
   const handlers: ViewHandlers = {
     onOpen: (i: CalendarItem) => {
       if (i.kind === 'task' && i.task) tasks.openTask(i.task.id);
+      else if (i.kind === 'milestone' && i.projectId) navigate(`/projects/${i.projectId}`);
       else if (i.occurrence) events.openEvent(i.occurrence.event.id, i.occurrence.seriesDate);
     },
     onNew: (date, startMin) => events.newEvent({ start: date, endDate: date, startTime: fromMinutes(startMin ?? 9 * 60) }),

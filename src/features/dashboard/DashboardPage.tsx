@@ -60,7 +60,7 @@ function EventsCard() {
   const cal = useCalendarData();
   const events = useEventEditor();
   const today = todayKey();
-  const upcoming = cal.itemsInRange(today, addDays(today, 7), { showTasks: false, categoryId: null }).slice(0, 6);
+  const upcoming = cal.itemsInRange(today, addDays(today, 7), { showTasks: false, categoryId: null }).filter((i) => i.kind === 'event').slice(0, 6);
 
   return (
     <section aria-labelledby="dash-events" className="rounded-3xl bg-surface p-5 shadow-soft ring-1 ring-line/70 sm:p-6">

@@ -7,8 +7,8 @@ Leia este arquivo no começo de toda conversa nova sobre o ROUTIG. A especifica�
 ## Estado da conversa (2026-11-03)
 
 - **Etapa 0 — Fundação:** concluída. Logo vetorial e design system aprovados pelo dono do produto em 2026-11-02.
-- **Etapa 1 — Organização central:** em andamento. **Tasks, Calendar, Inbox e Notes prontos e publicados.**
-- **Próximo passo:** **Projects**; depois Dashboard completo (personalização), Profile (interesses, evolução, história) e Settings.
+- **Etapa 1 — Organização central:** em andamento. **Tasks, Calendar, Inbox, Notes e Projects prontos e publicados.**
+- **Próximo passo:** Dashboard completo (personalização), Profile (interesses, evolução, história) e Settings. Proposta em aberto: puxar o backup (Etapa 5) para logo depois da Etapa 1; melhorias do desenho no Notes (lista de ideias abaixo).
 - **Como trabalhar:** o computador de desenvolvimento não tem Node. Escrever o código, enviar com `git push`, conferir o GitHub Actions (anotações de erro aparecem por arquivo e linha) e testar no app publicado.
 
 ## Etapa 1 — andamento
@@ -18,7 +18,7 @@ Leia este arquivo no começo de toda conversa nova sobre o ROUTIG. A especifica�
 | Tasks | ✅ Pronto, testado (CI e navegador) |
 | Dashboard | Parcial: saudação, resumo real de tarefas, mapa dos módulos. Falta personalização (cartões, perfis Estudos/Projetos/Completo, prévia) |
 | Calendar | ✅ Pronto (testes no CI; checagem no navegador nesta versão) |
-| Projects | A fazer |
+| Projects | ✅ Pronto (testes no CI; checagem no navegador nesta versão) |
 | Inbox | ✅ Pronto (testes no CI; checagem no navegador nesta versão) |
 | Notes | ✅ Pronto (testes no CI; checagem no navegador nesta versão) |
 | Profile | Parcial: nome e descrição. Falta interesses, Minha evolução, Minha história |
@@ -64,6 +64,7 @@ Leia este arquivo no começo de toda conversa nova sobre o ROUTIG. A especifica�
 | 0.3.0 | 2026-11-03 | Claude (Claude Code) | Etapa 1: módulo Calendar; criação rápida de evento; próximos compromissos no Dashboard; busca de eventos. |
 | 0.4.0 | 2026-11-03 | Claude (Claude Code) | Etapa 1: módulo Inbox; resumo do Inbox no Dashboard; layout do iPad (cabeçalhos e grades). |
 | 0.5.0 | 2026-11-03 | Claude (Claude Code) | Etapa 1: módulo Notes (blocos, desenho com Apple Pencil, versões); Inbox → nota; título de áudio vazio na conversão. |
+| 0.6.0 | 2026-11-03 | Claude (Claude Code) | Etapa 1: módulo Projects; projeto no editor de tarefa; marcos no Calendar; notas ligadas a projetos. |
 
 ## Calendar (Parte 6) — o que existe
 
@@ -99,3 +100,16 @@ Leia este arquivo no começo de toda conversa nova sobre o ROUTIG. A especifica�
 ## Ideias para o futuro (registradas, não fazem parte da Versão 1)
 
 - **Voz:** agora, usar o ditado do teclado do iPad; o áudio do Inbox é recado para ouvir depois. Etapa 2 (Idiomas): gravar a própria fala para treinar pronúncia. Com IA (Parte 28): capturar falando e a IA sugerir eventos/tarefas, e resumir recados de voz, sempre com confirmação. Decisão sobre botão "Ditar" pendente do dono do produto.
+
+## Projects (Parte 8) — o que existe
+
+- Dados: nome, descrição, categoria, status (ideia, planejado, em andamento, pausado, concluído, cancelado, arquivado), prioridade, início, prazo, cor, capa (imagem), tags, objetivos, participantes (só registro), histórico.
+- Página do projeto: visão geral com progresso real (tarefas e marcos concluídos; sem itens, não mostra porcentagem), etapas com datas, tarefas por etapa ou em Kanban (as mesmas de Tasks), marcos, cronograma (projeto, etapas, marcos, tarefas e linha de hoje), calendário, notas ligadas, referências (links) e histórico.
+- Lista de projetos em cartões, Kanban por status (arrastar ou "Mover para"), timeline com marcos e calendário de prazos e marcos.
+- Integração: campo Projeto no editor de tarefa; "Por projeto" no Tasks mostra os nomes; marcos aparecem no Calendar e abrem o projeto; notas ligam a projetos; "+ Criar → Projeto"; busca global encontra projetos.
+- Concluir tarefas ou marcos nunca conclui o projeto sozinho. Excluir de vez não apaga tarefas nem notas, só a ligação.
+
+## Pedidos do dono do produto (em aberto)
+
+- Desenho do Notes mais completo: marca-texto, formas, fundo pautado/quadriculado/pontilhado, zoom, desenhar sobre imagem, laço, refazer, mais cores, tela cheia, exportar como imagem. Aguardando escolha.
+- Sincronização entre aparelhos: recomendação é fazer depois da Etapa 6 (Google Drive) e puxar o backup para logo depois da Etapa 1. Aguardando decisão.

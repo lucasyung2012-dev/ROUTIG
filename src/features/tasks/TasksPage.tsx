@@ -265,7 +265,6 @@ export function TasksPage() {
           <CalendarView tasks={visible} data={data} onOpen={editor.openTask} onToggle={actions.toggle} onNew={(d) => editor.newTask(d)} />
         ) : (
           <>
-            {view === 'project' && <p className="px-2 pb-3 text-xs text-subtle">{t('tasks.projectsLater')}</p>}
             <GroupedView
               groups={view === 'priority' ? g.priority() : view === 'due' ? g.due() : view === 'project' ? g.project() : g.category()}
               data={data}

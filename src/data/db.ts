@@ -4,6 +4,7 @@ import type { Task, TaskList } from '@/domain/tasks';
 import type { CalendarEvent } from '@/domain/events';
 import type { InboxItem, StoredFile } from '@/domain/inbox';
 import type { Note, NoteCollection, Notebook, NoteTemplate, NoteVersion } from '@/domain/notes';
+import type { Project } from '@/domain/projects';
 
 /** Registro chave-valor (configurações, estado do onboarding, metadados). */
 export interface KvRecord {
@@ -33,6 +34,7 @@ export class RoutigDB extends Dexie {
   notebooks!: EntityTable<Notebook, 'id'>;
   noteCollections!: EntityTable<NoteCollection, 'id'>;
   noteTemplates!: EntityTable<NoteTemplate, 'id'>;
+  projects!: EntityTable<Project, 'id'>;
 
   constructor(name = 'routig') {
     super(name);
@@ -63,10 +65,14 @@ export class RoutigDB extends Dexie {
       noteCollections: 'id',
       noteTemplates: 'id',
     });
+    // Etapa 1: Projects.
+    this.version(6).stores({
+      projects: 'id, status, due, updatedAt',
+    });
   }
 }
 
-export const DB_SCHEMA_VERSION = 5;
+export const DB_SCHEMA_VERSION = 6;
 
 let instance: RoutigDB | null = null;
 

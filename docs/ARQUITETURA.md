@@ -29,6 +29,7 @@
 | 1 | 0 | `kv` (configurações), `changelog`, `links` |
 | 2 | 1 | + `tasks`, `taskLists` (configuração de status e categorias em `kv`: `tasks.config`) |
 | 3 | 1 | + `events` (categorias em `kv`: `calendar.config`) |
+| 4 | 1 | + `inbox`, `files` (arquivos binários separados, com hash SHA-256 para não duplicar) |
 
 ## Navegação
 

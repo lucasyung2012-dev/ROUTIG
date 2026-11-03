@@ -7,8 +7,8 @@ Leia este arquivo no começo de toda conversa nova sobre o ROUTIG. A especifica�
 ## Estado da conversa (2026-11-03)
 
 - **Etapa 0 — Fundação:** concluída. Logo vetorial e design system aprovados pelo dono do produto em 2026-11-02.
-- **Etapa 1 — Organização central:** em andamento. **Tasks e Calendar prontos e publicados.**
-- **Próximo passo:** **Inbox**, **Notes** e **Projects** (nessa ordem), depois Dashboard completo, Profile e Settings.
+- **Etapa 1 — Organização central:** em andamento. **Tasks, Calendar e Inbox prontos e publicados.**
+- **Próximo passo:** **Notes** e depois **Projects**; depois Dashboard completo, Profile e Settings.
 - **Como trabalhar:** o computador de desenvolvimento não tem Node. Escrever o código, enviar com `git push`, conferir o GitHub Actions (anotações de erro aparecem por arquivo e linha) e testar no app publicado.
 
 ## Etapa 1 — andamento
@@ -19,7 +19,7 @@ Leia este arquivo no começo de toda conversa nova sobre o ROUTIG. A especifica�
 | Dashboard | Parcial: saudação, resumo real de tarefas, mapa dos módulos. Falta personalização (cartões, perfis Estudos/Projetos/Completo, prévia) |
 | Calendar | ✅ Pronto (testes no CI; checagem no navegador nesta versão) |
 | Projects | A fazer |
-| Inbox | A fazer |
+| Inbox | ✅ Pronto (testes no CI; checagem no navegador nesta versão) |
 | Notes | A fazer |
 | Profile | Parcial: nome e descrição. Falta interesses, Minha evolução, Minha história |
 | Settings | Parcial: seções da Etapa 0. Faltam as que dependem de módulos novos |
@@ -62,6 +62,7 @@ Leia este arquivo no começo de toda conversa nova sobre o ROUTIG. A especifica�
 | 0.1.0 | 2026-11-02 | Claude (Claude Code) | Etapa 0: fundação. |
 | 0.2.0 | 2026-11-03 | Claude (Claude Code) | Etapa 1: módulo Tasks; Dashboard com resumo de tarefas; busca de tarefas; busca rolando no iPad e no celular. |
 | 0.3.0 | 2026-11-03 | Claude (Claude Code) | Etapa 1: módulo Calendar; criação rápida de evento; próximos compromissos no Dashboard; busca de eventos. |
+| 0.4.0 | 2026-11-03 | Claude (Claude Code) | Etapa 1: módulo Inbox; resumo do Inbox no Dashboard; layout do iPad (cabeçalhos e grades). |
 
 ## Calendar (Parte 6) — o que existe
 
@@ -74,3 +75,12 @@ Leia este arquivo no começo de toda conversa nova sobre o ROUTIG. A especifica�
 - Lixeira de eventos, botão "+ Criar" com Tarefa e Evento, busca global encontra eventos, Dashboard mostra os próximos compromissos de 7 dias.
 - Banco versão 3: tabela `events`; categorias em `kv` (`calendar.config`).
 - Fica para a Academy (Etapa 2): grade de horários escolares ligada a disciplinas, anos letivos e calendários escolares diferentes. Por enquanto, aulas, provas, entregas, feriados e férias são categorias de evento.
+
+## Inbox (Parte 20) — o que existe
+
+- Captura de texto (Enter guarda), links, fotos e arquivos (até 50 MB cada, guardados na tabela `files` com hash para não duplicar) e áudio gravado no aparelho (MediaRecorder, quando o navegador permite).
+- Sugestão local, sem IA externa: tipo (tarefa, evento, nota, link, ideia), data ("amanhã", "sexta", "dia 15", "20/12"), horário ("15h", "18:30") e #tags, com o motivo da sugestão.
+- Converter em tarefa ou evento abre uma prévia editável; nada é criado sem confirmação. Aviso de registros parecidos (tarefas, eventos e outros itens do Inbox). O item vira "processado", ligado ao registro criado.
+- Adiar (amanhã, próxima semana), arquivar, voltar para a entrada, excluir com desfazer.
+- Virar nota e guardar na Library aparecem como aviso até esses módulos existirem.
+- Dashboard mostra quantos itens esperam organização.

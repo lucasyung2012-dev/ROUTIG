@@ -1,5 +1,7 @@
 import { Link } from 'react-router-dom';
-import { ArrowRight, CalendarDays, ListTodo, Sparkles } from 'lucide-react';
+import { ArrowRight, CalendarDays, Inbox, ListTodo, Sparkles } from 'lucide-react';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { getDb } from '@/data/db';
 import { addDays, capitalizeFirst, formatDateKey, toDateKey, todayKey } from '@/domain/dates';
 import { fromMinutes } from '@/domain/events';
 import { useEventEditor } from '@/features/calendar/EventEditor';
@@ -25,6 +27,32 @@ export function greetingKey(hour: number): 'dashboard.morning' | 'dashboard.afte
 }
 
 export { capitalizeFirst } from '@/domain/dates';
+
+/** Resumo da Inbox: quantos itens esperam organização. */
+function InboxSummary() {
+  const { t } = useSettings();
+  const today = todayKey();
+  const count = useLiveQuery(
+    () => getDb().inbox.filter((i) => !i.deletedAt && i.status === 'open' && (!i.snoozedUntil || i.snoozedUntil <= today)).count(),
+    [today],
+  );
+  if (count === undefined) return null;
+  return (
+    <Link
+      to="/inbox"
+      className="flex items-center gap-4 rounded-2xl bg-surface p-4 shadow-soft ring-1 ring-line/70 transition hover:-translate-y-0.5 hover:shadow-lift"
+    >
+      <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-surface-3 text-muted">
+        <Inbox className="h-5 w-5" aria-hidden />
+      </span>
+      <span className="flex-1">
+        <span className="block font-semibold text-fg">{t('modules.inbox')}</span>
+        <span className="block text-sm text-muted">{count === 0 ? t('inbox.empty.open') : t('dashboard.inboxCount', { count })}</span>
+      </span>
+      <ArrowRight className="h-4 w-4 text-subtle" aria-hidden />
+    </Link>
+  );
+}
 
 /** Próximos compromissos (7 dias), vindos do Calendar. */
 function EventsCard() {
@@ -169,6 +197,8 @@ export function DashboardPage() {
         {!settings.nav.hidden.includes('calendar') && <EventsCard />}
         {!settings.nav.hidden.includes('tasks') && <TasksCard />}
       </div>
+
+      {!settings.nav.hidden.includes('inbox') && <InboxSummary />}
 
       <section aria-labelledby="dash-modules">
         <h2 id="dash-modules" className="mb-4 text-xs font-semibold uppercase tracking-[0.16em] text-subtle">

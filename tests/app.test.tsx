@@ -135,6 +135,19 @@ describe('Calendar (Parte 6)', () => {
   });
 });
 
+describe('Inbox (Parte 20)', () => {
+  it('capturar com Enter guarda o item e mostra a sugestão', async () => {
+    await finishOnboarding();
+    window.location.hash = '#/inbox';
+    const user = userEvent.setup();
+    render(<App />);
+    const box = await screen.findByRole('textbox', { name: /Jogue aqui/ });
+    await user.type(box, 'estudar vocabulário #alemão{Enter}');
+    expect(await screen.findByText('estudar vocabulário #alemão')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Virar tarefa/ })).toBeInTheDocument();
+  });
+});
+
 describe('aparência (Parte 3.3)', () => {
   it('escolher tema escuro aplica no documento e grava', async () => {
     await finishOnboarding();

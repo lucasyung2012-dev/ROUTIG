@@ -2,6 +2,7 @@ import Dexie, { type EntityTable } from 'dexie';
 import type { ChangeEntry, Link } from '@/domain/entity';
 import type { Task, TaskList } from '@/domain/tasks';
 import type { CalendarEvent } from '@/domain/events';
+import type { InboxItem, StoredFile } from '@/domain/inbox';
 
 /** Registro chave-valor (configurações, estado do onboarding, metadados). */
 export interface KvRecord {
@@ -24,6 +25,8 @@ export class RoutigDB extends Dexie {
   tasks!: EntityTable<Task, 'id'>;
   taskLists!: EntityTable<TaskList, 'id'>;
   events!: EntityTable<CalendarEvent, 'id'>;
+  inbox!: EntityTable<InboxItem, 'id'>;
+  files!: EntityTable<StoredFile, 'id'>;
 
   constructor(name = 'routig') {
     super(name);
@@ -41,10 +44,15 @@ export class RoutigDB extends Dexie {
     this.version(3).stores({
       events: 'id, start, endDate, categoryId, seriesOf, updatedAt',
     });
+    // Etapa 1: Inbox. Arquivos ficam numa tabela própria, separados dos dados (Parte 24.1).
+    this.version(4).stores({
+      inbox: 'id, status, snoozedUntil, createdAt',
+      files: 'id, hash, createdAt',
+    });
   }
 }
 
-export const DB_SCHEMA_VERSION = 3;
+export const DB_SCHEMA_VERSION = 4;
 
 let instance: RoutigDB | null = null;
 

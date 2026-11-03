@@ -34,6 +34,8 @@ export interface ChangeEntry {
   at: string;
   entityType: string;
   entityId: string;
-  action: 'create' | 'update' | 'delete' | 'restore' | 'purge' | 'migrate';
+  action: 'create' | 'update' | 'delete' | 'restore' | 'purge' | 'migrate' | 'complete' | 'skip';
   fields?: string[];
+  /** Detalhe curto e legível (ex.: data da ocorrência concluída). */
+  note?: string;
 }

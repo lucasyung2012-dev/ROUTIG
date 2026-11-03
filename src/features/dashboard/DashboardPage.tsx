@@ -1,8 +1,15 @@
 import { Link } from 'react-router-dom';
-import { ArrowRight, Sparkles } from 'lucide-react';
+import { ArrowRight, ListTodo, Sparkles } from 'lucide-react';
+import { toDateKey, todayKey } from '@/domain/dates';
+import { compareTasks, isClosedKind, statusKind } from '@/domain/tasks';
+import { TaskRow } from '@/features/tasks/TaskRow';
+import { useTaskEditor } from '@/features/tasks/TaskEditor';
+import { useTaskActions } from '@/features/tasks/useTaskActions';
+import { useTasksData } from '@/features/tasks/useTasksData';
+import { LoadingState } from '@/ui/States';
 import { MODULES, TONE_CLASSES } from '@/app/modules';
 import { useSettings } from '@/app/SettingsProvider';
-import { CURRENT_STAGE } from '@/app/version';
+import { isModuleReady } from '@/app/version';
 import { visibleModules } from '@/domain/settings';
 import { RoutigMark } from '@/brand/Logo';
 import { Badge } from '@/ui/Badge';
@@ -19,9 +26,63 @@ export function capitalizeFirst(text: string): string {
   return text.charAt(0).toLocaleUpperCase() + text.slice(1);
 }
 
+/** Resumo real das tarefas: só conta o que está registrado (Parte 5.3). */
+function TasksCard() {
+  const { t } = useSettings();
+  const data = useTasksData();
+  const editor = useTaskEditor();
+  const actions = useTaskActions(data);
+  const today = todayKey();
+  const open = data.active.filter((x) => !isClosedKind(statusKind(data.config, x.statusId)));
+  const overdue = open.filter((x) => x.dueDate && x.dueDate < today).length;
+  const dueToday = open.filter((x) => x.dueDate === today).length;
+  const doneToday = data.active.filter((x) => x.completedAt && toDateKey(new Date(x.completedAt)) === today).length;
+  const next = [...open].sort(compareTasks(data.config)).slice(0, 5);
+
+  return (
+    <section aria-labelledby="dash-tasks" className="rounded-3xl bg-surface p-5 shadow-soft ring-1 ring-line/70 sm:p-6">
+      <div className="flex flex-wrap items-center gap-3">
+        <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet/10 text-violet">
+          <ListTodo className="h-5 w-5" aria-hidden />
+        </span>
+        <h2 id="dash-tasks" className="flex-1 text-lg font-semibold tracking-tight text-fg">
+          {t('dashboard.tasksTitle')}
+        </h2>
+        <Link to="/tasks" className="text-sm font-medium text-accent hover:underline">
+          {t('dashboard.seeAll')}
+        </Link>
+      </div>
+
+      {data.loading ? (
+        <LoadingState label={t('common.loading')} lines={3} className="mt-4" />
+      ) : open.length === 0 ? (
+        <p className="mt-4 text-sm text-muted">{t('dashboard.tasksEmpty')}</p>
+      ) : (
+        <>
+          <div className="mt-4 flex flex-wrap gap-2">
+            {overdue > 0 && <Badge tone="danger">{t('dashboard.tasksOverdue', { count: overdue })}</Badge>}
+            <Badge tone="accent">{t('dashboard.tasksToday', { count: dueToday })}</Badge>
+            <Badge>{t('dashboard.tasksOpen', { count: open.length })}</Badge>
+            {doneToday > 0 && <Badge tone="success">{t('dashboard.doneToday', { count: doneToday })}</Badge>}
+          </div>
+          <h3 className="mb-1 mt-5 text-xs font-semibold uppercase tracking-[0.14em] text-subtle">{t('dashboard.nextUp')}</h3>
+          <ul className="flex flex-col">
+            {next.map((task) => (
+              <li key={task.id}>
+                <TaskRow task={task} data={data} onOpen={editor.openTask} onToggle={actions.toggle} compact />
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+      {actions.dialogs}
+    </section>
+  );
+}
+
 /**
- * Dashboard da Etapa 0. Ainda não existem dados de módulos, então ele não
- * mostra números: só a saudação, a data e o mapa dos módulos.
+ * Dashboard: saudação, resumo real das tarefas e o mapa dos módulos.
+ * Os outros módulos entram no painel conforme forem construídos.
  */
 export function DashboardPage() {
   const { settings, t } = useSettings();
@@ -53,6 +114,8 @@ export function DashboardPage() {
         </div>
       </section>
 
+      {!settings.nav.hidden.includes('tasks') && <TasksCard />}
+
       <section aria-labelledby="dash-modules">
         <h2 id="dash-modules" className="mb-4 text-xs font-semibold uppercase tracking-[0.16em] text-subtle">
           {t('dashboard.yourModules')}
@@ -62,7 +125,7 @@ export function DashboardPage() {
             const def = MODULES[id];
             const Icon = def.icon;
             const tone = TONE_CLASSES[def.tone];
-            const ready = def.stage <= CURRENT_STAGE;
+            const ready = isModuleReady(id);
             return (
               <li key={id}>
                 <Link

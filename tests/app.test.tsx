@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { App } from '@/App';
 import { RoutigDB, setDbForTests } from '@/data/db';
@@ -93,6 +93,29 @@ describe('navegação (Parte 4)', () => {
     window.location.hash = '#/academy';
     render(<App />);
     expect(await screen.findByText('Academy chega na Etapa 2: Aprendizagem')).toBeInTheDocument();
+  });
+});
+
+describe('Tasks (Parte 7)', () => {
+  it('criação rápida: escrever e apertar Enter cria a tarefa e ela aparece na lista', async () => {
+    await finishOnboarding();
+    window.location.hash = '#/tasks';
+    const user = userEvent.setup();
+    render(<App />);
+    const input = await screen.findByRole('textbox', { name: 'Adicionar tarefa e apertar Enter' });
+    await user.type(input, 'Estudar vocabulário de alemão{Enter}');
+    expect(await screen.findByRole('button', { name: 'Concluir: Estudar vocabulário de alemão' })).toBeInTheDocument();
+  });
+
+  it('concluir pela lista tira a tarefa das pendentes', async () => {
+    await finishOnboarding();
+    window.location.hash = '#/tasks';
+    const user = userEvent.setup();
+    render(<App />);
+    const input = await screen.findByRole('textbox', { name: 'Adicionar tarefa e apertar Enter' });
+    await user.type(input, 'Praticar violão{Enter}');
+    await user.click(await screen.findByRole('button', { name: 'Concluir: Praticar violão' }));
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Concluir: Praticar violão' })).not.toBeInTheDocument());
   });
 });
 

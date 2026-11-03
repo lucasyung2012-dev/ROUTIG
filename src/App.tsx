@@ -6,6 +6,7 @@ import { ErrorBoundary } from '@/app/ErrorBoundary';
 import { AppShell } from '@/app/layout/AppShell';
 import { DashboardPage } from '@/features/dashboard/DashboardPage';
 import { ModuleRoadmapPage } from '@/features/roadmap/ModuleRoadmapPage';
+import { TasksPage } from '@/features/tasks/TasksPage';
 import { ProfilePage } from '@/features/profile/ProfilePage';
 import { SettingsIndexPage, SettingsSectionPage } from '@/features/settings/SettingsPage';
 import { LogoComparePage } from '@/features/brand/LogoComparePage';
@@ -83,7 +84,8 @@ function Gate() {
       <Routes>
         <Route element={<AppShell />}>
           <Route index element={<DashboardPage />} />
-          {NAV_MODULE_IDS.filter((id) => id !== 'dashboard').map((id) => (
+          <Route path="tasks" element={<TasksPage />} />
+          {NAV_MODULE_IDS.filter((id) => id !== 'dashboard' && id !== 'tasks').map((id) => (
             <Route key={id} path={MODULES[id].path.slice(1)} element={<ModuleRoadmapPage id={id} />} />
           ))}
           <Route path="profile" element={<ProfilePage />} />

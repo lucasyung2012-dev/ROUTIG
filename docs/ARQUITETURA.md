@@ -27,6 +27,7 @@
 | Versão | Etapa | Tabelas |
 |---|---|---|
 | 1 | 0 | `kv` (configurações), `changelog`, `links` |
+| 2 | 1 | + `tasks`, `taskLists` (configuração de status e categorias em `kv`: `tasks.config`) |
 
 ## Navegação
 

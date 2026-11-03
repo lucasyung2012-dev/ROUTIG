@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useId, useRef, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { IconButton } from './IconButton';
@@ -20,6 +20,7 @@ const FOCUSABLE = 'button, [href], input, select, textarea, [tabindex]:not([tabi
 /** Janela modal acessível: foco preso, Esc fecha, foco volta ao elemento de origem. */
 export function Dialog({ open, onClose, title, description, children, footer, closeLabel, size = 'md' }: DialogProps) {
   const panel = useRef<HTMLDivElement>(null);
+  const titleId = useId();
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
 
@@ -30,6 +31,9 @@ export function Dialog({ open, onClose, title, description, children, footer, cl
     const first = node?.querySelector<HTMLElement>(FOCUSABLE);
     (first ?? node)?.focus();
     const onKey = (e: KeyboardEvent) => {
+      // Com duas janelas abertas (ex.: confirmação sobre o editor), só a de cima responde.
+      const open = document.querySelectorAll('[role="dialog"][aria-modal="true"]');
+      if (open[open.length - 1] !== node) return;
       if (e.key === 'Escape') {
         e.stopPropagation();
         onCloseRef.current();
@@ -67,7 +71,7 @@ export function Dialog({ open, onClose, title, description, children, footer, cl
         ref={panel}
         role="dialog"
         aria-modal="true"
-        aria-labelledby="dialog-title"
+        aria-labelledby={titleId}
         tabIndex={-1}
         className={cn(
           'relative flex max-h-[92vh] w-full animate-scale-in flex-col overflow-hidden rounded-t-3xl bg-surface shadow-lift ring-1 ring-line sm:rounded-3xl',
@@ -78,7 +82,7 @@ export function Dialog({ open, onClose, title, description, children, footer, cl
       >
         <div className="flex items-start gap-3 px-6 pb-2 pt-6">
           <div className="min-w-0 flex-1">
-            <h2 id="dialog-title" className="text-lg font-semibold tracking-tight text-fg">
+            <h2 id={titleId} className="text-lg font-semibold tracking-tight text-fg">
               {title}
             </h2>
             {description && <div className="mt-1 text-sm leading-relaxed text-muted">{description}</div>}

@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useRef, useState, type ComponentType } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
-import { Search } from 'lucide-react';
+import { ListTodo, Search } from 'lucide-react';
+import { formatDateKey } from '@/domain/dates';
+import { taskSearchText } from '@/domain/tasks';
+import { useTaskEditor } from '@/features/tasks/TaskEditor';
+import { useTasksData } from '@/features/tasks/useTasksData';
 import { MODULES, NAV_MODULE_IDS, SYSTEM_MODULE_IDS, type ModuleId } from '@/app/modules';
 import { useSettings } from '@/app/SettingsProvider';
 import { SETTINGS_SECTIONS } from '@/features/settings/sections';
@@ -9,7 +13,9 @@ import { cn } from '@/ui/cn';
 
 interface Result {
   key: string;
-  group: 'modules' | 'settings';
+  group: 'modules' | 'settings' | 'tasks';
+  /** Tarefa a abrir no editor, em vez de navegar. */
+  taskId?: string;
   label: string;
   detail: string;
   path: string;
@@ -20,10 +26,12 @@ export function normalizeText(s: string): string {
   return s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 }
 
-/** Busca global da Etapa 0: navega entre módulos e seções de Settings. */
+/** Busca global: tarefas (título, descrição, tags, checklist, observações), módulos e seções de Settings. */
 export function CommandPalette({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { t } = useSettings();
+  const { t, settings } = useSettings();
   const navigate = useNavigate();
+  const tasks = useTasksData();
+  const editor = useTaskEditor();
   const [query, setQuery] = useState('');
   const [active, setActive] = useState(0);
   const input = useRef<HTMLInputElement>(null);
@@ -51,41 +59,76 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
   const results = useMemo(() => {
     const q = normalizeText(query.trim());
     if (!q) return all;
-    return all.filter((r) => normalizeText(`${r.label} ${r.detail}`).includes(q));
-  }, [all, query]);
+    const words = q.split(/\s+/);
+    const taskHits: Result[] = tasks.active
+      .filter((x) => {
+        const hay = taskSearchText(x);
+        return words.every((w) => hay.includes(w));
+      })
+      .slice(0, 8)
+      .map((x) => ({
+        key: `t:${x.id}`,
+        group: 'tasks' as const,
+        taskId: x.id,
+        label: x.title,
+        detail: [t('modules.tasks'), x.dueDate ? formatDateKey(x.dueDate, settings.locale) : '', ...x.tags.map((g) => `#${g}`)].filter(Boolean).join(' · '),
+        path: '/tasks',
+        icon: ListTodo,
+      }));
+    return [...taskHits, ...all.filter((r) => normalizeText(`${r.label} ${r.detail}`).includes(q))];
+  }, [all, query, tasks.active, settings.locale, t]);
 
   useEffect(() => {
     if (open) {
       setQuery('');
       setActive(0);
-      window.setTimeout(() => input.current?.focus(), 0);
+      // No toque (iPad, celular) não abre o teclado sozinho: ele cobriria metade da lista.
+      const coarse = window.matchMedia?.('(pointer: coarse)').matches;
+      if (!coarse) window.setTimeout(() => input.current?.focus(), 0);
     }
   }, [open]);
 
   useEffect(() => setActive(0), [query]);
+
+  // Altura realmente visível (desconta o teclado na tela do iPad e do celular).
+  const [viewportH, setViewportH] = useState(() => (typeof window === 'undefined' ? 800 : window.visualViewport?.height ?? window.innerHeight));
+  useEffect(() => {
+    if (!open) return;
+    const vv = window.visualViewport;
+    const onResize = () => setViewportH(vv?.height ?? window.innerHeight);
+    onResize();
+    vv?.addEventListener('resize', onResize);
+    window.addEventListener('resize', onResize);
+    return () => {
+      vv?.removeEventListener('resize', onResize);
+      window.removeEventListener('resize', onResize);
+    };
+  }, [open]);
 
   if (!open) return null;
   const activeKey = results[active]?.key;
 
   const go = (r: Result | undefined) => {
     if (!r) return;
-    navigate(r.path);
+    if (r.taskId) editor.openTask(r.taskId);
+    else navigate(r.path);
     onClose();
   };
 
   const groups: Array<{ id: Result['group']; label: string }> = [
+    { id: 'tasks', label: t('search.groupTasks') },
     { id: 'modules', label: t('search.groupModules') },
     { id: 'settings', label: t('search.groupSettings') },
   ];
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-[12vh]">
+    <div className="fixed inset-x-0 top-0 z-50 flex items-start justify-center p-4 pt-[6vh] sm:pt-[10vh]" style={{ height: viewportH }}>
       <div className="absolute inset-0 bg-bg/70 backdrop-blur-sm" onClick={onClose} aria-hidden />
       <div
         role="dialog"
         aria-modal="true"
         aria-label={t('search.open')}
-        className="relative w-full max-w-xl animate-scale-in overflow-hidden rounded-3xl bg-surface shadow-lift ring-1 ring-line"
+        className="relative flex max-h-full w-full max-w-xl animate-scale-in flex-col overflow-hidden rounded-3xl bg-surface shadow-lift ring-1 ring-line"
         onKeyDown={(e) => {
           if (e.key === 'Escape') onClose();
           if (e.key === 'ArrowDown') {
@@ -116,7 +159,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
           />
           <kbd className="hidden rounded-md bg-surface-2 px-1.5 py-0.5 text-[0.7rem] text-subtle ring-1 ring-line sm:block">Esc</kbd>
         </div>
-        <ul id="palette-results" role="listbox" className="max-h-[52vh] overflow-y-auto p-2">
+        <ul id="palette-results" role="listbox" className="min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain p-2">
           {results.length === 0 && <li className="px-4 py-8 text-center text-sm text-muted">{t('search.empty', { query })}</li>}
           {groups.map((g) => {
             const items = results.filter((r) => r.group === g.id);

@@ -1,5 +1,6 @@
 import Dexie, { type EntityTable } from 'dexie';
 import type { ChangeEntry, Link } from '@/domain/entity';
+import type { Task, TaskList } from '@/domain/tasks';
 
 /** Registro chave-valor (configurações, estado do onboarding, metadados). */
 export interface KvRecord {
@@ -19,6 +20,8 @@ export class RoutigDB extends Dexie {
   kv!: EntityTable<KvRecord, 'key'>;
   changelog!: EntityTable<ChangeEntry, 'seq'>;
   links!: EntityTable<Link, 'id'>;
+  tasks!: EntityTable<Task, 'id'>;
+  taskLists!: EntityTable<TaskList, 'id'>;
 
   constructor(name = 'routig') {
     super(name);
@@ -27,10 +30,15 @@ export class RoutigDB extends Dexie {
       changelog: '++seq, at, entityType, entityId, [entityType+entityId]',
       links: 'id, from, to, relation, [from+to]',
     });
+    // Etapa 1: Tasks. Só acrescenta tabelas; nada da versão 1 muda.
+    this.version(2).stores({
+      tasks: 'id, statusId, listId, dueDate, parentId, projectId, goalId, updatedAt, *tags',
+      taskLists: 'id, order',
+    });
   }
 }
 
-export const DB_SCHEMA_VERSION = 1;
+export const DB_SCHEMA_VERSION = 2;
 
 let instance: RoutigDB | null = null;
 

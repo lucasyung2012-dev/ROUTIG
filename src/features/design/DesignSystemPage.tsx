@@ -73,11 +73,11 @@ export function DesignSystemPage() {
           <div className="text-2xl font-semibold tracking-tight text-fg">{t('design.sampleHeading')}</div>
           <div className="text-lg font-semibold text-fg">{t('design.sampleHeading')}</div>
           <p className="max-w-prose text-[0.9375rem] leading-relaxed text-muted">{t('design.sampleBody')}</p>
-          <div className="text-xs font-semibold uppercase tracking-[0.16em] text-subtle">Inter · 400 · 500 · 600 · 700</div>
+          <div className="text-xs font-semibold uppercase tracking-[0.16em] text-subtle">{t('design.weights')}</div>
         </Surface>
       </Block>
 
-      <Block title={t('design.buttons')}>
+      <Block title={t('design.buttons')} hint={t('design.buttonsHint')}>
         <div className="flex flex-wrap gap-3">
           <Button variant="primary" icon={<Plus className="h-4 w-4" aria-hidden />}>
             {t('design.primary')}
@@ -122,7 +122,7 @@ export function DesignSystemPage() {
         </Surface>
       </Block>
 
-      <Block title={t('design.states')}>
+      <Block title={t('design.states')} hint={t('design.statesHint')}>
         <div className="grid gap-4 lg:grid-cols-3">
           <Surface>
             <div className="mb-2 text-sm font-medium text-fg">{t('design.loadingTitle')}</div>
@@ -136,16 +136,16 @@ export function DesignSystemPage() {
           </Surface>
         </div>
         <div className="mt-4 flex flex-wrap gap-2">
-          <Badge>neutral</Badge>
-          <Badge tone="accent">accent</Badge>
-          <Badge tone="success">success</Badge>
-          <Badge tone="warning">warning</Badge>
-          <Badge tone="danger">danger</Badge>
-          <Badge tone="info">info</Badge>
+          <Badge>{t('design.badgeNeutral')}</Badge>
+          <Badge tone="accent">{t('design.badgeAccent')}</Badge>
+          <Badge tone="success">{t('design.badgeSuccess')}</Badge>
+          <Badge tone="warning">{t('design.badgeWarning')}</Badge>
+          <Badge tone="danger">{t('design.badgeDanger')}</Badge>
+          <Badge tone="info">{t('design.badgeInfo')}</Badge>
         </div>
       </Block>
 
-      <Block title={t('design.moduleTones')}>
+      <Block title={t('design.moduleTones')} hint={t('design.tonesHint')}>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-8">
           {NAV_MODULE_IDS.map((id) => {
             const def = MODULES[id];
@@ -166,10 +166,12 @@ export function DesignSystemPage() {
   );
 }
 
-function Block({ title, children }: { title: string; children: ReactNode }) {
+function Block({ title, hint, children }: { title: string; hint?: string; children: ReactNode }) {
   return (
     <section>
-      <h2 className="mb-4 text-xs font-semibold uppercase tracking-[0.16em] text-subtle">{title}</h2>
+      <h2 className="text-xs font-semibold uppercase tracking-[0.16em] text-subtle">{title}</h2>
+      {hint && <p className="mt-1 text-sm text-muted">{hint}</p>}
+      <div className="mt-4" />
       {children}
     </section>
   );

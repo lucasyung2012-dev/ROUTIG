@@ -8,7 +8,7 @@ Leia este arquivo no começo de toda conversa nova sobre o ROUTIG. A especifica�
 
 - **Etapa 0 — Fundação:** concluída. Logo vetorial e design system aprovados pelo dono do produto em 2026-11-02.
 - **Etapa 1 — Organização central:** em andamento. **Tasks, Calendar, Inbox, Notes e Projects prontos e publicados.**
-- **Próximo passo:** Dashboard completo (personalização), Profile (interesses, evolução, história) e Settings. Proposta em aberto: puxar o backup (Etapa 5) para logo depois da Etapa 1; melhorias do desenho no Notes (lista de ideias abaixo).
+- **Próximo passo:** Dashboard completo (personalização), Profile (interesses, evolução, história) e Settings. Depois: backup, desenho completo do Notes e Etapa 2 (ver "Ordem combinada").
 - **Como trabalhar:** o computador de desenvolvimento não tem Node. Escrever o código, enviar com `git push`, conferir o GitHub Actions (anotações de erro aparecem por arquivo e linha) e testar no app publicado.
 
 ## Etapa 1 — andamento
@@ -109,7 +109,10 @@ Leia este arquivo no começo de toda conversa nova sobre o ROUTIG. A especifica�
 - Integração: campo Projeto no editor de tarefa; "Por projeto" no Tasks mostra os nomes; marcos aparecem no Calendar e abrem o projeto; notas ligam a projetos; "+ Criar → Projeto"; busca global encontra projetos.
 - Concluir tarefas ou marcos nunca conclui o projeto sozinho. Excluir de vez não apaga tarefas nem notas, só a ligação.
 
-## Pedidos do dono do produto (em aberto)
+## Ordem combinada a seguir (2026-11-03)
 
-- Desenho do Notes mais completo: marca-texto, formas, fundo pautado/quadriculado/pontilhado, zoom, desenhar sobre imagem, laço, refazer, mais cores, tela cheia, exportar como imagem. Aguardando escolha.
-- Sincronização entre aparelhos: recomendação é fazer depois da Etapa 6 (Google Drive) e puxar o backup para logo depois da Etapa 1. Aguardando decisão.
+1. Terminar a Etapa 1: Dashboard completo (personalização), Profile (interesses, evolução, história) e Settings.
+2. Backup completo (adiantado da Etapa 5; ver DECISOES.md).
+3. Desenho do Notes completo (todos os recursos aprovados; ver DECISOES.md).
+4. Etapa 2: Academy e Idiomas.
+5. Sincronização pelo Google Drive: depois da Etapa 6.

@@ -26,6 +26,7 @@ import { Surface } from '@/ui/Surface';
 import { useToast } from '@/ui/toast';
 import { cn } from '@/ui/cn';
 import { ColorPicker, ProjectCover, STATUS_TONE } from './ProjectsPage';
+import { AutoTextarea } from '@/features/notes/BlockEditor';
 import { useProjectsData, type ProjectsData } from './useProjectsData';
 
 const TABS = ['overview', 'work', 'milestones', 'timeline', 'calendar', 'notes', 'materials', 'history'] as const;
@@ -117,13 +118,15 @@ function ProjectDetail({ project, data }: { project: Project; data: ProjectsData
         <ProjectCover project={{ ...project, ...draft }} className="h-28 sm:h-36" />
         <div className="flex flex-col gap-3 p-5 sm:p-6">
           <div className="flex flex-wrap items-start gap-3">
-            <input
-              value={draft.name}
-              maxLength={200}
-              aria-label={t('projects.fields.name')}
-              onChange={(e) => change({ name: e.target.value })}
-              className="min-w-0 flex-1 rounded-xl bg-transparent px-1 text-2xl font-semibold tracking-tight text-fg focus:bg-surface-2 focus:outline-none sm:text-3xl"
-            />
+            <div className="min-w-0 flex-1">
+              <AutoTextarea
+                value={draft.name}
+                maxLength={200}
+                aria-label={t('projects.fields.name')}
+                onChange={(e) => change({ name: e.target.value.replace(/\n/g, ' ') })}
+                className="rounded-xl px-1 text-2xl font-semibold tracking-tight text-fg focus:bg-surface-2 sm:text-3xl"
+              />
+            </div>
             <Badge tone={STATUS_TONE[draft.status]}>{t(`projects.status.${draft.status}`)}</Badge>
           </div>
           {progress.percent !== null ? (
@@ -352,10 +355,12 @@ function Work({ project, draft, change, data }: { project: Project; draft: Proje
           aria-label={t('projects.addTask')}
           onKeyDown={(e) => {
             if (e.key !== 'Enter' || !newTask.trim()) return;
-            void createTask(emptyTaskInput({ title: newTask.trim(), projectId: project.id, originModule: 'projects' })).then(
-              () => setNewTask(''),
-              () => toast.show(t('errors.saveFailed'), 'error'),
-            );
+            const title = newTask.trim();
+            setNewTask('');
+            void createTask(emptyTaskInput({ title, projectId: project.id, originModule: 'projects' })).catch(() => {
+              setNewTask((cur) => cur || title);
+              toast.show(t('errors.saveFailed'), 'error');
+            });
           }}
         />
         {mode === 'kanban' ? (

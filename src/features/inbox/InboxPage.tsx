@@ -143,12 +143,15 @@ function CaptureBox() {
 
   const saveText = async () => {
     if (!text.trim()) return;
+    const value = text;
+    // Limpa na hora: a próxima captura pode começar sem esperar.
+    setText('');
     setBusy(true);
     try {
-      await captureText(text);
-      setText('');
+      await captureText(value);
       toast.show(t('inbox.captured'));
     } catch (e) {
+      setText((cur) => cur || value);
       reportError(e);
     } finally {
       setBusy(false);

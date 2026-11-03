@@ -90,11 +90,13 @@ export function TasksPage() {
     if (!title) return;
     const today = todayKey();
     const listId = filter.listId && filter.listId !== 'none' ? filter.listId : null;
+    // Limpa na hora: quem digita rápido já pode escrever a próxima sem perder texto.
+    setQuick('');
     try {
       await createTask(emptyTaskInput({ title, listId, dueDate: quickDue === 'today' ? today : quickDue === 'tomorrow' ? addDays(today, 1) : null }));
-      setQuick('');
       toast.show(t('tasks.added'));
     } catch (e) {
+      setQuick((cur) => cur || title);
       actions.reportError(e);
     }
   };

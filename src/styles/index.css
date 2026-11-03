@@ -1,0 +1,160 @@
+@import '@fontsource-variable/inter';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * Tokens do ROUTIG. Valores em "R G B" para o Tailwind aplicar opacidade.
+ * Claro em :root; escuro pelo sistema (tema automático) ou por data-theme="dark".
+ */
+:root {
+  --bg: 247 246 252;
+  --surface: 255 255 255;
+  --surface-2: 242 240 250;
+  --surface-3: 232 229 245;
+  --line: 226 223 239;
+  --fg: 22 19 43;
+  --muted: 92 88 120;
+  --subtle: 140 136 166;
+  --accent: 115 87 246;
+  --accent-fg: 255 255 255;
+  --violet: 115 87 246;
+  --teal: 13 140 127;
+  --amber: 180 105 0;
+  --rose: 201 61 110;
+  --blue: 47 111 204;
+  --danger: 196 50 77;
+  --success: 13 140 127;
+  --warning: 180 105 0;
+  --shadow: 40 24 96;
+  --grad-brand: linear-gradient(135deg, #6c63f0 0%, #7b3ff6 45%, #b044d6 75%, #ee4b7a 100%);
+  --glow-1: 115 87 246;
+  --glow-2: 236 102 149;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --bg: 8 11 28;
+    --surface: 14 18 40;
+    --surface-2: 21 26 52;
+    --surface-3: 31 37 70;
+    --line: 38 44 82;
+    --fg: 236 235 250;
+    --muted: 165 164 198;
+    --subtle: 112 113 150;
+    --accent: 140 118 255;
+    --accent-fg: 255 255 255;
+    --violet: 140 118 255;
+    --teal: 22 184 166;
+    --amber: 245 158 11;
+    --rose: 236 102 149;
+    --blue: 67 139 234;
+    --danger: 255 107 134;
+    --success: 22 184 166;
+    --warning: 245 158 11;
+    --shadow: 0 0 0;
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme='dark'] {
+  --bg: 8 11 28;
+  --surface: 14 18 40;
+  --surface-2: 21 26 52;
+  --surface-3: 31 37 70;
+  --line: 38 44 82;
+  --fg: 236 235 250;
+  --muted: 165 164 198;
+  --subtle: 112 113 150;
+  --accent: 140 118 255;
+  --accent-fg: 255 255 255;
+  --violet: 140 118 255;
+  --teal: 22 184 166;
+  --amber: 245 158 11;
+  --rose: 236 102 149;
+  --blue: 67 139 234;
+  --danger: 255 107 134;
+  --success: 22 184 166;
+  --warning: 245 158 11;
+  --shadow: 0 0 0;
+  color-scheme: dark;
+}
+
+/* Tamanho do texto (Settings → Acessibilidade). */
+:root[data-font='small'] { font-size: 93.75%; }
+:root[data-font='large'] { font-size: 112.5%; }
+:root[data-font='xlarge'] { font-size: 125%; }
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  @apply bg-bg font-sans text-fg antialiased;
+  font-feature-settings: 'cv11', 'ss01', 'ss03';
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Fundo ambiente: dois brilhos discretos nas cores do logo. */
+.ambient {
+  background:
+    radial-gradient(60rem 40rem at 110% -10%, rgb(var(--glow-2) / 0.08), transparent 60%),
+    radial-gradient(50rem 36rem at -10% 110%, rgb(var(--glow-1) / 0.1), transparent 60%),
+    rgb(var(--bg));
+}
+
+:focus-visible {
+  outline: 2px solid rgb(var(--accent));
+  outline-offset: 2px;
+  border-radius: 0.5rem;
+}
+
+.text-gradient {
+  background: var(--grad-brand);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.bg-brand {
+  background: var(--grad-brand);
+}
+
+.skeleton {
+  background: linear-gradient(90deg, rgb(var(--surface-2)) 0%, rgb(var(--surface-3)) 50%, rgb(var(--surface-2)) 100%);
+  background-size: 200% 100%;
+  @apply animate-shimmer rounded-lg;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+.safe-top { padding-top: env(safe-area-inset-top, 0px); }
+.safe-bottom { padding-bottom: env(safe-area-inset-bottom, 0px); }
+
+/* Movimento reduzido: pelo sistema ou pela configuração do app. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+  }
+}
+:root[data-motion='reduce'] *,
+:root[data-motion='reduce'] *::before,
+:root[data-motion='reduce'] *::after {
+  animation-duration: 1ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 1ms !important;
+}
+
+/* Barra de rolagem discreta. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(var(--line)) transparent;
+}

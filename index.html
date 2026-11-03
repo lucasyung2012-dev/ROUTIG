@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#080B1C" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="ROUTIG" />
+    <meta name="description" content="ROUTIG — Your route. Your progress." />
+    <link rel="icon" type="image/png" href="./brand/routig-logo-original.png" />
+    <link rel="apple-touch-icon" href="./brand/routig-logo-original.png" />
+    <title>ROUTIG</title>
+    <script>
+      // Aplica o tema salvo antes do primeiro desenho, para não piscar.
+      try {
+        var t = localStorage.getItem('routig.theme');
+        if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t);
+      } catch (e) {}
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <noscript>O ROUTIG precisa de JavaScript para funcionar.</noscript>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

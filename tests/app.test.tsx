@@ -119,6 +119,22 @@ describe('Tasks (Parte 7)', () => {
   });
 });
 
+describe('Calendar (Parte 6)', () => {
+  it('tarefa com prazo aparece na agenda sem ser copiada', async () => {
+    await finishOnboarding();
+    const { createTask } = await import('@/data/tasksRepo');
+    const { emptyTaskInput } = await import('@/domain/tasks');
+    const { todayKey } = await import('@/domain/dates');
+    await createTask(emptyTaskInput({ title: 'Entregar redação', dueDate: todayKey() }));
+    localStorage.setItem('routig.calendar.view', 'agenda');
+    window.location.hash = '#/calendar';
+    render(<App />);
+    expect(await screen.findByText('Entregar redação')).toBeInTheDocument();
+    const { getDb } = await import('@/data/db');
+    expect(await getDb().events.count()).toBe(0);
+  });
+});
+
 describe('aparência (Parte 3.3)', () => {
   it('escolher tema escuro aplica no documento e grava', async () => {
     await finishOnboarding();

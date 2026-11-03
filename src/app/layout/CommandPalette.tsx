@@ -1,11 +1,15 @@
 import { useEffect, useMemo, useRef, useState, type ComponentType } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
-import { ListTodo, Search } from 'lucide-react';
+import { CalendarDays, ListTodo, Search } from 'lucide-react';
 import { formatDateKey } from '@/domain/dates';
 import { taskSearchText } from '@/domain/tasks';
 import { useTaskEditor } from '@/features/tasks/TaskEditor';
 import { useTasksData } from '@/features/tasks/useTasksData';
+import { useEventEditor } from '@/features/calendar/EventEditor';
+import { useCalendarData } from '@/features/calendar/useCalendarData';
+import { addDays, todayKey } from '@/domain/dates';
+import { occurrencesInRange } from '@/domain/events';
 import { MODULES, NAV_MODULE_IDS, SYSTEM_MODULE_IDS, type ModuleId } from '@/app/modules';
 import { useSettings } from '@/app/SettingsProvider';
 import { SETTINGS_SECTIONS } from '@/features/settings/sections';
@@ -13,7 +17,9 @@ import { cn } from '@/ui/cn';
 
 interface Result {
   key: string;
-  group: 'modules' | 'settings' | 'tasks';
+  group: 'modules' | 'settings' | 'tasks' | 'events';
+  /** Evento e data da ocorrência a abrir no editor. */
+  event?: { id: string; seriesDate: string };
   /** Tarefa a abrir no editor, em vez de navegar. */
   taskId?: string;
   label: string;
@@ -32,6 +38,8 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
   const navigate = useNavigate();
   const tasks = useTasksData();
   const editor = useTaskEditor();
+  const eventEditor = useEventEditor();
+  const cal = useCalendarData();
   const [query, setQuery] = useState('');
   const [active, setActive] = useState(0);
   const input = useRef<HTMLInputElement>(null);
@@ -75,8 +83,28 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
         path: '/tasks',
         icon: ListTodo,
       }));
-    return [...taskHits, ...all.filter((r) => normalizeText(`${r.label} ${r.detail}`).includes(q))];
-  }, [all, query, tasks.active, settings.locale, t]);
+    const today = todayKey();
+    const eventHits: Result[] = cal.events
+      .filter((e) => {
+        const hay = normalizeText(`${e.title} ${e.location} ${e.description} ${e.notes}`);
+        return words.every((w) => hay.includes(w));
+      })
+      .slice(0, 8)
+      .map((e) => {
+        const next = occurrencesInRange(e, today, addDays(today, 366))[0];
+        const date = next?.date ?? e.start;
+        return {
+          key: `e:${e.id}`,
+          group: 'events' as const,
+          event: { id: e.id, seriesDate: next?.seriesDate ?? e.start },
+          label: e.title,
+          detail: [t('modules.calendar'), formatDateKey(date, settings.locale), e.location].filter(Boolean).join(' · '),
+          path: '/calendar',
+          icon: CalendarDays,
+        };
+      });
+    return [...taskHits, ...eventHits, ...all.filter((r) => normalizeText(`${r.label} ${r.detail}`).includes(q))];
+  }, [all, query, tasks.active, cal.events, settings.locale, t]);
 
   useEffect(() => {
     if (open) {
@@ -111,12 +139,14 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
   const go = (r: Result | undefined) => {
     if (!r) return;
     if (r.taskId) editor.openTask(r.taskId);
+    else if (r.event) eventEditor.openEvent(r.event.id, r.event.seriesDate);
     else navigate(r.path);
     onClose();
   };
 
   const groups: Array<{ id: Result['group']; label: string }> = [
     { id: 'tasks', label: t('search.groupTasks') },
+    { id: 'events', label: t('search.groupEvents') },
     { id: 'modules', label: t('search.groupModules') },
     { id: 'settings', label: t('search.groupSettings') },
   ];

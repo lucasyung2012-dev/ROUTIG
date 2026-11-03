@@ -2,13 +2,13 @@
 
 Leia este arquivo no começo de toda conversa nova sobre o ROUTIG. A especificação completa é o "ROUTIG — Prompt Master" (35 partes), fornecido pelo dono do produto. Decisões em [DECISOES.md](DECISOES.md), arquitetura em [ARQUITETURA.md](ARQUITETURA.md).
 
-**Atualizado:** 2026-11-03
+**Atualizado:** 2026-11-03 (Calendar)
 
 ## Estado da conversa (2026-11-03)
 
 - **Etapa 0 — Fundação:** concluída. Logo vetorial e design system aprovados pelo dono do produto em 2026-11-02.
-- **Etapa 1 — Organização central:** em andamento. **Tasks pronto e publicado.**
-- **Próximo passo:** módulo **Calendar** (Parte 6). Ele deve mostrar as tarefas com prazo lendo a tabela `tasks`, sem copiar registros.
+- **Etapa 1 — Organização central:** em andamento. **Tasks e Calendar prontos e publicados.**
+- **Próximo passo:** **Inbox**, **Notes** e **Projects** (nessa ordem), depois Dashboard completo, Profile e Settings.
 - **Como trabalhar:** o computador de desenvolvimento não tem Node. Escrever o código, enviar com `git push`, conferir o GitHub Actions (anotações de erro aparecem por arquivo e linha) e testar no app publicado.
 
 ## Etapa 1 — andamento
@@ -17,7 +17,7 @@ Leia este arquivo no começo de toda conversa nova sobre o ROUTIG. A especifica�
 |---|---|
 | Tasks | ✅ Pronto, testado (CI e navegador) |
 | Dashboard | Parcial: saudação, resumo real de tarefas, mapa dos módulos. Falta personalização (cartões, perfis Estudos/Projetos/Completo, prévia) |
-| Calendar | A fazer |
+| Calendar | ✅ Pronto (testes no CI; checagem no navegador nesta versão) |
 | Projects | A fazer |
 | Inbox | A fazer |
 | Notes | A fazer |
@@ -61,3 +61,16 @@ Leia este arquivo no começo de toda conversa nova sobre o ROUTIG. A especifica�
 |---|---|---|---|
 | 0.1.0 | 2026-11-02 | Claude (Claude Code) | Etapa 0: fundação. |
 | 0.2.0 | 2026-11-03 | Claude (Claude Code) | Etapa 1: módulo Tasks; Dashboard com resumo de tarefas; busca de tarefas; busca rolando no iPad e no celular. |
+| 0.3.0 | 2026-11-03 | Claude (Claude Code) | Etapa 1: módulo Calendar; criação rápida de evento; próximos compromissos no Dashboard; busca de eventos. |
+
+## Calendar (Parte 6) — o que existe
+
+- Visualizações: dia e semana (grade de horas, itens sobrepostos lado a lado, linha da hora atual), mês, ano (dias com itens destacados) e agenda (60 dias).
+- Eventos: nome, data, início e fim (ou dia inteiro com vários dias, para feriados e férias), local, categoria, descrição, observações, lembretes (guardados; avisos chegam na Etapa 5), ligação com uma tarefa e histórico.
+- Categorias de fábrica: compromisso, aula, prova, entrega, feriado, férias, extracurricular e outro. Renomear, mudar cor, criar e remover as próprias.
+- Recorrência diária, semanal (dias escolhidos), mensal e anual, com exceções, pausas e fim. Editar ou excluir uma ocorrência pergunta: somente esta, esta e as próximas, ou toda a série. "Esta e as próximas" divide a série sem mexer no passado.
+- Tarefas com prazo aparecem no calendário lidas da tabela `tasks` (sem cópia), com visual diferente dos eventos; abrem no editor de tarefa.
+- Conflitos de horário entre eventos: aviso no editor e nas visualizações; nada é alterado sozinho.
+- Lixeira de eventos, botão "+ Criar" com Tarefa e Evento, busca global encontra eventos, Dashboard mostra os próximos compromissos de 7 dias.
+- Banco versão 3: tabela `events`; categorias em `kv` (`calendar.config`).
+- Fica para a Academy (Etapa 2): grade de horários escolares ligada a disciplinas, anos letivos e calendários escolares diferentes. Por enquanto, aulas, provas, entregas, feriados e férias são categorias de evento.

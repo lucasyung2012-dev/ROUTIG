@@ -1,6 +1,9 @@
 import { Link } from 'react-router-dom';
-import { ArrowRight, ListTodo, Sparkles } from 'lucide-react';
-import { toDateKey, todayKey } from '@/domain/dates';
+import { ArrowRight, CalendarDays, ListTodo, Sparkles } from 'lucide-react';
+import { addDays, formatDateKey, toDateKey, todayKey } from '@/domain/dates';
+import { fromMinutes } from '@/domain/events';
+import { useEventEditor } from '@/features/calendar/EventEditor';
+import { TONE_ITEM, useCalendarData } from '@/features/calendar/useCalendarData';
 import { compareTasks, isClosedKind, statusKind } from '@/domain/tasks';
 import { TaskRow } from '@/features/tasks/TaskRow';
 import { useTaskEditor } from '@/features/tasks/TaskEditor';
@@ -24,6 +27,57 @@ export function greetingKey(hour: number): 'dashboard.morning' | 'dashboard.afte
 /** "segunda-feira, 2 de novembro" → "Segunda-feira, 2 de novembro" (só a primeira letra). */
 export function capitalizeFirst(text: string): string {
   return text.charAt(0).toLocaleUpperCase() + text.slice(1);
+}
+
+/** Próximos compromissos (7 dias), vindos do Calendar. */
+function EventsCard() {
+  const { t, settings } = useSettings();
+  const cal = useCalendarData();
+  const events = useEventEditor();
+  const today = todayKey();
+  const upcoming = cal.itemsInRange(today, addDays(today, 7), { showTasks: false, categoryId: null }).slice(0, 6);
+
+  return (
+    <section aria-labelledby="dash-events" className="rounded-3xl bg-surface p-5 shadow-soft ring-1 ring-line/70 sm:p-6">
+      <div className="flex flex-wrap items-center gap-3">
+        <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue/10 text-blue">
+          <CalendarDays className="h-5 w-5" aria-hidden />
+        </span>
+        <h2 id="dash-events" className="flex-1 text-lg font-semibold tracking-tight text-fg">
+          {t('dashboard.eventsTitle')}
+        </h2>
+        <Link to="/calendar" className="text-sm font-medium text-accent hover:underline">
+          {t('dashboard.openCalendar')}
+        </Link>
+      </div>
+      {cal.loading ? (
+        <LoadingState label={t('common.loading')} lines={3} className="mt-4" />
+      ) : upcoming.length === 0 ? (
+        <p className="mt-4 text-sm text-muted">{t('dashboard.eventsEmpty')}</p>
+      ) : (
+        <ul className="mt-4 flex flex-col gap-1.5">
+          {upcoming.map((i) => (
+            <li key={i.key}>
+              <button
+                type="button"
+                onClick={() => i.occurrence && events.openEvent(i.occurrence.event.id, i.occurrence.seriesDate)}
+                className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left transition hover:bg-surface-2/70"
+              >
+                <span className={cn('h-9 w-1 shrink-0 rounded-full', TONE_ITEM[i.tone].bar)} aria-hidden />
+                <span className="w-16 shrink-0 text-xs font-medium capitalize text-muted">
+                  {i.date === today ? t('tasks.due.today') : formatDateKey(i.date, settings.locale, { weekday: 'short', day: 'numeric' })}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[0.9375rem] font-medium text-fg">{i.title}</span>
+                  <span className="block text-xs tabular text-muted">{i.allDay ? t('calendar.allDay') : fromMinutes(i.start!)}</span>
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
 }
 
 /** Resumo real das tarefas: só conta o que está registrado (Parte 5.3). */
@@ -114,7 +168,10 @@ export function DashboardPage() {
         </div>
       </section>
 
-      {!settings.nav.hidden.includes('tasks') && <TasksCard />}
+      <div className="grid gap-6 lg:grid-cols-2">
+        {!settings.nav.hidden.includes('calendar') && <EventsCard />}
+        {!settings.nav.hidden.includes('tasks') && <TasksCard />}
+      </div>
 
       <section aria-labelledby="dash-modules">
         <h2 id="dash-modules" className="mb-4 text-xs font-semibold uppercase tracking-[0.16em] text-subtle">

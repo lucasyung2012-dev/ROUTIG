@@ -1,6 +1,7 @@
 import Dexie, { type EntityTable } from 'dexie';
 import type { ChangeEntry, Link } from '@/domain/entity';
 import type { Task, TaskList } from '@/domain/tasks';
+import type { CalendarEvent } from '@/domain/events';
 
 /** Registro chave-valor (configurações, estado do onboarding, metadados). */
 export interface KvRecord {
@@ -22,6 +23,7 @@ export class RoutigDB extends Dexie {
   links!: EntityTable<Link, 'id'>;
   tasks!: EntityTable<Task, 'id'>;
   taskLists!: EntityTable<TaskList, 'id'>;
+  events!: EntityTable<CalendarEvent, 'id'>;
 
   constructor(name = 'routig') {
     super(name);
@@ -35,10 +37,14 @@ export class RoutigDB extends Dexie {
       tasks: 'id, statusId, listId, dueDate, parentId, projectId, goalId, updatedAt, *tags',
       taskLists: 'id, order',
     });
+    // Etapa 1: Calendar.
+    this.version(3).stores({
+      events: 'id, start, endDate, categoryId, seriesOf, updatedAt',
+    });
   }
 }
 
-export const DB_SCHEMA_VERSION = 2;
+export const DB_SCHEMA_VERSION = 3;
 
 let instance: RoutigDB | null = null;
 

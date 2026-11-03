@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
-import { Menu, Monitor, Moon, Plus, Search, Sun, WifiOff } from 'lucide-react';
+import { Menu, Monitor, Moon, Search, Sun, WifiOff } from 'lucide-react';
 import { useSettings } from '@/app/SettingsProvider';
 import type { ThemeSetting } from '@/domain/settings';
 import { Logo } from '@/brand/Logo';
 import { IconButton } from '@/ui/IconButton';
 import { Sidebar } from './Sidebar';
 import { CommandPalette } from './CommandPalette';
-import { TaskEditorProvider, useTaskEditor } from '@/features/tasks/TaskEditor';
+import { TaskEditorProvider } from '@/features/tasks/TaskEditor';
+import { EventEditorProvider } from '@/features/calendar/EventEditor';
+import { QuickCreate } from './QuickCreate';
 
 const NEXT_THEME: Record<ThemeSetting, ThemeSetting> = { auto: 'light', light: 'dark', dark: 'auto' };
 
@@ -15,13 +17,14 @@ const NEXT_THEME: Record<ThemeSetting, ThemeSetting> = { auto: 'light', light: '
 export function AppShell() {
   return (
     <TaskEditorProvider>
-      <Shell />
+      <EventEditorProvider>
+        <Shell />
+      </EventEditorProvider>
     </TaskEditorProvider>
   );
 }
 
 function Shell() {
-  const editor = useTaskEditor();
   const { settings, update, t } = useSettings();
   const [menuOpen, setMenuOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -79,15 +82,8 @@ function Shell() {
           </button>
 
           <div className="ml-auto flex items-center gap-1">
-            <button
-              type="button"
-              onClick={() => editor.newTask()}
-              aria-label={`${t('quick.create')}: ${t('quick.task')}`}
-              className="mr-1 inline-flex h-10 items-center gap-1.5 rounded-xl bg-brand px-3 text-sm font-semibold text-white shadow-glow transition hover:brightness-110"
-            >
-              <Plus className="h-4 w-4" aria-hidden />
-              <span className="hidden sm:inline">{t('quick.task')}</span>
-            </button>
+            <QuickCreate />
+
             {!online && (
               <span className="mr-1 hidden items-center gap-1.5 rounded-full bg-warning/15 px-3 py-1 text-xs font-medium text-warning sm:inline-flex" role="status">
                 <WifiOff className="h-3.5 w-3.5" aria-hidden />

@@ -6,7 +6,6 @@ import { CURRENT_STAGE } from '@/app/version';
 import { visibleModules } from '@/domain/settings';
 import { RoutigMark } from '@/brand/Logo';
 import { Badge } from '@/ui/Badge';
-import { Surface } from '@/ui/Surface';
 import { cn } from '@/ui/cn';
 
 export function greetingKey(hour: number): 'dashboard.morning' | 'dashboard.afternoon' | 'dashboard.evening' {

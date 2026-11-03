@@ -9,6 +9,8 @@ export interface Stroke {
   points: Array<[number, number, number]>;
   color: string;
   width: number;
+  /** Forma reconhecida (linha, retângulo…): desenhada com segmentos retos. */
+  shape?: ShapeKind;
 }
 
 export type Block =
@@ -279,4 +281,119 @@ export function versionsToPrune(versions: NoteVersion[], max = 50): string[] {
     .sort((a, b) => b.at.localeCompare(a.at))
     .slice(max)
     .map((v) => v.id);
+}
+
+/* ---------- Formas automáticas (segurar a caneta parada no fim do traço) ---------- */
+
+export type ShapeKind = 'line' | 'triangle' | 'rectangle' | 'ellipse';
+type Pt = [number, number];
+
+function dist(a: Pt, b: Pt): number {
+  return Math.hypot(a[0] - b[0], a[1] - b[1]);
+}
+
+function distToSegment(p: Pt, a: Pt, b: Pt): number {
+  const l2 = (b[0] - a[0]) ** 2 + (b[1] - a[1]) ** 2;
+  if (l2 === 0) return dist(p, a);
+  const t = Math.max(0, Math.min(1, ((p[0] - a[0]) * (b[0] - a[0]) + (p[1] - a[1]) * (b[1] - a[1])) / l2));
+  return dist(p, [a[0] + t * (b[0] - a[0]), a[1] + t * (b[1] - a[1])]);
+}
+
+/** Simplificação de Douglas–Peucker: mantém só os "cantos" do traço. */
+export function simplify(points: Pt[], epsilon: number): Pt[] {
+  if (points.length < 3) return points;
+  let maxD = 0;
+  let idx = 0;
+  const first = points[0]!;
+  const last = points[points.length - 1]!;
+  for (let i = 1; i < points.length - 1; i++) {
+    const d = distToSegment(points[i]!, first, last);
+    if (d > maxD) {
+      maxD = d;
+      idx = i;
+    }
+  }
+  if (maxD <= epsilon) return [first, last];
+  return [...simplify(points.slice(0, idx + 1), epsilon).slice(0, -1), ...simplify(points.slice(idx), epsilon)];
+}
+
+/** Cantos de um traço fechado: simplifica e junta o último canto com o primeiro. */
+function cornersOfClosed(points: Pt[], diag: number): Pt[] {
+  // Começa no ponto mais distante do início, para o canto inicial não sumir na simplificação.
+  const start = points[0]!;
+  let far = 0;
+  points.forEach((p, i) => {
+    if (dist(p, start) > dist(points[far]!, start)) far = i;
+  });
+  const a = simplify(points.slice(0, far + 1), diag * 0.07);
+  const b = simplify(points.slice(far), diag * 0.07);
+  const corners = [...a.slice(0, -1), ...b];
+  // O fim do traço fechado volta perto do começo: é o mesmo canto.
+  if (corners.length > 1 && dist(corners[0]!, corners[corners.length - 1]!) < diag * 0.2) corners.pop();
+  // Junta cantos muito próximos.
+  return corners.filter((c, i) => i === 0 || dist(c, corners[i - 1]!) > diag * 0.12);
+}
+
+/**
+ * Reconhece a forma de um traço feito à mão e devolve os pontos da forma "perfeita".
+ * Retorna null quando o traço não parece nenhuma forma (fica como desenho livre).
+ */
+export function recognizeShape(stroke: Stroke): { kind: ShapeKind; points: Stroke['points'] } | null {
+  const pts: Pt[] = stroke.points.map(([x, y]) => [x, y]);
+  if (pts.length < 4) return null;
+  const pressure = stroke.points.reduce((a, p) => a + p[2], 0) / stroke.points.length;
+  const xs = pts.map((p) => p[0]);
+  const ys = pts.map((p) => p[1]);
+  const minX = Math.min(...xs);
+  const maxX = Math.max(...xs);
+  const minY = Math.min(...ys);
+  const maxY = Math.max(...ys);
+  const w = maxX - minX;
+  const h = maxY - minY;
+  const diag = Math.hypot(w, h);
+  if (diag < 20) return null;
+  const withP = (list: Pt[]): Stroke['points'] => list.map(([x, y]) => [Math.round(x * 10) / 10, Math.round(y * 10) / 10, pressure]);
+
+  const first = pts[0]!;
+  const last = pts[pts.length - 1]!;
+  const closed = dist(first, last) < diag * 0.22;
+
+  if (!closed) {
+    // Linha: todos os pontos perto do segmento entre o começo e o fim.
+    const maxDev = Math.max(...pts.map((p) => distToSegment(p, first, last)));
+    if (maxDev < Math.max(6, dist(first, last) * 0.08)) return { kind: 'line', points: withP([first, last]) };
+    return null;
+  }
+
+  // Elipse: a distância "normalizada" até o centro fica perto de 1 em todo o contorno.
+  const cx = (minX + maxX) / 2;
+  const cy = (minY + maxY) / 2;
+  const rx = Math.max(w / 2, 1);
+  const ry = Math.max(h / 2, 1);
+  const radialErr = pts.reduce((a, [x, y]) => a + Math.abs(Math.sqrt(((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2) - 1), 0) / pts.length;
+
+  const corners = cornersOfClosed(pts, diag);
+  if (corners.length === 3 && radialErr > 0.08) return { kind: 'triangle', points: withP([...corners, corners[0]!]) };
+  if (corners.length === 4 && radialErr > 0.06) {
+    // Quase alinhado com a tela: vira retângulo reto; inclinado: mantém os 4 cantos.
+    const axisAligned = corners.every((c) => (Math.abs(c[0] - minX) < w * 0.2 || Math.abs(c[0] - maxX) < w * 0.2) && (Math.abs(c[1] - minY) < h * 0.2 || Math.abs(c[1] - maxY) < h * 0.2));
+    const rect: Pt[] = axisAligned ? [[minX, minY], [maxX, minY], [maxX, maxY], [minX, maxY]] : corners;
+    return { kind: 'rectangle', points: withP([...rect, rect[0]!]) };
+  }
+  if (radialErr < 0.12) {
+    // Quase redondo: vira círculo de verdade.
+    const round = Math.abs(rx - ry) / Math.max(rx, ry) < 0.15;
+    const r = (rx + ry) / 2;
+    const ell: Pt[] = Array.from({ length: 49 }, (_, i) => {
+      const a = (i / 48) * Math.PI * 2;
+      return [cx + (round ? r : rx) * Math.cos(a), cy + (round ? r : ry) * Math.sin(a)];
+    });
+    return { kind: 'ellipse', points: withP(ell) };
+  }
+  return null;
+}
+
+/** Traço de forma: segmentos retos, sem a suavização do traço livre. */
+export function polylinePath(points: Stroke['points']): string {
+  return points.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${x} ${y}`).join(' ');
 }

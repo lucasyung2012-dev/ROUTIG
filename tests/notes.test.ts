@@ -16,7 +16,7 @@ import {
   VERSION_INTERVAL_MS,
 } from '@/data/notesRepo';
 import { captureText, convertToNote } from '@/data/inboxRepo';
-import { blocksToText, builtinTemplates, cloneBlocks, matchesNote, noteText, strokePath, strokeWidth, textToBlocks, versionsToPrune, type Block } from '@/domain/notes';
+import { blocksToText, builtinTemplates, cloneBlocks, matchesNote, noteText, recognizeShape, strokePath, strokeWidth, textToBlocks, versionsToPrune, type Block, type Stroke } from '@/domain/notes';
 
 describe('modo rápido ⇄ blocos (Parte 17.1)', () => {
   it('texto vira blocos com títulos, listas, checklist, citação e separador', () => {
@@ -65,6 +65,78 @@ describe('desenho (Parte 17.3)', () => {
     const light = strokeWidth({ points: [[0, 0, 0.1]], color: '#000', width: 4 });
     const strong = strokeWidth({ points: [[0, 0, 1]], color: '#000', width: 4 });
     expect(strong).toBeGreaterThan(light);
+  });
+});
+
+describe('formas automáticas (segurar a caneta)', () => {
+  // Traço "à mão": pontos ao longo de um caminho com um tremido determinístico.
+  const wobble = (i: number) => Math.sin(i * 1.7) * 3;
+  const along = (pts: Array<[number, number]>, per = 20): Stroke =>
+    ({
+      color: '#000',
+      width: 4,
+      points: pts.slice(0, -1).flatMap(([x1, y1], k) => {
+        const [x2, y2] = pts[k + 1]!;
+        return Array.from({ length: per }, (_, i) => {
+          const f = i / per;
+          return [x1 + (x2 - x1) * f + wobble(i + k), y1 + (y2 - y1) * f + wobble(i + k + 5), 0.5] as [number, number, number];
+        });
+      }),
+    }) satisfies Stroke;
+
+  it('linha torta vira linha reta', () => {
+    const s = along([
+      [100, 100],
+      [500, 130],
+    ]);
+    s.points.push([500, 130, 0.5]);
+    expect(recognizeShape(s)?.kind).toBe('line');
+    expect(recognizeShape(s)?.points).toHaveLength(2);
+  });
+
+  it('retângulo torto vira retângulo reto', () => {
+    const r = recognizeShape(
+      along([
+        [100, 100],
+        [400, 104],
+        [397, 300],
+        [102, 296],
+        [104, 108],
+      ]),
+    );
+    expect(r?.kind).toBe('rectangle');
+    expect(r?.points).toHaveLength(5);
+  });
+
+  it('triângulo e círculo', () => {
+    expect(
+      recognizeShape(
+        along([
+          [300, 100],
+          [450, 350],
+          [150, 350],
+          [296, 108],
+        ]),
+      )?.kind,
+    ).toBe('triangle');
+    const circle: Stroke = {
+      color: '#000',
+      width: 4,
+      points: Array.from({ length: 60 }, (_, i) => {
+        const a = (i / 58) * Math.PI * 2;
+        return [500 + (150 + wobble(i)) * Math.cos(a), 300 + (150 + wobble(i + 3)) * Math.sin(a), 0.5] as [number, number, number];
+      }),
+    };
+    expect(recognizeShape(circle)?.kind).toBe('ellipse');
+  });
+
+  it('rabisco livre continua livre', () => {
+    const scribble: Stroke = {
+      color: '#000',
+      width: 4,
+      points: Array.from({ length: 60 }, (_, i) => [100 + i * 8, 200 + Math.sin(i / 2) * 60 + (i % 7) * 9, 0.5] as [number, number, number]),
+    };
+    expect(recognizeShape(scribble)).toBeNull();
   });
 });
 

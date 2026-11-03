@@ -87,3 +87,8 @@ export function formatDateKey(key: DateKey, locale: string, opts: Intl.DateTimeF
 export function isTimeKey(value: unknown): value is string {
   return typeof value === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
 }
+
+/** "novembro de 2026" → "Novembro de 2026": só a primeira letra (CSS capitalize mudaria todas as palavras). */
+export function capitalizeFirst(text: string): string {
+  return text.charAt(0).toLocaleUpperCase() + text.slice(1);
+}

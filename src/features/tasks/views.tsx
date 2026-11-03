@@ -2,7 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 import { useSettings } from '@/app/SettingsProvider';
 import { updateTask } from '@/data/tasksRepo';
-import { addMonths, formatDateKey, monthGrid, startOfMonth, todayKey, type DateKey } from '@/domain/dates';
+import { addMonths, capitalizeFirst, formatDateKey, monthGrid, startOfMonth, todayKey, type DateKey } from '@/domain/dates';
 import { DUE_BUCKETS, dueBucket, PRIORITIES, PRIORITY_RANK, type Task } from '@/domain/tasks';
 import { Button } from '@/ui/Button';
 import { IconButton } from '@/ui/IconButton';
@@ -184,7 +184,7 @@ export function CalendarView({ tasks, data, onOpen, onNew }: ViewProps) {
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center gap-2">
-        <h3 className="flex-1 text-lg font-semibold capitalize tracking-tight text-fg">{formatDateKey(month, settings.locale, { month: 'long', year: 'numeric' })}</h3>
+        <h3 className="flex-1 text-lg font-semibold tracking-tight text-fg">{capitalizeFirst(formatDateKey(month, settings.locale, { month: 'long', year: 'numeric' }))}</h3>
         <Button size="sm" variant="ghost" onClick={() => setMonth(startOfMonth(today))}>
           {t('tasks.calendar.today')}
         </Button>
@@ -192,7 +192,7 @@ export function CalendarView({ tasks, data, onOpen, onNew }: ViewProps) {
         <IconButton size="sm" label={t('tasks.calendar.next')} icon={<ChevronRight className="h-4 w-4" />} onClick={() => setMonth(addMonths(month, 1, 1))} />
       </div>
       <div className="overflow-x-auto">
-        <div className="grid min-w-[640px] grid-cols-7 overflow-hidden rounded-2xl ring-1 ring-line/70">
+        <div className="grid min-w-[480px] grid-cols-7 overflow-hidden rounded-2xl ring-1 ring-line/70">
           {weekdayLabels.map((w, i) => (
             <div key={i} className="bg-surface-2 px-2 py-2 text-center text-[0.7rem] font-semibold uppercase tracking-wider text-subtle">
               {w}

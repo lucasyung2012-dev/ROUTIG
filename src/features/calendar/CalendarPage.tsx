@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { CalendarDays, CalendarRange, ChevronLeft, ChevronRight, Columns3, Grid3x3, List, Plus, Rows3, Tags, Trash2 } from 'lucide-react';
 import { useSettings } from '@/app/SettingsProvider';
-import { addDays, addMonths, addYears, formatDateKey, monthGrid, startOfMonth, startOfWeek, todayKey, type DateKey } from '@/domain/dates';
+import { addDays, addMonths, addYears, capitalizeFirst, formatDateKey, monthGrid, startOfMonth, startOfWeek, todayKey, type DateKey } from '@/domain/dates';
 import { fromMinutes } from '@/domain/events';
 import { useTaskEditor } from '@/features/tasks/TaskEditor';
 import { Button } from '@/ui/Button';
@@ -157,8 +157,8 @@ export function CalendarPage() {
           </Button>
           <IconButton size="sm" label={t('calendar.prev')} icon={<ChevronLeft className="h-4 w-4" />} onClick={() => setAnchor(step(view, anchor, -1))} />
           <IconButton size="sm" label={t('calendar.next')} icon={<ChevronRight className="h-4 w-4" />} onClick={() => setAnchor(step(view, anchor, 1))} />
-          <h2 className="ml-1 text-lg font-semibold capitalize tracking-tight text-fg sm:text-xl" aria-live="polite">
-            {title}
+          <h2 className="ml-1 text-lg font-semibold tracking-tight text-fg sm:text-xl" aria-live="polite">
+            {capitalizeFirst(title)}
           </h2>
         </div>
         <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">

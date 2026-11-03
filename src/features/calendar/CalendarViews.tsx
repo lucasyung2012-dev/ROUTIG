@@ -55,7 +55,7 @@ export function MonthView({ anchor, items, handlers }: { anchor: DateKey; items:
 
   return (
     <div className="overflow-x-auto">
-      <div className="grid min-w-[700px] grid-cols-7 overflow-hidden rounded-2xl ring-1 ring-line/70">
+      <div className="grid min-w-[480px] grid-cols-7 overflow-hidden rounded-2xl ring-1 ring-line/70">
         {labels.map((w, i) => (
           <div key={i} className="bg-surface-2 px-2 py-2 text-center text-[0.7rem] font-semibold uppercase tracking-wider text-subtle">
             {w}
@@ -126,12 +126,12 @@ export function TimeGridView({ days, items, handlers }: { days: DateKey[]; items
   }, [days.join()]);
 
   const cols = days.length;
-  const gridCols = { gridTemplateColumns: `3.5rem repeat(${cols}, minmax(${cols > 1 ? '7.5rem' : '0'}, 1fr))` };
+  const gridCols = { gridTemplateColumns: `3.5rem repeat(${cols}, minmax(${cols > 1 ? '5.5rem' : '0'}, 1fr))` };
 
   return (
     <div className="overflow-hidden rounded-2xl ring-1 ring-line/70">
       <div className="overflow-x-auto">
-        <div style={{ minWidth: cols > 1 ? `${3.5 + cols * 7.5}rem` : undefined }}>
+        <div style={{ minWidth: cols > 1 ? `${3.5 + cols * 5.5}rem` : undefined }}>
           {/* Cabeçalho */}
           <div className="grid border-b border-line/60 bg-surface-2" style={gridCols}>
             <div />

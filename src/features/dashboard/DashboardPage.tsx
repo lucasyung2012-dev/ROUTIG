@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { ArrowRight, CalendarDays, ListTodo, Sparkles } from 'lucide-react';
-import { addDays, formatDateKey, toDateKey, todayKey } from '@/domain/dates';
+import { addDays, capitalizeFirst, formatDateKey, toDateKey, todayKey } from '@/domain/dates';
 import { fromMinutes } from '@/domain/events';
 import { useEventEditor } from '@/features/calendar/EventEditor';
 import { TONE_ITEM, useCalendarData } from '@/features/calendar/useCalendarData';
@@ -24,10 +24,7 @@ export function greetingKey(hour: number): 'dashboard.morning' | 'dashboard.afte
   return 'dashboard.evening';
 }
 
-/** "segunda-feira, 2 de novembro" → "Segunda-feira, 2 de novembro" (só a primeira letra). */
-export function capitalizeFirst(text: string): string {
-  return text.charAt(0).toLocaleUpperCase() + text.slice(1);
-}
+export { capitalizeFirst } from '@/domain/dates';
 
 /** Próximos compromissos (7 dias), vindos do Calendar. */
 function EventsCard() {

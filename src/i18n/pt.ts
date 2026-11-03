@@ -980,6 +980,7 @@ export const pt = {
       color: 'Cor {color}',
       size: 'Espessura',
       penOnly: 'Só a caneta desenha',
+      taller: 'Aumentar área',
       penOnlyHint: 'Com o Apple Pencil, o dedo e a palma não riscam.',
       area: 'Área de desenho',
       clearTitle: 'Limpar o desenho?',

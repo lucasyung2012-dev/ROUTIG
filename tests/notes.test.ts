@@ -25,6 +25,11 @@ describe('modo rápido ⇄ blocos (Parte 17.1)', () => {
     expect(blocks[7]).toMatchObject({ type: 'todo', checked: true, text: 'ler' });
   });
 
+  it('itens vazios continuam com o tipo certo (lista, checklist, título)', () => {
+    const blocks = textToBlocks('## \n- \n[ ] \n1. \n---');
+    expect(blocks.map((b) => b.type)).toEqual(['heading', 'bullet', 'todo', 'numbered', 'divider']);
+  });
+
   it('ida e volta não perde texto, e blocos que não são texto ficam separados', () => {
     const text = '# Título\nparágrafo\n- item\n1. um\n2. dois\n[ ] tarefa\n> frase\n---';
     const image: Block = { id: 'img', type: 'image', fileId: 'f1', caption: 'foto' };

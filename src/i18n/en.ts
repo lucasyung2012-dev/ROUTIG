@@ -982,6 +982,7 @@ export const en: Messages = {
       color: 'Color {color}',
       size: 'Thickness',
       penOnly: 'Only the pen draws',
+      taller: 'Make taller',
       penOnlyHint: 'With Apple Pencil, fingers and palm do not draw.',
       area: 'Drawing area',
       clearTitle: 'Clear the drawing?',

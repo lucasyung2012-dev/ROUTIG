@@ -403,7 +403,7 @@ function BlockBody({
     case 'link':
       return <LinkBlock url={b.url} title={b.title} onChange={(patch) => onChange({ ...b, ...patch })} />;
     case 'drawing':
-      return <DrawingBlock strokes={b.strokes} height={b.height} onChange={(strokes) => onChange({ ...b, strokes })} />;
+      return <DrawingBlock strokes={b.strokes} height={b.height} onChange={(strokes) => onChange({ ...b, strokes })} onResize={(height) => onChange({ ...b, height })} />;
   }
 }
 

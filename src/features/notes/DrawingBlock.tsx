@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { Eraser, PenLine, Trash2, Undo2 } from 'lucide-react';
+import { Eraser, MoveVertical, PenLine, Trash2, Undo2 } from 'lucide-react';
 import { useSettings } from '@/app/SettingsProvider';
 import { strokePath, strokeWidth, type Stroke } from '@/domain/notes';
 import { ConfirmDialog } from '@/ui/ConfirmDialog';
@@ -24,7 +24,17 @@ function readPenOnly(): boolean {
  * como `pointerType === 'pen'` com pressão, então o traço engrossa com a força.
  * Com "Só a caneta desenha", toques de dedo e palma são ignorados.
  */
-export function DrawingBlock({ strokes, height, onChange }: { strokes: Stroke[]; height: number; onChange: (strokes: Stroke[]) => void }) {
+export function DrawingBlock({
+  strokes,
+  height,
+  onChange,
+  onResize,
+}: {
+  strokes: Stroke[];
+  height: number;
+  onChange: (strokes: Stroke[]) => void;
+  onResize: (height: number) => void;
+}) {
   const { t } = useSettings();
   const svg = useRef<SVGSVGElement>(null);
   const [tool, setTool] = useState<'pen' | 'eraser'>('pen');
@@ -100,6 +110,7 @@ export function DrawingBlock({ strokes, height, onChange }: { strokes: Stroke[];
         <span className="mx-1 h-6 w-px bg-line" aria-hidden />
         <IconButton size="sm" label={t('notes.draw.undo')} icon={<Undo2 className="h-4 w-4" />} disabled={strokes.length === 0} onClick={() => onChange(strokes.slice(0, -1))} />
         <IconButton size="sm" label={t('notes.draw.clear')} icon={<Trash2 className="h-4 w-4" />} disabled={strokes.length === 0} onClick={() => setConfirmClear(true)} />
+        <IconButton size="sm" label={t('notes.draw.taller')} icon={<MoveVertical className="h-4 w-4" />} disabled={height >= 3000} onClick={() => onResize(Math.min(3000, height + 400))} />
         <label className="ml-auto flex items-center gap-2 text-xs text-muted" title={t('notes.draw.penOnlyHint')}>
           <input
             type="checkbox"

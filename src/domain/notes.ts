@@ -57,7 +57,7 @@ export function newBlock(type: BlockType): Block {
     case 'link':
       return { id, type, url: '', title: '' };
     case 'drawing':
-      return { id, type, strokes: [], height: 420 };
+      return { id, type, strokes: [], height: 700 };
   }
 }
 
@@ -120,10 +120,11 @@ export function textToBlocks(text: string): Block[] {
     const line = raw.replace(/\s+$/, '');
     const id = newId('blk');
     let m: RegExpMatchArray | null;
-    if ((m = line.match(/^(#{1,3})\s+(.*)$/))) out.push({ id, type: 'heading', level: m[1]!.length as 1 | 2 | 3, text: m[2]! });
-    else if ((m = line.match(/^\s*\[( |x|X)\]\s+(.*)$/))) out.push({ id, type: 'todo', checked: m[1]!.toLowerCase() === 'x', text: m[2]! });
-    else if ((m = line.match(/^\s*[-*•]\s+(.*)$/))) out.push({ id, type: 'bullet', text: m[1]! });
-    else if ((m = line.match(/^\s*\d+[.)]\s+(.*)$/))) out.push({ id, type: 'numbered', text: m[1]! });
+    // O texto depois do marcador é opcional: "- " vazio continua sendo item de lista.
+    if ((m = line.match(/^(#{1,3})(?:\s+(.*))?$/))) out.push({ id, type: 'heading', level: m[1]!.length as 1 | 2 | 3, text: m[2] ?? '' });
+    else if ((m = line.match(/^\s*\[( |x|X)\](?:\s+(.*))?$/))) out.push({ id, type: 'todo', checked: m[1]!.toLowerCase() === 'x', text: m[2] ?? '' });
+    else if ((m = line.match(/^\s*[-*•](?:\s+(.*))?$/)) && !/^\s*-{2,}/.test(line)) out.push({ id, type: 'bullet', text: m[1] ?? '' });
+    else if ((m = line.match(/^\s*\d+[.)](?:\s+(.*))?$/))) out.push({ id, type: 'numbered', text: m[1] ?? '' });
     else if ((m = line.match(/^>\s?(.*)$/))) out.push({ id, type: 'quote', text: m[1]! });
     else if (/^\s*(-{3,}|_{3,})\s*$/.test(line)) out.push({ id, type: 'divider' });
     else out.push({ id, type: 'paragraph', text: line });

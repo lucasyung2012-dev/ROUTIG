@@ -27,8 +27,8 @@ export function ToastProvider({ children, closeLabel }: { children: ReactNode; c
     (message, kind = 'success', action) => {
       const id = ++seq.current;
       setItems((list) => [...list.slice(-2), { id, kind, message, action }]);
-      // Erros ficam mais tempo na tela para dar tempo de ler.
-      window.setTimeout(() => dismiss(id), kind === 'error' ? 8000 : action ? 7000 : 3500);
+      // Aviso com ação (ex.: "Atualizar") fica até o usuário decidir; erros ficam mais tempo.
+      if (!action) window.setTimeout(() => dismiss(id), kind === 'error' ? 8000 : 3500);
     },
     [dismiss],
   );

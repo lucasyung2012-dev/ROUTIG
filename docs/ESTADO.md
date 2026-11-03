@@ -23,13 +23,20 @@ Leia este arquivo no começo de toda conversa nova sobre o ROUTIG. A especifica�
 
 ### Testado
 
-- Ainda nada confirmado. O primeiro envio ao GitHub vai rodar tipos, testes e build pela primeira vez.
+- **CI (GitHub Actions):** tipos, 6 arquivos de teste e build passando; publicação no GitHub Pages funcionando.
+- **No navegador, app publicado (tamanho celular e iPad):** onboarding completo (idioma, tema escuro, módulos, nome, preferências), Dashboard com saudação, sidebar no iPad, tela de comparação do logo, aviso de versão nova e troca de versão, aviso de funcionamento offline.
+- **Logo vetorial:** sobreposição com o PNG medida por pixel: 70% na primeira versão, 97,9% na atual.
+- Não testado ainda: iPad e iPhone reais (Safari), Apple Pencil, instalação na tela de início.
+
+### Corrigido depois do primeiro teste
+
+- Aviso de offline repetia a cada configuração salva.
+- Data do Dashboard com todas as palavras em maiúscula.
+- Cartão do logo espremido no tamanho de iPad.
+- Aviso de versão nova sumia sozinho; agora fica até o toque.
 
 ### Falta na Etapa 0
 
-- Ver o resultado do primeiro CI e corrigir o que falhar.
-- Ativar o GitHub Pages (Settings → Pages → Source: GitHub Actions).
-- Abrir o app publicado no navegador e conferir visual e fluxos.
 - Aprovação do dono do produto: design system e logo vetorial.
 
 ### Próxima etapa: 1 — Organização central

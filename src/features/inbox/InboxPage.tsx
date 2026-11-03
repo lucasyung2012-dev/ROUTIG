@@ -425,7 +425,7 @@ function ItemCard({ item, openItems }: { item: InboxItem; openItems: InboxItem[]
 /* ---------- Conversão com prévia e confirmação (Parte 20.2) ---------- */
 
 function ConvertDialog({ item, suggestion, type, openItems, onClose }: { item: InboxItem; suggestion: Suggestion; type: 'task' | 'event'; openItems: InboxItem[]; onClose: () => void }) {
-  const { t } = useSettings();
+  const { t, settings } = useSettings();
   const toast = useToast();
   const cal = useCalendarData();
   const taskEditor = useTaskEditor();
@@ -477,7 +477,7 @@ function ConvertDialog({ item, suggestion, type, openItems, onClose }: { item: I
     }
   };
 
-  const typeName = t(`inbox.types.${type}`);
+  const typeName = t(`inbox.types.${type}`).toLocaleLowerCase(settings.locale);
   return (
     <Dialog
       open

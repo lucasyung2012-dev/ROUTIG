@@ -27,6 +27,13 @@ describe('sugestões (lógica local, Parte 20.2)', () => {
     expect(parseTime('página 20')).toBeNull();
   });
 
+  it('tira do título a data e a hora que viraram campos', () => {
+    expect(suggest({ kind: 'text', text: 'treino de futebol sexta 17h #esporte', url: null }, TODAY).title).toBe('treino de futebol');
+    expect(suggest({ kind: 'text', text: 'entregar redação amanhã', url: null }, TODAY).title).toBe('entregar redação');
+    expect(suggest({ kind: 'text', text: 'prova de história dia 15 às 8h', url: null }, TODAY).title).toBe('prova de história');
+    expect(suggest({ kind: 'text', text: 'festa 20/12', url: null }, TODAY).title).toBe('festa');
+  });
+
   it('separa tags e limpa o título', () => {
     expect(extractTags('revisar #Matemática e #prova')).toEqual(['matemática', 'prova']);
     expect(cleanTitle('ideia: app de flashcards #estudo')).toBe('app de flashcards');

@@ -141,13 +141,37 @@ export function cleanTitle(text: string): string {
     .slice(0, 300);
 }
 
+/**
+ * Tira do título as palavras de data e hora que já viraram campos
+ * ("treino amanhã às 17h" → "treino").
+ */
+export function stripDateTime(text: string): string {
+  // Fronteira de palavra feita à mão: \b do JavaScript não entende letras acentuadas (amanhã, às).
+  const end = '(?=\\s|$|[,.;:!?])';
+  const rx = (body: string, flags = 'gi') => new RegExp(`(^|\\s)${body}${end}`, flags);
+  return ` ${text} `
+    .replace(rx('(?:às|as|at)?\\s*(?:[01]?\\d|2[0-3])(?::[0-5]\\d|h(?:[0-5]\\d)?)'), '$1')
+    .replace(rx('(?:depois de amanh[ãa]|amanh[ãa]|hoje|today|tomorrow)'), '$1')
+    .replace(
+      rx('(?:(?:na|no|nesta|neste|next|on)\\s+)?(?:domingo|segunda(?:-feira)?|ter[cç]a(?:-feira)?|quarta(?:-feira)?|quinta(?:-feira)?|sexta(?:-feira)?|s[áa]bado|sunday|monday|tuesday|wednesday|thursday|friday|saturday)'),
+      '$1',
+    )
+    .replace(rx('(?:no\\s+)?dia\\s+\\d{1,2}'), '$1')
+    .replace(rx('(?:em\\s+)?\\d{1,2}/\\d{1,2}(?:/\\d{2,4})?', 'g'), '$1')
+    .replace(/\s+/g, ' ')
+    .replace(/\s+([,.;:!?])/g, '$1')
+    .trim();
+}
+
 export function suggest(item: Pick<InboxItem, 'kind' | 'text' | 'url'>, today: DateKey = todayKey()): Suggestion {
   const text = item.text ?? '';
   const url = item.url ?? text.match(URL_RE)?.[0] ?? null;
   const tags = extractTags(text);
   const date = parseDate(text, today);
   const time = parseTime(text);
-  const title = cleanTitle(text) || (url ?? '');
+  const base = cleanTitle(text);
+  const stripped = date || time ? stripDateTime(base) : base;
+  const title = stripped || base || (url ?? '');
   const reasons: Suggestion['reasons'] = [];
 
   if (item.kind === 'image' || item.kind === 'file' || item.kind === 'audio') {

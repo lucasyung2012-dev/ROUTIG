@@ -51,7 +51,7 @@ export function RoutigMark({
       </defs>
       <path d={MARK_BOWL} stroke={stroke} strokeWidth={MARK_STROKE} strokeLinecap="round" strokeLinejoin="round" {...draw} />
       <path d={MARK_BODY} stroke={stroke} strokeWidth={MARK_STROKE} strokeLinecap="round" strokeLinejoin="round" {...draw} />
-      <path d={MARK_ARROW} fill={stroke} stroke={stroke} strokeWidth={10} strokeLinejoin="round" />
+      <path d={MARK_ARROW} fill={stroke} stroke={stroke} strokeWidth={12} strokeLinejoin="round" />
     </svg>
   );
 }

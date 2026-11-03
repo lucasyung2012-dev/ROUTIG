@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { MODULES, NAV_MODULE_IDS, SYSTEM_MODULE_IDS } from '@/app/modules';
 import { resolveTheme } from '@/services/theme';
-import { greetingKey } from '@/features/dashboard/DashboardPage';
+import { capitalizeFirst, greetingKey } from '@/features/dashboard/DashboardPage';
 import { formatBytes } from '@/services/storage';
 
 describe('módulos (Parte 2.2)', () => {
@@ -46,6 +46,11 @@ describe('utilitários', () => {
     expect(greetingKey(13)).toBe('dashboard.afternoon');
     expect(greetingKey(22)).toBe('dashboard.evening');
     expect(greetingKey(3)).toBe('dashboard.evening');
+  });
+
+  it('data com só a primeira letra maiúscula', () => {
+    expect(capitalizeFirst('segunda-feira, 2 de novembro de 2026')).toBe('Segunda-feira, 2 de novembro de 2026');
+    expect(capitalizeFirst('')).toBe('');
   });
 
   it('formata bytes', () => {

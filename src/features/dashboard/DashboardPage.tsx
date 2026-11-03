@@ -14,6 +14,11 @@ export function greetingKey(hour: number): 'dashboard.morning' | 'dashboard.afte
   return 'dashboard.evening';
 }
 
+/** "segunda-feira, 2 de novembro" → "Segunda-feira, 2 de novembro" (só a primeira letra). */
+export function capitalizeFirst(text: string): string {
+  return text.charAt(0).toLocaleUpperCase() + text.slice(1);
+}
+
 /**
  * Dashboard da Etapa 0. Ainda não existem dados de módulos, então ele não
  * mostra números: só a saudação, a data e o mapa dos módulos.
@@ -24,7 +29,7 @@ export function DashboardPage() {
   const now = new Date();
   const greeting = t(greetingKey(now.getHours()));
   const name = settings.profile.displayName.trim();
-  const date = new Intl.DateTimeFormat(locale, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(now);
+  const date = capitalizeFirst(new Intl.DateTimeFormat(locale, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(now));
   const modules = visibleModules(settings).filter((id) => id !== 'dashboard');
 
   return (
@@ -34,7 +39,7 @@ export function DashboardPage() {
           <RoutigMark className="h-full w-full" />
         </div>
         <div className="relative max-w-xl">
-          <p className="text-sm font-medium capitalize text-muted">{date}</p>
+          <p className="text-sm font-medium text-muted">{date}</p>
           <h1 className="mt-2 text-balance text-3xl font-semibold tracking-tight text-fg sm:text-4xl">
             {name ? t('dashboard.greetingNamed', { greeting, name }) : greeting}
           </h1>

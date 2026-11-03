@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useRegisterSW } from 'virtual:pwa-register/react';
 import { useSettings } from '@/app/SettingsProvider';
 import { useToast } from '@/ui/toast';
@@ -16,13 +16,21 @@ export function PwaPrompt() {
     updateServiceWorker,
   } = useRegisterSW();
 
-  useEffect(() => {
-    if (needRefresh) toast.show(t('pwa.updateReady'), 'info', { label: t('pwa.update'), run: () => void updateServiceWorker(true) });
-  }, [needRefresh, t, toast, updateServiceWorker]);
+  // Os textos mudam a cada configuração salva; o aviso deve sair uma vez só.
+  const latest = useRef({ t, toast, updateServiceWorker });
+  latest.current = { t, toast, updateServiceWorker };
 
   useEffect(() => {
-    if (offlineReady) toast.show(t('pwa.offlineReady'), 'success');
-  }, [offlineReady, t, toast]);
+    if (!needRefresh) return;
+    const { t: tr, toast: ts, updateServiceWorker: update } = latest.current;
+    ts.show(tr('pwa.updateReady'), 'info', { label: tr('pwa.update'), run: () => void update(true) });
+  }, [needRefresh]);
+
+  useEffect(() => {
+    if (!offlineReady) return;
+    const { t: tr, toast: ts } = latest.current;
+    ts.show(tr('pwa.offlineReady'), 'success');
+  }, [offlineReady]);
 
   return null;
 }

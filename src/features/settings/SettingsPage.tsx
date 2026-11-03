@@ -425,7 +425,7 @@ function AboutSection() {
   const approvedAt = settings.brand.approvedAt ? new Intl.DateTimeFormat(settings.locale, { dateStyle: 'medium' }).format(new Date(settings.brand.approvedAt)) : '';
   return (
     <div className="flex flex-col gap-6">
-      <Surface className="flex flex-col gap-5 sm:flex-row sm:items-center">
+      <Surface className="flex flex-col gap-5 xl:flex-row xl:items-center">
         <div className="flex shrink-0 gap-3">
           <img src={logoPngUrl} alt="" className="h-20 w-20 rounded-2xl" />
           <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-[#080B1C] p-2">
@@ -444,7 +444,7 @@ function AboutSection() {
             {settings.brand.vectorApproved ? t('settings.about.logoStatusVector', { date: approvedAt }) : t('settings.about.logoStatusPng')}
           </p>
         </div>
-        <Link to="/settings/logo" className="inline-flex h-11 shrink-0 items-center rounded-xl bg-brand px-4 text-[0.9375rem] font-medium text-white shadow-glow hover:brightness-110">
+        <Link to="/settings/logo" className="inline-flex h-11 w-fit shrink-0 items-center rounded-xl bg-brand px-4 text-[0.9375rem] font-medium text-white shadow-glow hover:brightness-110">
           {t('settings.about.logoCompare')}
         </Link>
       </Surface>

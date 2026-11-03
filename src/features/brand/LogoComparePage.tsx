@@ -2,7 +2,8 @@ import { useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { Check, ChevronLeft, Undo2 } from 'lucide-react';
 import { useSettings } from '@/app/SettingsProvider';
-import { RoutigMark, logoPngUrl } from '@/brand/Logo';
+import { RoutigMark, logoPngUrl, useVectorApproved } from '@/brand/Logo';
+import { VECTOR_APPROVED_AT } from '@/brand/mark';
 import { Badge } from '@/ui/Badge';
 import { Button } from '@/ui/Button';
 import { PageHeader } from '@/ui/PageHeader';
@@ -22,7 +23,10 @@ export function LogoComparePage() {
   const toast = useToast();
   const [mode, setMode] = useState<Mode>('overlay');
   const [opacity, setOpacity] = useState(60);
-  const approved = settings.brand.vectorApproved;
+  const approved = useVectorApproved();
+  const productDate = VECTOR_APPROVED_AT
+    ? new Intl.DateTimeFormat(settings.locale, { dateStyle: 'long' }).format(new Date(`${VECTOR_APPROVED_AT}T12:00:00`))
+    : '';
 
   const setApproved = (value: boolean) =>
     update((s) => ({ ...s, brand: { vectorApproved: value, approvedAt: value ? nowIso() : null } })).then(
@@ -100,8 +104,13 @@ export function LogoComparePage() {
           </div>
         )}
 
-        <div className="flex flex-wrap justify-end gap-2 border-t border-line/70 pt-5">
-          {approved ? (
+        <div className="flex flex-wrap items-center justify-end gap-2 border-t border-line/70 pt-5">
+          {productDate ? (
+            <p className="inline-flex items-center gap-2 text-sm text-muted">
+              <Check className="h-4 w-4 text-success" aria-hidden />
+              {t('logo.approvedProduct', { date: productDate })}
+            </p>
+          ) : approved ? (
             <Button variant="secondary" icon={<Undo2 className="h-4 w-4" aria-hidden />} onClick={() => setApproved(false)}>
               {t('logo.revoke')}
             </Button>

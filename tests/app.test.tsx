@@ -107,14 +107,11 @@ describe('aparência (Parte 3.3)', () => {
     expect((await loadSettings()).theme).toBe('dark');
   });
 
-  it('logo: o PNG original fica em uso até a aprovação do vetor', async () => {
+  it('logo: o vetor aprovado é o oficial e a tela de comparação mostra a data', async () => {
     await finishOnboarding();
     window.location.hash = '#/settings/logo';
-    const user = userEvent.setup();
     render(<App />);
-    await user.click(await screen.findByRole('button', { name: /Aprovar vetor/ }));
-    const s = await loadSettings();
-    expect(s.brand.vectorApproved).toBe(true);
-    expect(s.brand.approvedAt).not.toBeNull();
+    expect(await screen.findByText(/Vetor aprovado em .*2026/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Aprovar vetor/ })).not.toBeInTheDocument();
   });
 });

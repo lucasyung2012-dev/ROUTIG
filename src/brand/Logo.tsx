@@ -10,6 +10,7 @@ import {
   MARK_STROKE,
   MARK_VIEWBOX_CROP,
   MARK_VIEWBOX_FULL,
+  VECTOR_APPROVED_AT,
 } from './mark';
 
 export const logoPngUrl = `${import.meta.env.BASE_URL}${LOGO_PNG_PATH}`;
@@ -56,13 +57,19 @@ export function RoutigMark({
   );
 }
 
+/** O vetor está em uso: aprovado no produto ou, antes disso, neste aparelho. */
+export function useVectorApproved(): boolean {
+  const { settings } = useSettings();
+  return Boolean(VECTOR_APPROVED_AT) || settings.brand.vectorApproved;
+}
+
 /**
- * Logo usado no app. Enquanto o vetor não for aprovado, mostra o PNG original
+ * Logo usado no app. Antes da aprovação do vetor, mostra o PNG original
  * sem nenhuma alteração (Parte 3.1: não redesenhar o símbolo).
  */
 export function Logo({ size = 40, className, animated = false }: { size?: number; className?: string; animated?: boolean }) {
-  const { settings, t } = useSettings();
-  if (settings.brand.vectorApproved) {
+  const { t } = useSettings();
+  if (useVectorApproved()) {
     return <RoutigMark className={className} size={size} animated={animated} title={t('app.name')} />;
   }
   return (

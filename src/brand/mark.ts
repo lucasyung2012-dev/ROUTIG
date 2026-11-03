@@ -36,3 +36,6 @@ export const MARK_GRADIENT = {
 } as const;
 
 export const LOGO_PNG_PATH = 'brand/routig-logo-original.png';
+
+/** Aprovação do dono do produto (docs/DECISOES.md): vale para todos os aparelhos. */
+export const VECTOR_APPROVED_AT = '2026-11-02';

@@ -37,7 +37,8 @@ Leia este arquivo no começo de toda conversa nova sobre o ROUTIG. A especifica�
 
 ### Falta na Etapa 0
 
-- Aprovação do dono do produto: design system e logo vetorial.
+- ~~Aprovação do logo vetorial~~: aprovado em 2026-11-02.
+- Aprovação do design system pelo dono do produto.
 
 ### Próxima etapa: 1 — Organização central
 

@@ -6,7 +6,8 @@ import { useSettings } from '@/app/SettingsProvider';
 import { APP_VERSION } from '@/app/version';
 import { DB_SCHEMA_VERSION } from '@/data/db';
 import { moveModule, toggleIn, type Settings } from '@/domain/settings';
-import { RoutigMark, logoPngUrl } from '@/brand/Logo';
+import { RoutigMark, logoPngUrl, useVectorApproved } from '@/brand/Logo';
+import { VECTOR_APPROVED_AT } from '@/brand/mark';
 import { formatBytes, getStorageStatus, requestPersistence, type StorageStatus } from '@/services/storage';
 import { Badge } from '@/ui/Badge';
 import { Button } from '@/ui/Button';
@@ -422,7 +423,9 @@ function StorageSection() {
 
 function AboutSection() {
   const { settings, t, tl } = useSettings();
-  const approvedAt = settings.brand.approvedAt ? new Intl.DateTimeFormat(settings.locale, { dateStyle: 'medium' }).format(new Date(settings.brand.approvedAt)) : '';
+  const vectorApproved = useVectorApproved();
+  const approvedIso = VECTOR_APPROVED_AT ? `${VECTOR_APPROVED_AT}T12:00:00` : settings.brand.approvedAt;
+  const approvedAt = approvedIso ? new Intl.DateTimeFormat(settings.locale, { dateStyle: 'medium' }).format(new Date(approvedIso)) : '';
   return (
     <div className="flex flex-col gap-6">
       <Surface className="flex flex-col gap-5 xl:flex-row xl:items-center">
@@ -435,13 +438,13 @@ function AboutSection() {
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-[0.9375rem] font-semibold text-fg">{t('settings.about.logoTitle')}</h2>
-            <Badge tone={settings.brand.vectorApproved ? 'success' : 'warning'}>
-              {settings.brand.vectorApproved ? t('logo.statusApproved') : t('logo.statusPending')}
+            <Badge tone={vectorApproved ? 'success' : 'warning'}>
+              {vectorApproved ? t('logo.statusApproved') : t('logo.statusPending')}
             </Badge>
           </div>
           <p className="mt-1 text-sm leading-relaxed text-muted">{t('settings.about.logoBody')}</p>
           <p className="mt-1 text-xs text-subtle">
-            {settings.brand.vectorApproved ? t('settings.about.logoStatusVector', { date: approvedAt }) : t('settings.about.logoStatusPng')}
+            {vectorApproved ? t('settings.about.logoStatusVector', { date: approvedAt }) : t('settings.about.logoStatusPng')}
           </p>
         </div>
         <Link to="/settings/logo" className="inline-flex h-11 w-fit shrink-0 items-center rounded-xl bg-brand px-4 text-[0.9375rem] font-medium text-white shadow-glow hover:brightness-110">

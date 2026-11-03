@@ -384,6 +384,7 @@ export const en: Messages = {
     revoked: 'The app is back to the original PNG.',
     statusPending: 'Waiting for your approval',
     statusApproved: 'Approved',
+    approvedProduct: 'Vector approved on {date}. It is the official logo on every device.',
   },
   design: {
     title: 'Design system',

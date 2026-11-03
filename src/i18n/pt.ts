@@ -382,6 +382,7 @@ export const pt = {
     revoked: 'O app voltou a usar o PNG original.',
     statusPending: 'Aguardando sua aprovação',
     statusApproved: 'Aprovado',
+    approvedProduct: 'Vetor aprovado em {date}. Ele é o logo oficial em todos os aparelhos.',
   },
   design: {
     title: 'Design system',

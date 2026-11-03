@@ -13,4 +13,5 @@ Registro das decisões tomadas com o dono do produto. Não mudar sem nova aprova
 | 2026-11-02 | **Notificações:** lembretes locais com o app aberto. Web Push (app fechado) só no futuro, com autorização, porque exige servidor. |
 | 2026-11-02 | **Backup:** automático dentro do app + exportação manual para Arquivos (o Safari não permite gravar sozinho numa pasta). |
 | 2026-11-02 | **Finanças:** criptografia com chave derivada de PIN; valores ocultos no Dashboard e na busca por padrão. |
+| 2026-11-02 | **Logo vetorial aprovado** pelo dono do produto, depois da comparação com o PNG (97,9% de sobreposição). Vale em todos os aparelhos (`VECTOR_APPROVED_AT` em `src/brand/mark.ts`). O ícone do PWA continua sendo o PNG original. |
 | 2026-11-02 | **Sem Node local:** o computador de desenvolvimento não tem Node.js. Toda verificação de tipos, testes e build acontece no GitHub Actions. |

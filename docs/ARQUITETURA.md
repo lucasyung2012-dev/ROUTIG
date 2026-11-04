@@ -35,6 +35,8 @@
 | 7 | 1 | + `interests` (interesses do Profile, ligados a projetos e notas por id) e `historyEntries` (registros escritos à mão em Minha história). Categorias próprias, ajustes da linha do tempo e o painel ficam em `kv` |
 | 8 | 2 | + `academicYears` (ano letivo com períodos, modelo de nota e escala de domínio), `subjects`, `teachers`, `assessments`, `periodResults` (recuperação e bônus por disciplina e período) |
 | 9 | 2 | + `contents` (conteúdo programático em árvore), `lessons` (registro de aulas), `doubts`. Tarefas e projetos ganham `subjectId` opcional (atividades e trabalhos da disciplina, sem cópia) |
+| 10 | 2 | + `decks`, `cards` (estado da repetição espaçada em `srs`, índice `srs.due`), `cardReviews` (histórico de cada resposta) |
+| 11 | 2 | + `studySessions` (planejamento de estudos) |
 
 ## Navegação
 

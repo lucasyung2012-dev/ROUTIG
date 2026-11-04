@@ -8,8 +8,8 @@ Leia este arquivo no começo de toda conversa nova sobre o ROUTIG. A especifica�
 
 - **Etapa 0 — Fundação:** concluída. Logo vetorial e design system aprovados pelo dono do produto em 2026-11-02.
 - **Etapa 1 — Organização central:** concluída no código (versão 0.7.0). Tasks, Calendar, Inbox, Notes, Projects, Dashboard, Profile e Settings publicados. Falta o dono do produto testar no iPad o Dashboard, o Profile e as Settings novas.
-- **Etapa 2 — Aprendizagem:** em andamento. Academy partes 1 (0.11.0) e 2 (0.12.0) publicadas e testadas no navegador. O dono do produto pediu para parar depois da parte 2 (2026-11-03, noite).
-- **Próximo passo:** Academy parte 3 (flashcards com repetição espaçada, planejamento de estudos, preparação para provas, pós-avaliação, importação com prévia) e Idiomas. O dono do produto autorizou seguir sem esperar confirmação a cada entrega (2026-11-03).
+- **Etapa 2 — Aprendizagem:** em andamento. Academy partes 1 (0.11.0), 2 (0.12.0), 3a flashcards (0.13.0) e 3b planejamento (0.14.0) publicadas e testadas no navegador.
+- **Próximo passo:** Academy 3c (preparação para provas e pós-avaliação: conteúdos cobrados, plano de revisão, questões, simulados, erros, reforço) e 3d (importação acadêmica com prévia), depois conferir a Parte 9 item por item, e Idiomas (reaproveita o motor de repetição espaçada de `domain/srs.ts`). O dono do produto autorizou seguir sem esperar confirmação a cada entrega (2026-11-03).
 - **Como trabalhar:** o computador de desenvolvimento não tem Node. Escrever o código, enviar com `git push`, conferir o GitHub Actions (anotações de erro aparecem por arquivo e linha) e testar no app publicado.
 
 ## Etapa 1 — andamento
@@ -72,6 +72,8 @@ Leia este arquivo no começo de toda conversa nova sobre o ROUTIG. A especifica�
 | 0.10.0 | 2026-11-03 | Claude (Claude Code) | Mais cores em todo o app: paleta única (preto, cinzas, branco e cores do ROUTIG) com "Outra cor" em projetos, interesses, listas, cadernos (agora editáveis) e categorias do Calendar. |
 | 0.11.0 | 2026-11-03 | Claude (Claude Code) | Etapa 2, Academy parte 1: anos letivos com instituição, série e períodos; disciplinas, itinerários e ênfases; professores; avaliações; modelo de nota configurável por ano e por disciplina (PP 2 + PU 4 + PO 2 + AC 2, média 6,0); recuperação até 6,0 e bônus até 0,5 acima de 6,0, com cálculo passo a passo e histórico; avaliações no Calendar e cartão Academy no Dashboard. |
 | 0.12.0 | 2026-11-03 | Claude (Claude Code) | Etapa 2, Academy parte 2: conteúdo programático em árvore (unidade, capítulo, tema, subtema, aula) com andamento e domínio separados, escala de domínio editável por ano; registro de aulas (data, professor, conteúdos, anotações, dificuldades, atividades, observações, materiais); dúvidas com resposta; trabalhos = projetos ligados à disciplina (instruções e critérios); atividades = tarefas ligadas à disciplina; materiais = notas ligadas; painel com progresso de aprendizagem, conteúdos recentes, dúvidas e materiais. |
+| 0.13.0 | 2026-11-03 | Claude (Claude Code) | Academy parte 3a: flashcards com repetição espaçada adaptativa (baralhos por disciplina ou livres, categorias e tags, cartões ligados ao conteúdo, revisão programada com atrasados e difíceis primeiro, cartão errado volta na mesma sessão, treino livre que não muda o agendamento, histórico, domínio estimado), aba Revisões e central de revisão. |
+| 0.14.0 | 2026-11-03 | Claude (Claude Code) | Academy parte 3b: planejamento de estudos (sessões com disciplina, conteúdos, data, hora, duração, prioridade e prova; revisões distribuídas 14/7/3/1 dia antes da prova com prévia; concluir com tempo real e dificuldades; pular; resumo da semana), sessões no Calendar e no painel da Academy. |
 
 ## Calendar (Parte 6) — o que existe
 

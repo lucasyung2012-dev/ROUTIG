@@ -125,7 +125,7 @@ export function ContentsTab({ subject, data, extras }: { subject: Subject; data:
       ) : (
         <Surface padded={false} className="divide-y divide-line/60">
           {nodes.map(({ content: c, depth }) => (
-            <div key={c.id} className="flex flex-col gap-2 px-3 py-2.5 sm:flex-row sm:items-center" style={{ paddingLeft: `${0.75 + depth * 1.25}rem` }}>
+            <div key={c.id} className="flex flex-col gap-2 px-3 py-2.5 xl:flex-row xl:items-center" style={{ paddingLeft: `${0.75 + depth * 1.25}rem` }}>
               <div className="flex min-w-0 flex-1 items-center gap-2">
                 {depth > 0 && <CornerDownRight className="h-3.5 w-3.5 shrink-0 text-subtle" aria-hidden />}
                 <span className="shrink-0 text-[0.7rem] font-semibold uppercase tracking-wide text-subtle">{t(`academy.contents.kinds.${c.kind}`)}</span>

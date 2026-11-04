@@ -8,8 +8,8 @@ Leia este arquivo no começo de toda conversa nova sobre o ROUTIG. A especifica�
 
 - **Etapa 0 — Fundação:** concluída. Logo vetorial e design system aprovados pelo dono do produto em 2026-11-02.
 - **Etapa 1 — Organização central:** concluída no código (versão 0.7.0). Tasks, Calendar, Inbox, Notes, Projects, Dashboard, Profile e Settings publicados. Falta o dono do produto testar no iPad o Dashboard, o Profile e as Settings novas.
-- **Etapa 2 — Aprendizagem:** em andamento. Academy parte 1 publicada (0.11.0).
-- **Próximo passo:** Academy parte 2 (conteúdo programático com status e domínio, registro de aulas, dúvidas, trabalhos ligados a Tasks e Projects), depois parte 3 (flashcards com repetição espaçada, planejamento de estudos, preparação para provas, pós-avaliação, importação com prévia) e Idiomas. O dono do produto autorizou seguir sem esperar confirmação a cada entrega (2026-11-03).
+- **Etapa 2 — Aprendizagem:** em andamento. Academy partes 1 (0.11.0) e 2 (0.12.0) publicadas e testadas no navegador. O dono do produto pediu para parar depois da parte 2 (2026-11-03, noite).
+- **Próximo passo:** Academy parte 3 (flashcards com repetição espaçada, planejamento de estudos, preparação para provas, pós-avaliação, importação com prévia) e Idiomas. O dono do produto autorizou seguir sem esperar confirmação a cada entrega (2026-11-03).
 - **Como trabalhar:** o computador de desenvolvimento não tem Node. Escrever o código, enviar com `git push`, conferir o GitHub Actions (anotações de erro aparecem por arquivo e linha) e testar no app publicado.
 
 ## Etapa 1 — andamento
@@ -71,6 +71,7 @@ Leia este arquivo no começo de toda conversa nova sobre o ROUTIG. A especifica�
 | 0.9.0 | 2026-11-03 | Claude (Claude Code) | Desenho do Notes completo: marca-texto, formas por arrastar (linha, seta, retângulo, círculo), laço para selecionar e mover, mão e zoom, fundo liso, pautado, quadriculado ou pontilhado, desenhar sobre imagem, refazer, salvar como imagem (PNG). Corrige perda de edição feita durante o salvamento em Notes, Projects e Interesses. Excluir nota de vez não apaga arquivo usado como capa, foto ou fundo de desenho. |
 | 0.10.0 | 2026-11-03 | Claude (Claude Code) | Mais cores em todo o app: paleta única (preto, cinzas, branco e cores do ROUTIG) com "Outra cor" em projetos, interesses, listas, cadernos (agora editáveis) e categorias do Calendar. |
 | 0.11.0 | 2026-11-03 | Claude (Claude Code) | Etapa 2, Academy parte 1: anos letivos com instituição, série e períodos; disciplinas, itinerários e ênfases; professores; avaliações; modelo de nota configurável por ano e por disciplina (PP 2 + PU 4 + PO 2 + AC 2, média 6,0); recuperação até 6,0 e bônus até 0,5 acima de 6,0, com cálculo passo a passo e histórico; avaliações no Calendar e cartão Academy no Dashboard. |
+| 0.12.0 | 2026-11-03 | Claude (Claude Code) | Etapa 2, Academy parte 2: conteúdo programático em árvore (unidade, capítulo, tema, subtema, aula) com andamento e domínio separados, escala de domínio editável por ano; registro de aulas (data, professor, conteúdos, anotações, dificuldades, atividades, observações, materiais); dúvidas com resposta; trabalhos = projetos ligados à disciplina (instruções e critérios); atividades = tarefas ligadas à disciplina; materiais = notas ligadas; painel com progresso de aprendizagem, conteúdos recentes, dúvidas e materiais. |
 
 ## Calendar (Parte 6) — o que existe
 

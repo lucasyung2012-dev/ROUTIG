@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Activity, ArrowRight, CalendarDays, Diamond, FolderKanban, GraduationCap, Inbox, ListTodo, NotebookPen, Sun } from 'lucide-react';
+import { Activity, ArrowRight, CalendarDays, Diamond, FolderKanban, GraduationCap, Inbox, Languages, ListTodo, NotebookPen, Sun } from 'lucide-react';
 import { MODULES, TONE_CLASSES, type ModuleId } from '@/app/modules';
 import { useSettings } from '@/app/SettingsProvider';
 import { isModuleReady } from '@/app/version';
@@ -16,6 +16,7 @@ import { visibleModules } from '@/domain/settings';
 import { useEventEditor } from '@/features/calendar/EventEditor';
 import { toneLook, useCalendarData } from '@/features/calendar/useCalendarData';
 import { useAcademyData } from '@/features/academy/useAcademyData';
+import { useLanguages } from '@/features/languages/useLanguages';
 import { useProjectsData } from '@/features/projects/useProjectsData';
 import { TaskRow } from '@/features/tasks/TaskRow';
 import { useTaskEditor } from '@/features/tasks/TaskEditor';
@@ -432,6 +433,8 @@ export function renderLiveCard(id: LiveCard): ReactNode {
       return <TasksCard />;
     case 'academy':
       return <AcademyCard />;
+    case 'languages':
+      return <LanguagesCard />;
     case 'projects':
       return <ProjectsCard />;
     case 'milestones':
@@ -451,6 +454,7 @@ export const MODULE_OF_LIVE: Partial<Record<LiveCard, ModuleId>> = {
   events: 'calendar',
   tasks: 'tasks',
   academy: 'academy',
+  languages: 'languages',
   projects: 'projects',
   milestones: 'projects',
   notes: 'notes',
@@ -501,6 +505,40 @@ export function AcademyCard() {
             </ul>
           )}
         </>
+      )}
+    </CardShell>
+  );
+}
+
+/* ---------- Idiomas ---------- */
+
+/** Tempo de estudo da semana em cada idioma e o nível de cada um. */
+export function LanguagesCard() {
+  const { t } = useSettings();
+  const data = useLanguages();
+  const weekAgo = addDays(todayKey(), -6);
+  return (
+    <CardShell title={t('dashboard.cards.languages')} icon={<Languages className="h-5 w-5" />} tone="teal" link={{ to: '/languages', label: t('common.open') }}>
+      {data.loading ? (
+        <LoadingState label={t('common.loading')} lines={3} />
+      ) : data.languages.length === 0 ? (
+        <p className="text-sm text-muted">{t('dashboard.languagesEmpty')}</p>
+      ) : (
+        <ul className="flex flex-col gap-1">
+          {data.languages.map((l) => {
+            const min = data.sessionsOf(l.id).filter((s) => s.date >= weekAgo).reduce((a, s) => a + s.durationMin, 0);
+            return (
+              <li key={l.id}>
+                <Link to={`/languages/${l.id}`} className="flex items-center gap-3 rounded-xl px-2 py-1.5 transition hover:bg-surface-2/70">
+                  <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: l.color }} aria-hidden />
+                  <span className="min-w-0 flex-1 truncate text-sm font-medium text-fg">{l.name}</span>
+                  <span className="text-xs text-muted">{l.native ? t('languages.native') : (l.level ?? t('languages.noLevel'))}</span>
+                  <span className="w-16 text-right text-xs tabular text-fg">{t('languages.minutes', { min })}</span>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
       )}
     </CardShell>
   );

@@ -7,9 +7,9 @@ export const KPI_METRICS = ['tasksOverdue', 'tasksToday', 'tasksDoneWeek', 'proj
 export type KpiMetric = (typeof KPI_METRICS)[number];
 
 /** Cartões que já mostram dados reais. */
-export const LIVE_CARDS = ['today', 'events', 'tasks', 'academy', 'projects', 'milestones', 'notes', 'inbox', 'activity', 'modules'] as const;
+export const LIVE_CARDS = ['today', 'events', 'tasks', 'academy', 'languages', 'projects', 'milestones', 'notes', 'inbox', 'activity', 'modules'] as const;
 /** Cartões de módulos ainda não construídos: aparecem no catálogo como "em breve", nunca no painel. */
-export const PLANNED_CARDS = ['languages', 'habits', 'goals', 'sports', 'music', 'focus', 'insights'] as const;
+export const PLANNED_CARDS = ['habits', 'goals', 'sports', 'music', 'focus', 'insights'] as const;
 
 export type LiveCard = (typeof LIVE_CARDS)[number];
 export type PlannedCard = (typeof PLANNED_CARDS)[number];
@@ -72,6 +72,7 @@ export const DEFAULT_SIZE: Record<LiveCard, CardSize> = {
   events: 'md',
   tasks: 'md',
   academy: 'md',
+  languages: 'md',
   projects: 'md',
   milestones: 'md',
   notes: 'md',
@@ -117,7 +118,7 @@ export function builtinProfiles(): DashboardProfile[] {
       id: 'studies',
       name: '',
       builtin: true,
-      cards: [slot('today'), slot('kpi:tasksToday'), slot('kpi:tasksDoneWeek'), slot('kpi:eventsWeek'), slot('academy'), slot('events'), slot('tasks'), slot('notes'), slot('inbox', 'md')],
+      cards: [slot('today'), slot('kpi:tasksToday'), slot('kpi:tasksDoneWeek'), slot('kpi:eventsWeek'), slot('academy'), slot('languages'), slot('events'), slot('tasks'), slot('notes'), slot('inbox', 'md')],
     },
     {
       id: 'projects',

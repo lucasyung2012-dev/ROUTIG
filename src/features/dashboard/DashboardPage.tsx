@@ -1,24 +1,41 @@
-import { Link } from 'react-router-dom';
-import { ArrowRight, CalendarDays, Inbox, ListTodo, Sparkles } from 'lucide-react';
+import { useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { getDb } from '@/data/db';
-import { addDays, capitalizeFirst, formatDateKey, toDateKey, todayKey } from '@/domain/dates';
-import { fromMinutes } from '@/domain/events';
-import { useEventEditor } from '@/features/calendar/EventEditor';
-import { TONE_ITEM, useCalendarData } from '@/features/calendar/useCalendarData';
-import { compareTasks, isClosedKind, statusKind } from '@/domain/tasks';
-import { TaskRow } from '@/features/tasks/TaskRow';
-import { useTaskEditor } from '@/features/tasks/TaskEditor';
-import { useTaskActions } from '@/features/tasks/useTaskActions';
-import { useTasksData } from '@/features/tasks/useTasksData';
-import { LoadingState } from '@/ui/States';
-import { MODULES, TONE_CLASSES } from '@/app/modules';
+import { ArrowDown, ArrowUp, Check, Maximize2, Plus, SlidersHorizontal, Trash2, X } from 'lucide-react';
+import { MODULES } from '@/app/modules';
 import { useSettings } from '@/app/SettingsProvider';
-import { isModuleReady } from '@/app/version';
-import { visibleModules } from '@/domain/settings';
 import { RoutigMark } from '@/brand/Logo';
+import { loadDashboardConfig, saveDashboardConfig } from '@/data/dashboardRepo';
+import { capitalizeFirst } from '@/domain/dates';
+import {
+  CARD_MODULE,
+  KPI_METRICS,
+  KPI_MODULE,
+  LIVE_CARDS,
+  PLANNED_CARDS,
+  addCard,
+  cycleSize,
+  isKpi,
+  moveCard,
+  removeCard,
+  type CardId,
+  type CardSize,
+  type CardSlot,
+  type DashboardConfig,
+  type DashboardProfile,
+  type KpiMetric,
+  type LiveCard,
+} from '@/domain/dashboard';
+import { newId } from '@/domain/ids';
 import { Badge } from '@/ui/Badge';
+import { Button } from '@/ui/Button';
+import { ConfirmDialog } from '@/ui/ConfirmDialog';
+import { Dialog } from '@/ui/Dialog';
+import { Field, Input, Select } from '@/ui/Field';
+import { IconButton } from '@/ui/IconButton';
+import { EmptyState, LoadingState } from '@/ui/States';
+import { useToast } from '@/ui/toast';
 import { cn } from '@/ui/cn';
+import { KpiCard, renderLiveCard } from './cards';
 
 export function greetingKey(hour: number): 'dashboard.morning' | 'dashboard.afternoon' | 'dashboard.evening' {
   if (hour >= 5 && hour < 12) return 'dashboard.morning';
@@ -28,215 +45,252 @@ export function greetingKey(hour: number): 'dashboard.morning' | 'dashboard.afte
 
 export { capitalizeFirst } from '@/domain/dates';
 
-/** Resumo da Inbox: quantos itens esperam organização. */
-function InboxSummary() {
-  const { t } = useSettings();
-  const today = todayKey();
-  const count = useLiveQuery(
-    () => getDb().inbox.filter((i) => !i.deletedAt && i.status === 'open' && (!i.snoozedUntil || i.snoozedUntil <= today)).count(),
-    [today],
-  );
-  if (count === undefined) return null;
-  return (
-    <Link
-      to="/inbox"
-      className="flex items-center gap-4 rounded-2xl bg-surface p-4 shadow-soft ring-1 ring-line/70 transition hover:-translate-y-0.5 hover:shadow-lift"
-    >
-      <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-surface-3 text-muted">
-        <Inbox className="h-5 w-5" aria-hidden />
-      </span>
-      <span className="flex-1">
-        <span className="block font-semibold text-fg">{t('modules.inbox')}</span>
-        <span className="block text-sm text-muted">{count === 0 ? t('inbox.empty.open') : t('dashboard.inboxCount', { count })}</span>
-      </span>
-      <ArrowRight className="h-4 w-4 text-subtle" aria-hidden />
-    </Link>
-  );
-}
+/** Largura no grid: pequeno = 1/4, médio = metade, largo = linha inteira (no celular, pequeno = meia linha). */
+const SPAN: Record<CardSize, string> = {
+  sm: 'col-span-1',
+  md: 'col-span-2',
+  lg: 'col-span-2 lg:col-span-4',
+};
 
-/** Próximos compromissos (7 dias), vindos do Calendar. */
-function EventsCard() {
-  const { t, settings } = useSettings();
-  const cal = useCalendarData();
-  const events = useEventEditor();
-  const today = todayKey();
-  const upcoming = cal.itemsInRange(today, addDays(today, 7), { showTasks: false, categoryId: null }).filter((i) => i.kind === 'event').slice(0, 6);
-
-  return (
-    <section aria-labelledby="dash-events" className="rounded-3xl bg-surface p-5 shadow-soft ring-1 ring-line/70 sm:p-6">
-      <div className="flex flex-wrap items-center gap-3">
-        <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue/10 text-blue">
-          <CalendarDays className="h-5 w-5" aria-hidden />
-        </span>
-        <h2 id="dash-events" className="flex-1 text-lg font-semibold tracking-tight text-fg">
-          {t('dashboard.eventsTitle')}
-        </h2>
-        <Link to="/calendar" className="text-sm font-medium text-accent hover:underline">
-          {t('dashboard.openCalendar')}
-        </Link>
-      </div>
-      {cal.loading ? (
-        <LoadingState label={t('common.loading')} lines={3} className="mt-4" />
-      ) : upcoming.length === 0 ? (
-        <p className="mt-4 text-sm text-muted">{t('dashboard.eventsEmpty')}</p>
-      ) : (
-        <ul className="mt-4 flex flex-col gap-1.5">
-          {upcoming.map((i) => (
-            <li key={i.key}>
-              <button
-                type="button"
-                onClick={() => i.occurrence && events.openEvent(i.occurrence.event.id, i.occurrence.seriesDate)}
-                className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left transition hover:bg-surface-2/70"
-              >
-                <span className={cn('h-9 w-1 shrink-0 rounded-full', TONE_ITEM[i.tone].bar)} aria-hidden />
-                <span className="w-16 shrink-0 text-xs font-medium capitalize text-muted">
-                  {i.date === today ? t('tasks.due.today') : formatDateKey(i.date, settings.locale, { weekday: 'short', day: 'numeric' })}
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[0.9375rem] font-medium text-fg">{i.title}</span>
-                  <span className="block text-xs tabular text-muted">{i.allDay ? t('calendar.allDay') : fromMinutes(i.start!)}</span>
-                </span>
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
-  );
-}
-
-/** Resumo real das tarefas: só conta o que está registrado (Parte 5.3). */
-function TasksCard() {
-  const { t } = useSettings();
-  const data = useTasksData();
-  const editor = useTaskEditor();
-  const actions = useTaskActions(data);
-  const today = todayKey();
-  const open = data.active.filter((x) => !isClosedKind(statusKind(data.config, x.statusId)));
-  const overdue = open.filter((x) => x.dueDate && x.dueDate < today).length;
-  const dueToday = open.filter((x) => x.dueDate === today).length;
-  const doneToday = data.active.filter((x) => x.completedAt && toDateKey(new Date(x.completedAt)) === today).length;
-  const next = [...open].sort(compareTasks(data.config)).slice(0, 5);
-
-  return (
-    <section aria-labelledby="dash-tasks" className="rounded-3xl bg-surface p-5 shadow-soft ring-1 ring-line/70 sm:p-6">
-      <div className="flex flex-wrap items-center gap-3">
-        <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet/10 text-violet">
-          <ListTodo className="h-5 w-5" aria-hidden />
-        </span>
-        <h2 id="dash-tasks" className="flex-1 text-lg font-semibold tracking-tight text-fg">
-          {t('dashboard.tasksTitle')}
-        </h2>
-        <Link to="/tasks" className="text-sm font-medium text-accent hover:underline">
-          {t('dashboard.seeAll')}
-        </Link>
-      </div>
-
-      {data.loading ? (
-        <LoadingState label={t('common.loading')} lines={3} className="mt-4" />
-      ) : open.length === 0 ? (
-        <p className="mt-4 text-sm text-muted">{t('dashboard.tasksEmpty')}</p>
-      ) : (
-        <>
-          <div className="mt-4 flex flex-wrap gap-2">
-            {overdue > 0 && <Badge tone="danger">{t('dashboard.tasksOverdue', { count: overdue })}</Badge>}
-            <Badge tone="accent">{t('dashboard.tasksToday', { count: dueToday })}</Badge>
-            <Badge>{t('dashboard.tasksOpen', { count: open.length })}</Badge>
-            {doneToday > 0 && <Badge tone="success">{t('dashboard.doneToday', { count: doneToday })}</Badge>}
-          </div>
-          <h3 className="mb-1 mt-5 text-xs font-semibold uppercase tracking-[0.14em] text-subtle">{t('dashboard.nextUp')}</h3>
-          <ul className="flex flex-col">
-            {next.map((task) => (
-              <li key={task.id}>
-                <TaskRow task={task} data={data} onOpen={editor.openTask} onToggle={actions.toggle} compact />
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
-      {actions.dialogs}
-    </section>
-  );
+function moduleOf(id: CardId) {
+  return isKpi(id) ? KPI_MODULE[id.slice(4) as KpiMetric] : CARD_MODULE[id as LiveCard];
 }
 
 /**
- * Dashboard: saudação, resumo real das tarefas e o mapa dos módulos.
- * Os outros módulos entram no painel conforme forem construídos.
+ * Dashboard (Parte 5): perfis de painel, cartões e indicadores com dados reais.
+ * "Personalizar" edita uma cópia (prévia); só "Aplicar" grava.
  */
 export function DashboardPage() {
   const { settings, t } = useSettings();
-  const locale = settings.locale;
+  const toast = useToast();
+  const saved = useLiveQuery(() => loadDashboardConfig(), []);
+  const [draft, setDraft] = useState<DashboardConfig | null>(null);
+  const [catalogOpen, setCatalogOpen] = useState(false);
+  const [naming, setNaming] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
   const now = new Date();
   const greeting = t(greetingKey(now.getHours()));
   const name = settings.profile.displayName.trim();
-  const date = capitalizeFirst(new Intl.DateTimeFormat(locale, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(now));
-  const modules = visibleModules(settings).filter((id) => id !== 'dashboard');
+  const date = capitalizeFirst(new Intl.DateTimeFormat(settings.locale, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(now));
+
+  const config = draft ?? saved;
+  const editing = draft !== null;
+  const profile = config?.profiles.find((p) => p.id === config.activeId) ?? config?.profiles[0];
+  const hidden = new Set<string>(settings.nav.hidden);
+  const visible = (profile?.cards ?? []).filter((c) => {
+    const mod = moduleOf(c.id);
+    return !mod || !hidden.has(mod);
+  });
+
+  const profileName = (p: DashboardProfile) => (p.builtin ? t(`dashboard.profiles.${p.id as 'complete' | 'studies' | 'projects'}`) : p.name);
+
+  const updateCards = (fn: (cards: CardSlot[]) => CardSlot[]) =>
+    setDraft((d) => (d ? { ...d, profiles: d.profiles.map((p) => (p.id === d.activeId ? { ...p, cards: fn(p.cards) } : p)) } : d));
+
+  const switchProfile = async (id: string) => {
+    if (!config) return;
+    if (editing) setDraft({ ...config, activeId: id });
+    else await saveDashboardConfig({ ...config, activeId: id });
+  };
+
+  const apply = async () => {
+    if (!draft) return;
+    await saveDashboardConfig(draft);
+    setDraft(null);
+    toast.show(t('dashboard.applied'));
+  };
+
+  const createProfile = (label: string) => {
+    if (!config) return;
+    const p: DashboardProfile = { id: newId('dash'), name: label.trim().slice(0, 40), builtin: false, cards: profile ? [...profile.cards] : [] };
+    setDraft({ activeId: p.id, profiles: [...config.profiles, p] });
+    setNaming(false);
+  };
+
+  const deleteProfile = async () => {
+    if (!config || !profile || profile.builtin) return;
+    const next = { activeId: 'complete', profiles: config.profiles.filter((p) => p.id !== profile.id) };
+    if (editing) setDraft(next);
+    else await saveDashboardConfig(next);
+    setDeleting(false);
+  };
 
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-6">
       <section className="relative overflow-hidden rounded-3xl bg-surface p-6 shadow-soft ring-1 ring-line/70 sm:p-8">
         <div className="pointer-events-none absolute -right-10 -top-16 h-72 w-72 opacity-[0.16] sm:opacity-25" aria-hidden>
           <RoutigMark className="h-full w-full" />
         </div>
-        <div className="relative max-w-xl">
+        <div className="relative">
           <p className="text-sm font-medium text-muted">{date}</p>
-          <h1 className="mt-2 text-balance text-3xl font-semibold tracking-tight text-fg sm:text-4xl">
-            {name ? t('dashboard.greetingNamed', { greeting, name }) : greeting}
-          </h1>
-          <div className="mt-5 flex items-start gap-3 rounded-2xl bg-surface-2/70 p-4 ring-1 ring-line/60">
-            <Sparkles className="mt-0.5 h-5 w-5 shrink-0 text-accent" aria-hidden />
-            <div>
-              <div className="text-[0.9375rem] font-semibold text-fg">{t('dashboard.foundationTitle')}</div>
-              <p className="mt-1 text-sm leading-relaxed text-muted">{t('dashboard.foundationBody')}</p>
+          <h1 className="mt-2 text-balance text-3xl font-semibold tracking-tight text-fg sm:text-4xl">{name ? t('dashboard.greetingNamed', { greeting, name }) : greeting}</h1>
+          {config && profile && (
+            <div className="mt-5 flex flex-wrap items-end gap-2">
+              <div className="w-48">
+                <Field label={t('dashboard.profile')}>
+                  {(id) => (
+                    <Select id={id} value={profile.id} onChange={(e) => void switchProfile(e.target.value)}>
+                      {config.profiles.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {profileName(p)}
+                        </option>
+                      ))}
+                    </Select>
+                  )}
+                </Field>
+              </div>
+              {!editing && (
+                <Button variant="secondary" icon={<SlidersHorizontal className="h-4 w-4" />} onClick={() => setDraft(structuredClone(config))}>
+                  {t('dashboard.customize')}
+                </Button>
+              )}
             </div>
-          </div>
+          )}
         </div>
       </section>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        {!settings.nav.hidden.includes('calendar') && <EventsCard />}
-        {!settings.nav.hidden.includes('tasks') && <TasksCard />}
-      </div>
+      {editing && profile && (
+        <div className="sticky top-2 z-20 flex flex-wrap items-center gap-2 rounded-2xl bg-surface/95 p-3 shadow-lift ring-1 ring-accent/40 backdrop-blur">
+          <p className="min-w-0 flex-1 basis-60 text-sm font-medium text-fg">{t('dashboard.preview')}</p>
+          <Button size="sm" variant="secondary" icon={<Plus className="h-4 w-4" />} onClick={() => setCatalogOpen(true)}>
+            {t('dashboard.addCard')}
+          </Button>
+          <Button size="sm" variant="secondary" onClick={() => setNaming(true)}>
+            {t('dashboard.newProfile')}
+          </Button>
+          {!profile.builtin && (
+            <Button size="sm" variant="danger" icon={<Trash2 className="h-4 w-4" />} onClick={() => setDeleting(true)}>
+              {t('dashboard.deleteProfile')}
+            </Button>
+          )}
+          <Button size="sm" variant="ghost" icon={<X className="h-4 w-4" />} onClick={() => setDraft(null)}>
+            {t('dashboard.discard')}
+          </Button>
+          <Button size="sm" variant="primary" icon={<Check className="h-4 w-4" />} onClick={() => void apply()}>
+            {t('dashboard.apply')}
+          </Button>
+        </div>
+      )}
 
-      {!settings.nav.hidden.includes('inbox') && <InboxSummary />}
+      {!config ? (
+        <LoadingState label={t('common.loading')} lines={4} />
+      ) : visible.length === 0 ? (
+        <EmptyState title={t('dashboard.emptyProfile')} />
+      ) : (
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4 lg:gap-6">
+          {visible.map((slot, index) => (
+            <div key={slot.id} className={cn('relative min-w-0', SPAN[slot.size], editing && 'rounded-3xl outline-dashed outline-2 outline-offset-4 outline-accent/50')}>
+              {editing && (
+                <div className="absolute -top-4 right-3 z-10 flex gap-1 rounded-xl bg-surface p-1 shadow-lift ring-1 ring-line">
+                  <IconButton size="sm" label={t('dashboard.moveUp')} icon={<ArrowUp className="h-4 w-4" />} disabled={index === 0} onClick={() => updateCards((c) => moveCard(c, slot.id, -1))} />
+                  <IconButton size="sm" label={t('dashboard.moveDown')} icon={<ArrowDown className="h-4 w-4" />} disabled={index === visible.length - 1} onClick={() => updateCards((c) => moveCard(c, slot.id, 1))} />
+                  <IconButton
+                    size="sm"
+                    label={t('dashboard.size', { size: t(`dashboard.sizes.${slot.size}`) })}
+                    icon={<Maximize2 className="h-4 w-4" />}
+                    onClick={() => updateCards((c) => c.map((x) => (x.id === slot.id ? { ...x, size: cycleSize(x.size) } : x)))}
+                  />
+                  <IconButton size="sm" label={t('dashboard.remove')} icon={<X className="h-4 w-4" />} onClick={() => updateCards((c) => removeCard(c, slot.id))} />
+                </div>
+              )}
+              <div className={cn('h-full', editing && 'pointer-events-none select-none')}>{isKpi(slot.id) ? <KpiCard metric={slot.id.slice(4) as KpiMetric} /> : renderLiveCard(slot.id as LiveCard)}</div>
+            </div>
+          ))}
+        </div>
+      )}
 
-      <section aria-labelledby="dash-modules">
-        <h2 id="dash-modules" className="mb-4 text-xs font-semibold uppercase tracking-[0.16em] text-subtle">
-          {t('dashboard.yourModules')}
-        </h2>
-        <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {modules.map((id) => {
-            const def = MODULES[id];
-            const Icon = def.icon;
-            const tone = TONE_CLASSES[def.tone];
-            const ready = isModuleReady(id);
-            return (
-              <li key={id}>
-                <Link
-                  to={def.path}
-                  className="group flex h-full items-start gap-4 rounded-2xl bg-surface/80 p-4 ring-1 ring-line/70 transition duration-200 hover:-translate-y-0.5 hover:bg-surface hover:shadow-lift"
-                >
-                  <span className={cn('flex h-11 w-11 shrink-0 items-center justify-center rounded-xl', tone.soft, tone.text)}>
-                    <Icon className="h-5 w-5" aria-hidden />
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="flex items-center gap-2">
-                      <span className="truncate font-semibold text-fg">{t(`modules.${id}`)}</span>
-                      <ArrowRight className="h-4 w-4 shrink-0 text-subtle opacity-0 transition group-hover:translate-x-0.5 group-hover:opacity-100" aria-hidden />
-                    </span>
-                    <span className="mt-1 line-clamp-2 block text-sm leading-relaxed text-muted">{t(`moduleSummary.${id}`)}</span>
-                    <span className="mt-2.5 block">
-                      <Badge tone={ready ? 'success' : 'neutral'}>
-                        {ready ? t('dashboard.readyLabel') : `${t('dashboard.buildingLabel')} · ${t('dashboard.stageLabel', { stage: def.stage })}`}
-                      </Badge>
-                    </span>
-                  </span>
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
-      </section>
+      {catalogOpen && profile && <CatalogDialog cards={profile.cards} hidden={hidden} onAdd={(id) => updateCards((c) => addCard(c, id))} onClose={() => setCatalogOpen(false)} />}
+      {naming && <NewProfileDialog onCreate={createProfile} onClose={() => setNaming(false)} />}
+      <ConfirmDialog
+        open={deleting}
+        title={t('dashboard.deleteProfile')}
+        body={t('dashboard.deleteProfileBody', { name: profile ? profileName(profile) : '' })}
+        confirmLabel={t('dashboard.deleteConfirm')}
+        cancelLabel={t('common.cancel')}
+        danger
+        onConfirm={() => void deleteProfile()}
+        onCancel={() => setDeleting(false)}
+      />
     </div>
+  );
+}
+
+/** Catálogo: cartões vivos, indicadores e os que chegam com módulos futuros. */
+function CatalogDialog({ cards, hidden, onAdd, onClose }: { cards: CardSlot[]; hidden: Set<string>; onAdd: (id: CardId) => void; onClose: () => void }) {
+  const { t } = useSettings();
+  const has = (id: CardId) => cards.some((c) => c.id === id);
+  const row = (id: CardId, label: string) => (
+    <li key={id} className="flex items-center gap-3 rounded-xl px-2 py-2">
+      <span className="min-w-0 flex-1 truncate text-sm font-medium text-fg">{label}</span>
+      {has(id) ? (
+        <Badge tone="success">{t('dashboard.added')}</Badge>
+      ) : (
+        <Button size="sm" variant="secondary" icon={<Plus className="h-4 w-4" />} onClick={() => onAdd(id)}>
+          {t('dashboard.addCard')}
+        </Button>
+      )}
+    </li>
+  );
+  const allowed = (mod: string | null) => !mod || !hidden.has(mod);
+  return (
+    <Dialog open onClose={onClose} closeLabel={t('common.close')} title={t('dashboard.catalog')} footer={<Button onClick={onClose}>{t('common.close')}</Button>}>
+      <div className="flex flex-col gap-5">
+        <section>
+          <h3 className="mb-1 text-xs font-semibold uppercase tracking-[0.14em] text-subtle">{t('dashboard.catalogCards')}</h3>
+          <ul>{LIVE_CARDS.filter((id) => allowed(CARD_MODULE[id])).map((id) => row(id, t(`dashboard.cards.${id}`)))}</ul>
+        </section>
+        <section>
+          <h3 className="mb-1 text-xs font-semibold uppercase tracking-[0.14em] text-subtle">{t('dashboard.catalogKpis')}</h3>
+          <ul>{KPI_METRICS.filter((m) => allowed(KPI_MODULE[m])).map((m) => row(`kpi:${m}`, t(`dashboard.kpi.${m}`)))}</ul>
+        </section>
+        <section>
+          <h3 className="mb-1 text-xs font-semibold uppercase tracking-[0.14em] text-subtle">{t('dashboard.catalogSoon')}</h3>
+          <ul>
+            {PLANNED_CARDS.map((id) => {
+              const mod = CARD_MODULE[id]!;
+              return (
+                <li key={id} className="flex items-center gap-3 rounded-xl px-2 py-2 opacity-70">
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-medium text-fg">{t(`dashboard.cards.${id}`)}</span>
+                    <span className="block text-xs text-muted">{t('dashboard.soonHint', { module: t(`modules.${mod}`), stage: MODULES[mod].stage })}</span>
+                  </span>
+                  <Badge>{t('dashboard.catalogSoon')}</Badge>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      </div>
+    </Dialog>
+  );
+}
+
+function NewProfileDialog({ onCreate, onClose }: { onCreate: (name: string) => void; onClose: () => void }) {
+  const { t } = useSettings();
+  const [value, setValue] = useState('');
+  const ok = value.trim().length > 0;
+  return (
+    <Dialog
+      open
+      onClose={onClose}
+      closeLabel={t('common.cancel')}
+      title={t('dashboard.newProfile')}
+      size="sm"
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>
+            {t('common.cancel')}
+          </Button>
+          <Button variant="primary" disabled={!ok} onClick={() => onCreate(value)}>
+            {t('dashboard.createProfile')}
+          </Button>
+        </>
+      }
+    >
+      <Field label={t('dashboard.profileName')}>
+        {(id) => <Input id={id} autoFocus value={value} maxLength={40} onChange={(e) => setValue(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && ok && onCreate(value)} />}
+      </Field>
+    </Dialog>
   );
 }

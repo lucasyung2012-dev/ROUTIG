@@ -23,7 +23,7 @@ export function PwaPrompt() {
   useEffect(() => {
     if (!needRefresh) return;
     const { t: tr, toast: ts, updateServiceWorker: update } = latest.current;
-    ts.show(tr('pwa.updateReady'), 'info', { label: tr('pwa.update'), run: () => void update(true) });
+    ts.show(tr('pwa.updateReady'), 'info', { label: tr('pwa.update'), run: () => void update(true) }, { persistent: true });
   }, [needRefresh]);
 
   useEffect(() => {

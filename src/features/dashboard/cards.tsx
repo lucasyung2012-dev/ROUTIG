@@ -1,0 +1,454 @@
+import type { ReactNode } from 'react';
+import { Link } from 'react-router-dom';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { Activity, ArrowRight, CalendarDays, Diamond, FolderKanban, Inbox, ListTodo, NotebookPen, Sun } from 'lucide-react';
+import { MODULES, TONE_CLASSES, type ModuleId } from '@/app/modules';
+import { useSettings } from '@/app/SettingsProvider';
+import { isModuleReady } from '@/app/version';
+import { getDb } from '@/data/db';
+import { addDays, formatDateKey, toDateKey, todayKey } from '@/domain/dates';
+import { fromMinutes } from '@/domain/events';
+import type { KpiMetric, LiveCard } from '@/domain/dashboard';
+import { notePreview } from '@/domain/notes';
+import { isClosedProject } from '@/domain/projects';
+import { compareTasks, isClosedKind, statusKind } from '@/domain/tasks';
+import { visibleModules } from '@/domain/settings';
+import { useEventEditor } from '@/features/calendar/EventEditor';
+import { TONE_ITEM, useCalendarData } from '@/features/calendar/useCalendarData';
+import { useProjectsData } from '@/features/projects/useProjectsData';
+import { TaskRow } from '@/features/tasks/TaskRow';
+import { useTaskEditor } from '@/features/tasks/TaskEditor';
+import { useTaskActions } from '@/features/tasks/useTaskActions';
+import { useTasksData } from '@/features/tasks/useTasksData';
+import { Badge } from '@/ui/Badge';
+import { LoadingState } from '@/ui/States';
+import { cn } from '@/ui/cn';
+
+/* ---------- Moldura comum ---------- */
+
+export function CardShell({ title, icon, tone = 'violet', link, children }: { title: string; icon: ReactNode; tone?: keyof typeof TONE_CLASSES; link?: { to: string; label: string }; children: ReactNode }) {
+  const tc = TONE_CLASSES[tone];
+  return (
+    <section className="flex h-full flex-col rounded-3xl bg-surface p-5 shadow-soft ring-1 ring-line/70">
+      <div className="flex items-center gap-3">
+        <span className={cn('flex h-9 w-9 shrink-0 items-center justify-center rounded-xl', tc.soft, tc.text)}>{icon}</span>
+        <h2 className="min-w-0 flex-1 truncate text-base font-semibold tracking-tight text-fg">{title}</h2>
+        {link && (
+          <Link to={link.to} className="shrink-0 text-sm font-medium text-accent hover:underline">
+            {link.label}
+          </Link>
+        )}
+      </div>
+      <div className="mt-4 min-w-0 flex-1">{children}</div>
+    </section>
+  );
+}
+
+const isDoneStatus = (data: ReturnType<typeof useTasksData>) => (statusId: string) => isClosedKind(statusKind(data.config, statusId));
+
+/* ---------- Resumo do dia ---------- */
+
+export function TodayCard() {
+  const { t } = useSettings();
+  const cal = useCalendarData();
+  const inbox = useLiveQuery(() => getDb().inbox.filter((i) => !i.deletedAt && i.status === 'open').count(), []);
+  const today = todayKey();
+  if (cal.loading || inbox === undefined) return <CardShell title={t('dashboard.cards.today')} icon={<Sun className="h-5 w-5" />}><LoadingState label={t('common.loading')} lines={2} /></CardShell>;
+  const items = cal.itemsInRange(today, today, { showTasks: false, categoryId: null });
+  const events = items.filter((i) => i.kind === 'event').length;
+  const milestones = items.filter((i) => i.kind === 'milestone').length;
+  const open = cal.tasks.active.filter((x) => !isDoneStatus(cal.tasks)(x.statusId));
+  const dueToday = open.filter((x) => x.dueDate === today).length;
+  const overdue = open.filter((x) => x.dueDate && x.dueDate < today).length;
+  const free = events === 0 && dueToday === 0 && overdue === 0 && milestones === 0;
+  return (
+    <CardShell title={t('dashboard.cards.today')} icon={<Sun className="h-5 w-5" />} tone="amber">
+      {free ? (
+        <p className="text-sm text-muted">{t('dashboard.todayFree')}</p>
+      ) : (
+        <div className="flex flex-wrap gap-2">
+          {events > 0 && <Badge tone="info">{t('dashboard.todayEvents', { count: events })}</Badge>}
+          {dueToday > 0 && <Badge tone="accent">{t('dashboard.todayTasks', { count: dueToday })}</Badge>}
+          {overdue > 0 && <Badge tone="danger">{t('dashboard.todayOverdue', { count: overdue })}</Badge>}
+          {milestones > 0 && <Badge tone="warning">{t('dashboard.todayMilestones', { count: milestones })}</Badge>}
+          {inbox > 0 && <Badge>{t('dashboard.todayInbox', { count: inbox })}</Badge>}
+        </div>
+      )}
+    </CardShell>
+  );
+}
+
+/* ---------- Próximos compromissos ---------- */
+
+export function EventsCard() {
+  const { t, settings } = useSettings();
+  const cal = useCalendarData();
+  const events = useEventEditor();
+  const today = todayKey();
+  const upcoming = cal.itemsInRange(today, addDays(today, 7), { showTasks: false, categoryId: null }).filter((i) => i.kind === 'event').slice(0, 6);
+  return (
+    <CardShell title={t('dashboard.cards.events')} icon={<CalendarDays className="h-5 w-5" />} tone="blue" link={{ to: '/calendar', label: t('dashboard.openCalendar') }}>
+      {cal.loading ? (
+        <LoadingState label={t('common.loading')} lines={3} />
+      ) : upcoming.length === 0 ? (
+        <p className="text-sm text-muted">{t('dashboard.eventsEmpty')}</p>
+      ) : (
+        <ul className="flex flex-col gap-1">
+          {upcoming.map((i) => (
+            <li key={i.key}>
+              <button
+                type="button"
+                onClick={() => i.occurrence && events.openEvent(i.occurrence.event.id, i.occurrence.seriesDate)}
+                className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left transition hover:bg-surface-2/70"
+              >
+                <span className={cn('h-9 w-1 shrink-0 rounded-full', TONE_ITEM[i.tone].bar)} aria-hidden />
+                <span className="w-16 shrink-0 text-xs font-medium capitalize text-muted">{i.date === today ? t('tasks.due.today') : formatDateKey(i.date, settings.locale, { weekday: 'short', day: 'numeric' })}</span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[0.9375rem] font-medium text-fg">{i.title}</span>
+                  <span className="block text-xs tabular text-muted">{i.allDay ? t('calendar.allDay') : fromMinutes(i.start!)}</span>
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </CardShell>
+  );
+}
+
+/* ---------- Tarefas ---------- */
+
+export function TasksCard() {
+  const { t } = useSettings();
+  const data = useTasksData();
+  const editor = useTaskEditor();
+  const actions = useTaskActions(data);
+  const today = todayKey();
+  const open = data.active.filter((x) => !isDoneStatus(data)(x.statusId));
+  const overdue = open.filter((x) => x.dueDate && x.dueDate < today).length;
+  const dueToday = open.filter((x) => x.dueDate === today).length;
+  const doneToday = data.active.filter((x) => x.completedAt && toDateKey(new Date(x.completedAt)) === today).length;
+  const next = [...open].sort(compareTasks(data.config)).slice(0, 5);
+  return (
+    <CardShell title={t('dashboard.cards.tasks')} icon={<ListTodo className="h-5 w-5" />} link={{ to: '/tasks', label: t('dashboard.seeAll') }}>
+      {data.loading ? (
+        <LoadingState label={t('common.loading')} lines={3} />
+      ) : open.length === 0 ? (
+        <p className="text-sm text-muted">{t('dashboard.tasksEmpty')}</p>
+      ) : (
+        <>
+          <div className="flex flex-wrap gap-2">
+            {overdue > 0 && <Badge tone="danger">{t('dashboard.tasksOverdue', { count: overdue })}</Badge>}
+            <Badge tone="accent">{t('dashboard.tasksToday', { count: dueToday })}</Badge>
+            <Badge>{t('dashboard.tasksOpen', { count: open.length })}</Badge>
+            {doneToday > 0 && <Badge tone="success">{t('dashboard.doneToday', { count: doneToday })}</Badge>}
+          </div>
+          <ul className="mt-3 flex flex-col">
+            {next.map((task) => (
+              <li key={task.id}>
+                <TaskRow task={task} data={data} onOpen={editor.openTask} onToggle={actions.toggle} compact />
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+      {actions.dialogs}
+    </CardShell>
+  );
+}
+
+/* ---------- Projetos e marcos ---------- */
+
+export function ProjectsCard() {
+  const { t } = useSettings();
+  const data = useProjectsData();
+  const active = data.projects.filter((p) => !isClosedProject(p.status) && p.status !== 'idea').slice(0, 5);
+  return (
+    <CardShell title={t('dashboard.cards.projects')} icon={<FolderKanban className="h-5 w-5" />} tone="amber" link={{ to: '/projects', label: t('dashboard.seeAll') }}>
+      {data.loading ? (
+        <LoadingState label={t('common.loading')} lines={3} />
+      ) : active.length === 0 ? (
+        <p className="text-sm text-muted">{t('dashboard.projectsEmpty')}</p>
+      ) : (
+        <ul className="flex flex-col gap-3">
+          {active.map((p) => {
+            const pr = data.progressOf(p);
+            return (
+              <li key={p.id}>
+                <Link to={`/projects/${p.id}`} className="block rounded-xl px-2 py-1.5 transition hover:bg-surface-2/70">
+                  <div className="flex items-center gap-2">
+                    <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: p.color }} aria-hidden />
+                    <span className="min-w-0 flex-1 truncate font-medium text-fg">{p.name}</span>
+                    <span className="text-xs tabular text-muted">{pr.percent === null ? '—' : `${pr.percent}%`}</span>
+                  </div>
+                  {pr.percent !== null && (
+                    <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-surface-3" aria-hidden>
+                      <div className="h-full rounded-full" style={{ width: `${pr.percent}%`, background: p.color }} />
+                    </div>
+                  )}
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </CardShell>
+  );
+}
+
+export function MilestonesCard() {
+  const { t, settings } = useSettings();
+  const data = useProjectsData();
+  const today = todayKey();
+  const limit = addDays(today, 30);
+  const list = data.projects
+    .flatMap((p) => p.milestones.filter((m) => m.date && !m.done && m.date <= limit).map((m) => ({ p, m })))
+    .sort((a, b) => a.m.date!.localeCompare(b.m.date!))
+    .slice(0, 6);
+  return (
+    <CardShell title={t('dashboard.cards.milestones')} icon={<Diamond className="h-5 w-5" />} tone="amber">
+      {data.loading ? (
+        <LoadingState label={t('common.loading')} lines={3} />
+      ) : list.length === 0 ? (
+        <p className="text-sm text-muted">{t('dashboard.milestonesEmpty')}</p>
+      ) : (
+        <ul className="flex flex-col gap-1">
+          {list.map(({ p, m }) => (
+            <li key={m.id}>
+              <Link to={`/projects/${p.id}`} className="flex items-center gap-3 rounded-xl px-2 py-2 transition hover:bg-surface-2/70">
+                <span className="h-3 w-3 shrink-0 rotate-45" style={{ background: p.color }} aria-hidden />
+                <span className={cn('w-16 shrink-0 text-xs font-medium', m.date! < today ? 'text-danger' : 'text-muted')}>{formatDateKey(m.date!, settings.locale, { day: 'numeric', month: 'short' })}</span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-medium text-fg">{m.title}</span>
+                  <span className="block truncate text-xs text-muted">{p.name}</span>
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+    </CardShell>
+  );
+}
+
+/* ---------- Notas, Inbox e atividade ---------- */
+
+export function NotesCard() {
+  const { t } = useSettings();
+  const notes = useLiveQuery(() => getDb().notes.orderBy('updatedAt').reverse().filter((n) => !n.deletedAt).limit(5).toArray(), []);
+  return (
+    <CardShell title={t('dashboard.cards.notes')} icon={<NotebookPen className="h-5 w-5" />} tone="amber" link={{ to: '/notes', label: t('dashboard.openNotes') }}>
+      {!notes ? (
+        <LoadingState label={t('common.loading')} lines={3} />
+      ) : notes.length === 0 ? (
+        <p className="text-sm text-muted">{t('dashboard.notesEmpty')}</p>
+      ) : (
+        <ul className="flex flex-col gap-1">
+          {notes.map((n) => (
+            <li key={n.id}>
+              <Link to={`/notes/${n.id}`} className="block rounded-xl px-2 py-1.5 transition hover:bg-surface-2/70">
+                <span className="block truncate text-sm font-medium text-fg">{n.title || t('notes.untitled')}</span>
+                <span className="block truncate text-xs text-muted">{notePreview(n, 80) || '—'}</span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+    </CardShell>
+  );
+}
+
+export function InboxCard() {
+  const { t } = useSettings();
+  const today = todayKey();
+  const count = useLiveQuery(() => getDb().inbox.filter((i) => !i.deletedAt && i.status === 'open' && (!i.snoozedUntil || i.snoozedUntil <= today)).count(), [today]);
+  return (
+    <CardShell title={t('dashboard.cards.inbox')} icon={<Inbox className="h-5 w-5" />} tone="neutral" link={{ to: '/inbox', label: t('common.open') }}>
+      {count === undefined ? <LoadingState label={t('common.loading')} lines={1} /> : <p className="text-sm text-muted">{count === 0 ? t('inbox.empty.open') : t('dashboard.inboxCount', { count })}</p>}
+    </CardShell>
+  );
+}
+
+const ACTIVITY_TYPES = ['task', 'event', 'note', 'project', 'inbox'] as const;
+type ActivityType = (typeof ACTIVITY_TYPES)[number];
+
+/** O que foi criado, alterado ou concluído por último (do histórico de alterações). */
+export function ActivityCard() {
+  const { t, settings } = useSettings();
+  const rows = useLiveQuery(async () => {
+    const db = getDb();
+    const entries = (await db.changelog.orderBy('seq').reverse().limit(80).toArray()).filter((e) => (ACTIVITY_TYPES as readonly string[]).includes(e.entityType));
+    // Uma linha por registro: só a mudança mais recente de cada um.
+    const seen = new Set<string>();
+    const unique = entries.filter((e) => (seen.has(`${e.entityType}:${e.entityId}`) ? false : (seen.add(`${e.entityType}:${e.entityId}`), true))).slice(0, 8);
+    return Promise.all(
+      unique.map(async (e) => {
+        const type = e.entityType as ActivityType;
+        const name =
+          type === 'task'
+            ? (await db.tasks.get(e.entityId))?.title
+            : type === 'event'
+              ? (await db.events.get(e.entityId))?.title
+              : type === 'note'
+                ? (await db.notes.get(e.entityId))?.title || t('notes.untitled')
+                : type === 'project'
+                  ? (await db.projects.get(e.entityId))?.name
+                  : (await db.inbox.get(e.entityId))?.text.slice(0, 60);
+        const href = type === 'task' ? '/tasks' : type === 'event' ? '/calendar' : type === 'note' ? `/notes/${e.entityId}` : type === 'project' ? `/projects/${e.entityId}` : '/inbox';
+        return { key: e.seq ?? `${e.entityId}${e.at}`, at: e.at, action: e.action, type, name, href };
+      }),
+    );
+  }, [t]);
+  const fmt = new Intl.DateTimeFormat(settings.locale, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  return (
+    <CardShell title={t('dashboard.cards.activity')} icon={<Activity className="h-5 w-5" />} tone="rose">
+      {!rows ? (
+        <LoadingState label={t('common.loading')} lines={3} />
+      ) : rows.length === 0 ? (
+        <p className="text-sm text-muted">{t('dashboard.activityEmpty')}</p>
+      ) : (
+        <ul className="flex flex-col gap-1">
+          {rows.map((r) => (
+            <li key={r.key}>
+              <Link to={r.href} className="flex items-baseline gap-3 rounded-xl px-2 py-1.5 transition hover:bg-surface-2/70">
+                <span className="w-24 shrink-0 text-xs tabular text-subtle">{fmt.format(new Date(r.at))}</span>
+                <span className="min-w-0 flex-1 truncate text-sm text-muted">
+                  {t(`dashboard.actions.${r.action}`)} {t(`dashboard.entity.${r.type}`)}: <span className="font-medium text-fg">{r.name ?? t('dashboard.removed')}</span>
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+    </CardShell>
+  );
+}
+
+/* ---------- Mapa dos módulos ---------- */
+
+export function ModulesCard() {
+  const { t, settings } = useSettings();
+  const modules = visibleModules(settings).filter((id) => id !== 'dashboard');
+  return (
+    <section aria-labelledby="dash-modules">
+      <h2 id="dash-modules" className="mb-4 text-xs font-semibold uppercase tracking-[0.16em] text-subtle">
+        {t('dashboard.yourModules')}
+      </h2>
+      <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        {modules.map((id) => {
+          const def = MODULES[id];
+          const Icon = def.icon;
+          const tone = TONE_CLASSES[def.tone];
+          const ready = isModuleReady(id);
+          return (
+            <li key={id}>
+              <Link to={def.path} className="group flex h-full items-start gap-4 rounded-2xl bg-surface/80 p-4 ring-1 ring-line/70 transition duration-200 hover:-translate-y-0.5 hover:bg-surface hover:shadow-lift">
+                <span className={cn('flex h-11 w-11 shrink-0 items-center justify-center rounded-xl', tone.soft, tone.text)}>
+                  <Icon className="h-5 w-5" aria-hidden />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-center gap-2">
+                    <span className="truncate font-semibold text-fg">{t(`modules.${id}`)}</span>
+                    <ArrowRight className="h-4 w-4 shrink-0 text-subtle opacity-0 transition group-hover:translate-x-0.5 group-hover:opacity-100" aria-hidden />
+                  </span>
+                  <span className="mt-1 line-clamp-2 block text-sm leading-relaxed text-muted">{t(`moduleSummary.${id}`)}</span>
+                  <span className="mt-2.5 block">
+                    <Badge tone={ready ? 'success' : 'neutral'}>{ready ? t('dashboard.readyLabel') : `${t('dashboard.buildingLabel')} · ${t('dashboard.stageLabel', { stage: def.stage })}`}</Badge>
+                  </span>
+                </span>
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
+/* ---------- Indicadores ---------- */
+
+const KPI_LINK: Record<KpiMetric, string> = {
+  tasksOverdue: '/tasks',
+  tasksToday: '/tasks',
+  tasksDoneWeek: '/tasks',
+  projectsActive: '/projects',
+  eventsWeek: '/calendar',
+  inboxOpen: '/inbox',
+  notesTotal: '/notes',
+};
+
+/** Um número real, contado agora a partir do banco (Parte 5.3: nada inventado). */
+export function KpiCard({ metric }: { metric: KpiMetric }) {
+  const { t } = useSettings();
+  const value = useLiveQuery(async () => {
+    const db = getDb();
+    const today = todayKey();
+    const weekAgo = addDays(today, -6);
+    const cfg = await db.kv.get('tasks.config');
+    const closed = new Set(
+      ((cfg?.value as { statuses?: Array<{ id: string; kind: string }> } | undefined)?.statuses ?? [])
+        .filter((s) => ['done', 'cancelled', 'archived'].includes(s.kind))
+        .map((s) => s.id)
+        .concat(['done', 'cancelled', 'archived']),
+    );
+    switch (metric) {
+      case 'tasksOverdue':
+        return db.tasks.filter((x) => !x.deletedAt && !closed.has(x.statusId) && !!x.dueDate && x.dueDate < today).count();
+      case 'tasksToday':
+        return db.tasks.filter((x) => !x.deletedAt && !closed.has(x.statusId) && x.dueDate === today).count();
+      case 'tasksDoneWeek':
+        return db.tasks.filter((x) => !x.deletedAt && !!x.completedAt && toDateKey(new Date(x.completedAt)) >= weekAgo).count();
+      case 'projectsActive':
+        return db.projects.filter((p) => !p.deletedAt && p.status === 'active').count();
+      case 'inboxOpen':
+        return db.inbox.filter((i) => !i.deletedAt && i.status === 'open').count();
+      case 'notesTotal':
+        return db.notes.filter((n) => !n.deletedAt).count();
+      case 'eventsWeek':
+        return -1; // calculado abaixo com as ocorrências (inclui eventos que se repetem)
+    }
+  }, [metric]);
+  const cal = useCalendarData();
+  const today = todayKey();
+  const shown = metric === 'eventsWeek' ? (cal.loading ? undefined : cal.itemsInRange(today, addDays(today, 6), { showTasks: false, categoryId: null }).filter((i) => i.kind === 'event').length) : value;
+  const danger = metric === 'tasksOverdue' && (shown ?? 0) > 0;
+  return (
+    <Link to={KPI_LINK[metric]} className="flex h-full flex-col justify-between gap-2 rounded-3xl bg-surface p-5 shadow-soft ring-1 ring-line/70 transition hover:-translate-y-0.5 hover:shadow-lift">
+      <span className="text-sm font-medium text-muted">{t(`dashboard.kpi.${metric}`)}</span>
+      <span className={cn('text-4xl font-semibold tabular tracking-tight', danger ? 'text-danger' : 'text-fg')}>{shown === undefined ? '…' : shown}</span>
+    </Link>
+  );
+}
+
+/** Desenha um cartão "vivo" pelo id. */
+export function renderLiveCard(id: LiveCard): ReactNode {
+  switch (id) {
+    case 'today':
+      return <TodayCard />;
+    case 'events':
+      return <EventsCard />;
+    case 'tasks':
+      return <TasksCard />;
+    case 'projects':
+      return <ProjectsCard />;
+    case 'milestones':
+      return <MilestonesCard />;
+    case 'notes':
+      return <NotesCard />;
+    case 'inbox':
+      return <InboxCard />;
+    case 'activity':
+      return <ActivityCard />;
+    case 'modules':
+      return <ModulesCard />;
+  }
+}
+
+export const MODULE_OF_LIVE: Partial<Record<LiveCard, ModuleId>> = {
+  events: 'calendar',
+  tasks: 'tasks',
+  projects: 'projects',
+  milestones: 'projects',
+  notes: 'notes',
+  inbox: 'inbox',
+};

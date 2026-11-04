@@ -12,7 +12,8 @@ interface ToastItem {
 }
 
 interface ToastApi {
-  show: (message: string, kind?: ToastKind, action?: ToastItem['action']) => void;
+  /** `persistent`: fica até o usuário tocar (só para decisões, como "Há uma nova versão"). */
+  show: (message: string, kind?: ToastKind, action?: ToastItem['action'], options?: { persistent?: boolean }) => void;
 }
 
 const ToastContext = createContext<ToastApi | null>(null);
@@ -24,11 +25,11 @@ export function ToastProvider({ children, closeLabel }: { children: ReactNode; c
   const dismiss = useCallback((id: number) => setItems((list) => list.filter((t) => t.id !== id)), []);
 
   const show = useCallback<ToastApi['show']>(
-    (message, kind = 'success', action) => {
+    (message, kind = 'success', action, options) => {
       const id = ++seq.current;
       setItems((list) => [...list.slice(-2), { id, kind, message, action }]);
-      // Aviso com ação (ex.: "Atualizar") fica até o usuário decidir; erros ficam mais tempo.
-      if (!action) window.setTimeout(() => dismiss(id), kind === 'error' ? 8000 : 3500);
+      // Simples: 3,5 s. Com "Desfazer": 5 s. Erros: 8 s. Decisões (persistent): até o toque.
+      if (!options?.persistent) window.setTimeout(() => dismiss(id), kind === 'error' ? 8000 : action ? 5000 : 3500);
     },
     [dismiss],
   );

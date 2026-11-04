@@ -177,7 +177,11 @@ export function BackupSection() {
                   size="sm"
                   label={t('backup.restoreThis')}
                   icon={<ArchiveRestore className="h-4 w-4" />}
-                  onClick={() => void snapshotText(s.id).then((text) => text && openPreview(text, t(`backup.kinds.${s.kind}`)))}
+                  onClick={() =>
+                    void snapshotText(s.id).then((text) => {
+                      if (text) void openPreview(text, t(`backup.kinds.${s.kind}`));
+                    })
+                  }
                 />
                 <IconButton
                   size="sm"

@@ -8,7 +8,7 @@ Leia este arquivo no começo de toda conversa nova sobre o ROUTIG. A especifica�
 
 - **Etapa 0 — Fundação:** concluída. Logo vetorial e design system aprovados pelo dono do produto em 2026-11-02.
 - **Etapa 1 — Organização central:** concluída no código (versão 0.7.0). Tasks, Calendar, Inbox, Notes, Projects, Dashboard, Profile e Settings publicados. Falta o dono do produto testar no iPad o Dashboard, o Profile e as Settings novas.
-- **Próximo passo:** (backup feito na 0.8.0) desenho completo do Notes, depois mais cores com cor personalizada, e a Etapa 2 (ver "Ordem combinada").
+- **Próximo passo:** (backup na 0.8.0, desenho na 0.9.0) mais cores com cor personalizada, e a Etapa 2 (ver "Ordem combinada").
 - **Como trabalhar:** o computador de desenvolvimento não tem Node. Escrever o código, enviar com `git push`, conferir o GitHub Actions (anotações de erro aparecem por arquivo e linha) e testar no app publicado.
 
 ## Etapa 1 — andamento
@@ -67,6 +67,7 @@ Leia este arquivo no começo de toda conversa nova sobre o ROUTIG. A especifica�
 | 0.6.0 | 2026-11-03 | Claude (Claude Code) | Etapa 1: módulo Projects; projeto no editor de tarefa; marcos no Calendar; notas ligadas a projetos. |
 | 0.7.0 | 2026-11-03 | Claude (Claude Code) | Fim da Etapa 1: Dashboard completo, Profile completo, Settings (Módulos, Dispositivos, Ajuda); avisos somem sozinhos (5 s com Desfazer). |
 | 0.8.0 | 2026-11-03 | Claude (Claude Code) | Backup completo (Parte 25): exportar para Arquivos, cópia interna diária, cópias manuais e antes de restaurar, restauração com prévia e verificação de integridade, histórico de exportações, aviso de backup desatualizado no Dashboard. |
+| 0.9.0 | 2026-11-03 | Claude (Claude Code) | Desenho do Notes completo: marca-texto, formas por arrastar (linha, seta, retângulo, círculo), laço para selecionar e mover, mão e zoom, fundo liso, pautado, quadriculado ou pontilhado, desenhar sobre imagem, refazer, salvar como imagem (PNG). Corrige perda de edição feita durante o salvamento em Notes, Projects e Interesses. Excluir nota de vez não apaga arquivo usado como capa, foto ou fundo de desenho. |
 
 ## Calendar (Parte 6) — o que existe
 
@@ -117,6 +118,6 @@ Leia este arquivo no começo de toda conversa nova sobre o ROUTIG. A especifica�
 
 1. ~~Terminar a Etapa 1~~ (feito em 2026-11-03, versão 0.7.0).
 2. ~~Backup completo~~ (feito em 2026-11-03, versão 0.8.0).
-3. Desenho do Notes completo (todos os recursos aprovados; ver DECISOES.md).
+3. ~~Desenho do Notes completo~~ (feito em 2026-11-03, versão 0.9.0).
 4. Etapa 2: Academy e Idiomas.
 5. Sincronização pelo Google Drive: depois da Etapa 6.

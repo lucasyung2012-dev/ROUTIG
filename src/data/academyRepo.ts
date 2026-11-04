@@ -199,7 +199,9 @@ export const restoreSubject = (id: string) => setSubjectDeleted(id, null, 'resto
 /** Exclusão definitiva: a disciplina, as avaliações dela e as recuperações/bônus. */
 export async function purgeSubject(id: string): Promise<number> {
   const db = getDb();
-  return db.transaction('rw', [db.subjects, db.assessments, db.periodResults, db.changelog], async () => {
+  return db.transaction('rw', [db.subjects, db.assessments, db.periodResults, db.examPreps, db.changelog], async () => {
+    const ids = (await db.assessments.where('subjectId').equals(id).toArray()).map((a) => a.id);
+    await db.examPreps.bulkDelete(ids);
     const n = await db.assessments.where('subjectId').equals(id).delete();
     await db.periodResults.where('subjectId').equals(id).delete();
     await db.subjects.delete(id);
@@ -267,8 +269,9 @@ export const restoreAssessment = (id: string) => setAssessmentDeleted(id, null, 
 
 export async function purgeAssessment(id: string): Promise<void> {
   const db = getDb();
-  await db.transaction('rw', db.assessments, db.changelog, async () => {
+  await db.transaction('rw', db.assessments, db.examPreps, db.changelog, async () => {
     await db.assessments.delete(id);
+    await db.examPreps.delete(id);
     await log({ entityType: 'assessment', entityId: id, action: 'purge' });
   });
 }

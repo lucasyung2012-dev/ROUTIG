@@ -200,7 +200,7 @@ function SessionRow({ s, data, onEdit, onDone }: { s: StudySession; data: Academ
 }
 
 /** Conteúdos de uma disciplina para escolher (árvore com recuo). */
-function ContentPicker({ subjectId, value, onChange }: { subjectId: string; value: string[]; onChange: (ids: string[]) => void }) {
+export function ContentPicker({ subjectId, value, onChange }: { subjectId: string; value: string[]; onChange: (ids: string[]) => void }) {
   const { t } = useSettings();
   const contents = useLiveQuery(() => getDb().contents.where('subjectId').equals(subjectId).filter((c) => !c.deletedAt).toArray(), [subjectId]) ?? [];
   const nodes = flattenTree(contentTree(contents));
@@ -323,12 +323,12 @@ function SessionDialog({ data, session, subjectId, onClose }: { data: AcademyDat
 }
 
 /** Distribui revisões antes de uma prova: mostra as datas antes de criar (nada é criado sem confirmar). */
-function DistributeDialog({ data, onClose }: { data: AcademyData; onClose: () => void }) {
+export function DistributeDialog({ data, onClose, examId: initialExamId }: { data: AcademyData; onClose: () => void; examId?: string }) {
   const { t, settings } = useSettings();
   const toast = useToast();
   const today = todayKey();
   const exams = data.assessments.filter((a) => a.date && a.date >= today);
-  const [examId, setExamId] = useState(exams[0]?.id ?? '');
+  const [examId, setExamId] = useState(initialExamId ?? exams[0]?.id ?? '');
   const exam: Assessment | undefined = exams.find((a) => a.id === examId);
   const [duration, setDuration] = useState(40);
   const [contentIds, setContentIds] = useState<string[]>(exam?.contentIds ?? []);

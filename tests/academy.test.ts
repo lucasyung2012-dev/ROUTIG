@@ -229,3 +229,64 @@ describe('planejamento de estudos (Parte 9.8)', () => {
     await expect(setSessionStatus(a.id, 'done', { actualMin: -3 })).rejects.toMatchObject({ code: 'invalid' });
   });
 });
+
+describe('preparação para provas e pós-avaliação (Parte 9.10 e 9.11)', () => {
+  it('aponta o que reforçar com os motivos', async () => {
+    const { contentsToReinforce, emptyExamPrep } = await import('@/domain/academy');
+    const contents = [
+      { id: 'a', status: 'studied' as const, mastery: 1 },
+      { id: 'b', status: 'notStarted' as const, mastery: null },
+      { id: 'c', status: 'mastered' as const, mastery: 4 },
+    ];
+    const prep = { ...emptyExamPrep('x'), questions: [{ id: 'q', text: 'Q', answer: '', contentId: 'c', result: 'wrong' as const }], errors: [{ id: 'e', description: 'E', contentId: 'a', fixed: false }] };
+    const r = contentsToReinforce(['a', 'b', 'c'], contents, prep);
+    expect(Object.fromEntries(r)).toEqual({ a: ['lowMastery', 'openError'], b: ['notStudied'], c: ['wrongQuestion'] });
+  });
+
+  it('simulados em ordem e em porcentagem; simulado com nota acima do máximo é recusado', async () => {
+    const { mockTrend } = await import('@/domain/academy');
+    const { saveExamPrep, loadExamPrep } = await import('@/data/examPrepRepo');
+    expect(mockTrend([{ date: '2026-11-10', score: 8, maxScore: 10 }, { date: '2026-11-05', score: 3, maxScore: 5 }])).toEqual([
+      { date: '2026-11-05', pct: 60 },
+      { date: '2026-11-10', pct: 80 },
+    ]);
+    const y = await createYear({ label: '2026', institution: '', grade: '' });
+    const s = await createSubject({ yearId: y.id, name: 'Química', kind: 'subject', color: '#438BEA', teacherId: null });
+    const asm = await createAssessment({ ...emptyAssessmentInput(s.id, null), name: 'PU' });
+    const prep = await loadExamPrep(asm.id);
+    await expect(saveExamPrep({ ...prep, mocks: [{ id: 'm', date: '2026-11-05', score: 12, maxScore: 10, notes: '' }] })).rejects.toMatchObject({ code: 'invalid' });
+    await saveExamPrep({ ...prep, mocks: [{ id: 'm', date: '2026-11-05', score: 7, maxScore: 10, notes: '' }] });
+    expect((await loadExamPrep(asm.id)).mocks).toHaveLength(1);
+  });
+
+  it('levar a pós-avaliação ao conteúdo muda só o domínio, e só quando pedido', async () => {
+    const { saveExamPrep, loadExamPrep, applyPostToContents } = await import('@/data/examPrepRepo');
+    const { createContent, updateContent } = await import('@/data/academyContentRepo');
+    const y = await createYear({ label: '2026', institution: '', grade: '' });
+    const s = await createSubject({ yearId: y.id, name: 'Biologia', kind: 'subject', color: '#438BEA', teacherId: null });
+    const c1 = await createContent(s.id, null, 'unit', 'Células');
+    const c2 = await createContent(s.id, null, 'unit', 'Genética');
+    await updateContent(c1.id, { status: 'studied' });
+    await updateContent(c2.id, { mastery: 3 });
+    const asm = await createAssessment({ ...emptyAssessmentInput(s.id, null), name: 'PU' });
+    const prep = await loadExamPrep(asm.id);
+    await saveExamPrep({ ...prep, post: { ...prep.post, masteredContentIds: [c1.id], reviewContentIds: [c2.id] } });
+    expect((await getDb().contents.get(c1.id))?.mastery).toBeNull(); // nada muda sozinho
+    expect(await applyPostToContents(asm.id, 5)).toBe(2);
+    expect(await getDb().contents.get(c1.id)).toMatchObject({ mastery: 4, status: 'studied' });
+    expect((await getDb().contents.get(c2.id))?.mastery).toBe(1);
+    expect((await loadExamPrep(asm.id)).post.appliedAt).not.toBeNull();
+  });
+
+  it('excluir a avaliação de vez leva a preparação junto', async () => {
+    const { saveExamPrep, loadExamPrep } = await import('@/data/examPrepRepo');
+    const { purgeAssessment } = await import('@/data/academyRepo');
+    const y = await createYear({ label: '2026', institution: '', grade: '' });
+    const s = await createSubject({ yearId: y.id, name: 'Artes', kind: 'subject', color: '#438BEA', teacherId: null });
+    const asm = await createAssessment({ ...emptyAssessmentInput(s.id, null), name: 'Trabalho' });
+    await saveExamPrep({ ...(await loadExamPrep(asm.id)), errors: [{ id: 'e', description: 'Cor', contentId: null, fixed: false }] });
+    expect(await getDb().examPreps.count()).toBe(1);
+    await purgeAssessment(asm.id);
+    expect(await getDb().examPreps.count()).toBe(0);
+  });
+});

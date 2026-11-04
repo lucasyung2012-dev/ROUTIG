@@ -515,3 +515,92 @@ export function sessionTotals(list: Pick<StudySession, 'status' | 'durationMin' 
   const done = list.filter((s) => s.status === 'done').reduce((a, s) => a + (s.actualMin ?? s.durationMin), 0);
   return { planned, done, sessions: list.length, completed: list.filter((s) => s.status === 'done').length, skipped: list.filter((s) => s.status === 'skipped').length };
 }
+
+/* ---------- Preparação para provas e pós-avaliação (Parte 9.10 e 9.11) ---------- */
+
+export interface PrepQuestion {
+  id: string;
+  text: string;
+  answer: string;
+  contentId: string | null;
+  /** Resultado da última tentativa. */
+  result: 'pending' | 'right' | 'wrong';
+}
+
+export interface MockExam {
+  id: string;
+  date: DateKey;
+  score: number;
+  maxScore: number;
+  notes: string;
+}
+
+export interface ExamError {
+  id: string;
+  description: string;
+  contentId: string | null;
+  /** Já revisei e corrigi este erro. */
+  fixed: boolean;
+}
+
+export interface PostAssessment {
+  difficulties: string;
+  errors: string;
+  masteredContentIds: string[];
+  reviewContentIds: string[];
+  reflections: string;
+  /** Quando os conteúdos foram levados ao conteúdo programático (só com confirmação). */
+  appliedAt: string | null;
+}
+
+/** Tudo da preparação e da pós-avaliação de uma prova (id = id da avaliação). */
+export interface ExamPrep {
+  id: string;
+  questions: PrepQuestion[];
+  mocks: MockExam[];
+  errors: ExamError[];
+  post: PostAssessment;
+  updatedAt: string;
+}
+
+export function emptyExamPrep(assessmentId: string): ExamPrep {
+  return { id: assessmentId, questions: [], mocks: [], errors: [], post: { difficulties: '', errors: '', masteredContentIds: [], reviewContentIds: [], reflections: '', appliedAt: null }, updatedAt: '' };
+}
+
+export const examPrepSchema = z.object({
+  questions: z.array(z.object({ id: z.string(), text: z.string().trim().min(1).max(4000), answer: z.string().max(4000), contentId: z.string().nullable(), result: z.enum(['pending', 'right', 'wrong']) })).max(500),
+  mocks: z.array(z.object({ id: z.string(), date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), score: num(0, 1000), maxScore: num(0.01, 1000), notes: z.string().max(2000) }).refine((m) => m.score <= m.maxScore)).max(100),
+  errors: z.array(z.object({ id: z.string(), description: z.string().trim().min(1).max(2000), contentId: z.string().nullable(), fixed: z.boolean() })).max(500),
+  post: z.object({ difficulties: z.string().max(8000), errors: z.string().max(8000), masteredContentIds: z.array(z.string()).max(200), reviewContentIds: z.array(z.string()).max(200), reflections: z.string().max(8000), appliedAt: z.string().nullable() }),
+});
+
+export type ReinforceReason = 'lowMastery' | 'notStudied' | 'wrongQuestion' | 'openError' | 'postReview';
+
+/**
+ * Conteúdos da prova que precisam de reforço, com os motivos:
+ * domínio baixo, ainda não estudado, questão errada, erro não corrigido ou marcado na pós-avaliação.
+ */
+export function contentsToReinforce(contentIds: string[], contents: Pick<Content, 'id' | 'status' | 'mastery'>[], prep: Pick<ExamPrep, 'questions' | 'errors' | 'post'>): Map<string, ReinforceReason[]> {
+  const byId = new Map(contents.map((c) => [c.id, c]));
+  const out = new Map<string, ReinforceReason[]>();
+  const add = (id: string | null, r: ReinforceReason) => {
+    if (!id || !byId.has(id)) return;
+    const list = out.get(id) ?? [];
+    if (!list.includes(r)) out.set(id, [...list, r]);
+  };
+  for (const id of contentIds) {
+    const c = byId.get(id);
+    if (!c) continue;
+    if (c.mastery !== null && c.mastery <= 1) add(id, 'lowMastery');
+    if (c.status === 'notStarted') add(id, 'notStudied');
+  }
+  for (const q of prep.questions) if (q.result === 'wrong') add(q.contentId, 'wrongQuestion');
+  for (const e of prep.errors) if (!e.fixed) add(e.contentId, 'openError');
+  for (const id of prep.post.reviewContentIds) add(id, 'postReview');
+  return out;
+}
+
+/** Evolução dos simulados em porcentagem, do mais antigo ao mais recente. */
+export function mockTrend(mocks: Pick<MockExam, 'date' | 'score' | 'maxScore'>[]): { date: DateKey; pct: number }[] {
+  return [...mocks].sort((a, b) => a.date.localeCompare(b.date)).map((m) => ({ date: m.date, pct: Math.round((m.score / m.maxScore) * 100) }));
+}

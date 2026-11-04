@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
+import { Link } from 'react-router-dom';
 import { Plus, Trash2 } from 'lucide-react';
 import { useSettings } from '@/app/SettingsProvider';
 import {
@@ -346,6 +347,11 @@ export function AssessmentDialog({ data, assessment, subjectId, periodId, onClos
             <Button variant="danger" className="mr-auto" icon={<Trash2 className="h-4 w-4" />} onClick={() => void remove()}>
               {t('academy.assessment.moveToTrash')}
             </Button>
+          )}
+          {assessment && !window.location.hash.includes(`/academy/assessments/${assessment.id}`) && (
+            <Link to={`/academy/assessments/${assessment.id}`} onClick={onClose} className="inline-flex h-11 items-center rounded-xl px-4 text-[0.9375rem] font-medium text-accent hover:bg-surface-2">
+              {t('academy.exam.open')}
+            </Link>
           )}
           <Button variant="ghost" onClick={onClose}>
             {t('common.cancel')}

@@ -6,7 +6,7 @@ import type { InboxItem, StoredFile } from '@/domain/inbox';
 import type { Note, NoteCollection, Notebook, NoteTemplate, NoteVersion } from '@/domain/notes';
 import type { Project } from '@/domain/projects';
 import type { HistoryEntry, Interest } from '@/domain/interests';
-import type { AcademicYear, Assessment, Card, CardReview, Content, Deck, Doubt, Lesson, PeriodResult, StudySession, Subject, Teacher } from '@/domain/academy';
+import type { AcademicYear, Assessment, Card, CardReview, Content, Deck, Doubt, ExamPrep, Lesson, PeriodResult, StudySession, Subject, Teacher } from '@/domain/academy';
 
 /** Registro chave-valor (configurações, estado do onboarding, metadados). */
 export interface KvRecord {
@@ -51,6 +51,7 @@ export class RoutigDB extends Dexie {
   cards!: EntityTable<Card, 'id'>;
   cardReviews!: EntityTable<CardReview, 'id'>;
   studySessions!: EntityTable<StudySession, 'id'>;
+  examPreps!: EntityTable<ExamPrep, 'id'>;
 
   constructor(name = 'routig') {
     super(name);
@@ -114,10 +115,14 @@ export class RoutigDB extends Dexie {
     this.version(11).stores({
       studySessions: 'id, subjectId, date, status, assessmentId',
     });
+    // Etapa 2: preparação para provas e pós-avaliação (uma por avaliação).
+    this.version(12).stores({
+      examPreps: 'id',
+    });
   }
 }
 
-export const DB_SCHEMA_VERSION = 11;
+export const DB_SCHEMA_VERSION = 12;
 
 let instance: RoutigDB | null = null;
 

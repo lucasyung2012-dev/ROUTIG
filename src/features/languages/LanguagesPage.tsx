@@ -80,9 +80,11 @@ export function LanguagesPage() {
                       </span>
                       <div className="min-w-0 flex-1">
                         <div className="truncate text-lg font-semibold text-fg">{l.name}</div>
-                        <div className="text-xs text-muted">{last ? t('languages.lastSession', { activity: t(`languages.activities.${last.activity}`) }) : t('languages.noSessions')}</div>
+                        <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
+                          {l.native ? <Badge tone="success">{t('languages.native')}</Badge> : <Badge tone={l.level ? 'accent' : 'neutral'}>{l.level ?? t('languages.noLevel')}</Badge>}
+                          <span className="text-xs text-muted">{last ? t('languages.lastSession', { activity: t(`languages.activities.${last.activity}`) }) : t('languages.noSessions')}</span>
+                        </div>
                       </div>
-                      {l.native ? <Badge tone="success">{t('languages.native')}</Badge> : <Badge tone={l.level ? 'accent' : 'neutral'}>{l.level ?? t('languages.noLevel')}</Badge>}
                     </div>
                     {!l.native && (
                       <div className="grid grid-cols-4 gap-2">

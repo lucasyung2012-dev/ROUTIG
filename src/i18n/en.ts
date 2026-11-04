@@ -245,7 +245,7 @@ export const en: Messages = {
       today: 'Today at a glance',
       events: 'Upcoming events',
       tasks: 'Open tasks',
-      projects: 'Active projects',
+      projects: 'Open projects',
       milestones: 'Upcoming milestones',
       notes: 'Recent notes',
       inbox: 'Inbox summary',

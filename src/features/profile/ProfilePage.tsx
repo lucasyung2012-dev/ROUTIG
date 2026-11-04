@@ -491,8 +491,8 @@ function HistoryTab() {
 
   return (
     <section className="flex flex-col gap-4">
-      <Surface className="flex flex-col gap-3 sm:flex-row sm:items-end">
-        <div className="sm:w-44">
+      <Surface className="flex flex-col gap-3 lg:flex-row lg:items-end">
+        <div className="lg:w-44">
           <Field label={t('profile.history.date')}>{(id) => <Input id={id} type="date" value={date} onChange={(e) => setDate(e.target.value || todayKey())} />}</Field>
         </div>
         <div className="min-w-0 flex-1">

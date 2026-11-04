@@ -243,7 +243,7 @@ export const pt = {
       today: 'Resumo do dia',
       events: 'Próximos compromissos',
       tasks: 'Tarefas pendentes',
-      projects: 'Projetos ativos',
+      projects: 'Projetos em aberto',
       milestones: 'Próximos marcos',
       notes: 'Notas recentes',
       inbox: 'Resumo da Inbox',

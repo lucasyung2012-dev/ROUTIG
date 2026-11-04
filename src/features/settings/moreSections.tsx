@@ -23,7 +23,7 @@ function Row({ title, hint, children }: { title: string; hint?: ReactNode; child
 /* ---------- Módulos ---------- */
 
 /** Módulos prontos que têm opções próprias (o texto diz onde elas ficam). */
-const MODULE_OPTIONS = ['dashboard', 'tasks', 'calendar', 'projects', 'notes', 'inbox'] as const;
+const MODULE_OPTIONS = ['dashboard', 'tasks', 'calendar', 'academy', 'projects', 'notes', 'inbox'] as const;
 type ModuleWithOptions = (typeof MODULE_OPTIONS)[number];
 const hasOptions = (id: ModuleId): id is ModuleWithOptions => (MODULE_OPTIONS as readonly string[]).includes(id);
 

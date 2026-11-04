@@ -140,6 +140,12 @@ function SubjectDetail({ subject, data }: { subject: Subject; data: AcademyData 
       {tab === 'overview' && (
         <div className="flex flex-col gap-4">
           <OverviewSummary data={data} extras={extras} onTab={setTab} />
+          {subject.notes && (
+            <Surface tone="flat" className="flex flex-col gap-1">
+              <h2 className="text-sm font-semibold text-fg">{subject.kind === 'subject' ? t('academy.subject.notes') : t('academy.subject.pathNotes')}</h2>
+              <p className="whitespace-pre-wrap text-sm text-muted">{subject.notes}</p>
+            </Surface>
+          )}
           {(data.year?.periods ?? []).length === 0 && <p className="text-sm text-muted">{t('academy.subject.noPeriods')}</p>}
           <div className="grid gap-4 lg:grid-cols-2">
             {(data.year?.periods ?? []).map((p) => (

@@ -18,6 +18,11 @@ import { formatGrade, useAcademyData, type AcademyData } from './useAcademyData'
 import { useSubjectExtras } from './useSubjectExtras';
 import { useStudySessions } from './StudyPlanPage';
 import { ImportDialog } from './ImportDialog';
+import { compareTasks, isClosedKind, statusKind } from '@/domain/tasks';
+import { TaskRow } from '@/features/tasks/TaskRow';
+import { useTaskEditor } from '@/features/tasks/TaskEditor';
+import { useTaskActions } from '@/features/tasks/useTaskActions';
+import { useTasksData } from '@/features/tasks/useTasksData';
 
 /** Período "de agora": o que contém hoje pelas datas; senão, o primeiro. */
 export function currentPeriodId(year: AcademicYear | null): string | null {
@@ -225,12 +230,14 @@ function Dashboard({ data, onNewSubject }: { data: AcademyData; onNewSubject: ()
           )}
         </Surface>
 
-        {/* Atividades pendentes: avaliações que já passaram e ainda não têm nota */}
+        {/* Atividades pendentes: tarefas abertas das disciplinas e avaliações que já passaram sem nota */}
         <Surface className="flex flex-col gap-3">
           <h2 className="flex items-center gap-2 text-base font-semibold text-fg">
             <ClipboardList className="h-5 w-5 text-amber" aria-hidden />
-            {t('academy.dash.pending')}
+            {t('academy.dash.pendingActivities')}
           </h2>
+          <PendingActivities data={data} />
+          <h3 className="mt-1 text-xs font-semibold uppercase tracking-[0.14em] text-subtle">{t('academy.dash.pending')}</h3>
           {toGrade.length === 0 ? (
             <p className="text-sm text-muted">{t('academy.dash.pendingEmpty')}</p>
           ) : (
@@ -430,5 +437,35 @@ function PlanPanel({ data }: { data: AcademyData }) {
         </ul>
       )}
     </Surface>
+  );
+}
+
+/** Atividades (tarefas ligadas às disciplinas) ainda abertas, as mesmas de Tasks. */
+function PendingActivities({ data }: { data: AcademyData }) {
+  const { t } = useSettings();
+  const tasks = useTasksData();
+  const editor = useTaskEditor();
+  const actions = useTaskActions(tasks);
+  const ids = new Set(data.subjects.map((s) => s.id));
+  const open = tasks.active
+    .filter((x) => x.subjectId && ids.has(x.subjectId) && !isClosedKind(statusKind(tasks.config, x.statusId)))
+    .sort(compareTasks(tasks.config))
+    .slice(0, 8);
+  if (tasks.loading) return null;
+  return (
+    <>
+      {open.length === 0 ? (
+        <p className="text-sm text-muted">{t('academy.dash.activitiesEmpty')}</p>
+      ) : (
+        <ul className="flex flex-col">
+          {open.map((task) => (
+            <li key={task.id}>
+              <TaskRow task={task} data={tasks} onOpen={editor.openTask} onToggle={actions.toggle} compact />
+            </li>
+          ))}
+        </ul>
+      )}
+      {actions.dialogs}
+    </>
   );
 }

@@ -176,6 +176,7 @@ export function SubjectDialog({ data, subject, onClose, onCreated }: { data: Aca
   const [kind, setKind] = useState<SubjectKind>(subject?.kind ?? 'subject');
   const [color, setColor] = useState(subject?.color ?? PALETTE[(data.subjects.length + 9) % PALETTE.length]!);
   const [teacherId, setTeacherId] = useState<string | null>(subject?.teacherId ?? null);
+  const [notes, setNotes] = useState(subject?.notes ?? '');
   const [ownModel, setOwnModel] = useState(!!subject?.model);
   const [model, setModel] = useState<GradingModel>(subject?.model ?? data.year?.model ?? defaultGradingModel());
   const [error, setError] = useState<string | null>(null);
@@ -183,9 +184,9 @@ export function SubjectDialog({ data, subject, onClose, onCreated }: { data: Aca
   const save = async () => {
     if (!data.year) return;
     try {
-      if (subject) await updateSubject(subject.id, { name, kind, color, teacherId, model: ownModel ? model : null });
+      if (subject) await updateSubject(subject.id, { name, kind, color, teacherId, notes, model: ownModel ? model : null });
       else {
-        const s = await createSubject({ yearId: data.year.id, name, kind, color, teacherId });
+        const s = await createSubject({ yearId: data.year.id, name, kind, color, teacherId, notes });
         if (ownModel) await updateSubject(s.id, { model });
         onCreated?.(s);
       }
@@ -243,6 +244,9 @@ export function SubjectDialog({ data, subject, onClose, onCreated }: { data: Aca
             )}
           </Field>
         </div>
+        <Field label={kind === 'subject' ? t('academy.subject.notes') : t('academy.subject.pathNotes')} hint={kind === 'subject' ? undefined : t('academy.subject.pathNotesHint')} optionalLabel={t('common.optional')}>
+          {(id, d) => <Textarea id={id} aria-describedby={d} rows={kind === 'subject' ? 2 : 4} value={notes} maxLength={4000} onChange={(e) => setNotes(e.target.value)} />}
+        </Field>
         <ColorPicker value={color} onChange={setColor} label={t('projects.fields.color')} showLabel />
         <div className="flex flex-col gap-3 rounded-2xl bg-surface-2/50 p-3">
           <Switch label={t('academy.subject.ownModel')} hint={t('academy.subject.ownModelHint')} checked={ownModel} onChange={setOwnModel} />

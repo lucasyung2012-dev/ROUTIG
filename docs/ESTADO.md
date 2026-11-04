@@ -8,8 +8,8 @@ Leia este arquivo no começo de toda conversa nova sobre o ROUTIG. A especifica�
 
 - **Etapa 0 — Fundação:** concluída. Logo vetorial e design system aprovados pelo dono do produto em 2026-11-02.
 - **Etapa 1 — Organização central:** concluída no código (versão 0.7.0). Tasks, Calendar, Inbox, Notes, Projects, Dashboard, Profile e Settings publicados. Falta o dono do produto testar no iPad o Dashboard, o Profile e as Settings novas.
-- **Etapa 2 — Aprendizagem:** em andamento. Academy partes 1 (0.11.0), 2 (0.12.0), 3a flashcards (0.13.0), 3b planejamento (0.14.0) e 3c provas e pós-avaliação (0.15.0) publicadas e testadas no navegador.
-- **Próximo passo:** Academy 3d (importação acadêmica com prévia), depois conferir a Parte 9 item por item, e Idiomas (reaproveita o motor de repetição espaçada de `domain/srs.ts`). O dono do produto autorizou seguir sem esperar confirmação a cada entrega (2026-11-03).
+- **Etapa 2 — Aprendizagem:** em andamento. Academy partes 1 (0.11.0), 2 (0.12.0), 3a flashcards (0.13.0), 3b planejamento (0.14.0) e 3c provas e pós-avaliação (0.15.0), 3d importação (0.16.0) e conferência final (0.17.0) publicadas e testadas. **Academy pronta.**
+- **Próximo passo:** Idiomas (Parte 10) (reaproveita o motor de repetição espaçada de `domain/srs.ts`). O dono do produto autorizou seguir sem esperar confirmação a cada entrega (2026-11-03).
 - **Como trabalhar:** o computador de desenvolvimento não tem Node. Escrever o código, enviar com `git push`, conferir o GitHub Actions (anotações de erro aparecem por arquivo e linha) e testar no app publicado.
 
 ## Etapa 1 — andamento
@@ -75,6 +75,8 @@ Leia este arquivo no começo de toda conversa nova sobre o ROUTIG. A especifica�
 | 0.13.0 | 2026-11-03 | Claude (Claude Code) | Academy parte 3a: flashcards com repetição espaçada adaptativa (baralhos por disciplina ou livres, categorias e tags, cartões ligados ao conteúdo, revisão programada com atrasados e difíceis primeiro, cartão errado volta na mesma sessão, treino livre que não muda o agendamento, histórico, domínio estimado), aba Revisões e central de revisão. |
 | 0.14.0 | 2026-11-03 | Claude (Claude Code) | Academy parte 3b: planejamento de estudos (sessões com disciplina, conteúdos, data, hora, duração, prioridade e prova; revisões distribuídas 14/7/3/1 dia antes da prova com prévia; concluir com tempo real e dificuldades; pular; resumo da semana), sessões no Calendar e no painel da Academy. |
 | 0.15.0 | 2026-11-03 | Claude (Claude Code) | Academy parte 3c: página de cada prova com preparação (conteúdos cobrados, reforço com motivos, plano de revisão, andamento), questões com acerto/erro, simulados com evolução, erros com "já revisei" e pós-avaliação (resultado, dificuldades, erros, dominados, para revisar, observações; levar ao conteúdo programático só com confirmação). Banco v12: `examPreps`. |
+| 0.16.0 | 2026-11-03 | Claude (Claude Code) | Academy parte 3d: importação acadêmica com prévia (texto, .txt, CSV, .ics; provas, conteúdos em árvore, aulas e notas; disciplina pelo nome; duplicados desmarcados; PDF e imagens como material, com dica do Texto ao Vivo). |
+| 0.17.0 | 2026-11-03 | Claude (Claude Code) | Academy completa (Parte 9 conferida item por item): atividades pendentes no painel e registro de itinerários e ênfases (escolhas, mudanças, interesses, experiências). Academy marcada como disponível. |
 
 ## Calendar (Parte 6) — o que existe
 

@@ -8,7 +8,7 @@ Leia este arquivo no começo de toda conversa nova sobre o ROUTIG. A especifica�
 
 - **Etapa 0 — Fundação:** concluída. Logo vetorial e design system aprovados pelo dono do produto em 2026-11-02.
 - **Etapa 1 — Organização central:** concluída no código (versão 0.7.0). Tasks, Calendar, Inbox, Notes, Projects, Dashboard, Profile e Settings publicados. Falta o dono do produto testar no iPad o Dashboard, o Profile e as Settings novas.
-- **Próximo passo:** (backup feito na 0.8.0) desenho completo do Notes, depois o desenho completo do Notes, mais cores com cor personalizada, e a Etapa 2 (ver "Ordem combinada").
+- **Próximo passo:** (backup feito na 0.8.0) desenho completo do Notes, depois mais cores com cor personalizada, e a Etapa 2 (ver "Ordem combinada").
 - **Como trabalhar:** o computador de desenvolvimento não tem Node. Escrever o código, enviar com `git push`, conferir o GitHub Actions (anotações de erro aparecem por arquivo e linha) e testar no app publicado.
 
 ## Etapa 1 — andamento

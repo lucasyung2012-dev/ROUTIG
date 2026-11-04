@@ -36,6 +36,7 @@ import { EmptyState, LoadingState } from '@/ui/States';
 import { useToast } from '@/ui/toast';
 import { cn } from '@/ui/cn';
 import { KpiCard, renderLiveCard } from './cards';
+import { BackupReminder } from '@/features/backup/BackupReminder';
 
 export function greetingKey(hour: number): 'dashboard.morning' | 'dashboard.afternoon' | 'dashboard.evening' {
   if (hour >= 5 && hour < 12) return 'dashboard.morning';
@@ -149,6 +150,8 @@ export function DashboardPage() {
           )}
         </div>
       </section>
+
+      {!editing && <BackupReminder />}
 
       {editing && profile && (
         <div className="sticky top-2 z-20 flex flex-wrap items-center gap-2 rounded-2xl bg-surface/95 p-3 shadow-lift ring-1 ring-accent/40 backdrop-blur">

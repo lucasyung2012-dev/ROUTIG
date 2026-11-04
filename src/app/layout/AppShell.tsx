@@ -10,6 +10,7 @@ import { CommandPalette } from './CommandPalette';
 import { TaskEditorProvider } from '@/features/tasks/TaskEditor';
 import { EventEditorProvider } from '@/features/calendar/EventEditor';
 import { QuickCreate } from './QuickCreate';
+import { runAutoBackupIfDue } from '@/data/backupRepo';
 
 const NEXT_THEME: Record<ThemeSetting, ThemeSetting> = { auto: 'light', light: 'dark', dark: 'auto' };
 
@@ -32,6 +33,12 @@ function Shell() {
   const location = useLocation();
 
   useEffect(() => setMenuOpen(false), [location.pathname]);
+
+  // Cópia interna diária (Parte 25.2): alguns segundos depois de abrir, sem travar a tela.
+  useEffect(() => {
+    const id = window.setTimeout(() => void runAutoBackupIfDue().catch(() => undefined), 4000);
+    return () => window.clearTimeout(id);
+  }, []);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

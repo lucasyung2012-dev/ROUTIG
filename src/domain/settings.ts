@@ -19,6 +19,8 @@ export const settingsSchema = z.object({
   profile: z.object({
     displayName: z.string().max(60),
     bio: z.string().max(280),
+    /** Foto do avatar guardada em `files` (opcional; sem foto, mostra a inicial). */
+    avatarFileId: z.string().nullable(),
   }),
   nav: z.object({
     order: z.array(navModuleId),
@@ -49,7 +51,7 @@ export function defaultSettings(): Settings {
     reduceMotion: false,
     weekStartsOn: 1,
     onboarding: { completed: false, step: 0 },
-    profile: { displayName: '', bio: '' },
+    profile: { displayName: '', bio: '', avatarFileId: null },
     nav: { order: [...NAV_MODULE_IDS], hidden: [], favorites: [], collapsed: false },
     brand: { vectorApproved: false, approvedAt: null },
     tips: { enabled: true, dismissed: [] },

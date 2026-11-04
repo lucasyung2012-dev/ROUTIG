@@ -140,7 +140,7 @@ function ProfileSection() {
     if (name === settings.profile.displayName && bio === settings.profile.bio) return;
     window.clearTimeout(timer.current);
     timer.current = window.setTimeout(() => {
-      void save((s) => ({ ...s, profile: { displayName: name.slice(0, 60), bio: bio.slice(0, 280) } })).then(() => setSavedAt(Date.now()));
+      void save((s) => ({ ...s, profile: { ...s.profile, displayName: name.slice(0, 60), bio: bio.slice(0, 280) } })).then(() => setSavedAt(Date.now()));
     }, 500);
     return () => window.clearTimeout(timer.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -118,7 +118,7 @@ export function DashboardPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <section className="relative overflow-hidden rounded-3xl bg-surface p-6 shadow-soft ring-1 ring-line/70 sm:p-8">
+      <section className="relative overflow-clip rounded-3xl bg-surface p-6 shadow-soft ring-1 ring-line/70 sm:p-8">
         <div className="pointer-events-none absolute -right-10 -top-16 h-72 w-72 opacity-[0.16] sm:opacity-25" aria-hidden>
           <RoutigMark className="h-full w-full" />
         </div>
@@ -180,9 +180,9 @@ export function DashboardPage() {
       ) : (
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4 lg:gap-6">
           {visible.map((slot, index) => (
-            <div key={slot.id} className={cn('relative min-w-0', SPAN[slot.size], editing && 'rounded-3xl outline-dashed outline-2 outline-offset-4 outline-accent/50')}>
+            <div key={slot.id} className={cn('flex min-w-0 flex-col', SPAN[slot.size], editing && 'gap-2 rounded-3xl p-2 outline-dashed outline-2 outline-accent/50')}>
               {editing && (
-                <div className="absolute -top-4 right-3 z-10 flex gap-1 rounded-xl bg-surface p-1 shadow-lift ring-1 ring-line">
+                <div className="flex flex-wrap justify-end gap-1">
                   <IconButton size="sm" label={t('dashboard.moveUp')} icon={<ArrowUp className="h-4 w-4" />} disabled={index === 0} onClick={() => updateCards((c) => moveCard(c, slot.id, -1))} />
                   <IconButton size="sm" label={t('dashboard.moveDown')} icon={<ArrowDown className="h-4 w-4" />} disabled={index === visible.length - 1} onClick={() => updateCards((c) => moveCard(c, slot.id, 1))} />
                   <IconButton
@@ -194,7 +194,7 @@ export function DashboardPage() {
                   <IconButton size="sm" label={t('dashboard.remove')} icon={<X className="h-4 w-4" />} onClick={() => updateCards((c) => removeCard(c, slot.id))} />
                 </div>
               )}
-              <div className={cn('h-full', editing && 'pointer-events-none select-none')}>{isKpi(slot.id) ? <KpiCard metric={slot.id.slice(4) as KpiMetric} /> : renderLiveCard(slot.id as LiveCard)}</div>
+              <div className={cn('min-h-0 flex-1', editing && 'pointer-events-none select-none')}>{isKpi(slot.id) ? <KpiCard metric={slot.id.slice(4) as KpiMetric} /> : renderLiveCard(slot.id as LiveCard)}</div>
             </div>
           ))}
         </div>

@@ -13,6 +13,7 @@ import { NotesPage } from '@/features/notes/NotesPage';
 import { ProjectsPage } from '@/features/projects/ProjectsPage';
 import { ProjectPage } from '@/features/projects/ProjectPage';
 import { ProfilePage } from '@/features/profile/ProfilePage';
+import { InterestPage } from '@/features/profile/InterestPage';
 import { SettingsIndexPage, SettingsSectionPage } from '@/features/settings/SettingsPage';
 import { LogoComparePage } from '@/features/brand/LogoComparePage';
 import { DesignSystemPage } from '@/features/design/DesignSystemPage';
@@ -100,6 +101,7 @@ function Gate() {
             <Route key={id} path={MODULES[id].path.slice(1)} element={<ModuleRoadmapPage id={id} />} />
           ))}
           <Route path="profile" element={<ProfilePage />} />
+          <Route path="profile/interests/:id" element={<InterestPage />} />
           <Route path="settings" element={<SettingsIndexPage />} />
           <Route path="settings/logo" element={<LogoComparePage />} />
           <Route path="settings/:section" element={<SettingsSectionPage />} />

@@ -5,6 +5,7 @@ import type { CalendarEvent } from '@/domain/events';
 import type { InboxItem, StoredFile } from '@/domain/inbox';
 import type { Note, NoteCollection, Notebook, NoteTemplate, NoteVersion } from '@/domain/notes';
 import type { Project } from '@/domain/projects';
+import type { HistoryEntry, Interest } from '@/domain/interests';
 
 /** Registro chave-valor (configurações, estado do onboarding, metadados). */
 export interface KvRecord {
@@ -35,6 +36,8 @@ export class RoutigDB extends Dexie {
   noteCollections!: EntityTable<NoteCollection, 'id'>;
   noteTemplates!: EntityTable<NoteTemplate, 'id'>;
   projects!: EntityTable<Project, 'id'>;
+  interests!: EntityTable<Interest, 'id'>;
+  historyEntries!: EntityTable<HistoryEntry, 'id'>;
 
   constructor(name = 'routig') {
     super(name);
@@ -69,10 +72,15 @@ export class RoutigDB extends Dexie {
     this.version(6).stores({
       projects: 'id, status, due, updatedAt',
     });
+    // Etapa 1: Profile (interesses e Minha história).
+    this.version(7).stores({
+      interests: 'id, status, categoryId, updatedAt',
+      historyEntries: 'id, date',
+    });
   }
 }
 
-export const DB_SCHEMA_VERSION = 6;
+export const DB_SCHEMA_VERSION = 7;
 
 let instance: RoutigDB | null = null;
 

@@ -164,7 +164,7 @@ export function ProjectsCard() {
   const data = useProjectsData();
   const active = data.projects.filter((p) => !isClosedProject(p.status) && p.status !== 'idea').slice(0, 5);
   return (
-    <CardShell title={t('dashboard.cards.projects')} icon={<FolderKanban className="h-5 w-5" />} tone="amber" link={{ to: '/projects', label: t('dashboard.seeAll') }}>
+    <CardShell title={t('dashboard.cards.projects')} icon={<FolderKanban className="h-5 w-5" />} tone="amber" link={{ to: '/projects', label: t('dashboard.seeAllProjects') }}>
       {data.loading ? (
         <LoadingState label={t('common.loading')} lines={3} />
       ) : active.length === 0 ? (

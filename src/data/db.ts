@@ -6,7 +6,7 @@ import type { InboxItem, StoredFile } from '@/domain/inbox';
 import type { Note, NoteCollection, Notebook, NoteTemplate, NoteVersion } from '@/domain/notes';
 import type { Project } from '@/domain/projects';
 import type { HistoryEntry, Interest } from '@/domain/interests';
-import type { AcademicYear, Assessment, Content, Doubt, Lesson, PeriodResult, Subject, Teacher } from '@/domain/academy';
+import type { AcademicYear, Assessment, Card, CardReview, Content, Deck, Doubt, Lesson, PeriodResult, Subject, Teacher } from '@/domain/academy';
 
 /** Registro chave-valor (configurações, estado do onboarding, metadados). */
 export interface KvRecord {
@@ -47,6 +47,9 @@ export class RoutigDB extends Dexie {
   contents!: EntityTable<Content, 'id'>;
   lessons!: EntityTable<Lesson, 'id'>;
   doubts!: EntityTable<Doubt, 'id'>;
+  decks!: EntityTable<Deck, 'id'>;
+  cards!: EntityTable<Card, 'id'>;
+  cardReviews!: EntityTable<CardReview, 'id'>;
 
   constructor(name = 'routig') {
     super(name);
@@ -100,10 +103,16 @@ export class RoutigDB extends Dexie {
       lessons: 'id, subjectId, date',
       doubts: 'id, subjectId, status',
     });
+    // Etapa 2: flashcards com repetição espaçada (Academy e, depois, Idiomas).
+    this.version(10).stores({
+      decks: 'id, subjectId',
+      cards: 'id, deckId, srs.due',
+      cardReviews: 'id, cardId, at',
+    });
   }
 }
 
-export const DB_SCHEMA_VERSION = 9;
+export const DB_SCHEMA_VERSION = 10;
 
 let instance: RoutigDB | null = null;
 

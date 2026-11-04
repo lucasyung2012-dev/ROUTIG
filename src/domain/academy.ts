@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type { BaseEntity } from './entity';
 import type { DateKey } from './dates';
 import { newId } from './ids';
+import type { Rating, SrsState } from './srs';
 
 /* ---------- Modelo de avaliação (Parte 9.6) ---------- */
 
@@ -422,4 +423,37 @@ export interface Doubt extends BaseEntity {
   answer: string;
   status: 'open' | 'resolved';
   resolvedAt: string | null;
+}
+
+/* ---------- Flashcards (Parte 9.9) ---------- */
+
+export interface Deck extends BaseEntity {
+  name: string;
+  /** Disciplina da Academy (opcional: dá para ter baralhos livres). */
+  subjectId: string | null;
+  color: string;
+  category: string;
+  tags: string[];
+}
+
+export interface Card extends BaseEntity {
+  deckId: string;
+  front: string;
+  back: string;
+  category: string;
+  tags: string[];
+  /** Conteúdo programático ligado (opcional). */
+  contentId: string | null;
+  srs: SrsState;
+}
+
+/** Uma resposta numa revisão. `manual`: treino livre, que não muda o agendamento. */
+export interface CardReview {
+  id: string;
+  cardId: string;
+  at: string;
+  rating: Rating;
+  intervalBefore: number;
+  intervalAfter: number;
+  manual: boolean;
 }

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { BookOpenCheck, CalendarClock, CircleHelp, ClipboardList, GraduationCap, History, NotebookPen, PenLine, Plus, Settings2, Users } from 'lucide-react';
+import { BookOpenCheck, CalendarClock, CircleHelp, ClipboardList, GraduationCap, History, Layers, NotebookPen, PenLine, Plus, Settings2, Users } from 'lucide-react';
 import { useSettings } from '@/app/SettingsProvider';
 import { setCurrentYear } from '@/data/academyRepo';
 import { addDays, formatDateKey, todayKey } from '@/domain/dates';
@@ -69,6 +69,10 @@ export function AcademyPage() {
               <Button variant="secondary" size="sm" icon={<Settings2 className="h-4 w-4" />} onClick={() => setYearDialog('edit')}>
                 {t('academy.year.settings')}
               </Button>
+              <Link to="/academy/review" className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-surface-2 px-3 text-sm font-medium text-fg ring-1 ring-inset ring-line transition hover:bg-surface-3">
+                <Layers className="h-4 w-4" aria-hidden />
+                {t('academy.review.title')}
+              </Link>
               <Button variant="secondary" size="sm" icon={<Users className="h-4 w-4" />} onClick={() => setTeachersOpen(true)}>
                 {t('academy.teachers.title')}
               </Button>

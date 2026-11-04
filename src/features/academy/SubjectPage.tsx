@@ -21,10 +21,11 @@ import { DecimalInput, GradeBadge, GradeExplanation } from './academyUi';
 import { AssessmentDialog, SubjectDialog } from './dialogs';
 import { formatGrade, useAcademyData, type AcademyData } from './useAcademyData';
 import { ContentsTab, DoubtsTab, LessonsTab, MaterialsTab, WorkTab } from './subjectTabs';
+import { DecksPanel, ReviewSession } from './flashcards';
 import { useSubjectExtras, type SubjectExtras } from './useSubjectExtras';
 
 /** Ambiente da disciplina (Parte 9.3). */
-const TABS = ['overview', 'contents', 'lessons', 'assessments', 'work', 'doubts', 'materials', 'history'] as const;
+const TABS = ['overview', 'contents', 'lessons', 'assessments', 'work', 'reviews', 'doubts', 'materials', 'history'] as const;
 type Tab = (typeof TABS)[number];
 
 /** Resumo do andamento: conteúdos, domínio, dúvidas, atividades e trabalhos. */
@@ -85,6 +86,7 @@ function SubjectDetail({ subject, data }: { subject: Subject; data: AcademyData 
   const [editing, setEditing] = useState(false);
   const [assessment, setAssessment] = useState<Assessment | 'new' | null>(null);
   const [newPeriod, setNewPeriod] = useState<string | null>(null);
+  const [session, setSession] = useState<{ deckIds: string[]; manual: boolean } | null>(null);
   const model = data.modelOf(subject);
   const teacher = subject.teacherId ? data.teacherById.get(subject.teacherId) : null;
   const yg = data.yearGradeOf(subject);
@@ -152,12 +154,14 @@ function SubjectDetail({ subject, data }: { subject: Subject; data: AcademyData 
       {tab === 'contents' && <ContentsTab subject={subject} data={data} extras={extras} />}
       {tab === 'lessons' && <LessonsTab subject={subject} data={data} extras={extras} />}
       {tab === 'work' && <WorkTab subject={subject} extras={extras} />}
+      {tab === 'reviews' && <DecksPanel subject={subject} onStart={(deckIds, manual) => setSession({ deckIds, manual })} />}
       {tab === 'doubts' && <DoubtsTab subject={subject} extras={extras} />}
       {tab === 'materials' && <MaterialsTab subject={subject} extras={extras} />}
       {tab === 'history' && <HistoryTab subject={subject} data={data} />}
 
       {editing && <SubjectDialog data={data} subject={subject} onClose={() => setEditing(false)} />}
       {assessment && assessment !== 'new' && <AssessmentDialog data={data} assessment={assessment} subjectId={subject.id} periodId={assessment.periodId} onClose={() => setAssessment(null)} />}
+      {session && <ReviewSession deckIds={session.deckIds} manual={session.manual} onClose={() => setSession(null)} />}
       {newPeriod !== null && <AssessmentDialog data={data} assessment={null} subjectId={subject.id} periodId={newPeriod || null} onClose={() => setNewPeriod(null)} />}
     </div>
   );

@@ -2,13 +2,13 @@
 
 Leia este arquivo no começo de toda conversa nova sobre o ROUTIG. A especificação completa é o "ROUTIG — Prompt Master" (35 partes), fornecido pelo dono do produto. Decisões em [DECISOES.md](DECISOES.md), arquitetura em [ARQUITETURA.md](ARQUITETURA.md).
 
-**Atualizado:** 2026-11-03 (Calendar)
+**Atualizado:** 2026-11-03 (fim da Etapa 1)
 
 ## Estado da conversa (2026-11-03)
 
 - **Etapa 0 — Fundação:** concluída. Logo vetorial e design system aprovados pelo dono do produto em 2026-11-02.
-- **Etapa 1 — Organização central:** em andamento. **Tasks, Calendar, Inbox, Notes e Projects prontos e publicados.**
-- **Próximo passo:** Dashboard completo (personalização), Profile (interesses, evolução, história) e Settings. Depois: backup, desenho completo do Notes e Etapa 2 (ver "Ordem combinada").
+- **Etapa 1 — Organização central:** concluída no código (versão 0.7.0). Tasks, Calendar, Inbox, Notes, Projects, Dashboard, Profile e Settings publicados. Falta o dono do produto testar no iPad o Dashboard, o Profile e as Settings novas.
+- **Próximo passo:** backup completo, depois o desenho completo do Notes, mais cores com cor personalizada, e a Etapa 2 (ver "Ordem combinada").
 - **Como trabalhar:** o computador de desenvolvimento não tem Node. Escrever o código, enviar com `git push`, conferir o GitHub Actions (anotações de erro aparecem por arquivo e linha) e testar no app publicado.
 
 ## Etapa 1 — andamento
@@ -16,13 +16,13 @@ Leia este arquivo no começo de toda conversa nova sobre o ROUTIG. A especifica�
 | Módulo | Estado |
 |---|---|
 | Tasks | ✅ Pronto, testado (CI e navegador) |
-| Dashboard | Parcial: saudação, resumo real de tarefas, mapa dos módulos. Falta personalização (cartões, perfis Estudos/Projetos/Completo, prévia) |
+| Dashboard | ✅ Pronto: perfis Completo, Estudos e Projetos; 9 cartões e 7 indicadores com dados reais; Personalizar com prévia (Aplicar/Descartar); perfis próprios; cartões de módulos futuros só como "Em breve" |
 | Calendar | ✅ Pronto (testes no CI; checagem no navegador nesta versão) |
 | Projects | ✅ Pronto (testes no CI; checagem no navegador nesta versão) |
 | Inbox | ✅ Pronto (testes no CI; checagem no navegador nesta versão) |
 | Notes | ✅ Pronto (testes no CI; checagem no navegador nesta versão) |
-| Profile | Parcial: nome e descrição. Falta interesses, Minha evolução, Minha história |
-| Settings | Parcial: seções da Etapa 0. Faltam as que dependem de módulos novos |
+| Profile | ✅ Pronto: avatar; interesses (categorias de fábrica e próprias, status escolhido pelo usuário, página com ícone, cor, capa, início, objetivos, projetos, notas, atividades, histórico e evolução); Minha evolução (números e gráficos semanais reais); Minha história (linha do tempo com registros próprios; renomear e ocultar) |
+| Settings | ✅ Etapa 1: + Módulos, Dispositivos (instalado ou navegador, conexão, offline, como instalar, dados por aparelho) e Ajuda (atalhos, como funciona, dicas de iPad). Notificações, Privacidade, Segurança, Backup, Restauração, Integrações e IA aparecem em Sobre como próximas etapas, sem controles falsos |
 
 ## Tasks (Parte 7) — o que existe
 
@@ -65,6 +65,7 @@ Leia este arquivo no começo de toda conversa nova sobre o ROUTIG. A especifica�
 | 0.4.0 | 2026-11-03 | Claude (Claude Code) | Etapa 1: módulo Inbox; resumo do Inbox no Dashboard; layout do iPad (cabeçalhos e grades). |
 | 0.5.0 | 2026-11-03 | Claude (Claude Code) | Etapa 1: módulo Notes (blocos, desenho com Apple Pencil, versões); Inbox → nota; título de áudio vazio na conversão. |
 | 0.6.0 | 2026-11-03 | Claude (Claude Code) | Etapa 1: módulo Projects; projeto no editor de tarefa; marcos no Calendar; notas ligadas a projetos. |
+| 0.7.0 | 2026-11-03 | Claude (Claude Code) | Fim da Etapa 1: Dashboard completo, Profile completo, Settings (Módulos, Dispositivos, Ajuda); avisos somem sozinhos (5 s com Desfazer). |
 
 ## Calendar (Parte 6) — o que existe
 
@@ -113,7 +114,7 @@ Leia este arquivo no começo de toda conversa nova sobre o ROUTIG. A especifica�
 
 ## Ordem combinada a seguir (2026-11-03)
 
-1. Terminar a Etapa 1: Dashboard completo (personalização), Profile (interesses, evolução, história) e Settings.
+1. ~~Terminar a Etapa 1~~ (feito em 2026-11-03, versão 0.7.0).
 2. Backup completo (adiantado da Etapa 5; ver DECISOES.md).
 3. Desenho do Notes completo (todos os recursos aprovados; ver DECISOES.md).
 4. Etapa 2: Academy e Idiomas.

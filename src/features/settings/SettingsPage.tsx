@@ -20,6 +20,7 @@ import { Surface } from '@/ui/Surface';
 import { Switch } from '@/ui/Switch';
 import { useToast } from '@/ui/toast';
 import { cn } from '@/ui/cn';
+import { DevicesSection, HelpSection, ModulesSection } from './moreSections';
 import { SETTINGS_SECTIONS, isSettingsSection, type SettingsSectionId } from './sections';
 
 /** Grava uma mudança e avisa se falhar. */
@@ -110,6 +111,12 @@ function SectionBody({ id }: { id: SettingsSectionId }) {
       return <AccessibilitySection />;
     case 'storage':
       return <StorageSection />;
+    case 'modules':
+      return <ModulesSection />;
+    case 'devices':
+      return <DevicesSection />;
+    case 'help':
+      return <HelpSection />;
     case 'about':
       return <AboutSection />;
   }

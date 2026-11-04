@@ -1,14 +1,17 @@
-import { Accessibility, Globe, HardDrive, Info, Languages, Palette, PanelsTopLeft, UserRound, type LucideIcon } from 'lucide-react';
+import { Accessibility, Globe, HardDrive, Info, Languages, LayoutGrid, LifeBuoy, Palette, PanelsTopLeft, Smartphone, UserRound, type LucideIcon } from 'lucide-react';
 
-/** Seções de Settings que já têm comportamento real na Etapa 0. */
+/** Seções de Settings com comportamento real (Parte 22). As que dependem de etapas futuras aparecem em Sobre. */
 export const SETTINGS_SECTIONS = [
   { id: 'profile', icon: UserRound },
   { id: 'appearance', icon: Palette },
   { id: 'language', icon: Languages },
   { id: 'region', icon: Globe },
   { id: 'navigation', icon: PanelsTopLeft },
-  { id: 'accessibility', icon: Accessibility },
+  { id: 'modules', icon: LayoutGrid },
   { id: 'storage', icon: HardDrive },
+  { id: 'devices', icon: Smartphone },
+  { id: 'accessibility', icon: Accessibility },
+  { id: 'help', icon: LifeBuoy },
   { id: 'about', icon: Info },
 ] as const satisfies ReadonlyArray<{ id: string; icon: LucideIcon }>;
 

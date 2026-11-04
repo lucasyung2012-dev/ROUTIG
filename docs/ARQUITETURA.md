@@ -32,6 +32,7 @@
 | 4 | 1 | + `inbox`, `files` (arquivos binários separados, com hash SHA-256 para não duplicar) |
 | 5 | 1 | + `notes`, `noteVersions`, `notebooks`, `noteCollections`, `noteTemplates` |
 | 6 | 1 | + `projects` (etapas, marcos e referências dentro do projeto; tarefas continuam em `tasks` com `projectId`) |
+| 7 | 1 | + `interests` (interesses do Profile, ligados a projetos e notas por id) e `historyEntries` (registros escritos à mão em Minha história). Categorias próprias, ajustes da linha do tempo e o painel ficam em `kv` |
 
 ## Navegação
 

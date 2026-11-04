@@ -6,7 +6,7 @@ import { useSettings } from '@/app/SettingsProvider';
 import { AcademyRuleError } from '@/data/academyRepo';
 import { getDb } from '@/data/db';
 import { answerCard, cardHistory, createCard, createDeck, resetCard, restoreCard, restoreDeck, softDeleteCard, softDeleteDeck, updateCard, updateDeck, type CardInput, type DeckInput } from '@/data/flashcardsRepo';
-import { contentTree, flattenTree, type Card, type Deck, type Subject } from '@/domain/academy';
+import { contentTree, flattenTree, type Card, type CardReview, type Content, type Deck, type Subject } from '@/domain/academy';
 import { formatDateKey, todayKey } from '@/domain/dates';
 import { cardStage, isDue, masteryScore, previewIntervals, RATINGS, sessionQueue, type Rating } from '@/domain/srs';
 import { Badge } from '@/ui/Badge';
@@ -309,8 +309,8 @@ function CardDialog({ deck, card, onClose }: { deck: Deck; card: Card | null; on
   const [input, setInput] = useState<CardInput>(card ? { deckId: card.deckId, front: card.front, back: card.back, category: card.category, tags: card.tags, contentId: card.contentId } : { deckId: deck.id, front: '', back: '', category: '', tags: [], contentId: null });
   const [tags, setTags] = useState(input.tags.join(', '));
   const [keepOpen, setKeepOpen] = useState(!card);
-  const contents = useLiveQuery(() => (deck.subjectId ? getDb().contents.where('subjectId').equals(deck.subjectId).filter((c) => !c.deletedAt).toArray() : Promise.resolve([])), [deck.subjectId]) ?? [];
-  const history = useLiveQuery(() => (card ? cardHistory(card.id) : Promise.resolve([])), [card?.id]) ?? [];
+  const contents = useLiveQuery(async (): Promise<Content[]> => (deck.subjectId ? getDb().contents.where('subjectId').equals(deck.subjectId).filter((c) => !c.deletedAt).toArray() : []), [deck.subjectId]) ?? [];
+  const history = useLiveQuery(async (): Promise<CardReview[]> => (card ? cardHistory(card.id) : []), [card?.id]) ?? [];
   const nodes = flattenTree(contentTree(contents));
   const save = async () => {
     try {

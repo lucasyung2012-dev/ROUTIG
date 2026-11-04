@@ -42,7 +42,7 @@ const round2 = (v: number) => Math.round(v * 100) / 100;
  * - again: errou → volta amanhã, facilidade −0,2, conta como lapso;
  * - hard: lembrou com esforço → intervalo cresce pouco (×1,2), facilidade −0,15;
  * - good: lembrou → 1 dia, depois 3, depois intervalo × facilidade;
- * - easy: fácil → como "good" × 1,3, facilidade +0,15.
+ * - easy: fácil → 3 dias, depois 5, depois intervalo × facilidade × 1,3; facilidade +0,15.
  */
 export function review(state: SrsState, rating: Rating, today: DateKey, at: string): SrsState {
   let { interval, ease, streak, lapses } = state;
@@ -64,7 +64,7 @@ export function review(state: SrsState, rating: Rating, today: DateKey, at: stri
       break;
     case 'easy':
       ease = clamp(ease + 0.15, MIN_EASE, MAX_EASE);
-      interval = streak === 0 ? 3 : Math.max(interval + 2, Math.round(interval * ease * 1.3));
+      interval = streak === 0 ? 3 : streak === 1 ? 5 : Math.max(interval + 2, Math.round(interval * ease * 1.3));
       streak += 1;
       break;
   }

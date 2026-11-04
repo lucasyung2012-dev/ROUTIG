@@ -19,8 +19,9 @@ import { Switch } from '@/ui/Switch';
 import { useToast } from '@/ui/toast';
 import { cn } from '@/ui/cn';
 import { useLanguages, type LanguagesData } from './useLanguages';
+import { VocabTab } from './VocabTab';
 
-const TABS = ['overview', 'skills', 'sessions', 'history'] as const;
+const TABS = ['overview', 'vocab', 'skills', 'sessions', 'history'] as const;
 type Tab = (typeof TABS)[number];
 
 export function LanguagePage() {
@@ -121,6 +122,7 @@ function LanguageDetail({ lang, data }: { lang: Language; data: LanguagesData })
       </div>
 
       {tab === 'overview' && <Overview lang={lang} data={data} onTab={setTab} />}
+      {tab === 'vocab' && <VocabTab lang={lang} />}
       {tab === 'skills' && <SkillsTab lang={lang} />}
       {tab === 'sessions' && <SessionsTab lang={lang} data={data} />}
       {tab === 'history' && <HistoryTab lang={lang} data={data} />}

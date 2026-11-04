@@ -12,7 +12,12 @@ import {
   type LanguagePreset,
   type LanguageSession,
   type LanguageSessionInput,
+  type VocabEntry,
+  type VocabInput,
+  vocabInputSchema,
 } from '@/domain/languages';
+import { todayKey } from '@/domain/dates';
+import { newSrsState, review, type Rating } from '@/domain/srs';
 
 export class LanguageRuleError extends Error {
   constructor(public code: 'invalid' | 'not_found' | 'duplicate') {
@@ -153,3 +158,81 @@ async function setSessionDeleted(id: string, deletedAt: string | null, action: '
 }
 export const softDeleteLanguageSession = (id: string) => setSessionDeleted(id, nowIso(), 'delete');
 export const restoreLanguageSession = (id: string) => setSessionDeleted(id, null, 'restore');
+
+/* ---------- Vocabulário (Parte 10.3) ---------- */
+
+function cleanVocab(input: VocabInput): VocabInput {
+  const parsed = vocabInputSchema.safeParse({ ...input, tags: input.tags.map((x) => x.trim().toLowerCase()).filter(Boolean) });
+  if (!parsed.success) throw new LanguageRuleError('invalid');
+  return parsed.data;
+}
+
+/** Mesmo termo no mesmo idioma (sem diferenciar maiúsculas) é a mesma palavra: não duplica. */
+async function findSameTerm(languageId: string, term: string, exceptId?: string) {
+  const key = term.trim().toLowerCase();
+  return getDb()
+    .vocab.where('languageId')
+    .equals(languageId)
+    .filter((v) => v.id !== exceptId && !v.deletedAt && v.term.trim().toLowerCase() === key)
+    .first();
+}
+
+export async function createVocab(input: VocabInput): Promise<VocabEntry> {
+  const data = cleanVocab(input);
+  const db = getDb();
+  return db.transaction('rw', db.vocab, db.changelog, async () => {
+    if (await findSameTerm(data.languageId, data.term)) throw new LanguageRuleError('duplicate');
+    const v: VocabEntry = { ...data, id: newId('voc'), srs: newSrsState(), ...base() };
+    await db.vocab.add(v);
+    await log({ entityType: 'vocab', entityId: v.id, action: 'create' });
+    return v;
+  });
+}
+
+export async function updateVocab(id: string, input: VocabInput): Promise<VocabEntry> {
+  const data = cleanVocab(input);
+  const db = getDb();
+  return db.transaction('rw', db.vocab, db.changelog, async () => {
+    const cur = await db.vocab.get(id);
+    if (!cur) throw new LanguageRuleError('not_found');
+    if (await findSameTerm(data.languageId, data.term, id)) throw new LanguageRuleError('duplicate');
+    const next: VocabEntry = { ...cur, ...data, updatedAt: nowIso(), rev: cur.rev + 1 };
+    await db.vocab.put(next);
+    await log({ entityType: 'vocab', entityId: id, action: 'update' });
+    return next;
+  });
+}
+
+async function setVocabDeleted(id: string, deletedAt: string | null, action: 'delete' | 'restore') {
+  const db = getDb();
+  await db.transaction('rw', db.vocab, db.changelog, async () => {
+    await db.vocab.update(id, { deletedAt, updatedAt: nowIso() });
+    await log({ entityType: 'vocab', entityId: id, action });
+  });
+}
+export const softDeleteVocab = (id: string) => setVocabDeleted(id, nowIso(), 'delete');
+export const restoreVocab = (id: string) => setVocabDeleted(id, null, 'restore');
+
+/** Recomeça o aprendizado da palavra (o histórico de revisões fica guardado). */
+export async function resetVocab(id: string): Promise<void> {
+  await getDb().vocab.update(id, { srs: newSrsState(), updatedAt: nowIso() });
+}
+
+/** Resposta numa revisão de vocabulário (mesmo motor e mesmo histórico dos flashcards). */
+export async function answerVocab(id: string, rating: Rating, manual = false, today = todayKey()): Promise<VocabEntry> {
+  const db = getDb();
+  return db.transaction('rw', db.vocab, db.cardReviews, async () => {
+    const v = await db.vocab.get(id);
+    if (!v) throw new LanguageRuleError('not_found');
+    const at = nowIso();
+    const next = manual ? v.srs : review(v.srs, rating, today, at);
+    await db.cardReviews.add({ id: newId('rev'), cardId: id, at, rating, intervalBefore: v.srs.interval, intervalAfter: next.interval, manual });
+    const out: VocabEntry = { ...v, srs: next, updatedAt: at };
+    await db.vocab.put(out);
+    return out;
+  });
+}
+
+export async function vocabReviews(id: string) {
+  return (await getDb().cardReviews.where('cardId').equals(id).toArray()).sort((a, b) => b.at.localeCompare(a.at));
+}

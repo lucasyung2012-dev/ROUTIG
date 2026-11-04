@@ -53,3 +53,37 @@ describe('sessões (Parte 10.6)', () => {
     expect(s).toMatchObject({ total: 75, sessions: 4, days: 2, bySkill: { listening: 30, speaking: 30, reading: 0, writing: 0 } });
   });
 });
+
+describe('vocabulário (Parte 10.3)', () => {
+  it('pinyin com números vira marcas de tom', async () => {
+    const { numberedToPinyin, tonesOf } = await import('@/domain/languages');
+    expect(numberedToPinyin('ni3 hao3')).toBe('nǐ hǎo');
+    expect(numberedToPinyin('xie4xie5')).toBe('xièxie');
+    expect(numberedToPinyin('lv4 nv3')).toBe('lǜ nǚ');
+    expect(numberedToPinyin('gou3 zhou1')).toBe('gǒu zhōu');
+    expect(numberedToPinyin('Zhong1guo2')).toBe('Zhōngguó');
+    expect(tonesOf('ni3 hao3')).toBe('3 3');
+  });
+
+  it('palavra não duplica, precisa de tradução ou significado, e guarda os dados do alemão', async () => {
+    const { createVocab } = await import('@/data/languagesRepo');
+    const { emptyVocabInput } = await import('@/domain/languages');
+    const l = await createLanguage({ name: 'Alemão', code: 'de', color: '#F59E0B' });
+    const base = emptyVocabInput(l.id, 'german');
+    const v = await createVocab({ ...base, term: 'Hund', translation: 'cachorro', plural: 'Hunde', german: { article: 'der', cases: '', prepositions: '', government: '' } });
+    expect(v.german?.article).toBe('der');
+    expect(v.srs.due).toBeNull();
+    await expect(createVocab({ ...base, term: 'hund', translation: 'cão' })).rejects.toMatchObject({ code: 'duplicate' });
+    await expect(createVocab({ ...base, term: 'Katze' })).rejects.toMatchObject({ code: 'invalid' });
+  });
+
+  it('revisão usa o mesmo motor dos flashcards e fica no histórico', async () => {
+    const { createVocab, answerVocab, vocabReviews } = await import('@/data/languagesRepo');
+    const { emptyVocabInput } = await import('@/domain/languages');
+    const l = await createLanguage({ name: 'Mandarim', code: 'zh', color: '#8E4EC6' });
+    const v = await createVocab({ ...emptyVocabInput(l.id, 'mandarin'), term: 'nǐ hǎo', translation: 'olá', mandarin: { characters: '你好', pinyin: 'nǐ hǎo', tones: '3 3' } });
+    const after = await answerVocab(v.id, 'good', false, '2026-11-04');
+    expect(after.srs).toMatchObject({ due: '2026-11-05', reps: 1 });
+    expect((await vocabReviews(v.id)).map((r) => r.rating)).toEqual(['good']);
+  });
+});

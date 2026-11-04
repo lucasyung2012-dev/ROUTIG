@@ -214,7 +214,8 @@ export async function updateTask(id: string, patch: Partial<TaskInput>): Promise
       next.completedAt = null;
     }
 
-    const fields = (Object.keys(data) as (keyof TaskInput)[]).filter((k) => JSON.stringify(current[k]) !== JSON.stringify(data[k]));
+    // Campo ausente em tarefas antigas (ex.: subjectId) vale o mesmo que vazio: não conta como mudança.
+    const fields = (Object.keys(data) as (keyof TaskInput)[]).filter((k) => JSON.stringify(current[k] ?? null) !== JSON.stringify(data[k] ?? null));
     await db.tasks.put(next);
     if (fields.length && !completedOccurrence) await log({ entityType: ENTITY, entityId: id, action: 'update', fields });
     return { task: next, completedOccurrence };

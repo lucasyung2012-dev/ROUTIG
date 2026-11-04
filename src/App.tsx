@@ -17,6 +17,7 @@ import { InterestPage } from '@/features/profile/InterestPage';
 import { AcademyPage } from '@/features/academy/AcademyPage';
 import { SubjectPage } from '@/features/academy/SubjectPage';
 import { DeckPage, ReviewHubPage } from '@/features/academy/flashcards';
+import { StudyPlanPage } from '@/features/academy/StudyPlanPage';
 import { SettingsIndexPage, SettingsSectionPage } from '@/features/settings/SettingsPage';
 import { LogoComparePage } from '@/features/brand/LogoComparePage';
 import { DesignSystemPage } from '@/features/design/DesignSystemPage';
@@ -103,6 +104,7 @@ function Gate() {
           <Route path="academy" element={<AcademyPage />} />
           <Route path="academy/subjects/:id" element={<SubjectPage />} />
           <Route path="academy/review" element={<ReviewHubPage />} />
+          <Route path="academy/plan" element={<StudyPlanPage />} />
           <Route path="academy/decks/:id" element={<DeckPage />} />
           {NAV_MODULE_IDS.filter((id) => !['dashboard', 'tasks', 'calendar', 'inbox', 'notes', 'projects', 'academy'].includes(id)).map((id) => (
             <Route key={id} path={MODULES[id].path.slice(1)} element={<ModuleRoadmapPage id={id} />} />

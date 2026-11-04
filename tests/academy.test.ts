@@ -204,3 +204,28 @@ describe('Academy parte 2: conteúdo programático, aulas e dúvidas', () => {
     expect(p2).toMatchObject({ subjectId: s.id, instructions: 'Em dupla' });
   });
 });
+
+describe('planejamento de estudos (Parte 9.8)', () => {
+  it('revisões 14, 7, 3 e 1 dia antes; só as que ainda dão tempo', async () => {
+    const { reviewDatesBefore } = await import('@/domain/academy');
+    expect(reviewDatesBefore('2026-11-30', '2026-11-03')).toEqual(['2026-11-16', '2026-11-23', '2026-11-27', '2026-11-29']);
+    expect(reviewDatesBefore('2026-11-08', '2026-11-03')).toEqual(['2026-11-05', '2026-11-07']);
+    expect(reviewDatesBefore('2026-11-03', '2026-11-03')).toEqual(['2026-11-03']); // prova hoje: revisa hoje
+    expect(reviewDatesBefore('2026-11-01', '2026-11-03')).toEqual([]); // prova já passou
+  });
+
+  it('cria sem duplicar, acompanha a execução e soma os minutos', async () => {
+    const { createSession, createSessions, setSessionStatus } = await import('@/data/studyPlanRepo');
+    const { sessionTotals } = await import('@/domain/academy');
+    const y = await createYear({ label: '2026', institution: '', grade: '' });
+    const s = await createSubject({ yearId: y.id, name: 'Física', kind: 'subject', color: '#438BEA', teacherId: null });
+    const input = { subjectId: s.id, contentIds: [], assessmentId: null, kind: 'review' as const, date: '2026-11-05', time: null, durationMin: 40, priority: 'high' as const, notes: '' };
+    const a = await createSession(input);
+    await expect(createSession(input)).rejects.toMatchObject({ code: 'duplicate' });
+    expect(await createSessions([input, { ...input, date: '2026-11-06' }])).toBe(1); // a repetida é pulada
+    await setSessionStatus(a.id, 'done', { actualMin: 55, difficulties: 'Vetores' });
+    const all = await getDb().studySessions.toArray();
+    expect(sessionTotals(all)).toMatchObject({ planned: 80, done: 55, completed: 1, sessions: 2 });
+    await expect(setSessionStatus(a.id, 'done', { actualMin: -3 })).rejects.toMatchObject({ code: 'invalid' });
+  });
+});

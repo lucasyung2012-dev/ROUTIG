@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { BookOpenCheck, CalendarClock, CircleHelp, ClipboardList, GraduationCap, History, Layers, NotebookPen, PenLine, Plus, Settings2, Users } from 'lucide-react';
+import { BookOpenCheck, CalendarClock, CalendarRange, CircleHelp, ClipboardList, GraduationCap, History, Layers, NotebookPen, PenLine, Plus, Settings2, Users } from 'lucide-react';
 import { useSettings } from '@/app/SettingsProvider';
 import { setCurrentYear } from '@/data/academyRepo';
 import { addDays, formatDateKey, todayKey } from '@/domain/dates';
@@ -16,6 +16,7 @@ import { GradeBadge } from './academyUi';
 import { AssessmentDialog, SubjectDialog, TeachersDialog, YearDialog } from './dialogs';
 import { formatGrade, useAcademyData, type AcademyData } from './useAcademyData';
 import { useSubjectExtras } from './useSubjectExtras';
+import { useStudySessions } from './StudyPlanPage';
 
 /** Período "de agora": o que contém hoje pelas datas; senão, o primeiro. */
 export function currentPeriodId(year: AcademicYear | null): string | null {
@@ -69,6 +70,10 @@ export function AcademyPage() {
               <Button variant="secondary" size="sm" icon={<Settings2 className="h-4 w-4" />} onClick={() => setYearDialog('edit')}>
                 {t('academy.year.settings')}
               </Button>
+              <Link to="/academy/plan" className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-surface-2 px-3 text-sm font-medium text-fg ring-1 ring-inset ring-line transition hover:bg-surface-3">
+                <CalendarRange className="h-4 w-4" aria-hidden />
+                {t('academy.plan.title')}
+              </Link>
               <Link to="/academy/review" className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-surface-2 px-3 text-sm font-medium text-fg ring-1 ring-inset ring-line transition hover:bg-surface-3">
                 <Layers className="h-4 w-4" aria-hidden />
                 {t('academy.review.title')}
@@ -232,6 +237,7 @@ function Dashboard({ data, onNewSubject }: { data: AcademyData; onNewSubject: ()
         </Surface>
       </div>
 
+      <PlanPanel data={data} />
       <LearningPanels data={data} />
 
       {/* Histórico acadêmico */}
@@ -371,5 +377,52 @@ function LearningPanels({ data }: { data: AcademyData }) {
         )}
       </Surface>
     </div>
+  );
+}
+
+/** Planejamento de estudos no painel (Parte 9.2): próximas sessões e o que ficou atrasado. */
+function PlanPanel({ data }: { data: AcademyData }) {
+  const { t, settings } = useSettings();
+  const { loading, sessions } = useStudySessions(data);
+  if (loading) return null;
+  const today = todayKey();
+  const overdue = sessions.filter((s) => s.status === 'planned' && s.date < today).length;
+  const next = sessions.filter((s) => s.status === 'planned' && s.date >= today).slice(0, 5);
+  return (
+    <Surface className="flex flex-col gap-3">
+      <div className="flex items-center gap-2">
+        <h2 className="flex min-w-0 flex-1 items-center gap-2 text-base font-semibold text-fg">
+          <CalendarRange className="h-5 w-5 text-teal" aria-hidden />
+          {t('academy.plan.title')}
+        </h2>
+        <Link to="/academy/plan" className="text-sm font-medium text-accent hover:underline">
+          {t('common.open')}
+        </Link>
+      </div>
+      {overdue > 0 && (
+        <div>
+          <Badge tone="warning">{t('academy.plan.overdue', { count: overdue })}</Badge>
+        </div>
+      )}
+      {next.length === 0 ? (
+        <p className="text-sm text-muted">{t('academy.plan.panelEmpty')}</p>
+      ) : (
+        <ul className="flex flex-col gap-1">
+          {next.map((s) => {
+            const sub = data.subjectById.get(s.subjectId);
+            return (
+              <li key={s.id} className="flex items-center gap-3 rounded-xl px-2 py-1.5 text-sm">
+                <span className="h-8 w-1 shrink-0 rounded-full ring-1 ring-line/60" style={{ background: sub?.color }} aria-hidden />
+                <span className="w-20 shrink-0 text-xs font-medium capitalize text-muted">{s.date === today ? t('tasks.due.today') : formatDateKey(s.date, settings.locale, { weekday: 'short', day: 'numeric' })}</span>
+                <span className="min-w-0 flex-1 truncate text-fg">
+                  {sub?.name} · {t(`academy.plan.kinds.${s.kind}`)}
+                </span>
+                <span className="text-xs text-muted">{t('academy.plan.minutes', { min: s.durationMin })}</span>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </Surface>
   );
 }

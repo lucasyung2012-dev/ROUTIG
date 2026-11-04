@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { BaseEntity } from './entity';
-import type { DateKey } from './dates';
+import { addDays, type DateKey } from './dates';
 import { newId } from './ids';
 import type { Rating, SrsState } from './srs';
 
@@ -456,4 +456,62 @@ export interface CardReview {
   intervalBefore: number;
   intervalAfter: number;
   manual: boolean;
+}
+
+/* ---------- Planejamento de estudos (Parte 9.8) ---------- */
+
+export const SESSION_STATUSES = ['planned', 'done', 'skipped'] as const;
+export type SessionStatus = (typeof SESSION_STATUSES)[number];
+
+export interface StudySession extends BaseEntity {
+  subjectId: string;
+  contentIds: string[];
+  /** Prova a que a sessão se refere (para revisar antes dela). */
+  assessmentId: string | null;
+  kind: 'study' | 'review';
+  date: DateKey;
+  time: string | null;
+  durationMin: number;
+  priority: 'none' | 'low' | 'medium' | 'high' | 'urgent';
+  status: SessionStatus;
+  /** Tempo de fato estudado (ao concluir). */
+  actualMin: number | null;
+  difficulties: string;
+  notes: string;
+  completedAt: string | null;
+}
+
+export type StudySessionInput = Pick<StudySession, 'subjectId' | 'contentIds' | 'assessmentId' | 'kind' | 'date' | 'time' | 'durationMin' | 'priority' | 'notes'>;
+
+export const studySessionInputSchema = z.object({
+  subjectId: z.string().min(1),
+  contentIds: z.array(z.string()).max(100),
+  assessmentId: z.string().nullable(),
+  kind: z.enum(['study', 'review']),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  time: z.string().regex(/^\d{2}:\d{2}$/).nullable(),
+  durationMin: z.number().int().min(5).max(600),
+  priority: z.enum(['none', 'low', 'medium', 'high', 'urgent']),
+  notes: z.string().max(4000),
+});
+
+/** Revisões antes da prova: 7, 3 e 1 dia antes (mais 14, se der tempo). Só datas a partir de hoje. */
+export const REVIEW_OFFSETS = [14, 7, 3, 1] as const;
+
+export function reviewDatesBefore(examDate: DateKey, today: DateKey, offsets: readonly number[] = REVIEW_OFFSETS): DateKey[] {
+  const out: DateKey[] = [];
+  for (const d of offsets) {
+    const day = addDays(examDate, -d);
+    if (day >= today && day < examDate && !out.includes(day)) out.push(day);
+  }
+  // Prova muito perto (amanhã ou hoje): pelo menos uma revisão hoje.
+  if (out.length === 0 && examDate >= today) out.push(today);
+  return out.sort();
+}
+
+/** Minutos planejados e feitos (para acompanhar a execução). */
+export function sessionTotals(list: Pick<StudySession, 'status' | 'durationMin' | 'actualMin'>[]) {
+  const planned = list.filter((s) => s.status !== 'skipped').reduce((a, s) => a + s.durationMin, 0);
+  const done = list.filter((s) => s.status === 'done').reduce((a, s) => a + (s.actualMin ?? s.durationMin), 0);
+  return { planned, done, sessions: list.length, completed: list.filter((s) => s.status === 'done').length, skipped: list.filter((s) => s.status === 'skipped').length };
 }

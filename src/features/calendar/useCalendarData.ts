@@ -11,7 +11,7 @@ import { useTasksData, type TasksData } from '@/features/tasks/useTasksData';
 /** Um item no calendário: ocorrência de evento ou tarefa com prazo (o registro original, nunca uma cópia). */
 export interface CalendarItem {
   key: string;
-  kind: 'event' | 'task' | 'milestone' | 'assessment';
+  kind: 'event' | 'task' | 'milestone' | 'assessment' | 'study';
   date: DateKey;
   endDate: DateKey;
   allDay: boolean;
@@ -51,6 +51,7 @@ export function useCalendarData(): CalendarData {
   const projects = useLiveQuery(() => getDb().projects.filter((p) => !p.deletedAt).toArray(), []);
   const assessments = useLiveQuery(() => getDb().assessments.filter((a) => !a.deletedAt && !!a.date).toArray(), []);
   const subjects = useLiveQuery(() => getDb().subjects.filter((s) => !s.deletedAt).toArray(), []);
+  const sessions = useLiveQuery(() => getDb().studySessions.filter((s) => !s.deletedAt).toArray(), []);
   const tasks = useTasksData();
 
   return useMemo(() => {
@@ -154,6 +155,29 @@ export function useCalendarData(): CalendarData {
             conflictWith: [],
           });
         }
+        // Sessões de estudo planejadas (Parte 9.8); as puladas não aparecem.
+        for (const ss of sessions ?? []) {
+          const s = subjectById.get(ss.subjectId);
+          if (!s || ss.status === 'skipped' || ss.date < from || ss.date > to) continue;
+          const start = ss.time ? toMinutes(ss.time) : null;
+          items.push({
+            key: `s:${ss.id}`,
+            kind: 'study',
+            date: ss.date,
+            endDate: ss.date,
+            allDay: start === null,
+            start,
+            end: start === null ? null : Math.min(start + ss.durationMin, 24 * 60),
+            title: `${ss.kind === 'review' ? '↻' : '✎'} ${s.name}`,
+            location: '',
+            tone: 'teal',
+            color: s.color,
+            categoryId: null,
+            done: ss.status === 'done',
+            subjectId: s.id,
+            conflictWith: [],
+          });
+        }
       }
       // Conflitos: só entre eventos com horário (tarefas não ocupam agenda).
       const slots = items
@@ -175,7 +199,7 @@ export function useCalendarData(): CalendarData {
       tasks,
       itemsInRange,
     };
-  }, [all, config, tasks, projects, assessments, subjects]);
+  }, [all, config, tasks, projects, assessments, subjects, sessions]);
 }
 
 export function useCategoryName() {

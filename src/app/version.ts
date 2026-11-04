@@ -1,6 +1,6 @@
 import type { ModuleId, Stage } from './modules';
 
-export const APP_VERSION = '0.13.0';
+export const APP_VERSION = '0.14.0';
 
 /** Etapa do roadmap em construção agora. Atualize ao concluir cada etapa. */
 export const CURRENT_STAGE: Stage = 1;

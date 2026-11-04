@@ -73,7 +73,7 @@ export function DecksPanel({ subject, onStart }: { subject?: Subject; onStart: (
   return (
     <div className="flex flex-col gap-4">
       <Surface className="flex flex-wrap items-center gap-3">
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 basis-56">
           <div className="font-semibold text-fg">{t('academy.review.today')}</div>
           <p className="text-sm text-muted">{t('academy.review.todayDetail', { due: all.due, fresh: Math.min(all.fresh, NEW_PER_SESSION) })}</p>
         </div>

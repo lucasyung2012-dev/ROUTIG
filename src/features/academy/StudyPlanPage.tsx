@@ -6,7 +6,7 @@ import { useSettings } from '@/app/SettingsProvider';
 import { AcademyRuleError } from '@/data/academyRepo';
 import { getDb } from '@/data/db';
 import { createSession, createSessions, restoreSession, setSessionStatus, softDeleteSession, updateSession } from '@/data/studyPlanRepo';
-import { contentTree, flattenTree, reviewDatesBefore, sessionTotals, type Assessment, type StudySession, type StudySessionInput } from '@/domain/academy';
+import { contentTree, flattenTree, reviewDatesBefore, sessionTotals, type Assessment, type Content, type StudySession, type StudySessionInput } from '@/domain/academy';
 import { addDays, formatDateKey, todayKey } from '@/domain/dates';
 import { PRIORITIES, type Priority } from '@/domain/tasks';
 import { Badge } from '@/ui/Badge';
@@ -158,7 +158,7 @@ function SessionRow({ s, data, onEdit, onDone }: { s: StudySession; data: Academ
   const toast = useToast();
   const subject = data.subjectById.get(s.subjectId);
   const exam = s.assessmentId ? data.assessments.find((a) => a.id === s.assessmentId) : null;
-  const contents = useLiveQuery(() => (s.contentIds.length ? getDb().contents.bulkGet(s.contentIds) : Promise.resolve([])), [s.contentIds.join(',')]) ?? [];
+  const contents = useLiveQuery(async (): Promise<(Content | undefined)[]> => (s.contentIds.length ? getDb().contents.bulkGet(s.contentIds) : []), [s.contentIds.join(',')]) ?? [];
   const titles = contents.filter((c): c is NonNullable<typeof c> => !!c && !c.deletedAt).map((c) => c.title);
   return (
     <li className={cn('flex flex-wrap items-center gap-3 rounded-xl px-2 py-2', s.status !== 'planned' && 'opacity-70')}>

@@ -8,7 +8,7 @@ Leia este arquivo no começo de toda conversa nova sobre o ROUTIG. A especifica�
 
 - **Etapa 0 — Fundação:** concluída. Logo vetorial e design system aprovados pelo dono do produto em 2026-11-02.
 - **Etapa 1 — Organização central:** concluída no código (versão 0.7.0). Tasks, Calendar, Inbox, Notes, Projects, Dashboard, Profile e Settings publicados. Falta o dono do produto testar no iPad o Dashboard, o Profile e as Settings novas.
-- **Próximo passo:** backup completo, depois o desenho completo do Notes, mais cores com cor personalizada, e a Etapa 2 (ver "Ordem combinada").
+- **Próximo passo:** (backup feito na 0.8.0) desenho completo do Notes, depois o desenho completo do Notes, mais cores com cor personalizada, e a Etapa 2 (ver "Ordem combinada").
 - **Como trabalhar:** o computador de desenvolvimento não tem Node. Escrever o código, enviar com `git push`, conferir o GitHub Actions (anotações de erro aparecem por arquivo e linha) e testar no app publicado.
 
 ## Etapa 1 — andamento
@@ -66,6 +66,7 @@ Leia este arquivo no começo de toda conversa nova sobre o ROUTIG. A especifica�
 | 0.5.0 | 2026-11-03 | Claude (Claude Code) | Etapa 1: módulo Notes (blocos, desenho com Apple Pencil, versões); Inbox → nota; título de áudio vazio na conversão. |
 | 0.6.0 | 2026-11-03 | Claude (Claude Code) | Etapa 1: módulo Projects; projeto no editor de tarefa; marcos no Calendar; notas ligadas a projetos. |
 | 0.7.0 | 2026-11-03 | Claude (Claude Code) | Fim da Etapa 1: Dashboard completo, Profile completo, Settings (Módulos, Dispositivos, Ajuda); avisos somem sozinhos (5 s com Desfazer). |
+| 0.8.0 | 2026-11-03 | Claude (Claude Code) | Backup completo (Parte 25): exportar para Arquivos, cópia interna diária, cópias manuais e antes de restaurar, restauração com prévia e verificação de integridade, histórico de exportações, aviso de backup desatualizado no Dashboard. |
 
 ## Calendar (Parte 6) — o que existe
 
@@ -115,7 +116,7 @@ Leia este arquivo no começo de toda conversa nova sobre o ROUTIG. A especifica�
 ## Ordem combinada a seguir (2026-11-03)
 
 1. ~~Terminar a Etapa 1~~ (feito em 2026-11-03, versão 0.7.0).
-2. Backup completo (adiantado da Etapa 5; ver DECISOES.md).
+2. ~~Backup completo~~ (feito em 2026-11-03, versão 0.8.0).
 3. Desenho do Notes completo (todos os recursos aprovados; ver DECISOES.md).
 4. Etapa 2: Academy e Idiomas.
 5. Sincronização pelo Google Drive: depois da Etapa 6.

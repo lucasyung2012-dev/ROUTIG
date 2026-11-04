@@ -119,12 +119,12 @@ export function BackupSection() {
       <Surface className="flex flex-col gap-4">
         <h2 className="text-[0.9375rem] font-semibold text-fg">{t('backup.automatic')}</h2>
         <Switch label={t('backup.autoDaily')} hint={t('backup.autoDailyHint')} checked={prefs.autoDaily} onChange={(autoDaily) => setPrefs({ autoDaily })} />
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <div>
+        <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+          <div className="min-w-0">
             <div className="text-[0.9375rem] font-medium text-fg">{t('backup.reminder')}</div>
             <p className="mt-1 text-sm text-muted">{t('backup.reminderHint')}</p>
           </div>
-          <div className="w-48">
+          <div className="w-full shrink-0 sm:w-56">
             <Select aria-label={t('backup.reminder')} value={prefs.reminderDays} onChange={(e) => setPrefs({ reminderDays: Number(e.target.value) as ReminderDays })}>
               {REMINDER_OPTIONS.map((d) => (
                 <option key={d} value={d}>

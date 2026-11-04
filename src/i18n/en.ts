@@ -1998,6 +1998,8 @@ export const en: Messages = {
       },
       reviewPlan: 'Review plan',
       noPlan: 'No session linked to this exam yet.',
+      needsDate: 'Set the exam date (in "Edit assessment") to spread reviews.',
+      pastDate: 'The exam has passed: see the After the exam tab.',
       openPlan: 'Open study plan',
       progress: 'Preparation progress',
       questionsSummary: 'Questions: {right} right of {tried} tried ({total} total)',

@@ -1996,6 +1996,8 @@ export const pt = {
       },
       reviewPlan: 'Plano de revisão',
       noPlan: 'Nenhuma sessão ligada a esta prova ainda.',
+      needsDate: 'Defina a data da prova (em "Editar avaliação") para distribuir revisões.',
+      pastDate: 'A prova já passou: veja a aba Pós-avaliação.',
       openPlan: 'Abrir planejamento',
       progress: 'Andamento da preparação',
       questionsSummary: 'Questões: {right} certas de {tried} feitas ({total} no total)',

@@ -195,6 +195,7 @@ function PrepTab({ assessment, prep, data, contents, contentById }: { assessment
             ))}
           </ul>
         )}
+        {(!assessment.date || assessment.date < todayKey()) && <p className="text-xs text-muted">{assessment.date ? t('academy.exam.pastDate') : t('academy.exam.needsDate')}</p>}
         <div className="flex flex-wrap gap-2">
           <Button size="sm" variant="secondary" icon={<Sparkles className="h-4 w-4" />} disabled={!assessment.date || assessment.date < todayKey()} onClick={() => setDistributing(true)}>
             {t('academy.plan.distribute')}

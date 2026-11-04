@@ -47,6 +47,7 @@ export interface YearInput {
   grade: string;
   periods?: AcademicPeriod[];
   model?: GradingModel;
+  masteryLevels?: string[];
 }
 
 /** Cria um ano letivo. O primeiro vira o "atual". Mesmo rótulo na mesma instituição não se repete. */
@@ -64,6 +65,7 @@ export async function createYear(input: YearInput): Promise<AcademicYear> {
       grade: input.grade.trim().slice(0, 60),
       periods: input.periods ?? defaultPeriods(),
       model: cleanModel(input.model ?? defaultGradingModel()),
+      masteryLevels: (input.masteryLevels ?? []).map((l) => l.trim().slice(0, 40)).filter(Boolean),
       current: all.length === 0,
       ...base(),
     };
@@ -73,7 +75,7 @@ export async function createYear(input: YearInput): Promise<AcademicYear> {
   });
 }
 
-export async function updateYear(id: string, patch: Partial<Pick<AcademicYear, 'label' | 'institution' | 'grade' | 'periods' | 'model'>>): Promise<void> {
+export async function updateYear(id: string, patch: Partial<Pick<AcademicYear, 'label' | 'institution' | 'grade' | 'periods' | 'model' | 'masteryLevels'>>): Promise<void> {
   const db = getDb();
   await db.transaction('rw', db.academicYears, db.changelog, async () => {
     const y = await db.academicYears.get(id);

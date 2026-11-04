@@ -6,23 +6,50 @@ import { useSettings } from '@/app/SettingsProvider';
 import { gradeHistory, purgeAssessment, restoreAssessment, restoreSubject, setPeriodResult, softDeleteSubject } from '@/data/academyRepo';
 import { getDb } from '@/data/db';
 import { formatDateKey } from '@/domain/dates';
-import type { AcademicPeriod, Assessment, Subject } from '@/domain/academy';
+import { contentProgress, masteryLevelsOf, type AcademicPeriod, type Assessment, type Subject } from '@/domain/academy';
 import { Badge } from '@/ui/Badge';
 import { Button } from '@/ui/Button';
 import { ConfirmDialog } from '@/ui/ConfirmDialog';
 import { Field } from '@/ui/Field';
 import { IconButton } from '@/ui/IconButton';
-import { Segmented } from '@/ui/Segmented';
 import { LoadingState } from '@/ui/States';
 import { Surface } from '@/ui/Surface';
 import { useToast } from '@/ui/toast';
+import { cn } from '@/ui/cn';
 import { AssessmentRow, currentPeriodId } from './AcademyPage';
 import { DecimalInput, GradeBadge, GradeExplanation } from './academyUi';
 import { AssessmentDialog, SubjectDialog } from './dialogs';
 import { formatGrade, useAcademyData, type AcademyData } from './useAcademyData';
+import { ContentsTab, DoubtsTab, LessonsTab, MaterialsTab, WorkTab } from './subjectTabs';
+import { useSubjectExtras, type SubjectExtras } from './useSubjectExtras';
 
-const TABS = ['overview', 'assessments', 'history'] as const;
+/** Ambiente da disciplina (Parte 9.3). */
+const TABS = ['overview', 'contents', 'lessons', 'assessments', 'work', 'doubts', 'materials', 'history'] as const;
 type Tab = (typeof TABS)[number];
+
+/** Resumo do andamento: conteúdos, domínio, dúvidas, atividades e trabalhos. */
+function OverviewSummary({ data, extras, onTab }: { data: AcademyData; extras: SubjectExtras; onTab: (t: Tab) => void }) {
+  const { t } = useSettings();
+  const levels = masteryLevelsOf(data.year);
+  const p = contentProgress(extras.contents, levels.length);
+  const openDoubts = extras.doubts.filter((d) => d.status === 'open').length;
+  const item = (label: string, value: number, tab: Tab) => (
+    <button type="button" onClick={() => onTab(tab)} className="flex flex-col items-start rounded-2xl bg-surface p-3 text-left ring-1 ring-line/70 transition hover:bg-surface-2">
+      <span className="text-2xl font-semibold tabular text-fg">{value}</span>
+      <span className="text-xs text-muted">{label}</span>
+    </button>
+  );
+  return (
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+      {item(t('academy.summary.contents'), p.total, 'contents')}
+      {item(t('academy.summary.studied'), p.studied, 'contents')}
+      {item(t('academy.summary.mastered'), p.mastered, 'contents')}
+      {item(t('academy.summary.lessons'), extras.lessons.length, 'lessons')}
+      {item(t('academy.summary.doubts'), openDoubts, 'doubts')}
+      {item(t('academy.summary.work'), extras.projects.length + extras.tasks.length, 'work')}
+    </div>
+  );
+}
 
 export function SubjectPage() {
   const { id } = useParams();
@@ -61,6 +88,7 @@ function SubjectDetail({ subject, data }: { subject: Subject; data: AcademyData 
   const model = data.modelOf(subject);
   const teacher = subject.teacherId ? data.teacherById.get(subject.teacherId) : null;
   const yg = data.yearGradeOf(subject);
+  const extras = useSubjectExtras([subject.id], data.assessmentsOf(subject.id).flatMap((a) => a.noteIds));
 
   const trash = async () => {
     await softDeleteSubject(subject.id);
@@ -90,10 +118,26 @@ function SubjectDetail({ subject, data }: { subject: Subject; data: AcademyData 
         </div>
       </div>
 
-      <Segmented value={tab} onChange={setTab} label={subject.name} options={TABS.map((v) => ({ value: v, label: t(`academy.subject.tabs.${v}`) }))} className="w-full sm:w-fit" />
+      <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+        <div role="tablist" aria-label={subject.name} className="inline-flex gap-1 rounded-xl bg-surface-2 p-1 ring-1 ring-inset ring-line">
+          {TABS.map((id) => (
+            <button
+              key={id}
+              role="tab"
+              type="button"
+              aria-selected={tab === id}
+              onClick={() => setTab(id)}
+              className={cn('h-9 whitespace-nowrap rounded-lg px-3 text-sm font-medium transition', tab === id ? 'bg-surface text-fg shadow-soft ring-1 ring-line' : 'text-muted hover:text-fg')}
+            >
+              {t(`academy.subject.tabs.${id}`)}
+            </button>
+          ))}
+        </div>
+      </div>
 
       {tab === 'overview' && (
         <div className="flex flex-col gap-4">
+          <OverviewSummary data={data} extras={extras} onTab={setTab} />
           {(data.year?.periods ?? []).length === 0 && <p className="text-sm text-muted">{t('academy.subject.noPeriods')}</p>}
           <div className="grid gap-4 lg:grid-cols-2">
             {(data.year?.periods ?? []).map((p) => (
@@ -105,6 +149,11 @@ function SubjectDetail({ subject, data }: { subject: Subject; data: AcademyData 
       )}
 
       {tab === 'assessments' && <AssessmentsTab subject={subject} data={data} onOpen={(a) => setAssessment(a)} onNew={() => setNewPeriod(currentPeriodId(data.year) ?? '')} />}
+      {tab === 'contents' && <ContentsTab subject={subject} data={data} extras={extras} />}
+      {tab === 'lessons' && <LessonsTab subject={subject} data={data} extras={extras} />}
+      {tab === 'work' && <WorkTab subject={subject} extras={extras} />}
+      {tab === 'doubts' && <DoubtsTab subject={subject} extras={extras} />}
+      {tab === 'materials' && <MaterialsTab subject={subject} extras={extras} />}
       {tab === 'history' && <HistoryTab subject={subject} data={data} />}
 
       {editing && <SubjectDialog data={data} subject={subject} onClose={() => setEditing(false)} />}

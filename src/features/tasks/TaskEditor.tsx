@@ -78,7 +78,8 @@ export function useTaskEditor(): TaskEditorApi {
 
 function inputOf(t: Task): TaskInput {
   const { title, description, notes, statusId, priority, dueDate, dueTime, listId, category, tags, parentId, checklist, attachments, projectId, goalId, originModule, recurrence, dependsOn } = t;
-  return { title, description, notes, statusId, priority, dueDate, dueTime, listId, category, tags, parentId, checklist, attachments, projectId, goalId, originModule, recurrence, dependsOn };
+  const subjectId = t.subjectId ?? null;
+  return { title, description, notes, statusId, priority, dueDate, dueTime, listId, category, tags, parentId, checklist, attachments, projectId, goalId, subjectId, originModule, recurrence, dependsOn };
 }
 
 interface DialogProps {
@@ -335,6 +336,7 @@ function TaskEditorDialog({ taskId, defaults, onCreated, onClose, onOpenOther }:
 
         <Section title={t('tasks.editor.links')}>
           <ProjectField value={draft.projectId} onChange={(projectId) => change({ projectId })} />
+          <SubjectField value={draft.subjectId ?? null} onChange={(subjectId) => change({ subjectId })} />
           <p className="text-xs text-subtle">{t('tasks.editor.linkLater')}</p>
         </Section>
 
@@ -359,6 +361,33 @@ function ProjectField({ value, onChange }: { value: string | null; onChange: (id
           {(projects ?? []).map((p) => (
             <option key={p.id} value={p.id}>
               {p.name}
+            </option>
+          ))}
+        </Select>
+      )}
+    </Field>
+  );
+}
+
+/** Disciplina da Academy: a tarefa vira atividade da disciplina e aparece na página dela. */
+function SubjectField({ value, onChange }: { value: string | null; onChange: (id: string | null) => void }) {
+  const { t } = useSettings();
+  const subjects = useLiveQuery(async () => {
+    const db = getDb();
+    const years = new Map((await db.academicYears.toArray()).map((y) => [y.id, y.label]));
+    return (await db.subjects.filter((s) => !s.deletedAt).toArray())
+      .map((s) => ({ id: s.id, label: `${s.name} · ${years.get(s.yearId) ?? ''}` }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, []);
+  if (!subjects?.length && !value) return null;
+  return (
+    <Field label={t('tasks.editor.subject')}>
+      {(id) => (
+        <Select id={id} value={value ?? ''} onChange={(e) => onChange(e.target.value || null)}>
+          <option value="">{t('tasks.editor.noSubject')}</option>
+          {(subjects ?? []).map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.label}
             </option>
           ))}
         </Select>

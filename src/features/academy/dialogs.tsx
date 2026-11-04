@@ -22,6 +22,7 @@ import {
   ASSESSMENT_TYPES,
   defaultGradingModel,
   defaultPeriods,
+  masteryLevelsOf,
   emptyAssessmentInput,
   periodForDate,
   SUBJECT_KINDS,
@@ -61,12 +62,13 @@ export function YearDialog({ year, onClose }: { year: AcademicYear | null; onClo
   const [grade, setGrade] = useState(year?.grade ?? '');
   const [periods, setPeriods] = useState<AcademicPeriod[]>(year?.periods ?? defaultPeriods());
   const [model, setModel] = useState<GradingModel>(year?.model ?? defaultGradingModel());
+  const [levels, setLevels] = useState<string[]>(masteryLevelsOf(year));
   const [error, setError] = useState<string | null>(null);
 
   const save = async () => {
     try {
-      if (year) await updateYear(year.id, { label, institution, grade, periods, model });
-      else await createYear({ label, institution, grade, periods, model });
+      if (year) await updateYear(year.id, { label, institution, grade, periods, model, masteryLevels: levels.map((l) => l.trim()).filter(Boolean) });
+      else await createYear({ label, institution, grade, periods, model, masteryLevels: levels });
       toast.show(year ? t('common.saved') : t('academy.year.created'));
       onClose();
     } catch (e) {
@@ -134,6 +136,23 @@ export function YearDialog({ year, onClose }: { year: AcademicYear | null; onClo
           </ul>
           <Button size="sm" variant="secondary" className="w-fit" icon={<Plus className="h-4 w-4" />} onClick={() => setPeriods([...periods, { id: newId('per'), name: t('academy.year.periodDefault', { n: periods.length + 1 }), start: null, end: null }])}>
             {t('academy.year.addPeriod')}
+          </Button>
+        </section>
+
+        <section className="flex flex-col gap-2">
+          <h3 className="text-sm font-semibold text-fg">{t('academy.year.mastery')}</h3>
+          <p className="text-sm text-muted">{t('academy.year.masteryHint')}</p>
+          <ol className="flex flex-col gap-2">
+            {levels.map((l, i) => (
+              <li key={i} className="flex items-center gap-2">
+                <span className="w-6 text-right text-xs tabular text-subtle">{i + 1}</span>
+                <Input aria-label={t('academy.year.masteryLevel', { n: i + 1 })} value={l} maxLength={40} className="min-w-0 flex-1" onChange={(e) => setLevels(levels.map((x, j) => (j === i ? e.target.value : x)))} />
+                <IconButton size="sm" label={t('academy.year.removeLevel', { n: i + 1 })} icon={<Trash2 className="h-4 w-4" />} disabled={levels.length <= 2} onClick={() => setLevels(levels.filter((_, j) => j !== i))} />
+              </li>
+            ))}
+          </ol>
+          <Button size="sm" variant="secondary" className="w-fit" icon={<Plus className="h-4 w-4" />} disabled={levels.length >= 10} onClick={() => setLevels([...levels, ''])}>
+            {t('academy.year.addLevel')}
           </Button>
         </section>
 

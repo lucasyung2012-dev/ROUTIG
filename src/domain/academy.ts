@@ -112,6 +112,8 @@ export interface AcademicYear extends BaseEntity {
   model: GradingModel;
   /** Ano que o app abre por padrão. */
   current: boolean;
+  /** Escala de domínio dos conteúdos (vazia = padrão). */
+  masteryLevels?: string[];
 }
 
 /** Disciplina comum, itinerário formativo ou ênfase (Parte 9.12: estruturas configuráveis, não disciplinas comuns). */
@@ -152,12 +154,14 @@ export interface Assessment extends BaseEntity {
   score: number | null;
   weight: number;
   notes: string;
-  /** Conteúdo cobrado (texto; a ligação com o conteúdo programático vem na parte 2). */
+  /** Conteúdo cobrado, em texto livre. */
   topics: string;
+  /** Conteúdo cobrado, ligado ao conteúdo programático. */
+  contentIds?: string[];
   noteIds: string[];
 }
 
-export type AssessmentInput = Pick<Assessment, 'subjectId' | 'periodId' | 'componentId' | 'name' | 'type' | 'date' | 'time' | 'maxScore' | 'score' | 'weight' | 'notes' | 'topics' | 'noteIds'>;
+export type AssessmentInput = Pick<Assessment, 'subjectId' | 'periodId' | 'componentId' | 'name' | 'type' | 'date' | 'time' | 'maxScore' | 'score' | 'weight' | 'notes' | 'topics' | 'contentIds' | 'noteIds'>;
 
 export const assessmentInputSchema = z
   .object({
@@ -173,6 +177,7 @@ export const assessmentInputSchema = z
     weight: num(0, 100),
     notes: z.string().max(4000),
     topics: z.string().max(4000),
+    contentIds: z.array(z.string()).max(100).optional(),
     noteIds: z.array(z.string()).max(50),
   })
   .refine((a) => a.score === null || a.score <= a.maxScore, { path: ['score'] });
@@ -304,4 +309,117 @@ export function defaultPeriods(): AcademicPeriod[] {
 export function periodForDate(periods: AcademicPeriod[], date: DateKey | null): string | null {
   if (!date) return null;
   return periods.find((p) => p.start && p.end && date >= p.start && date <= p.end)?.id ?? null;
+}
+
+/* ---------- Conteúdo programático (Parte 9.4) ---------- */
+
+export const CONTENT_KINDS = ['unit', 'chapter', 'topic', 'subtopic', 'lesson'] as const;
+export type ContentKind = (typeof CONTENT_KINDS)[number];
+
+/** Andamento do estudo. É diferente do domínio: concluir uma aula não quer dizer dominar o conteúdo. */
+export const CONTENT_STATUSES = ['notStarted', 'inProgress', 'studied', 'reviewed', 'mastered'] as const;
+export type ContentStatus = (typeof CONTENT_STATUSES)[number];
+
+export interface Content extends BaseEntity {
+  subjectId: string;
+  parentId: string | null;
+  kind: ContentKind;
+  title: string;
+  status: ContentStatus;
+  /** Nível de domínio (índice na escala do ano letivo); null = ainda não avaliado. */
+  mastery: number | null;
+  notes: string;
+  order: number;
+}
+
+/** Escala de domínio padrão; cada ano letivo pode ter a sua (Parte 9.4: domínio configurável). */
+export const DEFAULT_MASTERY_LEVELS = ['Não sei ainda', 'Inseguro', 'Razoável', 'Bom', 'Domino'];
+
+export function masteryLevelsOf(year: Pick<AcademicYear, 'masteryLevels'> | null): string[] {
+  return year?.masteryLevels?.length ? year.masteryLevels : DEFAULT_MASTERY_LEVELS;
+}
+
+/** Filho natural de cada nível (ao criar um item "dentro" de outro). */
+export function childKind(kind: ContentKind): ContentKind {
+  const i = CONTENT_KINDS.indexOf(kind);
+  return CONTENT_KINDS[Math.min(i + 1, CONTENT_KINDS.length - 1)]!;
+}
+
+export interface ContentNode {
+  content: Content;
+  depth: number;
+  children: ContentNode[];
+}
+
+/** Monta a árvore (ordenada) a partir da lista plana. Itens com pai inexistente sobem para a raiz. */
+export function contentTree(list: Content[]): ContentNode[] {
+  const ids = new Set(list.map((c) => c.id));
+  const byParent = new Map<string | null, Content[]>();
+  for (const c of list) {
+    const p = c.parentId && ids.has(c.parentId) ? c.parentId : null;
+    byParent.set(p, [...(byParent.get(p) ?? []), c]);
+  }
+  const build = (parent: string | null, depth: number, seen: Set<string>): ContentNode[] =>
+    (byParent.get(parent) ?? [])
+      .sort((a, b) => a.order - b.order || a.title.localeCompare(b.title))
+      .filter((c) => !seen.has(c.id))
+      .map((c) => ({ content: c, depth, children: build(c.id, depth + 1, new Set([...seen, c.id])) }));
+  return build(null, 0, new Set());
+}
+
+/** Lista na ordem da árvore (para mostrar com recuo). */
+export function flattenTree(nodes: ContentNode[]): ContentNode[] {
+  return nodes.flatMap((n) => [n, ...flattenTree(n.children)]);
+}
+
+/** Resumo do andamento e do domínio de uma lista de conteúdos. */
+export function contentProgress(list: Pick<Content, 'status' | 'mastery'>[], levels: number) {
+  const total = list.length;
+  const studied = list.filter((c) => c.status === 'studied' || c.status === 'reviewed' || c.status === 'mastered').length;
+  const rated = list.filter((c) => c.mastery !== null);
+  const top = levels - 1;
+  const masteredByLevel = rated.filter((c) => c.mastery === top).length;
+  return { total, studied, rated: rated.length, mastered: masteredByLevel, weak: rated.filter((c) => (c.mastery ?? 0) <= 1).length };
+}
+
+/* ---------- Registro de aulas (Parte 9.5) ---------- */
+
+export interface Lesson extends BaseEntity {
+  subjectId: string;
+  date: DateKey;
+  teacherId: string | null;
+  contentIds: string[];
+  /** O que foi estudado, quando não há item do conteúdo programático. */
+  topic: string;
+  notes: string;
+  difficulties: string;
+  activities: string;
+  observations: string;
+  noteIds: string[];
+}
+
+export type LessonInput = Pick<Lesson, 'subjectId' | 'date' | 'teacherId' | 'contentIds' | 'topic' | 'notes' | 'difficulties' | 'activities' | 'observations' | 'noteIds'>;
+
+export const lessonInputSchema = z.object({
+  subjectId: z.string().min(1),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  teacherId: z.string().nullable(),
+  contentIds: z.array(z.string()).max(100),
+  topic: z.string().max(300),
+  notes: z.string().max(20_000),
+  difficulties: z.string().max(4000),
+  activities: z.string().max(4000),
+  observations: z.string().max(4000),
+  noteIds: z.array(z.string()).max(50),
+});
+
+/* ---------- Dúvidas (Parte 9.2 e 9.3) ---------- */
+
+export interface Doubt extends BaseEntity {
+  subjectId: string;
+  contentId: string | null;
+  question: string;
+  answer: string;
+  status: 'open' | 'resolved';
+  resolvedAt: string | null;
 }

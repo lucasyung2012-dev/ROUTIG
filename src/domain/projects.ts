@@ -53,6 +53,10 @@ export interface Project extends BaseEntity {
   references: ProjectReference[];
   /** Etapa de cada tarefa do projeto (as tarefas continuam na tabela `tasks`). */
   taskPhases: Record<string, string>;
+  /** Trabalho escolar (Parte 9.7): disciplina da Academy, instruções e critérios de avaliação. */
+  subjectId?: string | null;
+  instructions?: string;
+  criteria?: string[];
 }
 
 export const PROJECT_COLORS = ['#7357F6', '#438BEA', '#16B8A6', '#F59E0B', '#EC6695', '#8B93B8'] as const;
@@ -79,6 +83,9 @@ export const projectInputSchema = z
     milestones: z.array(z.object({ id: z.string(), title: z.string().max(200), date: dateKey.nullable(), done: z.boolean(), doneAt: z.string().nullable() })).max(200),
     references: z.array(z.object({ id: z.string(), title: z.string().max(200), url: z.string().url() })).max(200),
     taskPhases: z.record(z.string(), z.string()),
+    subjectId: z.string().nullable().optional(),
+    instructions: z.string().max(20_000).optional(),
+    criteria: z.array(z.string().max(300)).max(50).optional(),
   })
   .refine((p) => !p.start || !p.due || p.start <= p.due, { message: 'due_before_start', path: ['due'] })
   .refine((p) => p.phases.every((ph) => !ph.start || !ph.end || ph.start <= ph.end), { message: 'phase_range', path: ['phases'] });

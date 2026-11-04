@@ -21,6 +21,7 @@ function clean(input: ProjectInput): ProjectInput {
     ...input,
     tags: normalizeTags(input.tags),
     objectives: input.objectives.map((o) => o.trim()).filter(Boolean),
+    criteria: (input.criteria ?? []).map((c) => c.trim()).filter(Boolean),
     participants: input.participants.map((p) => p.trim()).filter(Boolean),
   });
   if (!parsed.success) throw new ProjectRuleError('invalid');
@@ -29,7 +30,7 @@ function clean(input: ProjectInput): ProjectInput {
 
 export function projectInputOf(p: Project): ProjectInput {
   const { name, description, category, status, priority, start, due, color, coverFileId, tags, objectives, participants, phases, milestones, references, taskPhases } = p;
-  return { name, description, category, status, priority, start, due, color, coverFileId, tags, objectives, participants, phases, milestones, references, taskPhases };
+  return { name, description, category, status, priority, start, due, color, coverFileId, tags, objectives, participants, phases, milestones, references, taskPhases, subjectId: p.subjectId ?? null, instructions: p.instructions ?? '', criteria: p.criteria ?? [] };
 }
 
 export async function createProject(input: ProjectInput): Promise<Project> {

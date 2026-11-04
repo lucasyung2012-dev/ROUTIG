@@ -213,6 +213,43 @@ function Lines({ label, hint, value, onChange }: { label: string; hint: string; 
   );
 }
 
+/**
+ * Trabalho escolar (Parte 9.7): ligar o projeto a uma disciplina da Academy.
+ * Enunciado = descrição; etapas, entregas (marcos), participantes, arquivos e
+ * tarefas são os do próprio projeto. Aqui ficam disciplina, instruções e critérios.
+ */
+function SchoolWork({ draft, change }: { draft: ProjectInput; change: (p: Partial<ProjectInput>) => void }) {
+  const { t } = useSettings();
+  const subjects = useLiveQuery(async () => {
+    const db = getDb();
+    const years = new Map((await db.academicYears.toArray()).map((y) => [y.id, y.label]));
+    return (await db.subjects.filter((s) => !s.deletedAt).toArray()).map((s) => ({ id: s.id, label: `${s.name} · ${years.get(s.yearId) ?? ''}` })).sort((a, b) => a.label.localeCompare(b.label));
+  }, []);
+  if (!subjects?.length && !draft.subjectId) return null;
+  return (
+    <div className="flex flex-col gap-3 rounded-2xl bg-surface-2/50 p-3">
+      <Field label={t('projects.school.subject')} hint={t('projects.school.subjectHint')}>
+        {(id, d) => (
+          <Select id={id} aria-describedby={d} value={draft.subjectId ?? ''} onChange={(e) => change({ subjectId: e.target.value || null })}>
+            <option value="">{t('projects.school.none')}</option>
+            {(subjects ?? []).map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.label}
+              </option>
+            ))}
+          </Select>
+        )}
+      </Field>
+      {draft.subjectId && (
+        <>
+          <Field label={t('projects.school.instructions')}>{(id) => <Textarea id={id} rows={3} value={draft.instructions ?? ''} onChange={(e) => change({ instructions: e.target.value })} />}</Field>
+          <Lines label={t('projects.school.criteria')} hint={t('projects.school.criteriaHint')} value={draft.criteria ?? []} onChange={(criteria) => change({ criteria })} />
+        </>
+      )}
+    </div>
+  );
+}
+
 function Overview({ draft, change, onTrash }: { draft: ProjectInput; change: (p: Partial<ProjectInput>) => void; onTrash: () => void }) {
   const { t } = useSettings();
   const toast = useToast();
@@ -224,6 +261,7 @@ function Overview({ draft, change, onTrash }: { draft: ProjectInput; change: (p:
         <Field label={t('projects.fields.description')}>{(id) => <Textarea id={id} rows={5} value={draft.description} onChange={(e) => change({ description: e.target.value })} />}</Field>
         <Lines label={t('projects.fields.objectives')} hint={t('projects.fields.objectivesHint')} value={draft.objectives} onChange={(objectives) => change({ objectives })} />
         <Lines label={t('projects.fields.participants')} hint={t('projects.fields.participantsHint')} value={draft.participants} onChange={(participants) => change({ participants })} />
+        <SchoolWork draft={draft} change={change} />
       </Surface>
       <Surface className="flex flex-col gap-4">
         <div className="grid gap-4 sm:grid-cols-2">

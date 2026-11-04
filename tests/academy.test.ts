@@ -130,3 +130,77 @@ describe('registros da Academy', () => {
     expect(await getDb().assessments.count()).toBe(0);
   });
 });
+
+describe('Academy parte 2: conteúdo programático, aulas e dúvidas', () => {
+  const setup = async () => {
+    const y = await createYear({ label: '2026', institution: '', grade: '' });
+    const s = await createSubject({ yearId: y.id, name: 'Matemática', kind: 'subject', color: '#438BEA', teacherId: null });
+    return { y, s };
+  };
+
+  it('monta a árvore em ordem e não deixa um item virar filho de si mesmo', async () => {
+    const { createContent, reparentContent } = await import('@/data/academyContentRepo');
+    const { contentTree, flattenTree } = await import('@/domain/academy');
+    const { s } = await setup();
+    const u1 = await createContent(s.id, null, 'unit', 'Unidade 1');
+    const c1 = await createContent(s.id, u1.id, 'chapter', 'Frações');
+    await createContent(s.id, null, 'unit', 'Unidade 2');
+    const all = await getDb().contents.toArray();
+    expect(flattenTree(contentTree(all)).map((n) => [n.content.title, n.depth])).toEqual([
+      ['Unidade 1', 0],
+      ['Frações', 1],
+      ['Unidade 2', 0],
+    ]);
+    await expect(reparentContent(u1.id, c1.id)).rejects.toMatchObject({ code: 'invalid' });
+    await expect(createContent(s.id, u1.id, 'chapter', 'frações')).rejects.toMatchObject({ code: 'duplicate' });
+  });
+
+  it('domínio é separado do andamento; Lixeira leva os filhos junto e Desfazer devolve', async () => {
+    const { createContent, softDeleteContent, restoreContents, updateContent } = await import('@/data/academyContentRepo');
+    const { contentProgress } = await import('@/domain/academy');
+    const { s } = await setup();
+    const u = await createContent(s.id, null, 'unit', 'Unidade 1');
+    const c = await createContent(s.id, u.id, 'chapter', 'Frações');
+    await updateContent(c.id, { status: 'studied' });
+    let list = await getDb().contents.toArray();
+    expect(contentProgress(list, 5)).toMatchObject({ total: 2, studied: 1, mastered: 0, rated: 0 });
+    await updateContent(c.id, { mastery: 4 });
+    list = await getDb().contents.toArray();
+    expect(contentProgress(list, 5)).toMatchObject({ mastered: 1, rated: 1 });
+    const ids = await softDeleteContent(u.id);
+    expect(ids.sort()).toEqual([u.id, c.id].sort());
+    expect((await getDb().contents.toArray()).every((x) => x.deletedAt)).toBe(true);
+    await restoreContents(ids);
+    expect((await getDb().contents.toArray()).every((x) => !x.deletedAt)).toBe(true);
+  });
+
+  it('aula precisa de data válida; dúvida não duplica e guarda quando foi resolvida', async () => {
+    const { saveLesson, createDoubt, updateDoubt } = await import('@/data/academyContentRepo');
+    const { s } = await setup();
+    const base = { subjectId: s.id, teacherId: null, contentIds: [], topic: 'Frações', notes: '', difficulties: '', activities: '', observations: '', noteIds: [] };
+    await expect(saveLesson(null, { ...base, date: 'ontem' })).rejects.toMatchObject({ code: 'invalid' });
+    const l = await saveLesson(null, { ...base, date: '2026-11-03' });
+    expect((await saveLesson(l.id, { ...base, date: '2026-11-03', difficulties: 'MMC' })).difficulties).toBe('MMC');
+    const d = await createDoubt(s.id, 'Como achar o MMC?');
+    await expect(createDoubt(s.id, 'como achar o mmc?')).rejects.toMatchObject({ code: 'duplicate' });
+    await updateDoubt(d.id, { status: 'resolved', answer: 'Fatorando.' });
+    expect(await getDb().doubts.get(d.id)).toMatchObject({ status: 'resolved', answer: 'Fatorando.' });
+    expect((await getDb().doubts.get(d.id))?.resolvedAt).not.toBeNull();
+  });
+
+  it('atividade é tarefa e trabalho é projeto, ligados à disciplina sem cópia', async () => {
+    const { createTask, updateTask } = await import('@/data/tasksRepo');
+    const { createProject, updateProject, projectInputOf } = await import('@/data/projectsRepo');
+    const { emptyTaskInput } = await import('@/domain/tasks');
+    const { emptyProjectInput } = await import('@/domain/projects');
+    const { s } = await setup();
+    const task = await createTask(emptyTaskInput({ title: 'Exercícios p. 42', subjectId: s.id, originModule: 'academy' }));
+    expect(task.subjectId).toBe(s.id);
+    const after = await updateTask(task.id, { title: 'Exercícios p. 42 e 43' });
+    expect(after.task.subjectId).toBe(s.id);
+    const p = await createProject(emptyProjectInput({ name: 'Maquete', subjectId: s.id, criteria: [' Criatividade ', ''] }));
+    expect(p).toMatchObject({ subjectId: s.id, criteria: ['Criatividade'] });
+    const p2 = await updateProject(p.id, { ...projectInputOf(p), instructions: 'Em dupla' });
+    expect(p2).toMatchObject({ subjectId: s.id, instructions: 'Em dupla' });
+  });
+});

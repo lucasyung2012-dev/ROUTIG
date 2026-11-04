@@ -335,6 +335,7 @@ function pickInput(t: Task): TaskInput {
     attachments: t.attachments,
     projectId: t.projectId,
     goalId: t.goalId,
+    subjectId: t.subjectId ?? null,
     originModule: t.originModule,
     recurrence: t.recurrence,
     dependsOn: t.dependsOn,

@@ -76,6 +76,8 @@ export interface Task extends BaseEntity {
   attachments: TaskLinkAttachment[];
   projectId: string | null;
   goalId: string | null;
+  /** Disciplina da Academy (atividade escolar), quando houver. */
+  subjectId?: string | null;
   /** Módulo em que a tarefa nasceu (tasks, projects, academy…). */
   originModule: string;
   recurrence: Recurrence | null;
@@ -135,6 +137,7 @@ export const taskInputSchema = z.object({
   attachments: z.array(z.object({ id: z.string(), name: z.string().max(200), url: z.string().url() })).max(50),
   projectId: z.string().nullable(),
   goalId: z.string().nullable(),
+  subjectId: z.string().nullable().optional(),
   originModule: z.string(),
   recurrence: recurrenceSchema.nullable(),
   dependsOn: z.array(z.string()),

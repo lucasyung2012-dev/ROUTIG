@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { CalendarClock, ClipboardList, GraduationCap, History, PenLine, Plus, Settings2, Users } from 'lucide-react';
+import { BookOpenCheck, CalendarClock, CircleHelp, ClipboardList, GraduationCap, History, NotebookPen, PenLine, Plus, Settings2, Users } from 'lucide-react';
 import { useSettings } from '@/app/SettingsProvider';
 import { setCurrentYear } from '@/data/academyRepo';
 import { addDays, formatDateKey, todayKey } from '@/domain/dates';
-import type { AcademicYear, Assessment } from '@/domain/academy';
+import { contentProgress, masteryLevelsOf, type AcademicYear, type Assessment } from '@/domain/academy';
 import { Badge } from '@/ui/Badge';
 import { Button } from '@/ui/Button';
 import { Select } from '@/ui/Field';
@@ -15,6 +15,7 @@ import { cn } from '@/ui/cn';
 import { GradeBadge } from './academyUi';
 import { AssessmentDialog, SubjectDialog, TeachersDialog, YearDialog } from './dialogs';
 import { formatGrade, useAcademyData, type AcademyData } from './useAcademyData';
+import { useSubjectExtras } from './useSubjectExtras';
 
 /** Período "de agora": o que contém hoje pelas datas; senão, o primeiro. */
 export function currentPeriodId(year: AcademicYear | null): string | null {
@@ -227,6 +228,8 @@ function Dashboard({ data, onNewSubject }: { data: AcademyData; onNewSubject: ()
         </Surface>
       </div>
 
+      <LearningPanels data={data} />
+
       {/* Histórico acadêmico */}
       <Surface className="flex flex-col gap-3">
         <h2 className="flex items-center gap-2 text-base font-semibold text-fg">
@@ -273,5 +276,96 @@ export function AssessmentRow({ a, data, label, onOpen, warn = false }: { a: Ass
         )}
       </button>
     </li>
+  );
+}
+
+/** Progresso de aprendizagem, conteúdos recentes, dúvidas e materiais de todas as disciplinas do ano (Parte 9.2). */
+function LearningPanels({ data }: { data: AcademyData }) {
+  const { t } = useSettings();
+  const extras = useSubjectExtras(
+    data.subjects.map((s) => s.id),
+    data.assessments.flatMap((a) => a.noteIds),
+  );
+  const levels = masteryLevelsOf(data.year);
+  const p = contentProgress(extras.contents, levels.length);
+  const recent = [...extras.contents].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 6);
+  const doubts = extras.doubts.filter((d) => d.status === 'open').slice(0, 6);
+  const notes = extras.notes.slice(0, 6);
+  const subjectName = (id: string) => data.subjectById.get(id)?.name ?? '';
+  if (extras.loading) return null;
+  return (
+    <div className="grid gap-6 lg:grid-cols-2">
+      <Surface className="flex flex-col gap-3">
+        <h2 className="flex items-center gap-2 text-base font-semibold text-fg">
+          <BookOpenCheck className="h-5 w-5 text-teal" aria-hidden />
+          {t('academy.dash.progress')}
+        </h2>
+        {p.total === 0 ? (
+          <p className="text-sm text-muted">{t('academy.dash.progressEmpty')}</p>
+        ) : (
+          <>
+            <div className="flex flex-col gap-1.5">
+              <div className="flex justify-between text-sm text-muted">
+                <span>{t('academy.dash.studiedOf', { studied: p.studied, total: p.total })}</span>
+                <span>{t('academy.dash.masteredOf', { mastered: p.mastered, total: p.total })}</span>
+              </div>
+              <div className="h-2 overflow-hidden rounded-full bg-surface-3" aria-hidden>
+                <div className="h-full rounded-full bg-teal" style={{ width: `${(p.studied / p.total) * 100}%` }} />
+              </div>
+            </div>
+            <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-subtle">{t('academy.dash.recentContents')}</h3>
+            <ul className="flex flex-col gap-1">
+              {recent.map((c) => (
+                <li key={c.id}>
+                  <Link to={`/academy/subjects/${c.subjectId}`} className="flex items-baseline gap-2 rounded-xl px-2 py-1.5 text-sm hover:bg-surface-2/70">
+                    <span className="min-w-0 flex-1 truncate text-fg">{c.title}</span>
+                    <span className="shrink-0 text-xs text-muted">
+                      {subjectName(c.subjectId)} · {t(`academy.contents.statuses.${c.status}`)}
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+      </Surface>
+      <Surface className="flex flex-col gap-3">
+        <h2 className="flex items-center gap-2 text-base font-semibold text-fg">
+          <CircleHelp className="h-5 w-5 text-amber" aria-hidden />
+          {t('academy.dash.doubts')}
+        </h2>
+        {doubts.length === 0 ? (
+          <p className="text-sm text-muted">{t('academy.dash.doubtsEmpty')}</p>
+        ) : (
+          <ul className="flex flex-col gap-1">
+            {doubts.map((d) => (
+              <li key={d.id}>
+                <Link to={`/academy/subjects/${d.subjectId}`} className="block rounded-xl px-2 py-1.5 hover:bg-surface-2/70">
+                  <span className="block truncate text-sm text-fg">{d.question}</span>
+                  <span className="block text-xs text-muted">{subjectName(d.subjectId)}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+        <h3 className="mt-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-subtle">
+          <NotebookPen className="h-4 w-4" aria-hidden />
+          {t('academy.dash.materials')}
+        </h3>
+        {notes.length === 0 ? (
+          <p className="text-sm text-muted">{t('academy.dash.materialsEmpty')}</p>
+        ) : (
+          <ul className="flex flex-col gap-1">
+            {notes.map((n) => (
+              <li key={n.id}>
+                <Link to={`/notes/${n.id}`} className="block truncate rounded-xl px-2 py-1.5 text-sm text-fg hover:bg-surface-2/70">
+                  {n.title || t('notes.untitled')}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Surface>
+    </div>
   );
 }

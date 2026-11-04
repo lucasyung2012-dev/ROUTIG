@@ -95,9 +95,11 @@ Leia este arquivo no começo de toda conversa nova sobre o ROUTIG. A especifica�
 - Salvamento automático (0,7 s depois de parar de digitar, e ao sair). Histórico: uma versão a cada 5 minutos de edição, até 50 por nota; restaurar guarda o conteúdo atual antes.
 - Ligação com tarefas e eventos (um registro só). Inbox → "Virar nota" leva o texto e o arquivo do item, sem copiar o arquivo.
 - Lixeira com restaurar e excluir de vez (apaga versões e arquivos que só a nota usava). "+ Criar" tem Nota; a busca global encontra notas.
-- Não testado no aparelho real: Apple Pencil (pressão, palma). O navegador de teste não tem caneta.
+- **Testado no iPad real pelo dono do produto (2026-11-03): tudo funcionando** — desenho sem balançar, sem perder traços, tela cheia, formas automáticas, só a caneta desenha, cores, pressão e salvamento.
 
 ## Ideias para o futuro (registradas, não fazem parte da Versão 1)
+
+- **Escrita à mão → texto:** hoje, usar o Rabisco (Scribble) do iPadOS em qualquer campo de texto do ROUTIG (modo Rápido do Notes, títulos, tarefas, Inbox): reconhece letras, números e símbolos no próprio aparelho. Converter um desenho já feito em texto fica para a fase de IA (Parte 28), com autorização.
 
 - **Voz:** agora, usar o ditado do teclado do iPad; o áudio do Inbox é recado para ouvir depois. Etapa 2 (Idiomas): gravar a própria fala para treinar pronúncia. Com IA (Parte 28): capturar falando e a IA sugerir eventos/tarefas, e resumir recados de voz, sempre com confirmação. Decisão sobre botão "Ditar" pendente do dono do produto.
 

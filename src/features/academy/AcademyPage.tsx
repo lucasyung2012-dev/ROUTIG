@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { BookOpenCheck, CalendarClock, CalendarRange, CircleHelp, ClipboardList, GraduationCap, History, Layers, NotebookPen, PenLine, Plus, Settings2, Users } from 'lucide-react';
+import { BookOpenCheck, CalendarClock, CalendarRange, CircleHelp, ClipboardList, FileUp, GraduationCap, History, Layers, NotebookPen, PenLine, Plus, Settings2, Users } from 'lucide-react';
 import { useSettings } from '@/app/SettingsProvider';
 import { setCurrentYear } from '@/data/academyRepo';
 import { addDays, formatDateKey, todayKey } from '@/domain/dates';
@@ -17,6 +17,7 @@ import { AssessmentDialog, SubjectDialog, TeachersDialog, YearDialog } from './d
 import { formatGrade, useAcademyData, type AcademyData } from './useAcademyData';
 import { useSubjectExtras } from './useSubjectExtras';
 import { useStudySessions } from './StudyPlanPage';
+import { ImportDialog } from './ImportDialog';
 
 /** Período "de agora": o que contém hoje pelas datas; senão, o primeiro. */
 export function currentPeriodId(year: AcademicYear | null): string | null {
@@ -34,6 +35,7 @@ export function AcademyPage() {
   const [subjectDialog, setSubjectDialog] = useState(false);
   const [teachersOpen, setTeachersOpen] = useState(false);
   const [newAssessment, setNewAssessment] = useState(false);
+  const [importing, setImporting] = useState(false);
 
   if (data.loading) return <LoadingState label={t('common.loading')} lines={5} />;
 
@@ -81,6 +83,9 @@ export function AcademyPage() {
               <Button variant="secondary" size="sm" icon={<Users className="h-4 w-4" />} onClick={() => setTeachersOpen(true)}>
                 {t('academy.teachers.title')}
               </Button>
+              <Button variant="secondary" size="sm" icon={<FileUp className="h-4 w-4" />} disabled={data.subjects.length === 0} onClick={() => setImporting(true)}>
+                {t('academy.import.open')}
+              </Button>
               <Button variant="primary" size="sm" icon={<Plus className="h-4 w-4" />} disabled={data.subjects.length === 0} onClick={() => setNewAssessment(true)}>
                 {t('academy.assessment.new')}
               </Button>
@@ -109,6 +114,7 @@ export function AcademyPage() {
       {yearDialog && <YearDialog year={yearDialog === 'edit' ? year : null} onClose={() => setYearDialog(null)} />}
       {subjectDialog && <SubjectDialog data={data} subject={null} onClose={() => setSubjectDialog(false)} />}
       {teachersOpen && <TeachersDialog data={data} onClose={() => setTeachersOpen(false)} />}
+      {importing && <ImportDialog data={data} onClose={() => setImporting(false)} />}
       {newAssessment && data.subjects[0] && <AssessmentDialog data={data} assessment={null} subjectId={data.subjects[0].id} periodId={currentPeriodId(year)} onClose={() => setNewAssessment(false)} />}
     </div>
   );

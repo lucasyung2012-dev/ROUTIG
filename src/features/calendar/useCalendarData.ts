@@ -11,7 +11,7 @@ import { useTasksData, type TasksData } from '@/features/tasks/useTasksData';
 /** Um item no calendário: ocorrência de evento ou tarefa com prazo (o registro original, nunca uma cópia). */
 export interface CalendarItem {
   key: string;
-  kind: 'event' | 'task' | 'milestone';
+  kind: 'event' | 'task' | 'milestone' | 'assessment';
   date: DateKey;
   endDate: DateKey;
   allDay: boolean;
@@ -29,6 +29,8 @@ export interface CalendarItem {
   task?: Task;
   /** Marco de projeto: abre o projeto. */
   projectId?: string;
+  /** Avaliação da Academy: abre a disciplina. */
+  subjectId?: string;
   conflictWith: string[];
 }
 
@@ -47,6 +49,8 @@ export function useCalendarData(): CalendarData {
   const all = useLiveQuery(() => getDb().events.toArray(), []);
   const config = useLiveQuery(() => loadCalendarConfig(), []);
   const projects = useLiveQuery(() => getDb().projects.filter((p) => !p.deletedAt).toArray(), []);
+  const assessments = useLiveQuery(() => getDb().assessments.filter((a) => !a.deletedAt && !!a.date).toArray(), []);
+  const subjects = useLiveQuery(() => getDb().subjects.filter((s) => !s.deletedAt).toArray(), []);
   const tasks = useTasksData();
 
   return useMemo(() => {
@@ -126,6 +130,30 @@ export function useCalendarData(): CalendarData {
             });
           }
         }
+        // Provas e trabalhos da Academy, lidos da própria avaliação (Parte 1.2: aparecem no Calendar, sem cópia).
+        const subjectById = new Map((subjects ?? []).map((s) => [s.id, s]));
+        for (const a of assessments ?? []) {
+          const s = subjectById.get(a.subjectId);
+          if (!s || !a.date || a.date < from || a.date > to) continue;
+          const start = a.time ? toMinutes(a.time) : null;
+          items.push({
+            key: `a:${a.id}`,
+            kind: 'assessment',
+            date: a.date,
+            endDate: a.date,
+            allDay: start === null,
+            start,
+            end: start === null ? null : Math.min(start + 60, 24 * 60),
+            title: `${a.name} · ${s.name}`,
+            location: '',
+            tone: 'rose',
+            color: s.color,
+            categoryId: null,
+            done: a.score !== null,
+            subjectId: s.id,
+            conflictWith: [],
+          });
+        }
       }
       // Conflitos: só entre eventos com horário (tarefas não ocupam agenda).
       const slots = items
@@ -147,7 +175,7 @@ export function useCalendarData(): CalendarData {
       tasks,
       itemsInRange,
     };
-  }, [all, config, tasks, projects]);
+  }, [all, config, tasks, projects, assessments, subjects]);
 }
 
 export function useCategoryName() {

@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Activity, ArrowRight, CalendarDays, Diamond, FolderKanban, Inbox, ListTodo, NotebookPen, Sun } from 'lucide-react';
+import { Activity, ArrowRight, CalendarDays, Diamond, FolderKanban, GraduationCap, Inbox, ListTodo, NotebookPen, Sun } from 'lucide-react';
 import { MODULES, TONE_CLASSES, type ModuleId } from '@/app/modules';
 import { useSettings } from '@/app/SettingsProvider';
 import { isModuleReady } from '@/app/version';
@@ -15,6 +15,7 @@ import { compareTasks, isClosedKind, statusKind } from '@/domain/tasks';
 import { visibleModules } from '@/domain/settings';
 import { useEventEditor } from '@/features/calendar/EventEditor';
 import { toneLook, useCalendarData } from '@/features/calendar/useCalendarData';
+import { useAcademyData } from '@/features/academy/useAcademyData';
 import { useProjectsData } from '@/features/projects/useProjectsData';
 import { TaskRow } from '@/features/tasks/TaskRow';
 import { useTaskEditor } from '@/features/tasks/TaskEditor';
@@ -429,6 +430,8 @@ export function renderLiveCard(id: LiveCard): ReactNode {
       return <EventsCard />;
     case 'tasks':
       return <TasksCard />;
+    case 'academy':
+      return <AcademyCard />;
     case 'projects':
       return <ProjectsCard />;
     case 'milestones':
@@ -447,8 +450,58 @@ export function renderLiveCard(id: LiveCard): ReactNode {
 export const MODULE_OF_LIVE: Partial<Record<LiveCard, ModuleId>> = {
   events: 'calendar',
   tasks: 'tasks',
+  academy: 'academy',
   projects: 'projects',
   milestones: 'projects',
   notes: 'notes',
   inbox: 'inbox',
 };
+
+/* ---------- Academy ---------- */
+
+/** Próximas avaliações e notas a lançar, lidas da Academy (ano letivo atual). */
+export function AcademyCard() {
+  const { t, settings } = useSettings();
+  const data = useAcademyData();
+  const today = todayKey();
+  const upcoming = data.assessments.filter((a) => a.date && a.date >= today && a.date <= addDays(today, 14)).slice(0, 5);
+  const toGrade = data.assessments.filter((a) => a.date && a.date < today && a.score === null).length;
+  return (
+    <CardShell title={t('dashboard.cards.academy')} icon={<GraduationCap className="h-5 w-5" />} tone="blue" link={{ to: '/academy', label: t('common.open') }}>
+      {data.loading ? (
+        <LoadingState label={t('common.loading')} lines={3} />
+      ) : !data.year ? (
+        <p className="text-sm text-muted">{t('dashboard.academyNoYear')}</p>
+      ) : (
+        <>
+          {toGrade > 0 && (
+            <div className="mb-2">
+              <Badge tone="warning">{t('academy.dash.toGrade', { count: toGrade })}</Badge>
+            </div>
+          )}
+          {upcoming.length === 0 ? (
+            <p className="text-sm text-muted">{t('dashboard.academyEmpty')}</p>
+          ) : (
+            <ul className="flex flex-col gap-1">
+              {upcoming.map((a) => {
+                const s = data.subjectById.get(a.subjectId);
+                return (
+                  <li key={a.id}>
+                    <Link to={`/academy/subjects/${a.subjectId}`} className="flex items-center gap-3 rounded-xl px-2 py-2 transition hover:bg-surface-2/70">
+                      <span className="h-9 w-1 shrink-0 rounded-full ring-1 ring-line/60" style={{ background: s?.color }} aria-hidden />
+                      <span className="w-16 shrink-0 text-xs font-medium capitalize text-muted">{a.date === today ? t('tasks.due.today') : formatDateKey(a.date!, settings.locale, { weekday: 'short', day: 'numeric' })}</span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-medium text-fg">{a.name}</span>
+                        <span className="block truncate text-xs text-muted">{s?.name}</span>
+                      </span>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </>
+      )}
+    </CardShell>
+  );
+}

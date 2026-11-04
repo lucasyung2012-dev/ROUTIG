@@ -14,6 +14,8 @@ import { ProjectsPage } from '@/features/projects/ProjectsPage';
 import { ProjectPage } from '@/features/projects/ProjectPage';
 import { ProfilePage } from '@/features/profile/ProfilePage';
 import { InterestPage } from '@/features/profile/InterestPage';
+import { AcademyPage } from '@/features/academy/AcademyPage';
+import { SubjectPage } from '@/features/academy/SubjectPage';
 import { SettingsIndexPage, SettingsSectionPage } from '@/features/settings/SettingsPage';
 import { LogoComparePage } from '@/features/brand/LogoComparePage';
 import { DesignSystemPage } from '@/features/design/DesignSystemPage';
@@ -97,7 +99,9 @@ function Gate() {
           <Route path="notes/:id" element={<NotesPage />} />
           <Route path="projects" element={<ProjectsPage />} />
           <Route path="projects/:id" element={<ProjectPage />} />
-          {NAV_MODULE_IDS.filter((id) => !['dashboard', 'tasks', 'calendar', 'inbox', 'notes', 'projects'].includes(id)).map((id) => (
+          <Route path="academy" element={<AcademyPage />} />
+          <Route path="academy/subjects/:id" element={<SubjectPage />} />
+          {NAV_MODULE_IDS.filter((id) => !['dashboard', 'tasks', 'calendar', 'inbox', 'notes', 'projects', 'academy'].includes(id)).map((id) => (
             <Route key={id} path={MODULES[id].path.slice(1)} element={<ModuleRoadmapPage id={id} />} />
           ))}
           <Route path="profile" element={<ProfilePage />} />

@@ -16,7 +16,8 @@ describe('perfis de painel (Parte 5.2)', () => {
     expect(isValidCardId('tasks')).toBe(true);
     expect(isValidCardId('kpi:tasksOverdue')).toBe(true);
     expect(isValidCardId('kpi:inventado')).toBe(false);
-    expect(isValidCardId('academy')).toBe(false); // módulo futuro: só "em breve"
+    expect(isValidCardId('habits')).toBe(false); // módulo futuro: só "em breve"
+    expect(isValidCardId('academy')).toBe(true);
   });
 
   it('migração limpa dados ruins e recria os perfis de fábrica', () => {

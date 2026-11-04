@@ -6,6 +6,7 @@ import type { InboxItem, StoredFile } from '@/domain/inbox';
 import type { Note, NoteCollection, Notebook, NoteTemplate, NoteVersion } from '@/domain/notes';
 import type { Project } from '@/domain/projects';
 import type { HistoryEntry, Interest } from '@/domain/interests';
+import type { AcademicYear, Assessment, PeriodResult, Subject, Teacher } from '@/domain/academy';
 
 /** Registro chave-valor (configurações, estado do onboarding, metadados). */
 export interface KvRecord {
@@ -38,6 +39,11 @@ export class RoutigDB extends Dexie {
   projects!: EntityTable<Project, 'id'>;
   interests!: EntityTable<Interest, 'id'>;
   historyEntries!: EntityTable<HistoryEntry, 'id'>;
+  academicYears!: EntityTable<AcademicYear, 'id'>;
+  subjects!: EntityTable<Subject, 'id'>;
+  teachers!: EntityTable<Teacher, 'id'>;
+  assessments!: EntityTable<Assessment, 'id'>;
+  periodResults!: EntityTable<PeriodResult, 'id'>;
 
   constructor(name = 'routig') {
     super(name);
@@ -77,10 +83,18 @@ export class RoutigDB extends Dexie {
       interests: 'id, status, categoryId, updatedAt',
       historyEntries: 'id, date',
     });
+    // Etapa 2: Academy (anos letivos, disciplinas, professores, avaliações, recuperação e bônus).
+    this.version(8).stores({
+      academicYears: 'id, current',
+      subjects: 'id, yearId',
+      teachers: 'id',
+      assessments: 'id, subjectId, date',
+      periodResults: 'id, subjectId',
+    });
   }
 }
 
-export const DB_SCHEMA_VERSION = 7;
+export const DB_SCHEMA_VERSION = 8;
 
 let instance: RoutigDB | null = null;
 

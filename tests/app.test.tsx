@@ -90,9 +90,17 @@ describe('navegação (Parte 4)', () => {
 
   it('módulo ainda não construído mostra a etapa em que chega, sem fingir funcionar', async () => {
     await finishOnboarding();
+    window.location.hash = '#/music';
+    render(<App />);
+    expect(await screen.findByText('Música chega na Etapa 3: Desenvolvimento pessoal')).toBeInTheDocument();
+  });
+
+  it('Academy sem ano letivo pede para criar o primeiro, sem dados inventados', async () => {
+    await finishOnboarding();
     window.location.hash = '#/academy';
     render(<App />);
-    expect(await screen.findByText('Academy chega na Etapa 2: Aprendizagem')).toBeInTheDocument();
+    expect(await screen.findByText('Nenhum ano letivo ainda')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Novo ano letivo' })).toBeInTheDocument();
   });
 });
 

@@ -44,16 +44,16 @@ async function saveCalendarConfig(config: CalendarConfig): Promise<void> {
   });
 }
 
-export async function addEventCategory(name: string, tone: EventTone): Promise<EventCategory> {
+export async function addEventCategory(name: string, tone: EventTone, color: string | null = null): Promise<EventCategory> {
   const clean = name.trim().slice(0, 40);
   if (!clean) throw new EventRuleError('invalid');
   const config = await loadCalendarConfig();
-  const cat: EventCategory = { id: newId('cat'), name: clean, tone, builtin: false };
+  const cat: EventCategory = { id: newId('cat'), name: clean, tone, color, builtin: false };
   await saveCalendarConfig({ categories: [...config.categories, cat] });
   return cat;
 }
 
-export async function updateEventCategory(id: string, patch: Partial<Pick<EventCategory, 'name' | 'tone'>>): Promise<void> {
+export async function updateEventCategory(id: string, patch: Partial<Pick<EventCategory, 'name' | 'tone' | 'color'>>): Promise<void> {
   const config = await loadCalendarConfig();
   await saveCalendarConfig({ categories: config.categories.map((c) => (c.id === id ? { ...c, ...patch, name: (patch.name ?? c.name).slice(0, 40) } : c)) });
 }

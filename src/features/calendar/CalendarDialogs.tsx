@@ -12,7 +12,8 @@ import { IconButton } from '@/ui/IconButton';
 import { EmptyState } from '@/ui/States';
 import { useToast } from '@/ui/toast';
 import { cn } from '@/ui/cn';
-import { EVENT_TONES, TONE_ITEM, useCategoryName, type CalendarData } from './useCalendarData';
+import { EVENT_TONES, toneLook, useCategoryName, type CalendarData } from './useCalendarData';
+import { ColorPicker } from '@/ui/ColorPicker';
 
 export function CalendarTrashDialog({ open, onClose, cal }: { open: boolean; onClose: () => void; cal: CalendarData }) {
   const { t, settings } = useSettings();
@@ -66,6 +67,7 @@ export function CalendarConfigDialog({ open, onClose, cal }: { open: boolean; on
   const categoryName = useCategoryName();
   const [name, setName] = useState('');
   const [tone, setTone] = useState<EventTone>('blue');
+  const [color, setColor] = useState<string | null>(null);
   const [removing, setRemoving] = useState<EventCategory | null>(null);
   const fail = () => toast.show(t('errors.saveFailed'), 'error');
 
@@ -74,28 +76,39 @@ export function CalendarConfigDialog({ open, onClose, cal }: { open: boolean; on
       <Dialog open={open} onClose={onClose} title={t('calendar.config.title')} description={t('calendar.config.hint')} closeLabel={t('common.close')} footer={<Button variant="primary" onClick={onClose}>{t('common.done')}</Button>}>
         <ul className="flex flex-col gap-2">
           {cal.config.categories.map((c) => (
-            <li key={c.id} className="flex items-center gap-2">
-              <TonePicker value={c.tone} label={categoryName(c)} onChange={(v) => void updateEventCategory(c.id, { tone: v }).catch(fail)} />
-              <Input
-                aria-label={t('tasks.config.rename')}
-                defaultValue={categoryName(c)}
-                maxLength={40}
-                onBlur={(e) => {
-                  const v = e.target.value.trim();
-                  if (v && v !== categoryName(c)) void updateEventCategory(c.id, { name: v }).catch(fail);
-                }}
-                className="min-w-0 flex-1"
+            <li key={c.id} className="flex flex-col gap-2 rounded-xl bg-surface-2/50 p-2.5">
+              <div className="flex items-center gap-2">
+                <span className={cn('h-3 w-3 shrink-0 rounded-full', toneLook(c.tone, c.color).dot.className)} style={toneLook(c.tone, c.color).dot.style} aria-hidden />
+                <Input
+                  aria-label={t('tasks.config.rename')}
+                  defaultValue={categoryName(c)}
+                  maxLength={40}
+                  onBlur={(e) => {
+                    const v = e.target.value.trim();
+                    if (v && v !== categoryName(c)) void updateEventCategory(c.id, { name: v }).catch(fail);
+                  }}
+                  className="min-w-0 flex-1"
+                />
+                {c.builtin ? <span className="h-9 w-9" aria-hidden /> : <IconButton size="sm" label={t('calendar.config.remove', { name: categoryName(c) })} icon={<X className="h-4 w-4" />} onClick={() => setRemoving(c)} />}
+              </div>
+              <CategoryColor
+                tone={c.tone}
+                color={c.color ?? null}
+                label={categoryName(c)}
+                onTone={(v) => void updateEventCategory(c.id, { tone: v, color: null }).catch(fail)}
+                onColor={(v) => void updateEventCategory(c.id, { color: v }).catch(fail)}
               />
-              {c.builtin ? <span className="h-9 w-9" aria-hidden /> : <IconButton size="sm" label={t('calendar.config.remove', { name: categoryName(c) })} icon={<X className="h-4 w-4" />} onClick={() => setRemoving(c)} />}
             </li>
           ))}
         </ul>
-        <div className="mt-5 flex flex-wrap items-center gap-2">
-          <TonePicker value={tone} label={t('calendar.config.color')} onChange={setTone} />
-          <Input aria-label={t('calendar.config.name')} placeholder={t('calendar.config.name')} value={name} maxLength={40} onChange={(e) => setName(e.target.value)} className="min-w-0 flex-1" />
-          <Button icon={<Plus className="h-4 w-4" aria-hidden />} disabled={!name.trim()} onClick={() => void addEventCategory(name, tone).then(() => setName(''), fail)}>
-            {t('calendar.config.add')}
-          </Button>
+        <div className="mt-5 flex flex-col gap-2 rounded-xl p-2.5 ring-1 ring-line">
+          <div className="flex items-center gap-2">
+            <Input aria-label={t('calendar.config.name')} placeholder={t('calendar.config.name')} value={name} maxLength={40} onChange={(e) => setName(e.target.value)} className="min-w-0 flex-1" />
+            <Button icon={<Plus className="h-4 w-4" aria-hidden />} disabled={!name.trim()} onClick={() => void addEventCategory(name, tone, color).then(() => setName(''), fail)}>
+              {t('calendar.config.add')}
+            </Button>
+          </div>
+          <CategoryColor tone={tone} color={color} label={t('calendar.config.color')} onTone={(v) => (setTone(v), setColor(null))} onColor={setColor} />
         </div>
       </Dialog>
       <ConfirmDialog
@@ -116,20 +129,34 @@ export function CalendarConfigDialog({ open, onClose, cal }: { open: boolean; on
   );
 }
 
-function TonePicker({ value, label, onChange }: { value: EventTone; label: string; onChange: (t: EventTone) => void }) {
+/**
+ * Cor da categoria: primeiro os tons do tema (mudam com claro/escuro), depois a
+ * paleta do app e "Outra cor". Escolher um tom tira a cor própria.
+ */
+function CategoryColor({ tone, color, label, onTone, onColor }: { tone: EventTone; color: string | null; label: string; onTone: (t: EventTone) => void; onColor: (hex: string) => void }) {
+  const { t } = useSettings();
   return (
-    <div className="flex gap-1" role="radiogroup" aria-label={label}>
-      {EVENT_TONES.map((tone) => (
-        <button
-          key={tone}
-          type="button"
-          role="radio"
-          aria-checked={value === tone}
-          aria-label={tone}
-          onClick={() => onChange(tone)}
-          className={cn('h-6 w-6 rounded-full ring-offset-2 ring-offset-surface transition', TONE_ITEM[tone].dot, value === tone && 'ring-2 ring-fg')}
-        />
-      ))}
-    </div>
+    <ColorPicker
+      size="sm"
+      value={color}
+      label={label}
+      onChange={onColor}
+      extra={
+        <>
+          {EVENT_TONES.map((tn) => (
+            <button
+              key={tn}
+              type="button"
+              role="radio"
+              aria-checked={!color && tone === tn}
+              aria-label={t('calendar.config.themeTone', { tone: t(`calendar.config.tones.${tn}`) })}
+              onClick={() => onTone(tn)}
+              className={cn('h-6 w-6 shrink-0 rounded-full ring-offset-2 ring-offset-surface transition', toneLook(tn).dot.className, !color && tone === tn && 'ring-2 ring-fg')}
+            />
+          ))}
+          <span className="mx-0.5 h-6 w-px bg-line" aria-hidden />
+        </>
+      }
+    />
   );
 }

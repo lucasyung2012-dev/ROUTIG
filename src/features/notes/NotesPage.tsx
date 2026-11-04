@@ -1,11 +1,12 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { BookOpen, ChevronLeft, FolderClosed, Layers, LayoutTemplate, NotebookPen, Plus, RotateCcw, Search, Star, Trash2, X } from 'lucide-react';
+import { BookOpen, ChevronLeft, FolderClosed, Layers, LayoutTemplate, NotebookPen, Pencil, Plus, RotateCcw, Search, Star, Trash2, X } from 'lucide-react';
 import { useSettings } from '@/app/SettingsProvider';
 import {
   createCollection,
   createNote,
   createNotebook,
+  updateNotebook,
   deleteCollection,
   deleteNotebook,
   deleteTemplate,
@@ -23,6 +24,7 @@ import { IconButton } from '@/ui/IconButton';
 import { PageHeader } from '@/ui/PageHeader';
 import { EmptyState, LoadingState } from '@/ui/States';
 import { useToast } from '@/ui/toast';
+import { ColorPicker } from '@/ui/ColorPicker';
 import { cn } from '@/ui/cn';
 import { NoteEditor } from './NoteEditor';
 import { useNotesData, type NotesData } from './useNotesData';
@@ -167,6 +169,7 @@ function Sidebar({ data, filter, onFilter }: { data: NotesData; filter: Filter; 
   const [newNotebook, setNewNotebook] = useState('');
   const [newCollection, setNewCollection] = useState('');
   const [deletingNb, setDeletingNb] = useState<Notebook | null>(null);
+  const [editingNb, setEditingNb] = useState<Notebook | null>(null);
   const count = (pred: (n: Note) => boolean) => data.notes.filter(pred).length;
   const item = (active: boolean, label: string, n: number, onClick: () => void, icon: ReactNode, extra?: ReactNode) => (
     <li className="group flex items-center gap-1">
@@ -202,7 +205,14 @@ function Sidebar({ data, filter, onFilter }: { data: NotesData; filter: Filter; 
               count((n) => n.notebookId === nb.id),
               () => onFilter({ kind: 'notebook', id: nb.id }),
               <FolderClosed className="h-4 w-4" style={{ color: nb.color }} aria-hidden />,
-              <IconButton size="sm" label={t('notes.deleteNotebook', { name: nb.name })} icon={<X className="h-3.5 w-3.5" />} className="opacity-0 group-hover:opacity-100 focus:opacity-100" onClick={() => setDeletingNb(nb)} />,
+              <IconButton
+                size="sm"
+                label={t('notes.editNotebook', { name: nb.name })}
+                icon={<Pencil className="h-3.5 w-3.5" />}
+                // Com mouse aparece ao passar por cima; no iPad (sem "hover") fica sempre visível.
+                className="[@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 focus:opacity-100"
+                onClick={() => setEditingNb(nb)}
+              />,
             ),
           )}
           {item(filter.kind === 'notebook' && filter.id === null, t('notes.noNotebook'), count((n) => !n.notebookId), () => onFilter({ kind: 'notebook', id: null }), <FolderClosed className="h-4 w-4" aria-hidden />)}
@@ -232,7 +242,7 @@ function Sidebar({ data, filter, onFilter }: { data: NotesData; filter: Filter; 
                 size="sm"
                 label={t('notes.deleteCollection', { name: c.name })}
                 icon={<X className="h-3.5 w-3.5" />}
-                className="opacity-0 group-hover:opacity-100 focus:opacity-100"
+                className="[@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 focus:opacity-100"
                 onClick={() => {
                   void deleteCollection(c.id).catch(fail);
                   if (filter.kind === 'collection' && filter.id === c.id) onFilter({ kind: 'all' });
@@ -252,6 +262,16 @@ function Sidebar({ data, filter, onFilter }: { data: NotesData; filter: Filter; 
         </form>
       </div>
 
+      {editingNb && (
+        <NotebookDialog
+          notebook={editingNb}
+          onClose={() => setEditingNb(null)}
+          onDelete={() => {
+            setDeletingNb(editingNb);
+            setEditingNb(null);
+          }}
+        />
+      )}
       <ConfirmDialog
         open={!!deletingNb}
         danger
@@ -270,6 +290,42 @@ function Sidebar({ data, filter, onFilter }: { data: NotesData; filter: Filter; 
         }}
       />
     </>
+  );
+}
+
+/** Nome e cor do caderno; excluir fica aqui também (com confirmação). */
+function NotebookDialog({ notebook, onClose, onDelete }: { notebook: Notebook; onClose: () => void; onDelete: () => void }) {
+  const { t } = useSettings();
+  const toast = useToast();
+  const [name, setName] = useState(notebook.name);
+  const [color, setColor] = useState(notebook.color);
+  const save = () =>
+    void updateNotebook(notebook.id, { name, color }).then(onClose, () => toast.show(t('errors.saveFailed'), 'error'));
+  return (
+    <Dialog
+      open
+      onClose={onClose}
+      closeLabel={t('common.cancel')}
+      title={t('notes.editNotebook', { name: notebook.name })}
+      footer={
+        <>
+          <Button variant="danger" className="mr-auto" icon={<Trash2 className="h-4 w-4" />} onClick={onDelete}>
+            {t('notes.deleteNotebook', { name: notebook.name })}
+          </Button>
+          <Button variant="ghost" onClick={onClose}>
+            {t('common.cancel')}
+          </Button>
+          <Button variant="primary" disabled={!name.trim()} onClick={save}>
+            {t('common.save')}
+          </Button>
+        </>
+      }
+    >
+      <div className="flex flex-col gap-4">
+        <Input aria-label={t('notes.notebookName')} value={name} maxLength={60} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && name.trim() && save()} />
+        <ColorPicker value={color} onChange={setColor} label={t('projects.fields.color')} showLabel />
+      </div>
+    </Dialog>
   );
 }
 

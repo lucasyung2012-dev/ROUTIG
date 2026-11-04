@@ -14,7 +14,7 @@ import { isClosedProject } from '@/domain/projects';
 import { compareTasks, isClosedKind, statusKind } from '@/domain/tasks';
 import { visibleModules } from '@/domain/settings';
 import { useEventEditor } from '@/features/calendar/EventEditor';
-import { TONE_ITEM, useCalendarData } from '@/features/calendar/useCalendarData';
+import { toneLook, useCalendarData } from '@/features/calendar/useCalendarData';
 import { useProjectsData } from '@/features/projects/useProjectsData';
 import { TaskRow } from '@/features/tasks/TaskRow';
 import { useTaskEditor } from '@/features/tasks/TaskEditor';
@@ -101,7 +101,7 @@ export function EventsCard() {
                 onClick={() => i.occurrence && events.openEvent(i.occurrence.event.id, i.occurrence.seriesDate)}
                 className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left transition hover:bg-surface-2/70"
               >
-                <span className={cn('h-9 w-1 shrink-0 rounded-full', TONE_ITEM[i.tone].bar)} aria-hidden />
+                <span className={cn('h-9 w-1 shrink-0 rounded-full', toneLook(i.tone, i.color).bar.className)} style={toneLook(i.tone, i.color).bar.style} aria-hidden />
                 <span className="w-16 shrink-0 text-xs font-medium capitalize text-muted">{i.date === today ? t('tasks.due.today') : formatDateKey(i.date, settings.locale, { weekday: 'short', day: 'numeric' })}</span>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[0.9375rem] font-medium text-fg">{i.title}</span>

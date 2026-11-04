@@ -236,3 +236,13 @@ describe('desenho: formas por arrastar, laço e arquivos', () => {
     expect(strokeWidth({ points: [[0, 0, 1]], color: '#ff0', width: 20, highlight: true })).toBe(20);
   });
 });
+
+describe('cor do caderno', () => {
+  it('muda nome e cor; cor inválida é ignorada', async () => {
+    const { createNotebook, updateNotebook } = await import('@/data/notesRepo');
+    const nb = await createNotebook('Escola', '#7357F6');
+    await updateNotebook(nb.id, { name: 'Escola 2026', color: '#000000' });
+    await updateNotebook(nb.id, { color: 'roxo' });
+    expect(await getDb().notebooks.get(nb.id)).toMatchObject({ name: 'Escola 2026', color: '#000000' });
+  });
+});

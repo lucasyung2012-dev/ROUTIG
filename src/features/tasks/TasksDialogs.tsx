@@ -10,6 +10,7 @@ import { Input, Select } from '@/ui/Field';
 import { IconButton } from '@/ui/IconButton';
 import { EmptyState } from '@/ui/States';
 import { useToast } from '@/ui/toast';
+import { ColorPicker } from '@/ui/ColorPicker';
 import { LIST_COLORS, useStatusName, type TasksData } from './useTasksData';
 
 /* ---------- Lixeira ---------- */
@@ -139,32 +140,22 @@ export function TasksConfigDialog({ open, onClose, data }: { open: boolean; onCl
             <h3 className="text-sm font-semibold text-fg">{t('tasks.config.lists')}</h3>
             <ul className="flex flex-col gap-2">
               {data.lists.map((l) => (
-                <li key={l.id} className="flex items-center gap-2">
-                  <div className="flex gap-1" role="radiogroup" aria-label={l.name}>
-                    {LIST_COLORS.map((c) => (
-                      <button
-                        key={c}
-                        type="button"
-                        role="radio"
-                        aria-checked={l.color === c}
-                        aria-label={c}
-                        onClick={() => void updateList(l.id, { color: c })}
-                        className="h-6 w-6 rounded-full ring-offset-2 ring-offset-surface transition aria-checked:ring-2 aria-checked:ring-fg"
-                        style={{ background: c }}
-                      />
-                    ))}
+                <li key={l.id} className="flex flex-col gap-2 rounded-xl bg-surface-2/50 p-2.5">
+                  <div className="flex items-center gap-2">
+                    <span className="h-3 w-3 shrink-0 rounded-full ring-1 ring-line" style={{ background: l.color }} aria-hidden />
+                    <Input
+                      aria-label={t('tasks.config.rename')}
+                      defaultValue={l.name}
+                      maxLength={60}
+                      onBlur={(e) => {
+                        const name = e.target.value.trim();
+                        if (name && name !== l.name) void updateList(l.id, { name });
+                      }}
+                      className="min-w-0 flex-1"
+                    />
+                    <IconButton size="sm" label={t('tasks.config.deleteList', { name: l.name })} icon={<Trash2 className="h-4 w-4" />} onClick={() => setDeleting(l)} />
                   </div>
-                  <Input
-                    aria-label={t('tasks.config.rename')}
-                    defaultValue={l.name}
-                    maxLength={60}
-                    onBlur={(e) => {
-                      const name = e.target.value.trim();
-                      if (name && name !== l.name) void updateList(l.id, { name });
-                    }}
-                    className="min-w-0 flex-1"
-                  />
-                  <IconButton size="sm" label={t('tasks.config.deleteList', { name: l.name })} icon={<Trash2 className="h-4 w-4" />} onClick={() => setDeleting(l)} />
+                  <ColorPicker size="sm" value={l.color} label={l.name} onChange={(color) => void updateList(l.id, { color })} />
                 </li>
               ))}
             </ul>

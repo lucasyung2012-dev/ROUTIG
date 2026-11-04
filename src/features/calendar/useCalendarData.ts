@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, type CSSProperties } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useSettings } from '@/app/SettingsProvider';
 import { getDb } from '@/data/db';
@@ -21,6 +21,8 @@ export interface CalendarItem {
   title: string;
   location: string;
   tone: EventTone;
+  /** Cor própria (categoria com cor da paleta, ou a cor do projeto no marco). */
+  color?: string;
   categoryId: string | null;
   done: boolean;
   occurrence?: EventOccurrence;
@@ -51,6 +53,7 @@ export function useCalendarData(): CalendarData {
     const events = (all ?? []).filter((e) => !e.deletedAt);
     const cfg = config ?? migrateCalendarConfig(undefined);
     const toneOf = (id: string) => cfg.categories.find((c) => c.id === id)?.tone ?? 'neutral';
+    const colorOf = (id: string) => cfg.categories.find((c) => c.id === id)?.color ?? undefined;
 
     const itemsInRange: CalendarData['itemsInRange'] = (from, to, opts) => {
       const items: CalendarItem[] = [];
@@ -69,6 +72,7 @@ export function useCalendarData(): CalendarData {
             title: o.title,
             location: o.location,
             tone: toneOf(e.categoryId),
+            color: colorOf(e.categoryId),
             categoryId: e.categoryId,
             done: false,
             occurrence: o,
@@ -114,6 +118,7 @@ export function useCalendarData(): CalendarData {
               title: `◆ ${m.title} · ${p.name}`,
               location: '',
               tone: 'amber',
+              color: p.color,
               categoryId: null,
               done: m.done,
               projectId: p.id,
@@ -177,3 +182,13 @@ export const TONE_ITEM: Record<EventTone, { chip: string; bar: string; dot: stri
 };
 
 export const EVENT_TONES: EventTone[] = ['violet', 'blue', 'teal', 'amber', 'rose', 'neutral'];
+
+type Look = { className: string; style?: CSSProperties };
+
+/** Classes e estilo de um item: tom do tema (claro/escuro) ou a cor própria da paleta. */
+export function toneLook(tone: EventTone, color?: string | null): { chip: Look; bar: Look; dot: Look } {
+  if (!color) return { chip: { className: TONE_ITEM[tone].chip }, bar: { className: TONE_ITEM[tone].bar }, dot: { className: TONE_ITEM[tone].dot } };
+  const solid = { className: 'ring-1 ring-inset ring-line/60', style: { background: color } };
+  // Fundo do pedaço: a cor com 15% de opacidade, igual aos tons do tema.
+  return { chip: { className: 'text-fg', style: { background: `${color}26` } }, bar: solid, dot: solid };
+}

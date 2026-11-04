@@ -12,6 +12,8 @@ export interface EventCategory {
   /** Vazio nas categorias de fábrica: o nome vem da tradução. */
   name: string;
   tone: EventTone;
+  /** Cor da paleta (ou "Outra cor"); quando existe, vale no lugar do tom do tema. */
+  color?: string | null;
   builtin: boolean;
 }
 

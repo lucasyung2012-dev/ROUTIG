@@ -26,7 +26,7 @@ import { Switch } from '@/ui/Switch';
 import { useToast } from '@/ui/toast';
 import { cn } from '@/ui/cn';
 import { RecurrenceFields } from './RecurrenceFields';
-import { TONE_ITEM, useCalendarData, useCategoryName } from './useCalendarData';
+import { toneLook, useCalendarData, useCategoryName } from './useCalendarData';
 
 /* ---------- Contexto ---------- */
 
@@ -327,7 +327,7 @@ function EventEditorForm({ target, onClose, cal }: { target: EditorTarget; onClo
           <div className="flex flex-wrap gap-1.5" aria-hidden>
             {cal.config.categories.map((c) => (
               <span key={c.id} className={cn('inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[0.7rem] text-muted', c.id === draft.categoryId && 'bg-surface-2 text-fg')}>
-                <span className={cn('h-2 w-2 rounded-full', TONE_ITEM[c.tone].dot)} />
+                <span className={cn('h-2 w-2 rounded-full', toneLook(c.tone, c.color).dot.className)} style={toneLook(c.tone, c.color).dot.style} />
                 {categoryName(c)}
               </span>
             ))}

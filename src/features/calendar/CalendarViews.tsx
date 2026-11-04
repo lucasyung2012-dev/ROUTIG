@@ -4,7 +4,7 @@ import { useSettings } from '@/app/SettingsProvider';
 import { addDays, formatDateKey, monthGrid, todayKey, type DateKey } from '@/domain/dates';
 import { fromMinutes, layoutColumns } from '@/domain/events';
 import { cn } from '@/ui/cn';
-import { TONE_ITEM, type CalendarItem } from './useCalendarData';
+import { toneLook, type CalendarItem } from './useCalendarData';
 
 export interface ViewHandlers {
   onOpen: (item: CalendarItem) => void;
@@ -18,15 +18,16 @@ const HOUR_PX = 52;
 
 export function ItemChip({ item, onOpen, showTime = true }: { item: CalendarItem; onOpen: (i: CalendarItem) => void; showTime?: boolean }) {
   const { t } = useSettings();
-  const tone = TONE_ITEM[item.tone];
+  const look = toneLook(item.tone, item.color);
   return (
     <button
       type="button"
       onClick={() => onOpen(item)}
+      style={item.kind === 'task' ? undefined : look.chip.style}
       title={item.conflictWith.length ? t('calendar.conflictWith', { titles: item.conflictWith.join(', ') }) : item.title}
       className={cn(
         'flex w-full min-w-0 items-center gap-1.5 rounded-md px-1.5 py-0.5 text-left text-xs font-medium transition hover:brightness-110',
-        item.kind === 'task' ? 'bg-transparent text-muted ring-1 ring-inset ring-violet/40' : tone.chip,
+        item.kind === 'task' ? 'bg-transparent text-muted ring-1 ring-inset ring-violet/40' : look.chip.className,
         item.done && 'line-through opacity-60',
       )}
     >
@@ -35,7 +36,7 @@ export function ItemChip({ item, onOpen, showTime = true }: { item: CalendarItem
           {item.done && <Check className="h-2 w-2 text-white" />}
         </span>
       ) : (
-        <span className={cn('h-2 w-2 shrink-0 rounded-full', tone.dot)} aria-hidden />
+        <span className={cn('h-2 w-2 shrink-0 rounded-full', look.dot.className)} style={look.dot.style} aria-hidden />
       )}
       {showTime && item.start !== null && <span className="shrink-0 tabular text-muted">{fromMinutes(item.start)}</span>}
       <span className="truncate">{item.title}</span>
@@ -190,7 +191,7 @@ export function TimeGridView({ days, items, handlers }: { days: DateKey[]; items
                     )}
                     {timed.map((i) => {
                       const pos = layout.get(i.key) ?? { col: 0, cols: 1 };
-                      const tone = TONE_ITEM[i.tone];
+                      const look = toneLook(i.tone, i.color);
                       const height = Math.max(((i.end! - i.start!) / 60) * HOUR_PX, 22);
                       return (
                         <button
@@ -199,17 +200,18 @@ export function TimeGridView({ days, items, handlers }: { days: DateKey[]; items
                           onClick={() => handlers.onOpen(i)}
                           className={cn(
                             'absolute z-[5] flex flex-col overflow-hidden rounded-lg px-2 py-1 text-left text-xs shadow-soft ring-1 ring-inset transition hover:z-20 hover:brightness-110',
-                            i.kind === 'task' ? 'bg-surface ring-violet/50' : cn(tone.chip, 'ring-line/40'),
+                            i.kind === 'task' ? 'bg-surface ring-violet/50' : cn(look.chip.className, 'ring-line/40'),
                             i.done && 'opacity-60',
                           )}
                           style={{
+                            ...(i.kind === 'task' ? {} : look.chip.style),
                             top: (i.start! / 60) * HOUR_PX + 1,
                             height: height - 2,
                             left: `calc(${(pos.col / pos.cols) * 100}% + 2px)`,
                             width: `calc(${100 / pos.cols}% - 4px)`,
                           }}
                         >
-                          <span className={cn('absolute inset-y-0 left-0 w-1', i.kind === 'task' ? 'bg-violet' : tone.bar)} aria-hidden />
+                          <span className={cn('absolute inset-y-0 left-0 w-1', i.kind === 'task' ? 'bg-violet' : look.bar.className)} style={i.kind === 'task' ? undefined : look.bar.style} aria-hidden />
                           <span className={cn('flex items-center gap-1 truncate font-semibold text-fg', i.done && 'line-through')}>
                             {i.kind === 'task' && <ListTodo className="h-3 w-3 shrink-0 text-violet" aria-hidden />}
                             {i.occurrence?.event.recurrence && <Repeat className="h-3 w-3 shrink-0 text-muted" aria-hidden />}
@@ -308,7 +310,7 @@ export function AgendaView({ from, items, handlers }: { from: DateKey; items: Ca
             </button>
             <ul className="flex flex-col gap-1.5">
               {list.map((i) => {
-                const tone = TONE_ITEM[i.tone];
+                const look = toneLook(i.tone, i.color);
                 return (
                   <li key={i.key}>
                     <button
@@ -316,7 +318,7 @@ export function AgendaView({ from, items, handlers }: { from: DateKey; items: Ca
                       onClick={() => handlers.onOpen(i)}
                       className="flex w-full items-start gap-3 rounded-xl bg-surface px-3 py-2.5 text-left ring-1 ring-line/70 transition hover:bg-surface-2"
                     >
-                      <span className={cn('mt-1 h-8 w-1 shrink-0 rounded-full', i.kind === 'task' ? 'bg-violet' : tone.bar)} aria-hidden />
+                      <span className={cn('mt-1 h-8 w-1 shrink-0 rounded-full', i.kind === 'task' ? 'bg-violet' : look.bar.className)} style={i.kind === 'task' ? undefined : look.bar.style} aria-hidden />
                       <span className="min-w-0 flex-1">
                         <span className={cn('flex items-center gap-1.5 font-medium text-fg', i.done && 'text-subtle line-through')}>
                           {i.kind === 'task' && <ListTodo className="h-4 w-4 shrink-0 text-violet" aria-label={t('calendar.kindTask')} />}

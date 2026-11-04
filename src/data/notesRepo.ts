@@ -174,6 +174,16 @@ export async function renameNotebook(id: string, name: string): Promise<void> {
   await log({ entityType: 'notebook', entityId: id, action: 'update', fields: ['name'] });
 }
 
+/** Muda nome e/ou cor do caderno. */
+export async function updateNotebook(id: string, patch: { name?: string; color?: string }): Promise<void> {
+  const change: { name?: string; color?: string } = {};
+  if (patch.name !== undefined && patch.name.trim()) change.name = patch.name.trim().slice(0, 60);
+  if (patch.color !== undefined && /^#[0-9a-fA-F]{6}$/.test(patch.color)) change.color = patch.color;
+  if (!Object.keys(change).length) return;
+  await getDb().notebooks.update(id, change);
+  await log({ entityType: 'notebook', entityId: id, action: 'update', fields: Object.keys(change) });
+}
+
 /** Exclui o caderno; as notas continuam existindo, sem caderno. */
 export async function deleteNotebook(id: string): Promise<number> {
   const db = getDb();

@@ -15,7 +15,7 @@ import { cn } from '@/ui/cn';
 import { CalendarConfigDialog, CalendarTrashDialog } from './CalendarDialogs';
 import { AgendaView, MonthView, TimeGridView, YearView, type ViewHandlers } from './CalendarViews';
 import { useEventEditor } from './EventEditor';
-import { TONE_ITEM, useCalendarData, useCategoryName, type CalendarItem } from './useCalendarData';
+import { toneLook, useCalendarData, useCategoryName, type CalendarItem } from './useCalendarData';
 
 const VIEWS = [
   { id: 'day', icon: Rows3 },
@@ -196,7 +196,7 @@ export function CalendarPage() {
         <ul className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted" aria-label={t('calendar.filterCategory')}>
           {cal.config.categories.map((c) => (
             <li key={c.id} className="inline-flex items-center gap-1.5">
-              <span className={cn('h-2 w-2 rounded-full', TONE_ITEM[c.tone].dot)} aria-hidden />
+              <span className={cn('h-2 w-2 rounded-full', toneLook(c.tone, c.color).dot.className)} style={toneLook(c.tone, c.color).dot.style} aria-hidden />
               {categoryName(c)}
             </li>
           ))}

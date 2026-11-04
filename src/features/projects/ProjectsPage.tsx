@@ -4,7 +4,7 @@ import { CalendarDays, ChevronLeft, ChevronRight, Columns3, Flag, FolderKanban, 
 import { useSettings } from '@/app/SettingsProvider';
 import { createProject, purgeProject, restoreProject, updateProject, projectInputOf } from '@/data/projectsRepo';
 import { addMonths, formatDateKey, monthGrid, startOfMonth, todayKey, capitalizeFirst } from '@/domain/dates';
-import { emptyProjectInput, isClosedProject, isOverdueProject, positionOf, PROJECT_CATEGORIES, PROJECT_COLORS, PROJECT_STATUSES, timelineRange, type Project, type ProjectStatus } from '@/domain/projects';
+import { emptyProjectInput, isClosedProject, isOverdueProject, positionOf, PROJECT_CATEGORIES, PROJECT_STATUSES, timelineRange, type Project, type ProjectStatus } from '@/domain/projects';
 import { useObjectUrl } from '@/features/files/useObjectUrl';
 import { Badge } from '@/ui/Badge';
 import { Button } from '@/ui/Button';
@@ -16,6 +16,7 @@ import { PageHeader } from '@/ui/PageHeader';
 import { EmptyState, LoadingState } from '@/ui/States';
 import { Switch } from '@/ui/Switch';
 import { useToast } from '@/ui/toast';
+import { ColorPicker as AppColorPicker } from '@/ui/ColorPicker';
 import { cn } from '@/ui/cn';
 import { useProjectsData, type ProjectsData } from './useProjectsData';
 
@@ -440,27 +441,10 @@ function NewProjectDialog({ onClose }: { onClose: () => void }) {
   );
 }
 
+/** Cor de projeto ou interesse: a paleta do app, com preto, branco, cinza e "Outra cor". */
 export function ColorPicker({ value, onChange }: { value: string; onChange: (c: string) => void }) {
   const { t } = useSettings();
-  return (
-    <div className="flex flex-col gap-1.5">
-      <span className="text-sm font-medium text-fg">{t('projects.fields.color')}</span>
-      <div className="flex gap-2" role="radiogroup" aria-label={t('projects.fields.color')}>
-        {PROJECT_COLORS.map((c) => (
-          <button
-            key={c}
-            type="button"
-            role="radio"
-            aria-checked={value === c}
-            aria-label={c}
-            onClick={() => onChange(c)}
-            className={cn('h-8 w-8 rounded-full ring-offset-2 ring-offset-surface transition', value === c && 'ring-2 ring-fg')}
-            style={{ background: c }}
-          />
-        ))}
-      </div>
-    </div>
-  );
+  return <AppColorPicker value={value} onChange={onChange} label={t('projects.fields.color')} showLabel />;
 }
 
 function ProjectsTrashDialog({ data, onClose }: { data: ProjectsData; onClose: () => void }) {

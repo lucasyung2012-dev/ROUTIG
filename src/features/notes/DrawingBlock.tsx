@@ -144,8 +144,11 @@ function DrawingSurface({ strokes, height, background, imageFileId, onPatch, ful
   const [zoom, setZoom] = useState<number>(1);
   const [pan, setPan] = useState<Pt>([0, 0]);
   const [confirmClear, setConfirmClear] = useState(false);
-  const [past, setPast] = useState<Stroke[][]>([]);
-  const [future, setFuture] = useState<Stroke[][]>([]);
+  // Histórico em refs: toques rápidos em Desfazer/Refazer sempre veem a pilha mais recente.
+  const past = useRef<Stroke[][]>([]);
+  const future = useRef<Stroke[][]>([]);
+  const [, setHistoryTick] = useState(0);
+  const bump = () => setHistoryTick((n) => n + 1);
 
   const activePointer = useRef<number | null>(null);
   const currentRef = useRef<Stroke | null>(null);
@@ -171,8 +174,9 @@ function DrawingSurface({ strokes, height, background, imageFileId, onPatch, ful
   /** Muda os traços guardando o estado anterior para desfazer. */
   const commitChange = (next: Stroke[], before: Stroke[] = latest.current) => {
     if (next === before) return;
-    setPast((p) => [...p.slice(-(HISTORY_LIMIT - 1)), before]);
-    setFuture([]);
+    past.current = [...past.current.slice(-(HISTORY_LIMIT - 1)), before];
+    future.current = [];
+    bump();
     latest.current = next;
     onPatch({ strokes: next });
   };
@@ -183,18 +187,20 @@ function DrawingSurface({ strokes, height, background, imageFileId, onPatch, ful
   };
 
   const undo = () => {
-    const prev = past[past.length - 1];
+    const prev = past.current[past.current.length - 1];
     if (!prev) return;
-    setPast(past.slice(0, -1));
-    setFuture((f) => [latest.current, ...f]);
+    past.current = past.current.slice(0, -1);
+    future.current = [latest.current, ...future.current];
+    bump();
     setSelection([]);
     liveChange(prev);
   };
   const redo = () => {
-    const next = future[0];
+    const next = future.current[0];
     if (!next) return;
-    setFuture(future.slice(1));
-    setPast((p) => [...p, latest.current]);
+    future.current = future.current.slice(1);
+    past.current = [...past.current, latest.current];
+    bump();
     setSelection([]);
     liveChange(next);
   };
@@ -426,8 +432,8 @@ function DrawingSurface({ strokes, height, background, imageFileId, onPatch, ful
         {toolButton('hand', t('notes.draw.hand'), <Hand className="h-4 w-4" />)}
         {toolButton('eraser', t('notes.draw.eraser'), <Eraser className="h-4 w-4" />)}
         <span className="mx-1 h-6 w-px bg-line" aria-hidden />
-        <IconButton size="sm" label={t('notes.draw.undo')} icon={<Undo2 className="h-4 w-4" />} disabled={past.length === 0} onClick={undo} />
-        <IconButton size="sm" label={t('notes.draw.redo')} icon={<Redo2 className="h-4 w-4" />} disabled={future.length === 0} onClick={redo} />
+        <IconButton size="sm" label={t('notes.draw.undo')} icon={<Undo2 className="h-4 w-4" />} disabled={past.current.length === 0} onClick={undo} />
+        <IconButton size="sm" label={t('notes.draw.redo')} icon={<Redo2 className="h-4 w-4" />} disabled={future.current.length === 0} onClick={redo} />
         <span className="mx-1 h-6 w-px bg-line" aria-hidden />
         <IconButton size="sm" label={t('notes.draw.zoomOut')} icon={<ZoomOut className="h-4 w-4" />} disabled={zoomIndex <= 0} onClick={() => setZoomKeepingCenter(ZOOMS[Math.max(0, zoomIndex - 1)]!)} />
         <button type="button" className="h-8 min-w-[3rem] rounded-lg px-1 text-xs font-medium tabular text-muted hover:bg-surface-2" aria-label={t('notes.draw.zoomReset')} onClick={() => (setZoom(1), setPan([0, 0]))}>

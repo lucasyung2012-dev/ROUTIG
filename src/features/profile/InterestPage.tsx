@@ -61,6 +61,8 @@ function InterestDetail({ interest }: { interest: Interest }) {
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const dirty = useRef(false);
+  // Conta as edições: o que mudar durante um salvamento é salvo logo depois, não se perde.
+  const edits = useRef(0);
   const timer = useRef<number>();
   const lastRev = useRef(interest.rev);
   const latest = useRef(draft);
@@ -78,10 +80,12 @@ function InterestDetail({ interest }: { interest: Interest }) {
   const flush = async () => {
     window.clearTimeout(timer.current);
     if (!dirty.current) return;
+    const at = edits.current;
     try {
       const next = await updateInterest(interest.id, latest.current);
       lastRev.current = next.rev;
-      dirty.current = false;
+      if (edits.current === at) dirty.current = false;
+      else timer.current = window.setTimeout(() => void flush(), 300);
       setError(null);
       setSaved(true);
     } catch (e) {
@@ -100,6 +104,7 @@ function InterestDetail({ interest }: { interest: Interest }) {
   const change = (patch: Partial<InterestInput>) => {
     setDraft((d) => ({ ...d, ...patch }));
     dirty.current = true;
+    edits.current++;
     setSaved(false);
     window.clearTimeout(timer.current);
     timer.current = window.setTimeout(() => void flush(), 600);

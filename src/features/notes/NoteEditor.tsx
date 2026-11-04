@@ -34,6 +34,8 @@ export function NoteEditor({ note, data, onDeleted }: { note: Note; data: NotesD
   const [historyOpen, setHistoryOpen] = useState(false);
   const [templateOpen, setTemplateOpen] = useState(false);
   const dirty = useRef(false);
+  // Conta as edições: o que mudar durante um salvamento é salvo logo depois, não se perde.
+  const edits = useRef(0);
   const timer = useRef<number>();
   const lastRev = useRef(note.rev);
   const latest = useRef(draft);
@@ -50,11 +52,13 @@ export function NoteEditor({ note, data, onDeleted }: { note: Note; data: NotesD
   const flush = async () => {
     window.clearTimeout(timer.current);
     if (!dirty.current) return;
+    const at = edits.current;
     setStatus('saving');
     try {
       const saved = await saveNote(note.id, latest.current);
       lastRev.current = saved.rev;
-      dirty.current = false;
+      if (edits.current === at) dirty.current = false;
+      else timer.current = window.setTimeout(() => void flush(), 300);
       setStatus('saved');
     } catch {
       toast.show(t('errors.saveFailed'), 'error');
@@ -78,6 +82,7 @@ export function NoteEditor({ note, data, onDeleted }: { note: Note; data: NotesD
   const change = (patch: Partial<NoteInput>) => {
     setDraft((d) => ({ ...d, ...patch }));
     dirty.current = true;
+    edits.current++;
     setStatus('idle');
     window.clearTimeout(timer.current);
     timer.current = window.setTimeout(() => void flush(), 700);

@@ -1566,7 +1566,8 @@ export const pt = {
       notPassing: 'abaixo da média',
     },
     steps: {
-      component: '{code}: {points} de {max} ({count} avaliação/ões)',
+      component: '{code}: {points} de {max}',
+      componentMany: '{code}: {points} de {max} (média de {count} avaliações)',
       componentMissing: '{code}: sem nota ainda',
       assessment: '{name}: {value} (peso {weight})',
       original: 'Nota original: {value}',

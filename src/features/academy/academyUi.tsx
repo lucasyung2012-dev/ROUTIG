@@ -65,7 +65,7 @@ export function GradeBadge({ result, locale, passing }: { result: GradeResult; l
 function stepText(s: CalcStep, t: ReturnType<typeof useSettings>['t'], f: (v: number) => string): string {
   switch (s.kind) {
     case 'component':
-      return t('academy.steps.component', { code: s.code, points: f(s.points), max: f(s.max), count: s.count });
+      return s.count > 1 ? t('academy.steps.componentMany', { code: s.code, points: f(s.points), max: f(s.max), count: s.count }) : t('academy.steps.component', { code: s.code, points: f(s.points), max: f(s.max) });
     case 'componentMissing':
       return t('academy.steps.componentMissing', { code: s.code });
     case 'assessment':

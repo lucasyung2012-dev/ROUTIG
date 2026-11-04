@@ -114,11 +114,21 @@ export function YearDialog({ year, onClose }: { year: AcademicYear | null; onClo
           <p className="text-sm text-muted">{t('academy.year.periodsHint')}</p>
           <ul className="flex flex-col gap-2">
             {periods.map((p, i) => (
-              <li key={p.id} className="flex flex-wrap items-center gap-2">
-                <Input aria-label={t('academy.year.periodName')} value={p.name} maxLength={40} className="min-w-0 flex-1 basis-40" onChange={(e) => setPeriods(periods.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))} />
-                <Input type="date" aria-label={t('academy.year.periodStart')} value={p.start ?? ''} className="w-40" onChange={(e) => setPeriods(periods.map((x, j) => (j === i ? { ...x, start: e.target.value || null } : x)))} />
-                <Input type="date" aria-label={t('academy.year.periodEnd')} value={p.end ?? ''} className="w-40" onChange={(e) => setPeriods(periods.map((x, j) => (j === i ? { ...x, end: e.target.value || null } : x)))} />
-                <IconButton size="sm" label={t('academy.year.removePeriod', { name: p.name })} icon={<Trash2 className="h-4 w-4" />} onClick={() => void removePeriod(p)} />
+              <li key={p.id} className="flex flex-col gap-2 rounded-xl bg-surface-2/50 p-2.5">
+                <div className="flex items-center gap-2">
+                  <Input aria-label={t('academy.year.periodName')} value={p.name} maxLength={40} className="min-w-0 flex-1" onChange={(e) => setPeriods(periods.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))} />
+                  <IconButton size="sm" label={t('academy.year.removePeriod', { name: p.name })} icon={<Trash2 className="h-4 w-4" />} onClick={() => void removePeriod(p)} />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <label className="flex flex-col gap-1 text-xs text-muted">
+                    {t('academy.year.periodStart')}
+                    <Input type="date" value={p.start ?? ''} onChange={(e) => setPeriods(periods.map((x, j) => (j === i ? { ...x, start: e.target.value || null } : x)))} />
+                  </label>
+                  <label className="flex flex-col gap-1 text-xs text-muted">
+                    {t('academy.year.periodEnd')}
+                    <Input type="date" value={p.end ?? ''} onChange={(e) => setPeriods(periods.map((x, j) => (j === i ? { ...x, end: e.target.value || null } : x)))} />
+                  </label>
+                </div>
               </li>
             ))}
           </ul>

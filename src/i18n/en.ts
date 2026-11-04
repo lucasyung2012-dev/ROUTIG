@@ -1568,7 +1568,8 @@ export const en: Messages = {
       notPassing: 'below passing',
     },
     steps: {
-      component: '{code}: {points} of {max} ({count} assessment(s))',
+      component: '{code}: {points} of {max}',
+      componentMany: '{code}: {points} of {max} (average of {count} assessments)',
       componentMissing: '{code}: no score yet',
       assessment: '{name}: {value} (weight {weight})',
       original: 'Original grade: {value}',

@@ -3,7 +3,7 @@ import { newId, nowIso } from '@/domain/ids';
 import type { ChangeEntry, EntityRef } from '@/domain/entity';
 import { MAX_FILE_BYTES, sha256Hex, type StoredFile } from '@/domain/inbox';
 import { normalizeTags } from '@/domain/tasks';
-import { cloneBlocks, versionsToPrune, type Block, type Note, type NoteCollection, type Notebook, type NoteTemplate, type NoteVersion } from '@/domain/notes';
+import { blockFileIds, cloneBlocks, versionsToPrune, type Block, type Note, type NoteCollection, type Notebook, type NoteTemplate, type NoteVersion } from '@/domain/notes';
 
 const ENTITY = 'note';
 /** Intervalo mínimo entre versões automáticas do histórico. */
@@ -119,16 +119,18 @@ export async function restoreNote(id: string): Promise<void> {
 /** Exclusão definitiva: apaga a nota, as versões e os arquivos que só ela usava. */
 export async function purgeNote(id: string): Promise<void> {
   const db = getDb();
-  await db.transaction('rw', [db.notes, db.noteVersions, db.files, db.inbox, db.changelog], async () => {
+  await db.transaction('rw', [db.notes, db.noteVersions, db.files, db.inbox, db.projects, db.interests, db.kv, db.changelog], async () => {
     const n = await db.notes.get(id);
     if (!n) return;
     await db.notes.delete(id);
     await db.noteVersions.where('noteId').equals(id).delete();
-    const fileIds = n.blocks.flatMap((b) => (b.type === 'image' || b.type === 'file' ? [b.fileId] : [])).filter(Boolean);
-    for (const fid of fileIds) {
-      const usedByNote = await db.notes.filter((o) => o.blocks.some((b) => (b.type === 'image' || b.type === 'file') && b.fileId === fid)).count();
+    // O mesmo arquivo (mesmo conteúdo) pode ser capa de projeto, foto do perfil ou fundo de desenho em outra nota.
+    const avatar = ((await db.kv.get('settings'))?.value as { profile?: { avatarFileId?: string | null } } | undefined)?.profile?.avatarFileId;
+    for (const fid of blockFileIds(n.blocks)) {
+      const usedByNote = await db.notes.filter((o) => blockFileIds(o.blocks).includes(fid)).count();
       const usedByInbox = await db.inbox.filter((i) => i.fileId === fid).count();
-      if (usedByNote === 0 && usedByInbox === 0) await db.files.delete(fid);
+      const usedAsCover = (await db.projects.filter((p) => p.coverFileId === fid).count()) + (await db.interests.filter((i) => i.coverFileId === fid).count());
+      if (usedByNote === 0 && usedByInbox === 0 && usedAsCover === 0 && avatar !== fid) await db.files.delete(fid);
     }
     await log({ entityType: ENTITY, entityId: id, action: 'purge' });
   });

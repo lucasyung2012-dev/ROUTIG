@@ -203,3 +203,36 @@ describe('notas: salvar, versões e Lixeira (Parte 17.4)', () => {
     expect((await getDb().inbox.get(i.id))?.processedTo).toEqual({ type: 'note', id });
   });
 });
+
+describe('desenho: formas por arrastar, laço e arquivos', () => {
+  it('seta tem a linha e as duas asas na ponta', async () => {
+    const { dragShapePoints } = await import('@/domain/notes');
+    const pts = dragShapePoints('arrow', [0, 0], [100, 0]);
+    expect(pts).toHaveLength(5);
+    expect(pts[1]).toEqual([100, 0, 0.5]);
+    expect(pts[2]![0]).toBeLessThan(100);
+    expect(pts[2]![1]).not.toBe(pts[4]![1]); // uma asa para cada lado
+    expect(dragShapePoints('rectangle', [0, 0], [10, 20]).map(([x, y]) => [x, y])).toEqual([[0, 0], [10, 0], [10, 20], [0, 20], [0, 0]]);
+  });
+
+  it('laço pega só os traços dentro da volta e move só eles', async () => {
+    const { strokesInLasso, moveStrokes } = await import('@/domain/notes');
+    const a = { points: [[10, 10, 0.5], [20, 20, 0.5]] as Array<[number, number, number]>, color: '#000', width: 4 };
+    const b = { points: [[500, 500, 0.5], [510, 510, 0.5]] as Array<[number, number, number]>, color: '#000', width: 4 };
+    const sel = strokesInLasso([a, b], [[0, 0], [100, 0], [100, 100], [0, 100]]);
+    expect(sel).toEqual([0]);
+    const moved = moveStrokes([a, b], sel, 5, -5);
+    expect(moved[0]!.points[0]).toEqual([15, 5, 0.5]);
+    expect(moved[1]).toBe(b);
+  });
+
+  it('a imagem de fundo do desenho conta como arquivo usado', async () => {
+    const { blockFileIds } = await import('@/domain/notes');
+    expect(blockFileIds([{ id: 'd', type: 'drawing', strokes: [], height: 700, imageFileId: 'f1' }, { id: 'i', type: 'image', fileId: 'f2', caption: '' }])).toEqual(['f1', 'f2']);
+  });
+
+  it('marca-texto não varia com a pressão', async () => {
+    const { strokeWidth } = await import('@/domain/notes');
+    expect(strokeWidth({ points: [[0, 0, 1]], color: '#ff0', width: 20, highlight: true })).toBe(20);
+  });
+});

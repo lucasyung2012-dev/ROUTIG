@@ -11,7 +11,12 @@ export interface Stroke {
   width: number;
   /** Forma reconhecida (linha, retângulo…): desenhada com segmentos retos. */
   shape?: ShapeKind;
+  /** Marca-texto: largo, translúcido e sem variar com a pressão. */
+  highlight?: boolean;
 }
+
+export const DRAWING_BACKGROUNDS = ['blank', 'lined', 'grid', 'dots'] as const;
+export type DrawingBackground = (typeof DRAWING_BACKGROUNDS)[number];
 
 export type Block =
   | { id: string; type: 'paragraph'; text: string }
@@ -25,7 +30,7 @@ export type Block =
   | { id: string; type: 'image'; fileId: string; caption: string }
   | { id: string; type: 'file'; fileId: string; name: string; size: number }
   | { id: string; type: 'link'; url: string; title: string }
-  | { id: string; type: 'drawing'; strokes: Stroke[]; height: number };
+  | { id: string; type: 'drawing'; strokes: Stroke[]; height: number; background?: DrawingBackground; imageFileId?: string | null };
 
 export type BlockType = Block['type'];
 
@@ -270,7 +275,7 @@ export function strokePath(points: Stroke['points']): string {
 
 /** Espessura do traço pela pressão média da caneta (Apple Pencil); mouse e dedo usam pressão 0,5. */
 export function strokeWidth(s: Stroke): number {
-  if (s.points.length === 0) return s.width;
+  if (s.highlight || s.points.length === 0) return s.width;
   const avg = s.points.reduce((a, p) => a + p[2], 0) / s.points.length;
   return Math.max(0.6, s.width * (0.4 + avg * 1.2));
 }
@@ -285,7 +290,7 @@ export function versionsToPrune(versions: NoteVersion[], max = 50): string[] {
 
 /* ---------- Formas automáticas (segurar a caneta parada no fim do traço) ---------- */
 
-export type ShapeKind = 'line' | 'triangle' | 'rectangle' | 'ellipse';
+export type ShapeKind = 'line' | 'arrow' | 'triangle' | 'rectangle' | 'ellipse';
 type Pt = [number, number];
 
 function dist(a: Pt, b: Pt): number {
@@ -396,4 +401,77 @@ export function recognizeShape(stroke: Stroke): { kind: ShapeKind; points: Strok
 /** Traço de forma: segmentos retos, sem a suavização do traço livre. */
 export function polylinePath(points: Stroke['points']): string {
   return points.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${x} ${y}`).join(' ');
+}
+
+/* ---------- Formas por arrastar, laço e mover ---------- */
+
+export type DragShape = 'line' | 'arrow' | 'rectangle' | 'ellipse';
+
+/** Pontos de uma forma desenhada arrastando do ponto `a` ao ponto `b`. */
+export function dragShapePoints(kind: DragShape, a: Pt, b: Pt, pressure = 0.5): Stroke['points'] {
+  const r = (v: number) => Math.round(v * 10) / 10;
+  const out = (list: Pt[]): Stroke['points'] => list.map(([x, y]) => [r(x), r(y), pressure]);
+  switch (kind) {
+    case 'line':
+      return out([a, b]);
+    case 'arrow': {
+      // A ponta: duas "asas" de 30° saindo do fim, com tamanho proporcional (entre 14 e 40).
+      const ang = Math.atan2(b[1] - a[1], b[0] - a[0]);
+      const len = Math.min(40, Math.max(14, dist(a, b) * 0.25));
+      const wing = (d: number): Pt => [b[0] - len * Math.cos(ang + d), b[1] - len * Math.sin(ang + d)];
+      return out([a, b, wing(Math.PI / 6), b, wing(-Math.PI / 6)]);
+    }
+    case 'rectangle':
+      return out([a, [b[0], a[1]], b, [a[0], b[1]], a]);
+    case 'ellipse': {
+      const cx = (a[0] + b[0]) / 2;
+      const cy = (a[1] + b[1]) / 2;
+      const rx = Math.abs(b[0] - a[0]) / 2;
+      const ry = Math.abs(b[1] - a[1]) / 2;
+      return out(Array.from({ length: 49 }, (_, i) => [cx + rx * Math.cos((i / 48) * Math.PI * 2), cy + ry * Math.sin((i / 48) * Math.PI * 2)] as Pt));
+    }
+  }
+}
+
+/** Ponto dentro de um polígono (regra par-ímpar). */
+export function pointInPolygon([x, y]: Pt, poly: Pt[]): boolean {
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const [xi, yi] = poly[i]!;
+    const [xj, yj] = poly[j]!;
+    if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+
+/** Índices dos traços que o laço pegou: a maior parte dos pontos dentro da volta. */
+export function strokesInLasso(strokes: Stroke[], lasso: Pt[]): number[] {
+  if (lasso.length < 3) return [];
+  return strokes.flatMap((s, i) => {
+    const inside = s.points.filter(([x, y]) => pointInPolygon([x, y], lasso)).length;
+    return s.points.length > 0 && inside / s.points.length >= 0.5 ? [i] : [];
+  });
+}
+
+/** Move os traços escolhidos (o resto fica igual). */
+export function moveStrokes(strokes: Stroke[], indices: number[], dx: number, dy: number): Stroke[] {
+  const set = new Set(indices);
+  const r = (v: number) => Math.round(v * 10) / 10;
+  return strokes.map((s, i) => (set.has(i) ? { ...s, points: s.points.map(([x, y, p]) => [r(x + dx), r(y + dy), p] as [number, number, number]) } : s));
+}
+
+/** Caixa que envolve traços (para desenhar a seleção). */
+export function strokesBounds(strokes: Stroke[]): { x: number; y: number; w: number; h: number } | null {
+  const pts = strokes.flatMap((s) => s.points);
+  if (pts.length === 0) return null;
+  const xs = pts.map((p) => p[0]);
+  const ys = pts.map((p) => p[1]);
+  const x = Math.min(...xs);
+  const y = Math.min(...ys);
+  return { x, y, w: Math.max(...xs) - x, h: Math.max(...ys) - y };
+}
+
+/** Arquivos que os blocos usam (imagem, arquivo e imagem de fundo do desenho). */
+export function blockFileIds(blocks: Block[]): string[] {
+  return blocks.flatMap((b) => (b.type === 'image' || b.type === 'file' ? [b.fileId] : b.type === 'drawing' && b.imageFileId ? [b.imageFileId] : [])).filter(Boolean);
 }

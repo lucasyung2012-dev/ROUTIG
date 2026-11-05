@@ -339,7 +339,7 @@ function ItemsTab({ ins, data, category }: { ins: Instrument; data: MusicData; c
             return (
               <li key={i.id}>
                 <button type="button" onClick={() => setEditing({ item: i })} className="flex h-full w-full flex-col gap-2 rounded-2xl bg-surface p-4 text-left shadow-soft ring-1 ring-line/70 transition hover:-translate-y-0.5 hover:shadow-lift">
-                  <div className="flex items-start gap-2">
+                  <div className="flex flex-wrap items-start gap-2">
                     <span className="min-w-0 flex-1 font-semibold text-fg">{i.name}</span>
                     <Badge tone={i.status === 'mastered' ? 'success' : i.status === 'todo' ? 'neutral' : 'accent'}>{t(`music.itemStatuses.${i.status}`)}</Badge>
                   </div>

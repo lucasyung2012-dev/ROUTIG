@@ -44,6 +44,7 @@
 | 16 | 3 | + `habits` (frequências com data de início, pausas), `habitLogs` (um registro por hábito por dia, índice `[habitId+date]`) |
 | 17 | 3 | + `goals` (indicadores, marcos e ligações em `refs`), `goalCheckins` (valores, níveis e reflexões). Tarefas ligam pelo próprio `goalId` |
 | 18 | 3 | + `focusSessions` (sessões do Focus com `taskId` e `ref`). O timer em andamento e os ajustes ficam em `kv` (`focus.active`, `focus.config`) |
+| 19 | 3 | + `instruments`, `musicItems` (técnicas, acordes, ritmos, escalas, dedilhados, teoria), `songs` (repertório, partituras em `files`), `practiceSessions` |
 
 ## Navegação
 

@@ -43,6 +43,7 @@
 | 15 | 2 | + `grammarRules` (regras de gramática com exemplos, exercícios e repetição espaçada). As respostas de vocabulário e gramática ficam em `cardReviews` |
 | 16 | 3 | + `habits` (frequências com data de início, pausas), `habitLogs` (um registro por hábito por dia, índice `[habitId+date]`) |
 | 17 | 3 | + `goals` (indicadores, marcos e ligações em `refs`), `goalCheckins` (valores, níveis e reflexões). Tarefas ligam pelo próprio `goalId` |
+| 18 | 3 | + `focusSessions` (sessões do Focus com `taskId` e `ref`). O timer em andamento e os ajustes ficam em `kv` (`focus.active`, `focus.config`) |
 
 ## Navegação
 

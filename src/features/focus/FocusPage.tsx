@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import { createPortal } from 'react-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Coffee, Maximize2, Minimize2, Pause, Play, Plus, Settings2, SkipForward, Square, Timer, Trash2, Volume2, X } from 'lucide-react';
 import { useSettings } from '@/app/SettingsProvider';
@@ -202,7 +203,7 @@ function Setup() {
 
       <section className="flex flex-col gap-2">
         <h2 className="text-sm font-semibold text-fg">{t('focus.fields.environment')}</h2>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-5">
           {FOCUS_ENVIRONMENTS.map((env) => {
             const look = ENVIRONMENT_LOOK[env];
             return (
@@ -395,8 +396,9 @@ function Immersive({ onClose, onFinish }: { onClose: () => void; onFinish: () =>
   }, [onClose]);
   if (!c) return null;
   const look = ENVIRONMENT_LOOK[c.timer.environment];
-  return (
-    <div role="dialog" aria-modal="true" aria-label={t(`focus.environments.${c.timer.environment}`)} className={cn('fixed inset-0 z-[80] flex flex-col items-center justify-center gap-6 overflow-hidden p-6', look.text)} style={look.style}>
+  // Portal no <body>: a animação da página criaria um contêiner e a tela cheia não cobriria o menu.
+  return createPortal(
+    <div role="dialog" aria-modal="true" aria-label={t(`focus.environments.${c.timer.environment}`)} className={cn('fixed inset-0 z-40 flex flex-col items-center justify-center gap-6 overflow-hidden p-6', look.text)} style={look.style}>
       <div className="pointer-events-none absolute inset-0" aria-hidden>
         {look.decor}
       </div>
@@ -415,6 +417,8 @@ function Immersive({ onClose, onFinish }: { onClose: () => void; onFinish: () =>
         <Controls onFinish={onFinish} light />
       </div>
     </div>
+,
+    document.body,
   );
 }
 

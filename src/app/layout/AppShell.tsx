@@ -14,6 +14,7 @@ import { runAutoBackupIfDue } from '@/data/backupRepo';
 import { FocusProvider, useFocus } from '@/features/focus/FocusProvider';
 import { NotificationsProvider } from '@/features/notifications/NotificationsProvider';
 import { NotificationBell } from '@/features/notifications/NotificationBell';
+import { ModuleTip } from '@/features/help/ModuleTip';
 import { QuickPrivacyButton, QuickPrivacyProvider } from '@/features/security/QuickPrivacy';
 import { formatClock, phaseElapsed, phaseRemaining } from '@/domain/focus';
 
@@ -128,6 +129,7 @@ function Shell() {
 
         <main id="main" tabIndex={-1} className="flex-1 overflow-y-auto focus:outline-none">
           <div key={location.pathname} className="mx-auto w-full max-w-6xl animate-fade-up px-4 pb-16 pt-6 sm:px-8 sm:pt-8">
+            <ModuleTip pathname={location.pathname} />
             <Outlet />
           </div>
         </main>

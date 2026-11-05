@@ -5,6 +5,8 @@ import { MODULES, NAV_MODULE_IDS, type ModuleId } from '@/app/modules';
 import { useSettings } from '@/app/SettingsProvider';
 import { isModuleReady } from '@/app/version';
 import { Badge } from '@/ui/Badge';
+import { Button } from '@/ui/Button';
+import { Switch } from '@/ui/Switch';
 import { Surface } from '@/ui/Surface';
 import { cn } from '@/ui/cn';
 
@@ -126,7 +128,7 @@ export function DevicesSection() {
 /* ---------- Ajuda ---------- */
 
 export function HelpSection() {
-  const { t, tl } = useSettings();
+  const { t, tl, settings, update } = useSettings();
   const apple = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.userAgent);
   const shortcuts: { keys: string[]; label: string }[] = [
     { keys: [apple ? '⌘' : 'Ctrl', 'K'], label: t('settings.help.keySearch') },
@@ -136,6 +138,15 @@ export function HelpSection() {
   ];
   return (
     <div className="flex flex-col gap-6">
+      <Surface className="flex flex-col gap-3">
+        <h2 className="text-[0.9375rem] font-semibold text-fg">{t('tips.settingsTitle')}</h2>
+        <Switch label={t('tips.show')} hint={t('tips.showHint')} checked={settings.tips.enabled} onChange={(enabled) => void update((s) => ({ ...s, tips: { ...s.tips, enabled } }))} />
+        {settings.tips.dismissed.length > 0 && (
+          <Button size="sm" variant="secondary" className="w-fit" onClick={() => void update((s) => ({ ...s, tips: { enabled: true, dismissed: [] } }))}>
+            {t('tips.reset', { count: settings.tips.dismissed.length })}
+          </Button>
+        )}
+      </Surface>
       <Surface>
         <h2 className="text-[0.9375rem] font-semibold text-fg">{t('settings.help.shortcuts')}</h2>
         <p className="mt-1 text-sm text-muted">{t('settings.help.shortcutsHint')}</p>

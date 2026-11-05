@@ -29,14 +29,21 @@ export function PronunciationTab({ lang }: { lang: Language }) {
   const chunks = useRef<Blob[]>([]);
   const supported = typeof window !== 'undefined' && typeof MediaRecorder !== 'undefined' && !!navigator.mediaDevices?.getUserMedia;
 
-  useEffect(() => () => clip && URL.revokeObjectURL(clip.url), [clip]);
+  useEffect(
+    () => () => {
+      if (clip) URL.revokeObjectURL(clip.url);
+    },
+    [clip],
+  );
 
   const start = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const rec = new MediaRecorder(stream);
       chunks.current = [];
-      rec.ondataavailable = (e) => e.data.size && chunks.current.push(e.data);
+      rec.ondataavailable = (e) => {
+        if (e.data.size) chunks.current.push(e.data);
+      };
       rec.onstop = () => {
         stream.getTracks().forEach((tr) => tr.stop());
         const blob = new Blob(chunks.current, { type: rec.mimeType || 'audio/mp4' });

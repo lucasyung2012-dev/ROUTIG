@@ -438,7 +438,7 @@ export function KpiCard({ metric }: { metric: KpiMetric }) {
   return (
     <Link to={KPI_LINK[metric]} className="flex h-full flex-col justify-between gap-2 rounded-3xl bg-surface p-5 shadow-soft ring-1 ring-line/70 transition hover:-translate-y-0.5 hover:shadow-lift">
       <span className="text-sm font-medium text-muted">{t(`dashboard.kpi.${metric}`)}</span>
-      <span className={cn('text-4xl font-semibold tabular tracking-tight', danger ? 'text-danger' : 'text-fg')}>{shown === undefined ? '…' : shown}</span>
+      <span data-private="dashboard" className={cn('text-4xl font-semibold tabular tracking-tight', danger ? 'text-danger' : 'text-fg')}>{shown === undefined ? '…' : shown}</span>
     </Link>
   );
 }

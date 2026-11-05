@@ -90,9 +90,9 @@ describe('navegação (Parte 4)', () => {
 
   it('módulo ainda não construído mostra a etapa em que chega, sem fingir funcionar', async () => {
     await finishOnboarding();
-    window.location.hash = '#/sports';
+    window.location.hash = '#/finance';
     render(<App />);
-    expect(await screen.findByText('Esportes chega na Etapa 3: Desenvolvimento pessoal')).toBeInTheDocument();
+    expect(await screen.findByText('Finanças chega na Etapa 4: Gestão pessoal')).toBeInTheDocument();
   });
 
   it('Academy sem ano letivo pede para criar o primeiro, sem dados inventados', async () => {

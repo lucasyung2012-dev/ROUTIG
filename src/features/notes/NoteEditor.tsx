@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { CalendarDays, FolderKanban, GraduationCap, Guitar, History, Languages, ImagePlus, LayoutTemplate, ListTodo, Paperclip, PenTool, Star, Target, Trash2, X } from 'lucide-react';
+import { CalendarDays, FolderKanban, GraduationCap, Guitar, History, Languages, ImagePlus, LayoutTemplate, ListTodo, Paperclip, PenTool, Star, Target, Trash2, Trophy, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { getDb } from '@/data/db';
 import { useSettings } from '@/app/SettingsProvider';
@@ -186,6 +186,7 @@ function MetaRow({ draft, data, onChange }: { draft: NoteInput; data: NotesData;
   const languages = useLiveQuery(() => getDb().languages.filter((l) => !l.deletedAt).toArray(), []);
   const goals = useLiveQuery(() => getDb().goals.filter((g) => !g.deletedAt).toArray(), []);
   const instruments = useLiveQuery(() => getDb().instruments.filter((i) => !i.deletedAt).toArray(), []);
+  const sports = useLiveQuery(() => getDb().sports.filter((s) => !s.deletedAt).toArray(), []);
   const linkLabel = (type: string, id: string) =>
     type === 'task'
       ? cal.tasks.byId.get(id)?.title
@@ -201,7 +202,9 @@ function MetaRow({ draft, data, onChange }: { draft: NoteInput; data: NotesData;
                 ? goals?.find((g) => g.id === id)?.name
                 : type === 'instrument'
                   ? instruments?.find((i) => i.id === id)?.name
-                  : undefined;
+                  : type === 'sport'
+                    ? sports?.find((s) => s.id === id)?.name
+                    : undefined;
   const openLink = (type: string, id: string) => {
     if (type === 'task') tasks.openTask(id);
     else if (type === 'event') events.openEvent(id, cal.events.find((e) => e.id === id)?.start ?? '');
@@ -210,6 +213,7 @@ function MetaRow({ draft, data, onChange }: { draft: NoteInput; data: NotesData;
     else if (type === 'language') navigate(`/languages/${id}`);
     else if (type === 'goal') navigate(`/goals/${id}`);
     else if (type === 'instrument') navigate(`/music/${id}`);
+    else if (type === 'sport') navigate(`/sports/${id}`);
   };
 
   return (
@@ -294,6 +298,8 @@ function MetaRow({ draft, data, onChange }: { draft: NoteInput; data: NotesData;
                     <Target className="h-3.5 w-3.5 text-accent" aria-hidden />
                   ) : l.type === 'instrument' ? (
                     <Guitar className="h-3.5 w-3.5 text-accent" aria-hidden />
+                  ) : l.type === 'sport' ? (
+                    <Trophy className="h-3.5 w-3.5 text-accent" aria-hidden />
                   ) : (
                     <CalendarDays className="h-3.5 w-3.5 text-blue" aria-hidden />
                   )}

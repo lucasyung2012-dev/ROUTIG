@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Activity, ArrowRight, CalendarDays, Diamond, FolderKanban, GraduationCap, Guitar, Inbox, Languages, ListTodo, NotebookPen, Play, Repeat, Sun, Target, Timer } from 'lucide-react';
+import { Activity, ArrowRight, CalendarDays, Diamond, FolderKanban, GraduationCap, Guitar, Inbox, Languages, ListTodo, NotebookPen, Play, Repeat, Sun, Target, Timer, Trophy } from 'lucide-react';
 import { MODULES, TONE_CLASSES, type ModuleId } from '@/app/modules';
 import { useSettings } from '@/app/SettingsProvider';
 import { isModuleReady } from '@/app/version';
@@ -25,6 +25,7 @@ import { GoalProgressView } from '@/features/goals/goalsUi';
 import { useGoals } from '@/features/goals/useGoals';
 import { useFocus } from '@/features/focus/FocusProvider';
 import { useMusic } from '@/features/music/useMusic';
+import { useSports } from '@/features/sports/useSports';
 import { formatClock, phaseElapsed, phaseRemaining } from '@/domain/focus';
 import { useProjectsData } from '@/features/projects/useProjectsData';
 import { TaskRow } from '@/features/tasks/TaskRow';
@@ -452,6 +453,8 @@ export function renderLiveCard(id: LiveCard): ReactNode {
       return <FocusCard />;
     case 'music':
       return <MusicCard />;
+    case 'sports':
+      return <SportsCard />;
     case 'projects':
       return <ProjectsCard />;
     case 'milestones':
@@ -681,6 +684,38 @@ export function MusicCard() {
                   <span className="min-w-0 flex-1 truncate text-sm font-medium text-fg">{ins.name}</span>
                   <span className="text-xs text-muted">{t('music.learningCount', { count: learning })}</span>
                   <span className="w-16 text-right text-xs tabular text-fg">{t('focus.min', { min })}</span>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </CardShell>
+  );
+}
+
+/** Esportes (Parte 12): treinos e partidas dos últimos 30 dias de cada esporte. */
+export function SportsCard() {
+  const { t } = useSettings();
+  const data = useSports();
+  const monthAgo = addDays(todayKey(), -29);
+  return (
+    <CardShell title={t('dashboard.cards.sports')} icon={<Trophy className="h-5 w-5" />} tone="teal" link={{ to: '/sports', label: t('common.open') }}>
+      {data.loading ? (
+        <LoadingState label={t('common.loading')} lines={3} />
+      ) : data.sports.length === 0 ? (
+        <p className="text-sm text-muted">{t('dashboard.sportsEmpty')}</p>
+      ) : (
+        <ul className="flex flex-col gap-1">
+          {data.sports.map((s) => {
+            const acts = data.activitiesOf(s.id).filter((a) => a.date >= monthAgo);
+            const trainings = acts.filter((a) => a.type === 'training').length;
+            return (
+              <li key={s.id}>
+                <Link to={`/sports/${s.id}`} className="flex items-center gap-3 rounded-xl px-2 py-1.5 transition hover:bg-surface-2/70">
+                  <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: s.color }} aria-hidden />
+                  <span className="min-w-0 flex-1 truncate text-sm font-medium text-fg">{s.name}</span>
+                  <span className="text-xs text-muted">{t('sports.cardLine', { trainings, matches: acts.length - trainings })}</span>
                 </Link>
               </li>
             );

@@ -28,6 +28,8 @@ import { GoalPage } from '@/features/goals/GoalPage';
 import { FocusPage } from '@/features/focus/FocusPage';
 import { MusicPage } from '@/features/music/MusicPage';
 import { InstrumentPage } from '@/features/music/InstrumentPage';
+import { SportsPage } from '@/features/sports/SportsPage';
+import { SportPage } from '@/features/sports/SportPage';
 import { SettingsIndexPage, SettingsSectionPage } from '@/features/settings/SettingsPage';
 import { LogoComparePage } from '@/features/brand/LogoComparePage';
 import { DesignSystemPage } from '@/features/design/DesignSystemPage';
@@ -125,8 +127,10 @@ function Gate() {
           <Route path="focus" element={<FocusPage />} />
           <Route path="music" element={<MusicPage />} />
           <Route path="music/:id" element={<InstrumentPage />} />
+          <Route path="sports" element={<SportsPage />} />
+          <Route path="sports/:id" element={<SportPage />} />
           <Route path="academy/decks/:id" element={<DeckPage />} />
-          {NAV_MODULE_IDS.filter((id) => !['dashboard', 'tasks', 'calendar', 'inbox', 'notes', 'projects', 'academy', 'languages', 'habits', 'goals', 'focus', 'music'].includes(id)).map((id) => (
+          {NAV_MODULE_IDS.filter((id) => !['dashboard', 'tasks', 'calendar', 'inbox', 'notes', 'projects', 'academy', 'languages', 'habits', 'goals', 'focus', 'music', 'sports'].includes(id)).map((id) => (
             <Route key={id} path={MODULES[id].path.slice(1)} element={<ModuleRoadmapPage id={id} />} />
           ))}
           <Route path="profile" element={<ProfilePage />} />

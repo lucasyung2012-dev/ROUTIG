@@ -12,6 +12,7 @@ import type { Habit, HabitLog } from '@/domain/habits';
 import type { Goal, GoalCheckin } from '@/domain/goals';
 import type { FocusSession } from '@/domain/focus';
 import type { Instrument, MusicItem, PracticeSession, Song } from '@/domain/music';
+import type { Sport, SportActivity, SportItem } from '@/domain/sports';
 
 /** Registro chave-valor (configurações, estado do onboarding, metadados). */
 export interface KvRecord {
@@ -70,6 +71,9 @@ export class RoutigDB extends Dexie {
   musicItems!: EntityTable<MusicItem, 'id'>;
   songs!: EntityTable<Song, 'id'>;
   practiceSessions!: EntityTable<PracticeSession, 'id'>;
+  sports!: EntityTable<Sport, 'id'>;
+  sportActivities!: EntityTable<SportActivity, 'id'>;
+  sportItems!: EntityTable<SportItem, 'id'>;
 
   constructor(name = 'routig') {
     super(name);
@@ -171,10 +175,16 @@ export class RoutigDB extends Dexie {
       songs: 'id, instrumentId, status',
       practiceSessions: 'id, instrumentId, date',
     });
+    // Etapa 3: Esportes (tênis, futebol e outros: atividades, técnicas, fundamentos, posições).
+    this.version(20).stores({
+      sports: 'id, order',
+      sportActivities: 'id, sportId, date, type',
+      sportItems: 'id, sportId, category',
+    });
   }
 }
 
-export const DB_SCHEMA_VERSION = 19;
+export const DB_SCHEMA_VERSION = 20;
 
 let instance: RoutigDB | null = null;
 

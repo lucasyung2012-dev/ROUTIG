@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
+import { useSearchParams } from 'react-router-dom';
 import { BookOpen, FileUp, FolderTree, HardDrive, Library, Link2, Plus, Quote, RotateCcw, Star, Trash2 } from 'lucide-react';
 import { useSettings } from '@/app/SettingsProvider';
 import { getDb } from '@/data/db';
@@ -24,7 +25,8 @@ export function LibraryPage() {
   const { t } = useSettings();
   const all = useLiveQuery(() => getDb().libraryItems.toArray(), []);
   const collections = (useLiveQuery(() => getDb().libraryCollections.toArray(), []) ?? []).filter((c) => !c.deletedAt).sort((a, b) => a.name.localeCompare(b.name));
-  const [filter, setFilter] = useState<LibraryFilter>(EMPTY_LIBRARY_FILTER);
+  const [params] = useSearchParams();
+  const [filter, setFilter] = useState<LibraryFilter>(() => ({ ...EMPTY_LIBRARY_FILTER, text: params.get('q') ?? '' }));
   const [editing, setEditing] = useState<{ item?: LibraryItem; preset?: Partial<ItemMeta> } | null>(null);
   const [importing, setImporting] = useState(false);
   const [collectionDialog, setCollectionDialog] = useState<{ c?: LibraryCollection } | null>(null);

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ComponentType } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
-import { CalendarDays, FolderKanban, ListTodo, NotebookPen, Search } from 'lucide-react';
+import { CalendarDays, FolderKanban, GraduationCap, Guitar, Inbox, Languages, Library, ListTodo, NotebookPen, Repeat, Search, Target, Timer, Trophy, Wallet } from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { getDb } from '@/data/db';
 import { matchesNote, notePreview } from '@/domain/notes';
@@ -17,10 +17,13 @@ import { MODULES, NAV_MODULE_IDS, SYSTEM_MODULE_IDS, type ModuleId } from '@/app
 import { useSettings } from '@/app/SettingsProvider';
 import { SETTINGS_SECTIONS } from '@/features/settings/sections';
 import { cn } from '@/ui/cn';
+import { loadPrivacy } from '@/data/privacyRepo';
+import { searchModules } from '@/data/searchRepo';
+import { SEARCH_GROUPS, type SearchGroup, type SearchHit } from '@/domain/search';
 
 interface Result {
   key: string;
-  group: 'modules' | 'settings' | 'tasks' | 'events' | 'notes' | 'projects';
+  group: SearchGroup;
   /** Evento e data da ocorrência a abrir no editor. */
   event?: { id: string; seriesDate: string };
   /** Tarefa a abrir no editor, em vez de navegar. */
@@ -35,7 +38,7 @@ export function normalizeText(s: string): string {
   return s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 }
 
-/** Busca global: tarefas (título, descrição, tags, checklist, observações), módulos e seções de Settings. */
+/** Busca global: todos os módulos (títulos, textos, tags, categorias e metadados), com origem, tipo e data (Parte 4.3). */
 export function CommandPalette({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { t, settings } = useSettings();
   const navigate = useNavigate();
@@ -45,6 +48,15 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
   const cal = useCalendarData();
   const allNotes = useLiveQuery(() => getDb().notes.toArray(), []);
   const allProjects = useLiveQuery(() => getDb().projects.toArray(), []);
+  const privacy = useLiveQuery(() => loadPrivacy(), []);
+  const hidden = privacy?.searchHidden ?? ['finance'];
+  const [debounced, setDebounced] = useState('');
+  useEffect(() => {
+    const id = window.setTimeout(() => setDebounced(query), 180);
+    return () => window.clearTimeout(id);
+  }, [query]);
+  // Os outros módulos só são lidos com a busca aberta e algo digitado.
+  const more = useLiveQuery(() => (open && debounced.trim().length >= 2 ? searchModules(debounced, hidden) : Promise.resolve([] as SearchHit[])), [open, debounced, hidden.join()]);
   const [query, setQuery] = useState('');
   const [active, setActive] = useState(0);
   const input = useRef<HTMLInputElement>(null);
@@ -73,7 +85,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
     const q = normalizeText(query.trim());
     if (!q) return all;
     const words = q.split(/\s+/);
-    const taskHits: Result[] = tasks.active
+    const taskHits: Result[] = (hidden.includes('tasks') ? [] : tasks.active)
       .filter((x) => {
         const hay = taskSearchText(x);
         return words.every((w) => hay.includes(w));
@@ -89,7 +101,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
         icon: ListTodo,
       }));
     const today = todayKey();
-    const eventHits: Result[] = cal.events
+    const eventHits: Result[] = (hidden.includes('events') ? [] : cal.events)
       .filter((e) => {
         const hay = normalizeText(`${e.title} ${e.location} ${e.description} ${e.notes}`);
         return words.every((w) => hay.includes(w));
@@ -108,7 +120,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
           icon: CalendarDays,
         };
       });
-    const noteHits: Result[] = (allNotes ?? [])
+    const noteHits: Result[] = (hidden.includes('notes') ? [] : (allNotes ?? []))
       .filter((n) => !n.deletedAt && matchesNote(n, query))
       .slice(0, 8)
       .map((n) => ({
@@ -119,7 +131,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
         path: `/notes/${n.id}`,
         icon: NotebookPen,
       }));
-    const projectHits: Result[] = (allProjects ?? [])
+    const projectHits: Result[] = (hidden.includes('projects') ? [] : (allProjects ?? []))
       .filter((p) => {
         if (p.deletedAt) return false;
         const hay = normalizeText(`${p.name} ${p.description} ${p.tags.join(' ')} ${p.milestones.map((m) => m.title).join(' ')}`);
@@ -127,8 +139,16 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
       })
       .slice(0, 6)
       .map((p) => ({ key: `p:${p.id}`, group: 'projects' as const, label: p.name, detail: t('modules.projects'), path: `/projects/${p.id}`, icon: FolderKanban }));
-    return [...projectHits, ...taskHits, ...eventHits, ...noteHits, ...all.filter((r) => normalizeText(`${r.label} ${r.detail}`).includes(q))];
-  }, [all, query, tasks.active, cal.events, allNotes, allProjects, settings.locale, t]);
+    const moreHits: Result[] = (more ?? []).map((h) => ({
+      key: h.key,
+      group: h.group,
+      label: h.label,
+      detail: [t(`search.groups.${h.group}`), t(`search.types.${h.type}` as 'search.types.goal'), h.date ? formatDateKey(h.date, settings.locale) : '', h.snippet].filter(Boolean).join(' · '),
+      path: h.path,
+      icon: GROUP_ICON[h.group] ?? Search,
+    }));
+    return [...projectHits, ...taskHits, ...eventHits, ...noteHits, ...moreHits, ...all.filter((r) => normalizeText(`${r.label} ${r.detail}`).includes(q))];
+  }, [all, query, tasks.active, cal.events, allNotes, allProjects, settings.locale, t, more, hidden.join()]);
 
   useEffect(() => {
     if (open) {
@@ -168,14 +188,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
     onClose();
   };
 
-  const groups: Array<{ id: Result['group']; label: string }> = [
-    { id: 'projects', label: t('search.groupProjects') },
-    { id: 'tasks', label: t('search.groupTasks') },
-    { id: 'events', label: t('search.groupEvents') },
-    { id: 'notes', label: t('search.groupNotes') },
-    { id: 'modules', label: t('search.groupModules') },
-    { id: 'settings', label: t('search.groupSettings') },
-  ];
+  const groups: Array<{ id: Result['group']; label: string }> = SEARCH_GROUPS.map((id) => ({ id, label: t(`search.groups.${id}`) }));
 
   return createPortal(
     <div className="fixed inset-x-0 top-0 z-50 flex items-start justify-center p-4 pt-[6vh] sm:pt-[10vh]" style={{ height: viewportH }}>
@@ -253,9 +266,22 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
             );
           })}
         </ul>
-        <div className="border-t border-line/70 px-5 py-3 text-xs text-subtle">{t('search.contentLater')}</div>
+        <div className="border-t border-line/70 px-5 py-3 text-xs text-subtle">{t('search.footer')}</div>
       </div>
     </div>,
     document.body,
   );
 }
+
+const GROUP_ICON: Partial<Record<SearchGroup, ComponentType<{ className?: string }>>> = {
+  goals: Target,
+  habits: Repeat,
+  academy: GraduationCap,
+  languages: Languages,
+  music: Guitar,
+  sports: Trophy,
+  focus: Timer,
+  library: Library,
+  inbox: Inbox,
+  finance: Wallet,
+};

@@ -1,3 +1,4 @@
+import { PrivacySection } from './PrivacySection';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, NavLink, Navigate, useParams } from 'react-router-dom';
 import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, Eye, EyeOff, Monitor, Moon, RotateCcw, Star, Sun } from 'lucide-react';
@@ -112,6 +113,8 @@ function SectionBody({ id }: { id: SettingsSectionId }) {
       return <AccessibilitySection />;
     case 'storage':
       return <StorageSection />;
+    case 'privacy':
+      return <PrivacySection />;
     case 'modules':
       return <ModulesSection />;
     case 'backup':

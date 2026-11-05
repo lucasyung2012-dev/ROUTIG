@@ -2,7 +2,7 @@ import { getDb } from './db';
 import { newId, nowIso } from '@/domain/ids';
 import type { ChangeEntry, EntityRef } from '@/domain/entity';
 import { MAX_FILE_BYTES, sha256Hex, type StoredFile } from '@/domain/inbox';
-import { itemMetaSchema, kindForFile, normalizeTags, titleFromFile, type ItemMeta, type LibraryCollection, type LibraryItem } from '@/domain/library';
+import { isTextFile, itemMetaSchema, kindForFile, MAX_TEXT_INDEX, normalizeTags, titleFromFile, type ItemMeta, type LibraryCollection, type LibraryItem } from '@/domain/library';
 import { blockFileIds } from '@/domain/notes';
 
 export class LibraryRuleError extends Error {
@@ -70,6 +70,9 @@ export async function importFiles(cands: ImportCandidate[], defaults: { folder: 
   const db = getDb();
   const chosen = cands.filter((c) => c.include && !c.tooLarge);
   let n = 0;
+  // Texto dos arquivos de texto, lido antes (fora da transação) para a busca global.
+  const texts = new Map<ImportCandidate, string>();
+  for (const c of chosen) if (isTextFile(c.name, c.file.type)) texts.set(c, (await readText(c.file)).slice(0, MAX_TEXT_INDEX));
   try {
     for (const c of chosen) {
       await db.transaction('rw', db.files, db.libraryItems, db.changelog, async () => {
@@ -79,7 +82,7 @@ export async function importFiles(cands: ImportCandidate[], defaults: { folder: 
           await db.files.add(stored);
         }
         const meta = cleanMeta({ kind: c.kind, title: titleFromFile(c.name).slice(0, 200), author: '', url: '', folder: defaults.folder, category: '', tags: defaults.tags, collectionIds: defaults.collectionIds, favorite: false, readStatus: c.kind === 'book' ? 'want' : null, notes: '' });
-        const item: LibraryItem = { ...meta, fileId: stored.id, fileName: stored.name, size: stored.size, mime: stored.mime, origin: 'upload', importedAt: nowIso(), refs: [], id: newId('lib'), ...base() };
+        const item: LibraryItem = { ...meta, fileId: stored.id, fileName: stored.name, size: stored.size, mime: stored.mime, origin: 'upload', importedAt: nowIso(), refs: [], ...(texts.has(c) ? { textContent: texts.get(c) } : {}), id: newId('lib'), ...base() };
         await db.libraryItems.add(item);
         await log({ entityType: 'library', entityId: item.id, action: 'create', note: `upload:${c.name.slice(0, 80)}` });
       });
@@ -248,4 +251,14 @@ export async function storageUsage(): Promise<{ library: number; libraryFiles: n
     if (ids.has(f.id)) library += f.size;
   });
   return { library, libraryFiles: ids.size, allFiles, allCount };
+}
+
+async function readText(file: Blob): Promise<string> {
+  if (typeof file.text === 'function') return file.text();
+  return new Promise((resolve) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result ?? ''));
+    r.onerror = () => resolve('');
+    r.readAsText(file);
+  });
 }

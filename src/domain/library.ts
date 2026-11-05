@@ -36,6 +36,8 @@ export interface LibraryItem extends BaseEntity {
   importedAt: string;
   /** Módulos onde o material é usado (Parte 18.4). */
   refs: EntityRef[];
+  /** Texto extraído de arquivos de texto (TXT, MD, CSV) para a busca global (Parte 4.3). */
+  textContent?: string;
 }
 
 export interface LibraryCollection extends BaseEntity {
@@ -136,7 +138,7 @@ export function matchesLibrary(i: LibraryItem, f: LibraryFilter): boolean {
   if (f.favorites && !i.favorite) return false;
   const q = fold(f.text.trim());
   if (!q) return true;
-  return fold([i.title, i.author, i.category, i.folder, i.fileName, i.notes, ...i.tags].join(' ')).includes(q);
+  return fold([i.title, i.author, i.category, i.folder, i.fileName, i.notes, i.textContent ?? '', ...i.tags].join(' ')).includes(q);
 }
 
 /** Pastas existentes, incluindo as intermediárias ("Escola" de "Escola/9º ano"). */
@@ -160,3 +162,11 @@ export function formatBytes(n: number, locale: string): string {
   }
   return `${v.toLocaleString(locale, { maximumFractionDigits: v < 10 ? 1 : 0 })} ${units[u]}`;
 }
+
+/** Arquivos de texto simples, cujo conteúdo dá para ler e procurar sem biblioteca extra. */
+export function isTextFile(name: string, mime: string): boolean {
+  const ext = name.toLowerCase().split('.').pop() ?? '';
+  return mime.startsWith('text/') || ['txt', 'md', 'csv', 'json'].includes(ext);
+}
+
+export const MAX_TEXT_INDEX = 200_000;

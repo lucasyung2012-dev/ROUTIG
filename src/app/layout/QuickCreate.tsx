@@ -1,14 +1,17 @@
 import { useEffect, useRef, useState } from 'react';
-import { CalendarPlus, FolderKanban, ListTodo, NotebookPen, Plus } from 'lucide-react';
+import { CalendarPlus, FileUp, FolderKanban, ListTodo, NotebookPen, Plus, Repeat, Target, Timer } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useSettings } from '@/app/SettingsProvider';
 import { createNote, emptyNoteInput } from '@/data/notesRepo';
 import { useEventEditor } from '@/features/calendar/EventEditor';
+import { GoalDialog } from '@/features/goals/goalsUi';
+import { HabitDialog } from '@/features/habits/habitsUi';
+import { ImportDialog } from '@/features/library/libraryUi';
 import { useTaskEditor } from '@/features/tasks/TaskEditor';
 
 /**
- * Ações rápidas (Parte 4.4): criar de qualquer tela. Só aparecem os tipos
- * cujos módulos já existem; os outros entram conforme forem construídos.
+ * Ações rápidas (Parte 4.4): criar tarefas, eventos, notas, projetos, objetivos, hábitos, materiais
+ * e sessões de Focus de qualquer tela, com os mesmos formulários dos módulos.
  */
 export function QuickCreate() {
   const { t } = useSettings();
@@ -16,6 +19,7 @@ export function QuickCreate() {
   const events = useEventEditor();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
+  const [dialog, setDialog] = useState<'goal' | 'habit' | 'material' | null>(null);
   const box = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -36,6 +40,10 @@ export function QuickCreate() {
     { key: 'event', label: t('quick.event'), icon: CalendarPlus, run: () => events.newEvent() },
     { key: 'note', label: t('quick.note'), icon: NotebookPen, run: () => void createNote(emptyNoteInput()).then((n) => navigate(`/notes/${n.id}`)) },
     { key: 'project', label: t('quick.project'), icon: FolderKanban, run: () => navigate('/projects', { state: { create: true } }) },
+    { key: 'goal', label: t('quick.goal'), icon: Target, run: () => setDialog('goal') },
+    { key: 'habit', label: t('quick.habit'), icon: Repeat, run: () => setDialog('habit') },
+    { key: 'material', label: t('quick.material'), icon: FileUp, run: () => setDialog('material') },
+    { key: 'focus', label: t('quick.focus'), icon: Timer, run: () => navigate('/focus') },
   ];
 
   return (
@@ -52,7 +60,7 @@ export function QuickCreate() {
         <span className="sr-only sm:hidden">{t('quick.create')}</span>
       </button>
       {open && (
-        <div role="menu" className="absolute right-0 top-12 z-40 w-48 animate-scale-in overflow-hidden rounded-2xl bg-surface p-1.5 shadow-lift ring-1 ring-line">
+        <div role="menu" className="absolute right-0 top-12 z-40 w-52 animate-scale-in overflow-hidden rounded-2xl bg-surface p-1.5 shadow-lift ring-1 ring-line">
           {items.map(({ key, label, icon: Icon, run }) => (
             <button
               key={key}
@@ -70,6 +78,9 @@ export function QuickCreate() {
           ))}
         </div>
       )}
+      {dialog === 'goal' && <GoalDialog onClose={() => setDialog(null)} onSaved={(g) => navigate(`/goals/${g.id}`)} />}
+      {dialog === 'habit' && <HabitDialog categories={[]} onClose={() => setDialog(null)} onSaved={(h) => navigate(`/habits/${h.id}`)} />}
+      {dialog === 'material' && <ImportDialog collections={[]} folders={[]} onClose={() => setDialog(null)} />}
     </div>
   );
 }

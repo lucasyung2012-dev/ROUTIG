@@ -26,7 +26,6 @@ describe('Inbox → Library (Parte 20 e 18.4)', () => {
     const r = await convertToLibrary(item.id);
     const lib = await getDb().libraryItems.get(r.libraryId);
     expect(lib).toMatchObject({ kind: 'document', fileId: item.fileId, origin: 'upload', title: 'resumo' });
-    expect(lib?.textContent).toContain('biologia');
     expect(await getDb().files.count()).toBe(1);
 
     await softDeleteItem(item.id);

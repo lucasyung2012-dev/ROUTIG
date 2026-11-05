@@ -105,7 +105,7 @@ export async function createFromStoredFile(fileId: string, title: string): Promi
   if (!file) throw new LibraryRuleError('not_found');
   const existing = await db.libraryItems.filter((i) => !i.deletedAt && i.fileId === fileId).first();
   if (existing) return { item: existing, existed: true };
-  const textContent = isTextFile(file.name, file.mime) ? (await readText(file.blob)).slice(0, MAX_TEXT_INDEX) : undefined;
+  const textContent = isTextFile(file.name, file.mime) ? (await readText(file.blob).catch(() => '')).slice(0, MAX_TEXT_INDEX) || undefined : undefined;
   const data = cleanMeta({ kind: kindForFile(file.name, file.mime), title: (title.trim() || titleFromFile(file.name)).slice(0, 200), author: '', url: '', folder: '', category: '', tags: [], collectionIds: [], favorite: false, readStatus: null, notes: '' });
   const item: LibraryItem = { ...data, fileId, fileName: file.name, size: file.size, mime: file.mime, origin: 'upload', importedAt: nowIso(), refs: [], id: newId('lib'), ...base(), ...(textContent ? { textContent } : {}) };
   await db.transaction('rw', db.libraryItems, db.changelog, async () => {

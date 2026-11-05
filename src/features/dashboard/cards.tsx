@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Activity, ArrowRight, CalendarDays, Diamond, FolderKanban, GraduationCap, Inbox, Languages, ListTodo, NotebookPen, Repeat, Sun, Target } from 'lucide-react';
+import { Activity, ArrowRight, CalendarDays, Diamond, FolderKanban, GraduationCap, Inbox, Languages, ListTodo, NotebookPen, Play, Repeat, Sun, Target, Timer } from 'lucide-react';
 import { MODULES, TONE_CLASSES, type ModuleId } from '@/app/modules';
 import { useSettings } from '@/app/SettingsProvider';
 import { isModuleReady } from '@/app/version';
@@ -23,6 +23,8 @@ import { todayStatus } from '@/domain/habits';
 import { isGoalOverdue, isOpenGoal } from '@/domain/goals';
 import { GoalProgressView } from '@/features/goals/goalsUi';
 import { useGoals } from '@/features/goals/useGoals';
+import { useFocus } from '@/features/focus/FocusProvider';
+import { formatClock, phaseElapsed, phaseRemaining } from '@/domain/focus';
 import { useProjectsData } from '@/features/projects/useProjectsData';
 import { TaskRow } from '@/features/tasks/TaskRow';
 import { useTaskEditor } from '@/features/tasks/TaskEditor';
@@ -445,6 +447,8 @@ export function renderLiveCard(id: LiveCard): ReactNode {
       return <HabitsCard />;
     case 'goals':
       return <GoalsCard />;
+    case 'focus':
+      return <FocusCard />;
     case 'projects':
       return <ProjectsCard />;
     case 'milestones':
@@ -618,6 +622,35 @@ export function GoalsCard() {
           ))}
         </ul>
       )}
+    </CardShell>
+  );
+}
+
+/** Focus (Parte 13): minutos de hoje e a sessão em andamento, se houver. */
+export function FocusCard() {
+  const { t } = useSettings();
+  const { timer, now } = useFocus();
+  const today = todayKey();
+  const minutes = useLiveQuery(async () => (await getDb().focusSessions.where('date').equals(today).toArray()).filter((s) => !s.deletedAt).reduce((a, s) => a + s.actualMin, 0), [today]);
+  return (
+    <CardShell title={t('dashboard.cards.focus')} icon={<Timer className="h-5 w-5" />} tone="violet" link={{ to: '/focus', label: t('common.open') }}>
+      <div className="flex flex-col gap-3">
+        <div>
+          <span className="text-3xl font-semibold tabular tracking-tight text-fg">{t('focus.min', { min: minutes ?? 0 })}</span>
+          <span className="ml-2 text-sm text-muted">{t('focus.stats.today')}</span>
+        </div>
+        {timer ? (
+          <Link to="/focus" className="inline-flex w-fit items-center gap-2 rounded-xl bg-accent/15 px-3 py-2 text-sm font-semibold tabular text-accent">
+            <Timer className="h-4 w-4" aria-hidden />
+            {t(`focus.phases.${timer.phase}`)} · {formatClock(timer.waiting ? (timer.phaseMs ?? 0) : (phaseRemaining(timer, now) ?? phaseElapsed(timer, now)))}
+          </Link>
+        ) : (
+          <Link to="/focus" className="inline-flex w-fit items-center gap-2 rounded-xl bg-brand px-3 py-2 text-sm font-semibold text-white">
+            <Play className="h-4 w-4" aria-hidden />
+            {t('focus.start')}
+          </Link>
+        )}
+      </div>
     </CardShell>
   );
 }

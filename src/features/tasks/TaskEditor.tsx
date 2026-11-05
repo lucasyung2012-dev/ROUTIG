@@ -1,7 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { getDb } from '@/data/db';
-import { Check, Link2, Lock, Plus, Repeat, SkipForward, Trash2, X } from 'lucide-react';
+import { Check, Link2, Lock, Plus, Repeat, SkipForward, Timer, Trash2, X } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useSettings } from '@/app/SettingsProvider';
 import { createTask, restoreTask, skipOccurrence, softDeleteTask, taskHistory, updateTask } from '@/data/tasksRepo';
 import { formatDateKey } from '@/domain/dates';
@@ -205,9 +206,12 @@ function TaskEditorDialog({ taskId, defaults, onCreated, onClose, onOpenOther }:
           </>
         ) : (
           <div className="flex w-full flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center gap-2">
             <Button variant="danger" size="sm" icon={<Trash2 className="h-4 w-4" aria-hidden />} onClick={() => void trash()}>
               {t('tasks.editor.moveToTrash')}
             </Button>
+              {taskId && !closed && <FocusOnTask taskId={taskId} onGo={onClose} />}
+            </div>
             <div className="flex items-center gap-3">
               <span className="text-xs text-subtle" aria-live="polite">
                 {saved ? t('tasks.editor.saved') : ''}
@@ -372,6 +376,29 @@ function ProjectField({ value, onChange }: { value: string | null; onChange: (id
 }
 
 /** Disciplina da Academy: a tarefa vira atividade da disciplina e aparece na página dela. */
+/** Começa uma sessão do Focus ligada a esta tarefa (Parte 13.6) e mostra o tempo de foco já feito nela. */
+function FocusOnTask({ taskId, onGo }: { taskId: string; onGo: () => void }) {
+  const { t } = useSettings();
+  const navigate = useNavigate();
+  const minutes = useLiveQuery(async () => (await getDb().focusSessions.where('taskId').equals(taskId).toArray()).filter((s) => !s.deletedAt).reduce((a, s) => a + s.actualMin, 0), [taskId]);
+  return (
+    <>
+      <Button
+        variant="secondary"
+        size="sm"
+        icon={<Timer className="h-4 w-4" aria-hidden />}
+        onClick={() => {
+          onGo();
+          navigate(`/focus?task=${encodeURIComponent(taskId)}`);
+        }}
+      >
+        {t('tasks.editor.focus')}
+      </Button>
+      {!!minutes && <span className="text-xs text-subtle">{t('tasks.editor.focusTime', { min: minutes })}</span>}
+    </>
+  );
+}
+
 /** Objetivo do Goals (Parte 15.2): a tarefa aponta para o objetivo, sem cópia. */
 function GoalField({ value, onChange }: { value: string | null; onChange: (id: string | null) => void }) {
   const { t } = useSettings();

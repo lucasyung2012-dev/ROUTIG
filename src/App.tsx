@@ -25,6 +25,7 @@ import { HabitsPage } from '@/features/habits/HabitsPage';
 import { HabitPage } from '@/features/habits/HabitPage';
 import { GoalsPage } from '@/features/goals/GoalsPage';
 import { GoalPage } from '@/features/goals/GoalPage';
+import { FocusPage } from '@/features/focus/FocusPage';
 import { SettingsIndexPage, SettingsSectionPage } from '@/features/settings/SettingsPage';
 import { LogoComparePage } from '@/features/brand/LogoComparePage';
 import { DesignSystemPage } from '@/features/design/DesignSystemPage';
@@ -119,8 +120,9 @@ function Gate() {
           <Route path="habits/:id" element={<HabitPage />} />
           <Route path="goals" element={<GoalsPage />} />
           <Route path="goals/:id" element={<GoalPage />} />
+          <Route path="focus" element={<FocusPage />} />
           <Route path="academy/decks/:id" element={<DeckPage />} />
-          {NAV_MODULE_IDS.filter((id) => !['dashboard', 'tasks', 'calendar', 'inbox', 'notes', 'projects', 'academy', 'languages', 'habits', 'goals'].includes(id)).map((id) => (
+          {NAV_MODULE_IDS.filter((id) => !['dashboard', 'tasks', 'calendar', 'inbox', 'notes', 'projects', 'academy', 'languages', 'habits', 'goals', 'focus'].includes(id)).map((id) => (
             <Route key={id} path={MODULES[id].path.slice(1)} element={<ModuleRoadmapPage id={id} />} />
           ))}
           <Route path="profile" element={<ProfilePage />} />

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
-import { Menu, Monitor, Moon, Search, Sun, WifiOff } from 'lucide-react';
+import { Menu, Monitor, Moon, Pause, Search, Sun, Timer, WifiOff } from 'lucide-react';
 import { useSettings } from '@/app/SettingsProvider';
 import type { ThemeSetting } from '@/domain/settings';
 import { Logo } from '@/brand/Logo';
@@ -11,6 +11,8 @@ import { TaskEditorProvider } from '@/features/tasks/TaskEditor';
 import { EventEditorProvider } from '@/features/calendar/EventEditor';
 import { QuickCreate } from './QuickCreate';
 import { runAutoBackupIfDue } from '@/data/backupRepo';
+import { FocusProvider, useFocus } from '@/features/focus/FocusProvider';
+import { formatClock, phaseElapsed, phaseRemaining } from '@/domain/focus';
 
 const NEXT_THEME: Record<ThemeSetting, ThemeSetting> = { auto: 'light', light: 'dark', dark: 'auto' };
 
@@ -19,7 +21,9 @@ export function AppShell() {
   return (
     <TaskEditorProvider>
       <EventEditorProvider>
-        <Shell />
+        <FocusProvider>
+          <Shell />
+        </FocusProvider>
       </EventEditorProvider>
     </TaskEditorProvider>
   );
@@ -90,6 +94,7 @@ function Shell() {
 
           <div className="ml-auto flex items-center gap-1">
             <QuickCreate />
+            <FocusPill />
 
             {!online && (
               <span className="mr-1 hidden items-center gap-1.5 rounded-full bg-warning/15 px-3 py-1 text-xs font-medium text-warning sm:inline-flex" role="status">
@@ -121,5 +126,26 @@ function Shell() {
 
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
     </div>
+  );
+}
+
+/** Timer do Focus visível em qualquer tela, enquanto há uma sessão (leva de volta ao Focus). */
+function FocusPill() {
+  const { t } = useSettings();
+  const { timer, now } = useFocus();
+  const location = useLocation();
+  if (!timer || location.pathname === '/focus') return null;
+  const remaining = phaseRemaining(timer, now);
+  const clock = formatClock(timer.waiting ? (timer.phaseMs ?? 0) : (remaining ?? phaseElapsed(timer, now)));
+  const paused = timer.runningSince === null;
+  return (
+    <Link
+      to="/focus"
+      aria-label={`${t('modules.focus')}: ${t(`focus.phases.${timer.phase}`)} ${clock}`}
+      className="mr-1 inline-flex h-9 items-center gap-1.5 rounded-full bg-accent/15 px-3 text-sm font-semibold tabular text-accent ring-1 ring-inset ring-accent/30 transition hover:bg-accent/25"
+    >
+      {paused ? <Pause className="h-3.5 w-3.5" aria-hidden /> : <Timer className="h-3.5 w-3.5" aria-hidden />}
+      {clock}
+    </Link>
   );
 }

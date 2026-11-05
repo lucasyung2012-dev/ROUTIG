@@ -10,6 +10,7 @@ import type { AcademicYear, Assessment, Card, CardReview, Content, Deck, Doubt, 
 import type { GrammarRule, Language, LanguageSession, VocabEntry } from '@/domain/languages';
 import type { Habit, HabitLog } from '@/domain/habits';
 import type { Goal, GoalCheckin } from '@/domain/goals';
+import type { FocusSession } from '@/domain/focus';
 
 /** Registro chave-valor (configurações, estado do onboarding, metadados). */
 export interface KvRecord {
@@ -63,6 +64,7 @@ export class RoutigDB extends Dexie {
   habitLogs!: EntityTable<HabitLog, 'id'>;
   goals!: EntityTable<Goal, 'id'>;
   goalCheckins!: EntityTable<GoalCheckin, 'id'>;
+  focusSessions!: EntityTable<FocusSession, 'id'>;
 
   constructor(name = 'routig') {
     super(name);
@@ -153,10 +155,14 @@ export class RoutigDB extends Dexie {
       goals: 'id, status, deadline',
       goalCheckins: 'id, goalId, date',
     });
+    // Etapa 3: Focus (sessões de concentração).
+    this.version(18).stores({
+      focusSessions: 'id, date, taskId, kind',
+    });
   }
 }
 
-export const DB_SCHEMA_VERSION = 17;
+export const DB_SCHEMA_VERSION = 18;
 
 let instance: RoutigDB | null = null;
 

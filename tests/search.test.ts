@@ -39,7 +39,7 @@ describe('busca global (Parte 4.3)', () => {
     expect((await searchModules('matematica', prefs.searchHidden))[0]).toMatchObject({ group: 'library', label: 'Khan Academy' });
     expect((await searchModules('mitocondria', prefs.searchHidden))[0]).toMatchObject({ group: 'library', type: 'document' });
     expect(await searchModules('selic', prefs.searchHidden)).toEqual([]);
-    await savePrivacy({ searchHidden: [] });
+    await savePrivacy({ ...prefs, searchHidden: [] });
     expect((await searchModules('selic', (await loadPrivacy()).searchHidden))[0]).toMatchObject({ group: 'finance', type: 'asset' });
     expect((await getDb().libraryItems.toArray()).find((i) => i.fileName === 'resumo.txt')?.textContent).toContain('mitocôndria');
   });

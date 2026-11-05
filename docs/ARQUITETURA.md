@@ -46,6 +46,9 @@
 | 18 | 3 | + `focusSessions` (sessões do Focus com `taskId` e `ref`). O timer em andamento e os ajustes ficam em `kv` (`focus.active`, `focus.config`) |
 | 19 | 3 | + `instruments`, `musicItems` (técnicas, acordes, ritmos, escalas, dedilhados, teoria), `songs` (repertório, partituras em `files`), `practiceSessions` |
 | 20 | 3 | + `sports`, `sportActivities` (treino, partida, torneio, evento), `sportItems` (técnicas, fundamentos, habilidades, posições) |
+| 21 | 4 | + `finAssets`, `finTransactions` (com `source` da importação), `finQuotes` (valor informado com data e fonte) |
+| 22 | 4 | + `finLearning` (cursos, aulas, resumos, conceitos, aprendizados), `finTerms` (glossário com repetição espaçada), `marketEntries` (fato ou análise, sempre com fonte) |
+| 23 | 4 | + `finJournal` (diário de investimentos), `budgetCategories`, `budgetEntries` (orçamento opcional). PIN de Finanças em `kv` só como hash com sal |
 
 ## Navegação
 

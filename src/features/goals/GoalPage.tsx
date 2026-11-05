@@ -24,7 +24,7 @@ import { EmptyState, LoadingState } from '@/ui/States';
 import { Surface } from '@/ui/Surface';
 import { useToast } from '@/ui/toast';
 import { cn } from '@/ui/cn';
-import { CheckinDialog, GoalDialog, GoalProgressView, StatusBadge } from './goalsUi';
+import { CheckinDialog, GoalDialog, GoalProgressView } from './goalsUi';
 import { useGoals, type GoalsData } from './useGoals';
 
 const TABS = ['overview', 'related', 'journal', 'materials', 'history'] as const;

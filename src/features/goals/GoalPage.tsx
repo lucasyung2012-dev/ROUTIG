@@ -334,7 +334,7 @@ function RelatedTab({ goal }: { goal: Goal }) {
         )}
       </Surface>
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-2">
         {GOAL_REF_TYPES.map((type) => {
           const refs = goal.refs.filter((r) => r.type === type);
           const options = (names?.[type] ?? []).filter((o) => !refs.some((r) => r.id === o.id)).sort((a, b) => a.name.localeCompare(b.name));

@@ -9,8 +9,8 @@ Leia este arquivo no começo de toda conversa nova sobre o ROUTIG. A especifica�
 - **Etapa 0 — Fundação:** concluída. Logo vetorial e design system aprovados pelo dono do produto em 2026-11-02.
 - **Etapa 1 — Organização central:** concluída no código (versão 0.7.0). Tasks, Calendar, Inbox, Notes, Projects, Dashboard, Profile e Settings publicados. Falta o dono do produto testar no iPad o Dashboard, o Profile e as Settings novas.
 - **Etapa 2 — Aprendizagem:** concluída (versão 0.20.0). Academy (0.11.0 a 0.17.0) e Idiomas (0.18.0 a 0.20.0) publicados e testados. Idiomas tem visão geral, vocabulário, gramática, revisões (repetição espaçada de palavras e regras), habilidades, sessões, pronúncia (voz do aparelho e gravação da própria voz), materiais e histórico.
-- **Etapa 3 — Desenvolvimento pessoal:** em andamento. Ordem: Habits (0.21.0, pronto) → Goals → Focus → Música → Esportes. Goals vem antes de Música e Esportes para que as "metas" deles sejam objetivos do Goals, sem duplicar.
-- **Próximo passo:** Goals (Parte 15), com hábitos, tarefas e projetos relacionados. O dono do produto escolheu seguir a Etapa 3 antes da "praça" (2026-11-04); a praça (2D e depois 3D) entra quando ele mandar o prompt.
+- **Etapa 3 — Desenvolvimento pessoal:** em andamento. Ordem: Habits (0.21.0, pronto) → Goals (0.22.0, pronto) → Focus → Música → Esportes. Goals vem antes de Música e Esportes para que as "metas" deles sejam objetivos do Goals, sem duplicar.
+- **Próximo passo:** Focus (Parte 13): timer (Pomodoro, duração livre, pausas), modos minimalista e imersivo, sessões ligadas à tarefa original. A "praça" (2D e depois 3D) entra quando o dono do produto mandar o prompt.
 - **Como trabalhar:** o computador de desenvolvimento não tem Node. Escrever o código, enviar com `git push`, conferir o GitHub Actions (anotações de erro aparecem por arquivo e linha) e testar no app publicado.
 
 ## Etapa 1 — andamento
@@ -82,6 +82,7 @@ Leia este arquivo no começo de toda conversa nova sobre o ROUTIG. A especifica�
 | 0.19.0 | 2026-11-04 | Claude (Claude Code) | Idiomas parte 2: vocabulário com repetição espaçada (categorias, fases, fonte, voz do aparelho), campos de alemão (artigo, plural, casos, regência) e de mandarim (caracteres, pinyin com números vira acentos, tons). Banco v14. |
 | 0.20.0 | 2026-11-04 | Claude (Claude Code) | Idiomas parte 3 e conferência da Parte 10: gramática (explicação, exemplos, exercícios), revisões por baralho (tudo, vocabulário, categoria, gramática) com treino livre, pronúncia (ouvir o modelo, gravar a própria voz, guardar nos materiais) e materiais. Notas mostram o idioma ou a disciplina ligados. Idiomas marcado como disponível; Etapa 2 concluída. Banco v15. |
 | 0.21.0 | 2026-11-04 | Claude (Claude Code) | Habits (Parte 14): conclusão, quantidade, duração ou escala; frequência por dia, dias da semana, semana, mês, ano ou a cada N dias (mudanças valem a partir do dia, sem reescrever o passado); pausas que não contam contra; sem sequências; vistas Hoje, Semana, Mês e Ano (calendário de consistência); gráficos e histórico; aparece no Calendar (opcional) e no Dashboard. Banco v16. |
+| 0.22.0 | 2026-11-04 | Claude (Claude Code) | Goals (Parte 15): objetivos mensuráveis (indicadores que sobem ou descem), qualitativos (sem porcentagem), de habilidade (nível autoavaliado) e por etapas (marcos); área, horizonte, status, prioridade e prazo; acompanhamento com valores, níveis e reflexões; chegar à meta só sugere concluir; ligações sem cópia com tarefas (campo Objetivo no editor), projetos, hábitos, idiomas e disciplinas; prazos e marcos no Calendar; cartão no Dashboard. Banco v17. |
 
 ## Calendar (Parte 6) — o que existe
 

@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { ArrowDown, ArrowUp, Check, Maximize2, Plus, SlidersHorizontal, Trash2, X } from 'lucide-react';
-import { MODULES } from '@/app/modules';
 import { useSettings } from '@/app/SettingsProvider';
 import { RoutigMark } from '@/brand/Logo';
 import { loadDashboardConfig, saveDashboardConfig } from '@/data/dashboardRepo';
@@ -11,7 +10,6 @@ import {
   KPI_METRICS,
   KPI_MODULE,
   LIVE_CARDS,
-  PLANNED_CARDS,
   addCard,
   cycleSize,
   isKpi,
@@ -246,23 +244,6 @@ function CatalogDialog({ cards, hidden, onAdd, onClose }: { cards: CardSlot[]; h
         <section>
           <h3 className="mb-1 text-xs font-semibold uppercase tracking-[0.14em] text-subtle">{t('dashboard.catalogKpis')}</h3>
           <ul>{KPI_METRICS.filter((m) => allowed(KPI_MODULE[m])).map((m) => row(`kpi:${m}`, t(`dashboard.kpi.${m}`)))}</ul>
-        </section>
-        <section>
-          <h3 className="mb-1 text-xs font-semibold uppercase tracking-[0.14em] text-subtle">{t('dashboard.catalogSoon')}</h3>
-          <ul>
-            {PLANNED_CARDS.map((id) => {
-              const mod = CARD_MODULE[id]!;
-              return (
-                <li key={id} className="flex items-center gap-3 rounded-xl px-2 py-2 opacity-70">
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-medium text-fg">{t(`dashboard.cards.${id}`)}</span>
-                    <span className="block text-xs text-muted">{t('dashboard.soonHint', { module: t(`modules.${mod}`), stage: MODULES[mod].stage })}</span>
-                  </span>
-                  <Badge>{t('dashboard.catalogSoon')}</Badge>
-                </li>
-              );
-            })}
-          </ul>
         </section>
       </div>
     </Dialog>

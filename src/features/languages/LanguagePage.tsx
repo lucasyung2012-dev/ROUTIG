@@ -84,14 +84,14 @@ function LanguageDetail({ lang, data }: { lang: Language; data: LanguagesData })
           <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl text-lg font-bold uppercase text-white shadow-soft" style={{ background: lang.color }}>
             {(lang.code || lang.name).slice(0, 2)}
           </span>
-          <div className="min-w-0 flex-1">
+          <div className="min-w-0 flex-1 basis-56">
             <h1 className="text-2xl font-semibold tracking-tight text-fg sm:text-3xl">{lang.name}</h1>
             <p className="text-sm text-muted">{[lang.code.toUpperCase(), lang.profile !== 'generic' ? t(`languages.profiles.${lang.profile}`) : ''].filter(Boolean).join(' · ')}</p>
           </div>
           {lang.native ? (
             <Badge tone="success">{t('languages.native')}</Badge>
           ) : (
-            <div className="w-40">
+            <div className="w-52">
               <Select aria-label={t('languages.level')} value={lang.level ?? ''} onChange={(e) => void save({ level: (e.target.value || null) as CefrLevel | null })}>
                 <option value="">{t('languages.levelUnset')}</option>
                 {CEFR_LEVELS.map((l) => (

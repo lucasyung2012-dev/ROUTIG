@@ -1074,7 +1074,7 @@ export const en: Messages = {
     links: 'Linked to',
     addLink: 'Link to a project, task or event…',
     removeLink: 'Remove link',
-    linksLater: 'Links to subjects, languages and interests arrive when those modules exist.',
+    linksLater: 'To link to a subject, a language or an interest, use "Link a note…" inside it (in the Materials tab or in Profile).',
     history: 'Version history',
     historyHint: 'ROUTIG keeps a version every 5 minutes of editing (up to 50 per note).',
     noVersions: 'No earlier versions yet.',

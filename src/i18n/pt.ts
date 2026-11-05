@@ -1072,7 +1072,7 @@ export const pt = {
     links: 'Ligada a',
     addLink: 'Ligar a um projeto, tarefa ou evento…',
     removeLink: 'Remover ligação',
-    linksLater: 'Ligações com disciplinas, idiomas e interesses chegam quando esses módulos existirem.',
+    linksLater: 'Para ligar a uma disciplina, a um idioma ou a um interesse, use "Ligar uma nota…" dentro dele (na aba Materiais ou no Profile).',
     history: 'Histórico de versões',
     historyHint: 'O ROUTIG guarda uma versão a cada 5 minutos de edição (até 50 por nota).',
     noVersions: 'Ainda não há versões anteriores.',

@@ -2,7 +2,7 @@
 
 Leia este arquivo no começo de toda conversa nova sobre o ROUTIG. A especificação completa é o "ROUTIG — Prompt Master" (35 partes), fornecido pelo dono do produto. Decisões em [DECISOES.md](DECISOES.md), arquitetura em [ARQUITETURA.md](ARQUITETURA.md).
 
-**Atualizado:** 2026-11-04 (Etapa 5 em andamento)
+**Atualizado:** 2026-11-05 (Etapa 5 concluída; Etapa 6 a seguir)
 
 ## Estado da conversa (2026-11-04)
 
@@ -11,8 +11,8 @@ Leia este arquivo no começo de toda conversa nova sobre o ROUTIG. A especifica�
 - **Etapa 2 — Aprendizagem:** concluída (versão 0.20.0). Academy (0.11.0 a 0.17.0) e Idiomas (0.18.0 a 0.20.0) publicados e testados. Idiomas tem visão geral, vocabulário, gramática, revisões (repetição espaçada de palavras e regras), habilidades, sessões, pronúncia (voz do aparelho e gravação da própria voz), materiais e histórico.
 - **Etapa 3 — Desenvolvimento pessoal:** concluída (versão 0.25.0). Habits (0.21.0), Goals (0.22.0), Focus (0.23.0), Música (0.24.0) e Esportes (0.25.0) publicados e testados. Goals veio antes de Música e Esportes para que as metas deles sejam objetivos do Goals, sem duplicar.
 - **Etapa 4 — Gestão pessoal:** concluída (versão 0.30.0). Finanças (0.26.0 a 0.28.0), Library (0.29.0) e Insights (0.30.0). **Todos os 18 módulos estão construídos.**
-- **Etapa 5 — Integração e acabamento:** em andamento. Feito: busca global e ações rápidas (0.31.0), notificações (0.32.0), privacidade e segurança (0.33.0), backup e recuperação (0.34.0), importação e exportação (0.35.0). Falta: relacionamentos entre módulos, personalização e tutoriais.
-- **Próximo passo:** relacionamentos entre módulos, personalização e tutoriais (resto da Etapa 5). A "praça" (2D e depois 3D) entra quando o dono do produto mandar o prompt.
+- **Etapa 5 — Integração e acabamento:** concluída (versão 0.38.0). Busca global e ações rápidas (0.31.0), notificações (0.32.0), privacidade e segurança (0.33.0), backup e recuperação (0.34.0), importação e exportação (0.35.0), ligações entre módulos (0.36.0) e dicas nas telas (0.37.0). A personalização da Parte 5.2 já estava no Dashboard (cartões, indicadores, tamanhos, perfis com prévia).
+- **Próximo passo:** Etapa 6 (testes gerais): o dono do produto testa no iPad e no iPhone (instalação na Tela de Início, offline, Apple Pencil, avisos do aparelho, sons do Focus, gravação de voz, arquivos, PIN ao voltar para o app, backup em Arquivos) e as correções entram aqui. Antes da sincronização, limpar os dados de teste do navegador (com confirmação). Fechando a Etapa 6, isso é a **V1**.
 - **Como trabalhar:** o computador de desenvolvimento não tem Node. Escrever o código, enviar com `git push`, conferir o GitHub Actions (anotações de erro aparecem por arquivo e linha) e testar no app publicado.
 
 ## Etapa 1 — andamento
@@ -100,6 +100,7 @@ Leia este arquivo no começo de toda conversa nova sobre o ROUTIG. A especifica�
 | 0.35.0 | 2026-11-05 | Claude (Claude Code) | Importar e exportar (Settings): exporta tarefas, hábitos, Focus e Finanças em CSV (Finanças pede confirmação), Calendar em .ics com repetições, exceções e ocorrências editadas, e notas em Markdown; importa .ics no Calendar, lista ou CSV em Tasks (também colando o texto) e .md/.txt em Notes, sempre com prévia, escolha de categoria, lista ou caderno, e o que parece repetido desmarcado. As importações da Academy, de Finanças e da Library continuam nos módulos. |
 | 0.36.0 | 2026-11-05 | Claude (Claude Code) | Ligações entre módulos: Inbox → "Guardar na Library" (arquivo vira material com o mesmo arquivo, link vira material de link; se já estava na Library, só aponta para ele); Projects ganha os materiais da Library na aba Materiais; o editor de nota liga direto a disciplina, idioma, objetivo, instrumento e esporte; textos antigos que prometiam "Etapa 4/5" corrigidos. |
 | 0.37.0 | 2026-11-05 | Claude (Claude Code) | Tutoriais (Parte 29.4): uma dica curta e opcional na tela inicial de cada um dos 18 módulos, com "Entendi" (esconde aquela) e "Não mostrar dicas"; em Settings → Ajuda, ligar ou desligar e mostrar de novo as já vistas. A chave de dicas do onboarding, que não fazia nada, agora funciona. |
+| 0.38.0 | 2026-11-05 | Claude (Claude Code) | Fim da Etapa 5: texto do seletor de ligações da nota ("Ligar a…"), Sobre e roadmap atualizados (etapa atual: 6). |
 
 ## Calendar (Parte 6) — o que existe
 
@@ -154,6 +155,6 @@ Leia este arquivo no começo de toda conversa nova sobre o ROUTIG. A especifica�
 4. ~~Etapa 2: Academy e Idiomas~~ (feito em 2026-11-04, versão 0.20.0).
 5. ~~Etapa 3: Habits, Goals, Focus, Música e Esportes~~ (feito em 2026-11-04, versão 0.25.0).
    - ~~Etapa 4: Finanças, Library e Insights~~ (feito em 2026-11-04, versão 0.30.0).
-   - Etapa 5: busca global (0.31.0), notificações (0.32.0) e privacidade e segurança (0.33.0) e backup (0.34.0) feitos; seguem importação/exportação, relacionamentos e personalização.
+   - ~~Etapa 5: integração e acabamento~~ (feito em 2026-11-05, versão 0.38.0).
 6. Sincronização pelo Google Drive: depois da Etapa 6.
 7. **V1 = tudo até a Etapa 6** (decidido em 2026-11-05). Depois, o dono do produto manda o Prompt Master da **V2**. Antes de construir a V2: uma análise curta e crítica com os pontos principais (o que faz sentido, o que não faz, o que mudar, acrescentar ou reformular), e só então começar.

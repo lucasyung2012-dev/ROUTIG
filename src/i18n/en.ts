@@ -603,7 +603,7 @@ export const en: Messages = {
     },
     about: {
       version: 'Version',
-      build: 'Stage 5: integration and polish in progress (global search, alerts, privacy and security).',
+      build: 'Stage 5 done: every module linked together, with search, alerts, privacy, backup, import and tips. Next: Stage 6, tests on iPad and iPhone.',
       logoTitle: 'Official logo',
       logoBody: 'The vector logo was traced over the original PNG. Compare both and approve it before it is used in the app.',
       logoCompare: 'Compare and approve',
@@ -1164,7 +1164,7 @@ export const en: Messages = {
     tags: 'Tags',
     collectionsField: 'Collections',
     links: 'Linked to',
-    addLink: 'Link to a project, task or event…',
+    addLink: 'Link to…',
     removeLink: 'Remove link',
     linksLater: 'A note can be linked to many places and stays a single note. For interests, use "Link a note" in Profile.',
     history: 'Version history',

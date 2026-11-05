@@ -601,7 +601,7 @@ export const pt = {
     },
     about: {
       version: 'Versão',
-      build: 'Etapa 5: integração e acabamento em andamento (busca global, notificações, privacidade e segurança).',
+      build: 'Etapa 5 concluída: todos os módulos ligados entre si, com busca, avisos, privacidade, backup, importação e dicas. Próximo: Etapa 6, testes no iPad e no iPhone.',
       logoTitle: 'Logo oficial',
       logoBody: 'A versão vetorial do logo foi traçada sobre o PNG original. Compare as duas e aprove antes de ela entrar no app.',
       logoCompare: 'Comparar e aprovar',
@@ -1162,7 +1162,7 @@ export const pt = {
     tags: 'Tags',
     collectionsField: 'Coleções',
     links: 'Ligada a',
-    addLink: 'Ligar a um projeto, tarefa ou evento…',
+    addLink: 'Ligar a…',
     removeLink: 'Remover ligação',
     linksLater: 'Uma nota pode ficar ligada a vários lugares e continua sendo uma nota só. Para interesses, use "Ligar uma nota" no Profile.',
     history: 'Histórico de versões',

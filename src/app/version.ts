@@ -1,9 +1,9 @@
 import type { ModuleId, Stage } from './modules';
 
-export const APP_VERSION = '0.37.0';
+export const APP_VERSION = '0.38.0';
 
 /** Etapa do roadmap em construção agora. Atualize ao concluir cada etapa. */
-export const CURRENT_STAGE: Stage = 5;
+export const CURRENT_STAGE: Stage = 6;
 
 /**
  * Módulos que já funcionam de verdade. Um módulo só entra aqui com fluxos

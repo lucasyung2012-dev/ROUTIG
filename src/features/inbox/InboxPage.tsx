@@ -7,6 +7,7 @@ import {
   FileText,
   Image as ImageIcon,
   Inbox as InboxIcon,
+  Library as LibraryIcon,
   Link2,
   ListTodo,
   Mic,
@@ -23,6 +24,7 @@ import {
   captureFile,
   captureText,
   convertToEvent,
+  convertToLibrary,
   convertToNote,
   convertToTask,
   InboxRuleError,
@@ -319,7 +321,7 @@ function ItemCard({ item, openItems }: { item: InboxItem; openItems: InboxItem[]
 
       {item.status === 'processed' && item.processedTo ? (
         <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-line/60 pt-3">
-          <Badge tone="success">{t('inbox.processedTo', { type: t(`inbox.types.${item.processedTo.type === 'event' ? 'event' : item.processedTo.type === 'note' ? 'note' : 'task'}`).toLocaleLowerCase(settings.locale) })}</Badge>
+          <Badge tone="success">{t('inbox.processedTo', { type: (item.processedTo.type === 'library' ? t('modules.library') : t(`inbox.types.${item.processedTo.type === 'event' ? 'event' : item.processedTo.type === 'note' ? 'note' : 'task'}`).toLocaleLowerCase(settings.locale)) })}</Badge>
           <Button
             size="sm"
             variant="ghost"
@@ -327,6 +329,7 @@ function ItemCard({ item, openItems }: { item: InboxItem; openItems: InboxItem[]
               if (item.processedTo?.type === 'task') tasks.openTask(item.processedTo.id);
               if (item.processedTo?.type === 'event') events.openEvent(item.processedTo.id, '');
               if (item.processedTo?.type === 'note') navigate(`/notes/${item.processedTo.id}`);
+              if (item.processedTo?.type === 'library') navigate('/library');
             }}
           >
             {t('inbox.open')}
@@ -346,7 +349,6 @@ function ItemCard({ item, openItems }: { item: InboxItem; openItems: InboxItem[]
               {reasons && <span className="text-xs text-subtle">{t('inbox.because', { reasons })}</span>}
             </div>
           )}
-          {(s.type === 'link' || item.kind !== 'text') && item.status === 'open' && <p className="text-xs text-subtle">{t('inbox.libraryLater')}</p>}
           <div className="flex flex-wrap items-center gap-2">
             {item.status === 'open' && (
               <>
@@ -359,6 +361,21 @@ function ItemCard({ item, openItems }: { item: InboxItem; openItems: InboxItem[]
                 <Button size="sm" variant={s.type === 'note' || s.type === 'idea' ? 'primary' : 'secondary'} icon={<NotebookPen className="h-4 w-4" aria-hidden />} onClick={() => setConverting('note')}>
                   {t('inbox.toNote')}
                 </Button>
+                {(item.fileId || item.url || s.type === 'link') && (
+                  <Button
+                    size="sm"
+                    variant={s.type === 'link' || item.kind !== 'text' ? 'primary' : 'secondary'}
+                    icon={<LibraryIcon className="h-4 w-4" aria-hidden />}
+                    onClick={() =>
+                      void convertToLibrary(item.id).then(
+                        (r) => toast.show(r.existed ? t('inbox.inLibraryAlready') : t('inbox.savedToLibrary'), 'success'),
+                        () => toast.show(t('errors.saveFailed'), 'error'),
+                      )
+                    }
+                  >
+                    {t('inbox.toLibrary')}
+                  </Button>
+                )}
                 {item.snoozedUntil && item.snoozedUntil > todayKey() ? (
                   <Button size="sm" variant="ghost" icon={<RotateCcw className="h-4 w-4" aria-hidden />} onClick={() => void act(unsnooze(item.id), t('inbox.reopen'))}>
                     {t('inbox.unsnooze')}

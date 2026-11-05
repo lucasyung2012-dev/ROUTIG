@@ -335,6 +335,31 @@ function MetaRow({ draft, data, onChange }: { draft: NoteInput; data: NotesData;
                 {t('quick.event')}: {x.title}
               </option>
             ))}
+            {(subjects ?? []).map((x) => (
+              <option key={x.id} value={`subject:${x.id}`}>
+                {t('modules.academy')}: {x.name}
+              </option>
+            ))}
+            {(languages ?? []).map((x) => (
+              <option key={x.id} value={`language:${x.id}`}>
+                {t('modules.languages')}: {x.name}
+              </option>
+            ))}
+            {(goals ?? []).map((x) => (
+              <option key={x.id} value={`goal:${x.id}`}>
+                {t('modules.goals')}: {x.name}
+              </option>
+            ))}
+            {(instruments ?? []).map((x) => (
+              <option key={x.id} value={`instrument:${x.id}`}>
+                {t('modules.music')}: {x.name}
+              </option>
+            ))}
+            {(sports ?? []).map((x) => (
+              <option key={x.id} value={`sport:${x.id}`}>
+                {t('modules.sports')}: {x.name}
+              </option>
+            ))}
           </Select>
           <p className="text-xs text-subtle">{t('notes.linksLater')}</p>
         </div>

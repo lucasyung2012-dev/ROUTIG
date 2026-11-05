@@ -28,6 +28,7 @@ import { cn } from '@/ui/cn';
 import { ColorPicker, ProjectCover, STATUS_TONE } from './ProjectsPage';
 import { AutoTextarea } from '@/features/notes/BlockEditor';
 import { useProjectsData, type ProjectsData } from './useProjectsData';
+import { LibraryLinked } from '@/features/library/libraryUi';
 
 const TABS = ['overview', 'work', 'milestones', 'timeline', 'calendar', 'notes', 'materials', 'history'] as const;
 type Tab = (typeof TABS)[number];
@@ -197,7 +198,7 @@ function ProjectDetail({ project, data }: { project: Project; data: ProjectsData
       {tab === 'timeline' && <Timeline draft={draft} data={data} projectId={project.id} />}
       {tab === 'calendar' && <ProjectCalendar data={data} projectId={project.id} />}
       {tab === 'notes' && <ProjectNotes project={project} />}
-      {tab === 'materials' && <Materials draft={draft} change={change} />}
+      {tab === 'materials' && <Materials projectId={project.id} draft={draft} change={change} />}
       {tab === 'history' && <ProjectHistory project={project} />}
     </div>
   );
@@ -603,7 +604,7 @@ function ProjectNotes({ project }: { project: Project }) {
   );
 }
 
-function Materials({ draft, change }: { draft: ProjectInput; change: (p: Partial<ProjectInput>) => void }) {
+function Materials({ projectId, draft, change }: { projectId: string; draft: ProjectInput; change: (p: Partial<ProjectInput>) => void }) {
   const { t } = useSettings();
   const [title, setTitle] = useState('');
   const [url, setUrl] = useState('');
@@ -649,7 +650,9 @@ function Materials({ draft, change }: { draft: ProjectInput; change: (p: Partial
           {t('projects.invalidUrl')}
         </p>
       )}
-      <p className="text-xs text-subtle">{t('projects.filesLater')}</p>
+      <div className="mt-2 border-t border-line/70 pt-4">
+        <LibraryLinked refType="project" refId={projectId} />
+      </div>
     </Surface>
   );
 }

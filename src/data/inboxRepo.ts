@@ -1,4 +1,4 @@
-import { isFileUsed } from './libraryRepo';
+import { createFromStoredFile, createItem, isFileUsed, LibraryRuleError } from './libraryRepo';
 import { getDb } from './db';
 import { createTask } from './tasksRepo';
 import { createEvent } from './eventsRepo';
@@ -155,4 +155,36 @@ export async function convertToNote(id: string, input: NoteInput): Promise<strin
   const note = await createNote(input);
   await patch(id, { status: 'processed', processedTo: { type: 'note', id: note.id }, snoozedUntil: null }, { action: 'update', fields: ['status'], note: `note:${note.id}` });
   return note.id;
+}
+
+/**
+ * Guarda na Library (Parte 20 e 18.4): arquivo vira material com o mesmo
+ * arquivo (sem cópia); link vira material do tipo link. Se já estava na
+ * Library, o item do Inbox só passa a apontar para o material que existe.
+ */
+export async function convertToLibrary(id: string): Promise<{ libraryId: string; existed: boolean }> {
+  const item = await getDb().inbox.get(id);
+  if (!item) throw new Error('not_found');
+  let libraryId: string;
+  let existed = false;
+  if (item.fileId) {
+    const r = await createFromStoredFile(item.fileId, item.text);
+    libraryId = r.item.id;
+    existed = r.existed;
+  } else {
+    const url = item.url ?? item.text.match(/https?:\/\/\S+/)?.[0] ?? '';
+    if (!url) throw new LibraryRuleError('invalid');
+    const title = item.text.replace(url, '').trim() || url.replace(/^https?:\/\/(www\.)?/, '').slice(0, 200);
+    try {
+      libraryId = (await createItem({ kind: 'link', title, author: '', url, folder: '', category: '', tags: [], collectionIds: [], favorite: false, readStatus: null, notes: '' })).id;
+    } catch (e) {
+      if (!(e instanceof LibraryRuleError && e.code === 'duplicate')) throw e;
+      const dup = await getDb().libraryItems.filter((i) => !i.deletedAt && i.url === url).first();
+      if (!dup) throw e;
+      libraryId = dup.id;
+      existed = true;
+    }
+  }
+  await patch(id, { status: 'processed', processedTo: { type: 'library', id: libraryId }, snoozedUntil: null }, { action: 'update', fields: ['status'], note: `library:${libraryId}` });
+  return { libraryId, existed };
 }

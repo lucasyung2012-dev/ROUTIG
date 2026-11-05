@@ -95,6 +95,26 @@ export async function importFiles(cands: ImportCandidate[], defaults: { folder: 
   return n;
 }
 
+/**
+ * Material a partir de um arquivo que já está guardado (por exemplo, do Inbox).
+ * O arquivo é o mesmo, não é copiado. Se ele já está na Library, devolve o item que existe.
+ */
+export async function createFromStoredFile(fileId: string, title: string): Promise<{ item: LibraryItem; existed: boolean }> {
+  const db = getDb();
+  const file = await db.files.get(fileId);
+  if (!file) throw new LibraryRuleError('not_found');
+  const existing = await db.libraryItems.filter((i) => !i.deletedAt && i.fileId === fileId).first();
+  if (existing) return { item: existing, existed: true };
+  const textContent = isTextFile(file.name, file.mime) ? (await readText(file.blob)).slice(0, MAX_TEXT_INDEX) : undefined;
+  const data = cleanMeta({ kind: kindForFile(file.name, file.mime), title: (title.trim() || titleFromFile(file.name)).slice(0, 200), author: '', url: '', folder: '', category: '', tags: [], collectionIds: [], favorite: false, readStatus: null, notes: '' });
+  const item: LibraryItem = { ...data, fileId, fileName: file.name, size: file.size, mime: file.mime, origin: 'upload', importedAt: nowIso(), refs: [], id: newId('lib'), ...base(), ...(textContent ? { textContent } : {}) };
+  await db.transaction('rw', db.libraryItems, db.changelog, async () => {
+    await db.libraryItems.add(item);
+    await log({ entityType: 'library', entityId: item.id, action: 'create', note: 'inbox' });
+  });
+  return { item, existed: false };
+}
+
 /** Link, livro ou referência sem arquivo. */
 export async function createItem(meta: ItemMeta, refs: EntityRef[] = []): Promise<LibraryItem> {
   const data = cleanMeta(meta);

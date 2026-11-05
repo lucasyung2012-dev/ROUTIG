@@ -140,7 +140,7 @@ export function LanguageReviewSession({ lang, deck, manual, direction, onClose }
   const speakText = item?.kind === 'vocab' ? speakTextOf(item.v) : '';
 
   return (
-    <Dialog open onClose={onClose} closeLabel={t('common.close')} title={manual ? t('academy.review.practiceTitle') : t('languages.vocab.sessionTitle', { lang: lang.name })} size="lg">
+    <Dialog open onClose={onClose} closeLabel={t('common.close')} title={manual ? t('academy.review.practiceTitle') : t(deck.kind === 'vocab' ? 'languages.vocab.sessionTitle' : deck.kind === 'grammar' ? 'languages.reviews.sessionGrammar' : 'languages.reviews.sessionAll', { lang: lang.name })} size="lg">
       {!items || order === null ? (
         <LoadingState label={t('common.loading')} lines={3} />
       ) : done || !item ? (

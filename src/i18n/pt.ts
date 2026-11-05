@@ -2344,6 +2344,8 @@ export const pt = {
       allVocab: 'Todo o vocabulário',
       noCategory: 'Vocabulário sem categoria',
       grammarPrompt: 'Lembre a regra e um exemplo',
+      sessionAll: 'Revisão · {lang}',
+      sessionGrammar: 'Revisão de gramática · {lang}',
       emptyTitle: 'Nada para revisar ainda',
       empty: 'Adicione palavras no Vocabulário ou regras na Gramática para começar.',
     },

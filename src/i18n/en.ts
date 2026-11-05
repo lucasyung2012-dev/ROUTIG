@@ -2346,6 +2346,8 @@ export const en: Messages = {
       allVocab: 'All vocabulary',
       noCategory: 'Vocabulary without a category',
       grammarPrompt: 'Recall the rule and an example',
+      sessionAll: 'Review · {lang}',
+      sessionGrammar: 'Grammar review · {lang}',
       emptyTitle: 'Nothing to review yet',
       empty: 'Add words in Vocabulary or rules in Grammar to get started.',
     },

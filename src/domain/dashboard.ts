@@ -7,7 +7,7 @@ export const KPI_METRICS = ['tasksOverdue', 'tasksToday', 'tasksDoneWeek', 'proj
 export type KpiMetric = (typeof KPI_METRICS)[number];
 
 /** Cartões que já mostram dados reais. */
-export const LIVE_CARDS = ['today', 'events', 'tasks', 'academy', 'languages', 'habits', 'goals', 'focus', 'music', 'sports', 'projects', 'milestones', 'notes', 'inbox', 'activity', 'modules'] as const;
+export const LIVE_CARDS = ['today', 'events', 'tasks', 'academy', 'languages', 'habits', 'goals', 'focus', 'music', 'sports', 'finance', 'projects', 'milestones', 'notes', 'inbox', 'activity', 'modules'] as const;
 /** Cartões de módulos ainda não construídos: aparecem no catálogo como "em breve", nunca no painel. */
 export const PLANNED_CARDS = ['insights'] as const;
 
@@ -54,6 +54,7 @@ export const CARD_MODULE: Record<LiveCard | PlannedCard, ModuleId | null> = {
   sports: 'sports',
   music: 'music',
   focus: 'focus',
+  finance: 'finance',
   insights: 'insights',
 };
 
@@ -78,6 +79,7 @@ export const DEFAULT_SIZE: Record<LiveCard, CardSize> = {
   focus: 'sm',
   music: 'md',
   sports: 'md',
+  finance: 'sm',
   projects: 'md',
   milestones: 'md',
   notes: 'md',

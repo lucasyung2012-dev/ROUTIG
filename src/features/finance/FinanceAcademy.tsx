@@ -376,7 +376,7 @@ function TermReview({ terms, onClose }: { terms: FinTerm[]; onClose: () => void 
                 return (
                   <Button key={r} variant="secondary" onClick={() => void answer(r)} className="flex-col">
                     <span>{t(`academy.review.ratings.${r}`)}</span>
-                    <span className="text-xs text-muted">{t('finance.academy.inDays', { n: days })}</span>
+                    <span className="text-xs text-muted">{t('finance.academy.inDays', { count: days })}</span>
                   </Button>
                 );
               })}

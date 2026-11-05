@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Activity, ArrowRight, CalendarDays, Diamond, FolderKanban, GraduationCap, Guitar, Inbox, Languages, ListTodo, NotebookPen, Play, Repeat, Sun, Target, Timer, Trophy } from 'lucide-react';
+import { Activity, ArrowRight, CalendarDays, Diamond, FolderKanban, GraduationCap, Guitar, Inbox, Languages, ListTodo, NotebookPen, Play, Repeat, Sun, Target, Timer, Trophy, Wallet } from 'lucide-react';
 import { MODULES, TONE_CLASSES, type ModuleId } from '@/app/modules';
 import { useSettings } from '@/app/SettingsProvider';
 import { isModuleReady } from '@/app/version';
@@ -455,6 +455,8 @@ export function renderLiveCard(id: LiveCard): ReactNode {
       return <MusicCard />;
     case 'sports':
       return <SportsCard />;
+    case 'finance':
+      return <FinanceCard />;
     case 'projects':
       return <ProjectsCard />;
     case 'milestones':
@@ -720,6 +722,33 @@ export function SportsCard() {
               </li>
             );
           })}
+        </ul>
+      )}
+    </CardShell>
+  );
+}
+
+/** Finanças (Parte 16): sem nenhum valor em dinheiro no Dashboard (privacidade, Parte 16.8). */
+export function FinanceCard() {
+  const { t } = useSettings();
+  const today = todayKey();
+  const counts = useLiveQuery(async () => {
+    const db = getDb();
+    const assets = await db.finAssets.filter((a) => !a.deletedAt && !a.archived).count();
+    const toReview = await db.finJournal.filter((j) => !j.deletedAt && !j.reviewedAt && !!j.reviewOn && j.reviewOn <= today).count();
+    const terms = await db.finTerms.filter((x) => !x.deletedAt && x.srs.due <= today).count();
+    return { assets, toReview, terms };
+  }, [today]);
+  return (
+    <CardShell title={t('dashboard.cards.finance')} icon={<Wallet className="h-5 w-5" />} tone="blue" link={{ to: '/finance', label: t('common.open') }}>
+      {!counts ? (
+        <LoadingState label={t('common.loading')} lines={2} />
+      ) : (
+        <ul className="flex flex-col gap-1 text-sm">
+          <li className="text-fg">{t('dashboard.financeAssets', { count: counts.assets })}</li>
+          {counts.terms > 0 && <li className="text-fg">{t('dashboard.financeTerms', { count: counts.terms })}</li>}
+          {counts.toReview > 0 && <li className="text-warning">{t('dashboard.financeReview', { count: counts.toReview })}</li>}
+          <li className="text-xs text-muted">{t('dashboard.financePrivacy')}</li>
         </ul>
       )}
     </CardShell>

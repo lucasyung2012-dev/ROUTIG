@@ -107,3 +107,42 @@ describe('finanças: Academia e Mercado (Partes 16.2 e 16.5)', () => {
     expect(m.nature).toBe('analysis');
   });
 });
+
+describe('finanças: planejamento, diário e PIN (Partes 16.6 a 16.8)', () => {
+  it('reserva de emergência só com os números informados', async () => {
+    const { reserveTarget } = await import('@/domain/finance');
+    expect(reserveTarget(1000, 6, 1500)).toEqual({ target: 6000, missing: 4500, percent: 25 });
+    expect(reserveTarget(0, 6, 100).percent).toBeNull();
+  });
+
+  it('orçamento planejado × realizado no mês', async () => {
+    const { saveBudgetCategory, saveBudgetEntry } = await import('@/data/financePlanRepo');
+    const { budgetMonth } = await import('@/domain/finance');
+    const c = await saveBudgetCategory(null, 'Lanche', 'expense', 100);
+    await saveBudgetEntry(null, '2026-11-02', c.id, 30, '', '2026-11-04');
+    await saveBudgetEntry(null, '2026-10-30', c.id, 50, '', '2026-11-04');
+    const m = budgetMonth(await getDb().budgetCategories.toArray(), await getDb().budgetEntries.toArray(), '2026-11');
+    expect(m.expense).toEqual({ planned: 100, actual: 30 });
+  });
+
+  it('diário: escrever o resultado marca como revisto', async () => {
+    const { saveJournal } = await import('@/data/financePlanRepo');
+    const base = { date: '2026-11-01', assetId: null, decision: 'Comprar 1 cota', justification: '', expectation: 'subir', scenario: '', risks: '', learning: '', reviewOn: '2026-11-03', outcome: '', comparison: null };
+    const j = await saveJournal(null, base, '2026-11-04');
+    expect(j.reviewedAt).toBeNull();
+    const k = await saveJournal(j.id, { ...base, outcome: 'caiu', comparison: 'worse' }, '2026-11-04');
+    expect(k.reviewedAt).toBe('2026-11-04');
+  });
+
+  it('PIN guardado só como hash', async () => {
+    const { setFinancePin, checkFinancePin, removeFinancePin, hasFinancePin } = await import('@/data/financePlanRepo');
+    await setFinancePin('2468');
+    const stored = JSON.stringify((await getDb().kv.get('finance.pin'))?.value);
+    expect(stored).not.toContain('2468');
+    expect(await checkFinancePin('2468')).toBe(true);
+    expect(await checkFinancePin('1111')).toBe(false);
+    await expect(setFinancePin('12')).rejects.toMatchObject({ code: 'invalid' });
+    await removeFinancePin();
+    expect(await hasFinancePin()).toBe(false);
+  });
+});

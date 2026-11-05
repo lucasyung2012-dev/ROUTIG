@@ -434,3 +434,72 @@ export const marketInputSchema = z.object({
   notes: z.string().max(10_000),
 });
 export type MarketInput = z.infer<typeof marketInputSchema>;
+
+/* ---------- Diário de Investimentos (Parte 16.7) ---------- */
+
+export interface JournalEntry extends BaseEntity {
+  date: DateKey;
+  assetId: string | null;
+  /** A decisão (ex.: "comprar 10 cotas de IVVB11"). */
+  decision: string;
+  justification: string;
+  expectation: string;
+  scenario: string;
+  risks: string;
+  learning: string;
+  /** Quando olhar de novo para comparar. */
+  reviewOn: DateKey | null;
+  /** Resultado posterior, escrito depois. */
+  outcome: string;
+  /** Expectativa × realidade: como foi. */
+  comparison: 'better' | 'asExpected' | 'worse' | null;
+  reviewedAt: DateKey | null;
+}
+
+export const journalInputSchema = z.object({
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  assetId: z.string().nullable(),
+  decision: z.string().trim().min(1).max(500),
+  justification: z.string().max(10_000),
+  expectation: z.string().max(10_000),
+  scenario: z.string().max(10_000),
+  risks: z.string().max(10_000),
+  learning: z.string().max(10_000),
+  reviewOn: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .nullable(),
+  outcome: z.string().max(10_000),
+  comparison: z.enum(['better', 'asExpected', 'worse']).nullable(),
+});
+export type JournalInput = z.infer<typeof journalInputSchema>;
+
+/* ---------- Planejamento (Parte 16.6) ---------- */
+
+export interface BudgetCategory extends BaseEntity {
+  name: string;
+  kind: 'income' | 'expense';
+  /** Planejado por mês. */
+  planned: number;
+}
+
+export interface BudgetEntry extends BaseEntity {
+  date: DateKey;
+  categoryId: string;
+  amount: number;
+  description: string;
+}
+
+/** Planejado × realizado de um mês (só com o que você registrou). */
+export function budgetMonth(categories: BudgetCategory[], entries: Array<Pick<BudgetEntry, 'date' | 'categoryId' | 'amount'>>, month: string) {
+  const inMonth = entries.filter((e) => e.date.startsWith(month));
+  const rows = categories.map((c) => ({ category: c, planned: c.planned, actual: inMonth.filter((e) => e.categoryId === c.id).reduce((a, e) => a + e.amount, 0) }));
+  const sum = (kind: 'income' | 'expense', k: 'planned' | 'actual') => rows.filter((r) => r.category.kind === kind).reduce((a, r) => a + r[k], 0);
+  return { rows, income: { planned: sum('income', 'planned'), actual: sum('income', 'actual') }, expense: { planned: sum('expense', 'planned'), actual: sum('expense', 'actual') } };
+}
+
+/** Reserva de emergência: alvo = custo mensal × meses escolhidos. Só conta com os números que você informou. */
+export function reserveTarget(monthlyCost: number, months: number, saved: number): { target: number; missing: number; percent: number | null } {
+  const target = Math.max(0, monthlyCost) * Math.max(0, months);
+  return { target, missing: Math.max(0, target - Math.max(0, saved)), percent: target > 0 ? Math.min(100, Math.round((Math.max(0, saved) / target) * 100)) : null };
+}

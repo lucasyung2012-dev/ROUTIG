@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Archive, Eye, EyeOff, FileUp, Info, Plus, RotateCcw, Wallet } from 'lucide-react';
+import { Archive, Eye, EyeOff, FileUp, Info, KeyRound, Plus, RotateCcw, Wallet } from 'lucide-react';
 import { useSettings } from '@/app/SettingsProvider';
 import { loadHideValues, restoreAsset, saveHideValues, setAssetArchived } from '@/data/financeRepo';
 import { CURRENCIES, distribution, type AssetCategory, type Currency, type FinAsset } from '@/domain/finance';
@@ -14,10 +14,13 @@ import { AssetDialog, ImportDialog, Money, Qty } from './financeUi';
 import { HideContext, useFinance, useHidden, type FinanceData } from './useFinance';
 import { FinanceAcademy } from './FinanceAcademy';
 import { MarketArea } from './MarketArea';
+import { PlanningArea } from './PlanningArea';
+import { JournalArea } from './JournalArea';
+import { FinanceLock, PinDialog } from './FinanceLock';
 import { Segmented } from '@/ui/Segmented';
 
 /** As áreas internas (Parte 16.1). */
-const AREAS = ['investments', 'academy', 'market'] as const;
+const AREAS = ['academy', 'investments', 'market', 'planning', 'journal'] as const;
 type Area = (typeof AREAS)[number];
 const AREA_KEY = 'routig.finance.area';
 
@@ -25,9 +28,9 @@ function useArea(): [Area, (a: Area) => void] {
   const [area, setArea] = useState<Area>(() => {
     try {
       const v = localStorage.getItem(AREA_KEY);
-      return (AREAS as readonly string[]).includes(v ?? '') ? (v as Area) : 'investments';
+      return (AREAS as readonly string[]).includes(v ?? '') ? (v as Area) : 'academy';
     } catch {
-      return 'investments';
+      return 'academy';
     }
   });
   return [
@@ -82,8 +85,11 @@ export function FinancePage() {
   const [creating, setCreating] = useState(false);
   const [importing, setImporting] = useState(false);
   const [area, setArea] = useArea();
+  const [pinOpen, setPinOpen] = useState(false);
+  const [lockKey, setLockKey] = useState(0);
   if (data.loading) return <LoadingState label={t('common.loading')} lines={5} />;
   return (
+    <FinanceLock key={lockKey}>
     <HideContext.Provider value={hide}>
       <div className="flex flex-col gap-6">
         <PageHeader
@@ -94,6 +100,7 @@ export function FinancePage() {
           actions={
             <>
               <HideButton hide={hide} toggle={toggle} />
+              <IconButton label={t('finance.lock.button')} icon={<KeyRound className="h-4 w-4" />} onClick={() => setPinOpen(true)} />
               {area === 'investments' && (
                 <>
                   <Button variant="secondary" size="sm" icon={<FileUp className="h-4 w-4" />} onClick={() => setImporting(true)}>
@@ -113,6 +120,10 @@ export function FinancePage() {
           <FinanceAcademy />
         ) : area === 'market' ? (
           <MarketArea />
+        ) : area === 'planning' ? (
+          <PlanningArea />
+        ) : area === 'journal' ? (
+          <JournalArea assets={[...data.assets, ...data.archived]} />
         ) : data.assets.length === 0 && data.archived.length === 0 ? (
           <Surface tone="flat">
             <EmptyState icon={<Wallet className="h-6 w-6" />} title={t('finance.emptyTitle')} body={t('finance.empty')} />
@@ -135,8 +146,10 @@ export function FinancePage() {
         )}
         {creating && <AssetDialog onClose={() => setCreating(false)} />}
         {importing && <ImportDialog onClose={() => setImporting(false)} />}
+        {pinOpen && <PinDialog onClose={() => setPinOpen(false)} onLocked={() => setLockKey((k) => k + 1)} />}
       </div>
     </HideContext.Provider>
+    </FinanceLock>
   );
 }
 

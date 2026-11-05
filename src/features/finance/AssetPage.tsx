@@ -14,6 +14,7 @@ import { useToast } from '@/ui/toast';
 import { AssetDialog, Money, QuoteDialog, Qty, TxDialog } from './financeUi';
 import { Disclaimer, HideButton, useHideToggle } from './FinancePage';
 import { HideContext, useFinance, useHidden, type FinanceData } from './useFinance';
+import { FinanceLock } from './FinanceLock';
 
 export function AssetPage() {
   const { id } = useParams();
@@ -46,6 +47,7 @@ export function AssetPage() {
   };
   const cur = asset.currency;
   return (
+    <FinanceLock>
     <HideContext.Provider value={hide}>
       <div className="flex flex-col gap-5">
         <BackLink />
@@ -172,6 +174,7 @@ export function AssetPage() {
         {quote && <QuoteDialog asset={asset} onClose={() => setQuote(false)} />}
       </div>
     </HideContext.Provider>
+    </FinanceLock>
   );
 }
 

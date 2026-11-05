@@ -13,7 +13,7 @@ import type { Goal, GoalCheckin } from '@/domain/goals';
 import type { FocusSession } from '@/domain/focus';
 import type { Instrument, MusicItem, PracticeSession, Song } from '@/domain/music';
 import type { Sport, SportActivity, SportItem } from '@/domain/sports';
-import type { FinAsset, FinLearning, FinQuote, FinTerm, FinTransaction, MarketEntry } from '@/domain/finance';
+import type { BudgetCategory, BudgetEntry, FinAsset, FinLearning, FinQuote, FinTerm, FinTransaction, JournalEntry, MarketEntry } from '@/domain/finance';
 
 /** Registro chave-valor (configurações, estado do onboarding, metadados). */
 export interface KvRecord {
@@ -81,6 +81,9 @@ export class RoutigDB extends Dexie {
   finLearning!: EntityTable<FinLearning, 'id'>;
   finTerms!: EntityTable<FinTerm, 'id'>;
   marketEntries!: EntityTable<MarketEntry, 'id'>;
+  finJournal!: EntityTable<JournalEntry, 'id'>;
+  budgetCategories!: EntityTable<BudgetCategory, 'id'>;
+  budgetEntries!: EntityTable<BudgetEntry, 'id'>;
 
   constructor(name = 'routig') {
     super(name);
@@ -200,10 +203,16 @@ export class RoutigDB extends Dexie {
       finTerms: 'id, srs.due',
       marketEntries: 'id, kind, date',
     });
+    // Etapa 4: Finanças parte 3 (diário de investimentos e orçamento opcional).
+    this.version(23).stores({
+      finJournal: 'id, date, assetId',
+      budgetCategories: 'id',
+      budgetEntries: 'id, date, categoryId',
+    });
   }
 }
 
-export const DB_SCHEMA_VERSION = 22;
+export const DB_SCHEMA_VERSION = 23;
 
 let instance: RoutigDB | null = null;
 

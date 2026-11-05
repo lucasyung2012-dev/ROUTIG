@@ -19,6 +19,7 @@ import { useToast } from '@/ui/toast';
 import { cn } from '@/ui/cn';
 import { dayLook, HabitDialog, Heatmap, Legend, LogDialog, QuickLog, useFrequencyLabel, useValueLabel, useWeekdayNames } from './habitsUi';
 import { useHabits, type HabitsData } from './useHabits';
+import { LinkedGoals } from '@/features/goals/goalsUi';
 
 const TABS = ['overview', 'calendar', 'charts', 'history'] as const;
 type Tab = (typeof TABS)[number];
@@ -166,6 +167,7 @@ function Overview({ habit, data, onPick }: { habit: Habit; data: HabitsData; onP
         <Heatmap habit={habit} logs={logs} from={addDays(today, -7 * 26 + 1)} to={today} onPick={onPick} />
         <Legend />
       </Surface>
+      <LinkedGoals refType="habit" refId={habit.id} preset={{ area: 'personal' }} />
 
       {(habit.pauses.length > 0 || habit.notes) && (
         <div className="grid gap-4 lg:grid-cols-2">

@@ -5,6 +5,7 @@ import { getDb } from '@/data/db';
 import { loadCalendarConfig, migrateCalendarConfig, type CalendarConfig } from '@/data/eventsRepo';
 import { addDays, type DateKey } from '@/domain/dates';
 import { isExpectedDay, isPausedOn, logMeets, scheduleAt } from '@/domain/habits';
+import { isOpenGoal } from '@/domain/goals';
 import { findConflicts, occurrencesInRange, toMinutes, type CalendarEvent, type EventCategory, type EventOccurrence, type EventTone } from '@/domain/events';
 import { isClosedKind, statusKind, type Task } from '@/domain/tasks';
 import { useTasksData, type TasksData } from '@/features/tasks/useTasksData';
@@ -12,7 +13,7 @@ import { useTasksData, type TasksData } from '@/features/tasks/useTasksData';
 /** Um item no calendário: ocorrência de evento ou tarefa com prazo (o registro original, nunca uma cópia). */
 export interface CalendarItem {
   key: string;
-  kind: 'event' | 'task' | 'milestone' | 'assessment' | 'study' | 'habit';
+  kind: 'event' | 'task' | 'milestone' | 'assessment' | 'study' | 'habit' | 'goal';
   date: DateKey;
   endDate: DateKey;
   allDay: boolean;
@@ -34,6 +35,8 @@ export interface CalendarItem {
   subjectId?: string;
   /** Hábito: abre o hábito. */
   habitId?: string;
+  /** Prazo ou marco de objetivo: abre o objetivo. */
+  goalId?: string;
   conflictWith: string[];
 }
 
@@ -57,6 +60,7 @@ export function useCalendarData(): CalendarData {
   const sessions = useLiveQuery(() => getDb().studySessions.filter((s) => !s.deletedAt).toArray(), []);
   const habits = useLiveQuery(() => getDb().habits.filter((h) => !h.deletedAt && !h.archived && h.showInCalendar).toArray(), []);
   const habitLogs = useLiveQuery(() => getDb().habitLogs.filter((l) => !l.deletedAt).toArray(), []);
+  const goals = useLiveQuery(() => getDb().goals.filter((g) => !g.deletedAt && isOpenGoal(g)).toArray(), []);
   const tasks = useTasksData();
 
   return useMemo(() => {
@@ -211,6 +215,16 @@ export function useCalendarData(): CalendarData {
             });
           }
         }
+        // Prazos e marcos com data dos objetivos em aberto (Parte 15), lidos do próprio objetivo.
+        for (const g of goals ?? []) {
+          const dated: Array<{ key: string; date: string; title: string; done: boolean }> = [];
+          if (g.deadline) dated.push({ key: `g:${g.id}`, date: g.deadline, title: `◎ ${g.name}`, done: false });
+          for (const m of g.milestones) if (m.date) dated.push({ key: `gm:${g.id}:${m.id}`, date: m.date, title: `◇ ${m.title} · ${g.name}`, done: m.done });
+          for (const d of dated) {
+            if (d.date < from || d.date > to) continue;
+            items.push({ key: d.key, kind: 'goal', date: d.date, endDate: d.date, allDay: true, start: null, end: null, title: d.title, location: '', tone: 'amber', categoryId: null, done: d.done, goalId: g.id, conflictWith: [] });
+          }
+        }
       }
       // Conflitos: só entre eventos com horário (tarefas não ocupam agenda).
       const slots = items
@@ -232,7 +246,7 @@ export function useCalendarData(): CalendarData {
       tasks,
       itemsInRange,
     };
-  }, [all, config, tasks, projects, assessments, subjects, sessions, habits, habitLogs]);
+  }, [all, config, tasks, projects, assessments, subjects, sessions, habits, habitLogs, goals]);
 }
 
 export function useCategoryName() {

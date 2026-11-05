@@ -6,6 +6,7 @@ import { useSettings } from '@/app/SettingsProvider';
 import { createTask, restoreTask, skipOccurrence, softDeleteTask, taskHistory, updateTask } from '@/data/tasksRepo';
 import { formatDateKey } from '@/domain/dates';
 import { newId } from '@/domain/ids';
+import { isOpenGoal } from '@/domain/goals';
 import {
   emptyTaskInput,
   isClosedKind,
@@ -337,6 +338,7 @@ function TaskEditorDialog({ taskId, defaults, onCreated, onClose, onOpenOther }:
         <Section title={t('tasks.editor.links')}>
           <ProjectField value={draft.projectId} onChange={(projectId) => change({ projectId })} />
           <SubjectField value={draft.subjectId ?? null} onChange={(subjectId) => change({ subjectId })} />
+          <GoalField value={draft.goalId} onChange={(goalId) => change({ goalId })} />
           <p className="text-xs text-subtle">{t('tasks.editor.linkLater')}</p>
         </Section>
 
@@ -370,6 +372,27 @@ function ProjectField({ value, onChange }: { value: string | null; onChange: (id
 }
 
 /** Disciplina da Academy: a tarefa vira atividade da disciplina e aparece na página dela. */
+/** Objetivo do Goals (Parte 15.2): a tarefa aponta para o objetivo, sem cópia. */
+function GoalField({ value, onChange }: { value: string | null; onChange: (id: string | null) => void }) {
+  const { t } = useSettings();
+  const goals = useLiveQuery(async () => (await getDb().goals.filter((g) => !g.deletedAt && (isOpenGoal(g) || g.id === value)).toArray()).sort((a, b) => a.name.localeCompare(b.name)), [value]);
+  if (!goals?.length && !value) return null;
+  return (
+    <Field label={t('tasks.editor.goal')}>
+      {(id) => (
+        <Select id={id} value={value ?? ''} onChange={(e) => onChange(e.target.value || null)}>
+          <option value="">{t('tasks.editor.noGoal')}</option>
+          {(goals ?? []).map((g) => (
+            <option key={g.id} value={g.id}>
+              {g.name}
+            </option>
+          ))}
+        </Select>
+      )}
+    </Field>
+  );
+}
+
 function SubjectField({ value, onChange }: { value: string | null; onChange: (id: string | null) => void }) {
   const { t } = useSettings();
   const subjects = useLiveQuery(async () => {

@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Activity, ArrowRight, CalendarDays, Diamond, FolderKanban, GraduationCap, Inbox, Languages, ListTodo, NotebookPen, Repeat, Sun } from 'lucide-react';
+import { Activity, ArrowRight, CalendarDays, Diamond, FolderKanban, GraduationCap, Inbox, Languages, ListTodo, NotebookPen, Repeat, Sun, Target } from 'lucide-react';
 import { MODULES, TONE_CLASSES, type ModuleId } from '@/app/modules';
 import { useSettings } from '@/app/SettingsProvider';
 import { isModuleReady } from '@/app/version';
@@ -20,6 +20,9 @@ import { useLanguages } from '@/features/languages/useLanguages';
 import { QuickLog } from '@/features/habits/habitsUi';
 import { useHabits } from '@/features/habits/useHabits';
 import { todayStatus } from '@/domain/habits';
+import { isGoalOverdue, isOpenGoal } from '@/domain/goals';
+import { GoalProgressView } from '@/features/goals/goalsUi';
+import { useGoals } from '@/features/goals/useGoals';
 import { useProjectsData } from '@/features/projects/useProjectsData';
 import { TaskRow } from '@/features/tasks/TaskRow';
 import { useTaskEditor } from '@/features/tasks/TaskEditor';
@@ -440,6 +443,8 @@ export function renderLiveCard(id: LiveCard): ReactNode {
       return <LanguagesCard />;
     case 'habits':
       return <HabitsCard />;
+    case 'goals':
+      return <GoalsCard />;
     case 'projects':
       return <ProjectsCard />;
     case 'milestones':
@@ -578,6 +583,37 @@ export function HabitsCard() {
                   {t('habits.log')}
                 </Link>
               )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </CardShell>
+  );
+}
+
+/** Objetivos em andamento (Parte 15), com o progresso real de cada tipo. */
+export function GoalsCard() {
+  const { t, settings } = useSettings();
+  const data = useGoals();
+  const today = todayKey();
+  const list = data.goals.filter((g) => isOpenGoal(g) && g.status !== 'idea' && g.status !== 'paused').slice(0, 5);
+  return (
+    <CardShell title={t('dashboard.cards.goals')} icon={<Target className="h-5 w-5" />} tone="amber" link={{ to: '/goals', label: t('common.open') }}>
+      {data.loading ? (
+        <LoadingState label={t('common.loading')} lines={3} />
+      ) : list.length === 0 ? (
+        <p className="text-sm text-muted">{t('dashboard.goalsEmpty')}</p>
+      ) : (
+        <ul className="flex flex-col gap-2">
+          {list.map((g) => (
+            <li key={g.id}>
+              <Link to={`/goals/${g.id}`} className="flex flex-col gap-1 rounded-xl px-2 py-1.5 transition hover:bg-surface-2/70">
+                <span className="flex items-center gap-2">
+                  <span className="min-w-0 flex-1 truncate text-sm font-medium text-fg">{g.name}</span>
+                  {g.deadline && <span className={cn('text-xs', isGoalOverdue(g, today) ? 'font-medium text-danger' : 'text-muted')}>{formatDateKey(g.deadline, settings.locale)}</span>}
+                </span>
+                <GoalProgressView goal={g} checkins={data.checkinsOf(g.id)} compact />
+              </Link>
             </li>
           ))}
         </ul>

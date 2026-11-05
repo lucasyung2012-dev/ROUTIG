@@ -16,7 +16,7 @@ describe('perfis de painel (Parte 5.2)', () => {
     expect(isValidCardId('tasks')).toBe(true);
     expect(isValidCardId('kpi:tasksOverdue')).toBe(true);
     expect(isValidCardId('kpi:inventado')).toBe(false);
-    expect(isValidCardId('goals')).toBe(false); // módulo futuro: só "em breve"
+    expect(isValidCardId('sports')).toBe(false); // módulo futuro: só "em breve"
     expect(isValidCardId('academy')).toBe(true);
   });
 

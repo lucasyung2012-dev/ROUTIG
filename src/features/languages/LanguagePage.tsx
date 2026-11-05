@@ -23,6 +23,7 @@ import { GrammarTab } from './GrammarTab';
 import { MaterialsTab, PronunciationTab } from './PronunciationTab';
 import { ReviewsTab } from './ReviewsTab';
 import { VocabTab } from './VocabTab';
+import { LinkedGoals } from '@/features/goals/goalsUi';
 
 const TABS = ['overview', 'vocab', 'grammar', 'reviews', 'skills', 'sessions', 'pronunciation', 'materials', 'history'] as const;
 type Tab = (typeof TABS)[number];
@@ -192,6 +193,7 @@ function Overview({ lang, data, onTab }: { lang: Language; data: LanguagesData; 
           </div>
           <p className="text-xs text-subtle">{t('languages.goalsHint')}</p>
         </Surface>
+        <LinkedGoals refType="language" refId={lang.id} preset={{ area: 'learning' }} />
         <Surface className="flex flex-col gap-3">
           <div className="flex items-center gap-2">
             <h2 className="min-w-0 flex-1 font-semibold text-fg">{t('languages.skillTime')}</h2>

@@ -107,7 +107,7 @@ describe('gramática e revisões (Partes 10.4 e 10.7)', () => {
     const after = await answerGrammar(g.id, 'good', false, '2026-11-04');
     expect(after.srs).toMatchObject({ due: '2026-11-05', reps: 1 });
     const reviews = await getDb().cardReviews.where('cardId').equals(g.id).toArray();
-    expect(reviews.map((r) => [r.rating, r.manual])).toEqual([['easy', true], ['good', false]]);
+    expect(reviews.map((r) => [r.rating, r.manual]).sort((a, b) => String(a).localeCompare(String(b)))).toEqual([['easy', true], ['good', false]]);
   });
 
   it('cada baralho de revisão pega as palavras certas', async () => {

@@ -170,9 +170,10 @@ export function songInputOf(s: Song): SongInput {
 export function parseChordList(text: string): string[] {
   const seen = new Set<string>();
   const out: string[] = [];
-  for (const raw of text.split(/[\s,;/|]+/)) {
+  // A barra solta separa; colada ao acorde é o baixo ("D/F#").
+  for (const raw of text.split(/[\s,;|]+/)) {
     const c = raw.trim();
-    if (!c || seen.has(c.toLowerCase())) continue;
+    if (!c || c === '/' || seen.has(c.toLowerCase())) continue;
     seen.add(c.toLowerCase());
     out.push(c);
   }

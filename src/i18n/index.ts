@@ -33,8 +33,10 @@ export function interpolate(text: string, vars?: Record<string, string | number>
   return text.replace(/\{(\w+)\}/g, (m, name: string) => (name in vars ? String(vars[name]) : m));
 }
 
+/** Com count = 1, usa a forma "chave_one" quando ela existe ("1 cartão" em vez de "1 cartões"). */
 export function translate(locale: Locale, key: MessageKey, vars?: Record<string, string | number>): string {
-  const value = lookup(dictionaries[locale], key) ?? lookup(pt, key);
+  const one = vars?.count === 1 ? (lookup(dictionaries[locale], `${key}_one`) ?? lookup(pt, `${key}_one`)) : undefined;
+  const value = one ?? lookup(dictionaries[locale], key) ?? lookup(pt, key);
   return typeof value === 'string' ? interpolate(value, vars) : key;
 }
 

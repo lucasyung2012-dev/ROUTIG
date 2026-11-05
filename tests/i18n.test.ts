@@ -38,3 +38,12 @@ describe('textos', () => {
     expect(translateList('pt-BR', 'moduleFeatures.academy').length).toBeGreaterThan(3);
   });
 });
+
+describe('singular', () => {
+  it('usa a forma _one quando count é 1 e cai na forma normal quando ela não existe', () => {
+    expect(translate('pt-BR', 'academy.review.cards', { count: 1 })).toBe('1 cartão');
+    expect(translate('pt-BR', 'academy.review.cards', { count: 2 })).toBe('2 cartões');
+    expect(translate('en', 'languages.vocab.count', { count: 1 })).toBe('1 word');
+    expect(translate('pt-BR', 'languages.presetsAdded', { count: 1 })).toBe('1 idiomas adicionados');
+  });
+});

@@ -89,7 +89,7 @@ export function PronunciationTab({ lang }: { lang: Language }) {
     <div className="flex flex-col gap-4">
       <Surface className="flex flex-col gap-4">
         <p className="text-sm text-muted">{t('languages.pron.hint')}</p>
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Field label={t('languages.pron.text')}>{(id) => <Input id={id} value={text} maxLength={300} placeholder={t('languages.pron.textPlaceholder')} onChange={(e) => setText(e.target.value)} />}</Field>
           {list.length > 0 && (
             <Field label={t('languages.pron.fromVocab')}>
@@ -187,7 +187,7 @@ export function MaterialsTab({ lang }: { lang: Language }) {
           <EmptyState title={t('academy.materials.emptyTitle')} body={t('languages.materials.empty')} />
         </Surface>
       ) : (
-        <ul className="grid gap-3 sm:grid-cols-2">
+        <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {notes.map((n) => (
             <li key={n.id}>
               <Link to={`/notes/${n.id}`} className="block h-full rounded-2xl bg-surface p-4 shadow-soft ring-1 ring-line/70 transition hover:-translate-y-0.5 hover:shadow-lift">

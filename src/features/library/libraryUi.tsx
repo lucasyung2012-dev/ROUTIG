@@ -155,7 +155,7 @@ export function ItemDialog({ item, collections, folders, preset, refs, onClose }
     >
       <div className="flex flex-col gap-4">
         {item && <FileActions item={item} />}
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label={t('library.fields.title')}>{(id) => <Input id={id} autoFocus={!item} value={meta.title} maxLength={200} onChange={(e) => set({ title: e.target.value })} />}</Field>
           <Field label={t('library.fields.kind')}>
             {(id) => (
@@ -386,7 +386,7 @@ export function ImportDialog({ collections, folders, onClose, refs }: { collecti
             ))}
           </ul>
           {cands.some((c) => c.duplicateOf) && <p className="text-xs text-muted">{t('library.duplicateHint')}</p>}
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Field label={t('library.fields.folder')} optionalLabel={t('common.optional')}>
               {(id) => (
                 <>
@@ -454,7 +454,7 @@ export function LibraryLinked({ refType, refId }: { refType: LibRefType; refId: 
       {linked.length === 0 ? (
         <p className="text-sm text-muted">{t('library.noneLinked')}</p>
       ) : (
-        <ul className="grid gap-2 sm:grid-cols-2">
+        <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           {linked.map((i) => (
             <li key={i.id} className="flex items-center gap-2 rounded-2xl bg-surface p-2 shadow-soft ring-1 ring-line/70">
               <button type="button" onClick={() => setEditing(i)} className="flex min-w-0 flex-1 items-center gap-3 text-left">

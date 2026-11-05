@@ -305,7 +305,7 @@ function MonthView({ data, onLog }: { data: HabitsData; onLog: (h: Habit, d: Dat
   return (
     <div className="flex flex-col gap-4">
       <Nav label={label} onPrev={() => shift(-1)} onNext={() => shift(1)} onToday={() => setMonth(startOfMonth(today))} nextDisabled={month >= startOfMonth(today)} />
-      <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {data.habits.map((h) => (
           <li key={h.id}>
             <Surface className="flex flex-col gap-3">

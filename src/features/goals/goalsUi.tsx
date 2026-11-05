@@ -179,7 +179,7 @@ export function GoalDialog({ goal, preset, refs, onClose, onSaved }: { goal?: Go
             </div>
           )}
           {input.type === 'skill' && (
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Field label={t('goals.fields.levelMax')}>
                 {(id) => (
                   <Select id={id} value={input.levelMax} onChange={(e) => set({ levelMax: Number(e.target.value), levelTarget: input.levelTarget && Math.min(input.levelTarget, Number(e.target.value)) })}>
@@ -207,7 +207,7 @@ export function GoalDialog({ goal, preset, refs, onClose, onSaved }: { goal?: Go
           )}
         </section>
 
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label={t('goals.fields.area')}>
             {(id) => (
               <Select id={id} value={input.area} onChange={(e) => set({ area: e.target.value as GoalInput['area'] })}>
@@ -332,7 +332,7 @@ export function CheckinDialog({ goal, onClose }: { goal: Goal; onClose: () => vo
       <div className="flex flex-col gap-4">
         <Field label={t('goals.fields.date')}>{(id) => <Input id={id} type="date" value={date} max={today} onChange={(e) => e.target.value && setDate(e.target.value)} />}</Field>
         {goal.type === 'measurable' && goal.indicators.length > 0 && (
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             {goal.indicators.length > 1 && (
               <Field label={t('goals.fields.indicator')}>
                 {(id) => (

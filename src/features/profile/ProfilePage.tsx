@@ -191,7 +191,7 @@ function InterestsTab() {
       ) : shown.length === 0 ? (
         <p className="text-sm text-muted">{t('profile.interests.noneWithStatus')}</p>
       ) : (
-        <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {shown.map((i) => (
             <li key={i.id}>
               <Link to={`/profile/interests/${i.id}`} className="group block h-full overflow-hidden rounded-3xl bg-surface shadow-soft ring-1 ring-line/70 transition hover:-translate-y-0.5 hover:shadow-lift">
@@ -306,7 +306,7 @@ function NewInterestDialog({ onClose }: { onClose: () => void }) {
             />
           )}
         </Field>
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label={t('profile.fields.category')}>{(id) => <CategorySelect id={id} value={input.categoryId} onChange={(categoryId) => setInput({ ...input, categoryId })} />}</Field>
           <Field label={t('profile.fields.status')} hint={t('profile.statusHint')}>
             {(id, d) => (
@@ -410,7 +410,7 @@ function EvolutionTab() {
           </li>
         ))}
       </ul>
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <WeekBars title={t('profile.evolution.chartTasks')} weeks={taskWeeks} color="rgb(var(--violet))" locale={settings.locale} />
         <WeekBars title={t('profile.evolution.chartNotes')} weeks={noteWeeks} color="rgb(var(--amber))" locale={settings.locale} />
       </div>

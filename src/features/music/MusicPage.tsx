@@ -69,7 +69,7 @@ export function MusicPage() {
           />
         </Surface>
       ) : (
-        <ul className="grid gap-4 sm:grid-cols-2">
+        <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {data.instruments.map((ins) => {
             const week = data.practiceOf(ins.id).filter((p) => p.date >= weekAgo);
             const songs = data.songsOf(ins.id);
@@ -168,7 +168,7 @@ function AddInstrumentDialog({ onClose, used }: { onClose: () => void; used: num
     >
       <div className="flex flex-col gap-4">
         <Field label={t('music.fields.instrumentName')}>{(id) => <Input id={id} autoFocus value={name} maxLength={80} placeholder={t('music.instrumentPlaceholder')} onChange={(e) => setName(e.target.value)} />}</Field>
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label={t('music.fields.tuning')} optionalLabel={t('common.optional')}>
             {(id) => <Input id={id} value={tuning} maxLength={60} placeholder="E A D G" onChange={(e) => setTuning(e.target.value)} />}
           </Field>

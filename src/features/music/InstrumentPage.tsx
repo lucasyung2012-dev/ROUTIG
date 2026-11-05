@@ -147,7 +147,7 @@ function Overview({ ins, data, onTab, onPractice }: { ins: Instrument; data: Mus
         <Stat value={songs.filter((s) => s.status === 'mastered').length} label={t('music.stats.masteredSongs')} />
         <Stat value={sessions.length} label={t('music.stats.sessions')} />
       </div>
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Surface className="flex flex-col gap-2">
           <div className="flex items-center gap-2">
             <h2 className="min-w-0 flex-1 font-semibold text-fg">{t('music.inProgress')}</h2>
@@ -251,7 +251,7 @@ function Repertoire({ ins, data }: { ins: Instrument; data: MusicData }) {
           <EmptyState icon={<Music2 className="h-6 w-6" />} title={t('music.noSongsTitle')} body={songs.length ? t('music.noSongsFilter') : t('music.noSongs')} />
         </Surface>
       ) : (
-        <ul className="grid gap-3 lg:grid-cols-2">
+        <ul className="grid grid-cols-1 gap-3 lg:grid-cols-2">
           {shown.map((s) => {
             const used = times.get(s.id);
             return (
@@ -452,7 +452,7 @@ function Materials({ ins, data }: { ins: Instrument; data: MusicData }) {
           <EmptyState title={t('academy.materials.emptyTitle')} body={t('music.materialsEmpty')} />
         </Surface>
       ) : (
-        <ul className="grid gap-3 sm:grid-cols-2">
+        <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {notes.map((n) => (
             <li key={n.id}>
               <Link to={`/notes/${n.id}`} className="block h-full rounded-2xl bg-surface p-4 shadow-soft ring-1 ring-line/70 transition hover:-translate-y-0.5 hover:shadow-lift">
@@ -555,7 +555,7 @@ function EditInstrumentDialog({ ins, onClose }: { ins: Instrument; onClose: () =
     >
       <div className="flex flex-col gap-4">
         <Field label={t('music.fields.instrumentName')}>{(id) => <Input id={id} value={input.name} maxLength={80} onChange={(e) => set({ name: e.target.value })} />}</Field>
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label={t('music.fields.tuning')} optionalLabel={t('common.optional')}>
             {(id) => <Input id={id} value={input.tuning} maxLength={60} onChange={(e) => set({ tuning: e.target.value })} />}
           </Field>

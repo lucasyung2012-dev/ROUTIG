@@ -148,7 +148,7 @@ function Overview({ goal, data, onCheckin }: { goal: Goal; data: GoalsData; onCh
   const last = checkins[0];
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[3fr_2fr]">
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-[3fr_2fr]">
       <div className="flex flex-col gap-4">
         <Surface className="flex flex-col gap-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -337,7 +337,7 @@ function RelatedTab({ goal }: { goal: Goal }) {
         )}
       </Surface>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {GOAL_REF_TYPES.map((type) => {
           const refs = goal.refs.filter((r) => r.type === type);
           const options = (names?.[type] ?? []).filter((o) => !refs.some((r) => r.id === o.id)).sort((a, b) => a.name.localeCompare(b.name));
@@ -471,7 +471,7 @@ function MaterialsTab({ goal }: { goal: Goal }) {
           <EmptyState title={t('academy.materials.emptyTitle')} body={t('goals.materialsEmpty')} />
         </Surface>
       ) : (
-        <ul className="grid gap-3 sm:grid-cols-2">
+        <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {notes.map((n) => (
             <li key={n.id}>
               <Link to={`/notes/${n.id}`} className="block h-full rounded-2xl bg-surface p-4 shadow-soft ring-1 ring-line/70 transition hover:-translate-y-0.5 hover:shadow-lift">

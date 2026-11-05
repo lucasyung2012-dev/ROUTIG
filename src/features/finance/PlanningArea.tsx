@@ -104,7 +104,7 @@ function Reserve({ prefs, onChange }: { prefs: PlanPrefs; onChange: (p: PlanPref
         <p>{t('finance.plan.reserveHow')}</p>
         <p className="text-muted">{t('finance.plan.reserveWhere')}</p>
       </div>
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <Field label={t('finance.plan.monthlyCost', { currency: prefs.currency })}>
           {(id) => <Input id={id} inputMode="decimal" value={cost} onChange={(e) => setCost(e.target.value)} onBlur={() => commit({})} />}
         </Field>
@@ -289,7 +289,7 @@ function CategoryDialog({ cat, onClose }: { cat?: BudgetCategory; onClose: () =>
         </>
       }
     >
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <Field label={t('finance.plan.categoryName')}>{(id) => <Input id={id} autoFocus value={name} maxLength={80} placeholder={t('finance.plan.categoryPlaceholder')} onChange={(e) => setName(e.target.value)} />}</Field>
         <Field label={t('finance.plan.kind')}>
           {(id) => (
@@ -339,7 +339,7 @@ function EntryDialog({ cats, onClose }: { cats: BudgetCategory[]; onClose: () =>
         </>
       }
     >
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field label={t('finance.fields.date')}>{(id) => <Input id={id} type="date" value={date} max={today} onChange={(e) => e.target.value && setDate(e.target.value)} />}</Field>
         <Field label={t('finance.plan.category')}>
           {(id) => (

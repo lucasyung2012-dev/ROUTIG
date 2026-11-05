@@ -257,7 +257,7 @@ function Overview({ draft, change, onTrash }: { draft: ProjectInput; change: (p:
   const cover = useRef<HTMLInputElement>(null);
   const [tags, setTags] = useState(draft.tags.join(', '));
   return (
-    <div className="grid gap-5 lg:grid-cols-[1.4fr_1fr]">
+    <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1.4fr_1fr]">
       <Surface className="flex flex-col gap-4">
         <Field label={t('projects.fields.description')}>{(id) => <Textarea id={id} rows={5} value={draft.description} onChange={(e) => change({ description: e.target.value })} />}</Field>
         <Lines label={t('projects.fields.objectives')} hint={t('projects.fields.objectivesHint')} value={draft.objectives} onChange={(objectives) => change({ objectives })} />
@@ -265,7 +265,7 @@ function Overview({ draft, change, onTrash }: { draft: ProjectInput; change: (p:
         <SchoolWork draft={draft} change={change} />
       </Surface>
       <Surface className="flex flex-col gap-4">
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label={t('projects.fields.status')}>
             {(id) => (
               <Select id={id} value={draft.status} onChange={(e) => change({ status: e.target.value as ProjectStatus })}>

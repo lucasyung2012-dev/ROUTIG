@@ -170,7 +170,7 @@ function Overview({ habit, data, onPick }: { habit: Habit; data: HabitsData; onP
       <LinkedGoals refType="habit" refId={habit.id} preset={{ area: 'personal' }} />
 
       {(habit.pauses.length > 0 || habit.notes) && (
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           {habit.pauses.length > 0 && (
             <Surface className="flex flex-col gap-2">
               <h2 className="font-semibold text-fg">{t('habits.pausesTitle')}</h2>
@@ -322,7 +322,7 @@ function ChartsTab({ habit, data }: { habit: Habit; data: HabitsData }) {
         <Bars buckets={buckets} habit={habit} max={max} format={fmt} labelOf={labelOf} />
         {f.period === 'week' && unit === 'week' && habit.method === 'check' && <p className="text-xs text-muted">{t('habits.charts.weekTarget', { times: f.times })}</p>}
       </Surface>
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         {habit.method === 'scale' ? (
           <Surface className="flex flex-col gap-2">
             <h2 className="font-semibold text-fg">{t('habits.charts.distribution')}</h2>
@@ -365,7 +365,7 @@ function HistoryTab({ habit, data, onPick }: { habit: Habit; data: HabitsData; o
     return t('habits.history.edited');
   };
   return (
-    <div className="grid gap-4 lg:grid-cols-[2fr_1fr]">
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-[2fr_1fr]">
       <Surface className="flex flex-col gap-2">
         <h2 className="font-semibold text-fg">{t('habits.logsTitle')}</h2>
         {list.length === 0 ? (
@@ -447,7 +447,7 @@ function PauseDialog({ habit, onClose }: { habit: Habit; onClose: () => void }) 
       <div className="flex flex-col gap-4">
         <Segmented<'open' | 'range'> label={t('habits.pauseTitle')} value={mode} onChange={setMode} options={[{ value: 'open', label: t('habits.pauseOpen') }, { value: 'range', label: t('habits.pauseRange') }]} />
         {mode === 'range' && (
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field label={t('habits.fields.from')}>{(id) => <Input id={id} type="date" value={from} onChange={(e) => e.target.value && setFrom(e.target.value)} />}</Field>
             <Field label={t('habits.fields.to')}>{(id) => <Input id={id} type="date" value={to} min={from} onChange={(e) => e.target.value && setTo(e.target.value)} />}</Field>
           </div>

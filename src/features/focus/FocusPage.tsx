@@ -169,7 +169,7 @@ function Setup() {
 
   return (
     <Surface className="flex flex-col gap-5">
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field label={t('focus.fields.kind')}>
           {(id) => (
             <Select id={id} value={kind} onChange={(e) => setKind(e.target.value as FocusKind)}>
@@ -504,7 +504,7 @@ function ManualDialog({ onClose }: { onClose: () => void }) {
         </>
       }
     >
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field label={t('focus.fields.date')}>{(id) => <Input id={id} type="date" value={date} max={today} onChange={(e) => e.target.value && setDate(e.target.value)} />}</Field>
         <Field label={t('focus.fields.minutes')}>{(id) => <Input id={id} type="number" inputMode="numeric" min={1} max={1440} value={min} onChange={(e) => setMin(Math.max(1, Math.round(Number(e.target.value) || 1)))} />}</Field>
         <Field label={t('focus.fields.kind')}>
@@ -565,7 +565,7 @@ function SettingsDialog({ onClose }: { onClose: () => void }) {
       }
     >
       <div className="flex flex-col gap-4">
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {num('focusMin', t('focus.cfg.focusMin'), 240)}
           {num('shortBreakMin', t('focus.cfg.shortBreakMin'), 60)}
           {num('longBreakMin', t('focus.cfg.longBreakMin'), 120)}
@@ -606,7 +606,7 @@ function Stats() {
   const kinds = FOCUS_KINDS.filter((k) => stats.byKind[k] > 0).sort((a, b) => stats.byKind[b] - stats.byKind[a]);
   const kindTop = Math.max(1, ...kinds.map((k) => stats.byKind[k]));
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
       <Surface className="flex flex-col gap-3">
         <div className="grid grid-cols-3 gap-2 text-center">
           <div>
@@ -739,7 +739,7 @@ function EditSessionDialog({ session, onClose }: { session: FocusSession; onClos
         </>
       }
     >
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field label={t('focus.fields.kind')}>
           {(id) => (
             <Select id={id} value={kind} onChange={(e) => setKind(e.target.value as FocusKind)}>

@@ -142,13 +142,13 @@ function InterestDetail({ interest }: { interest: Interest }) {
         </div>
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <Surface className="flex flex-col gap-4">
           <h2 className="font-semibold text-fg">{t('profile.sections.about')}</h2>
           <Field label={t('profile.fields.description')} optionalLabel={t('common.optional')}>
             {(id) => <Textarea id={id} value={draft.description} maxLength={2000} placeholder={t('profile.fields.descriptionPlaceholder')} onChange={(e) => change({ description: e.target.value })} />}
           </Field>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field label={t('profile.fields.category')}>{(id) => <CategorySelect id={id} value={draft.categoryId} onChange={(categoryId) => change({ categoryId })} />}</Field>
             <Field label={t('profile.fields.status')} hint={t('profile.statusHint')}>
               {(id, d) => (
@@ -221,7 +221,7 @@ function InterestDetail({ interest }: { interest: Interest }) {
         </div>
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
         <ProjectsCard ids={draft.projectIds} onChange={(projectIds) => change({ projectIds })} />
         <MaterialsCard ids={draft.noteIds} onChange={(noteIds) => change({ noteIds })} />
       </div>

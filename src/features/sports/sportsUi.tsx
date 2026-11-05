@@ -96,7 +96,7 @@ export function ActivityDialog({ sport, activity, type, items, onClose }: { spor
     >
       <div className="flex flex-col gap-4">
         <Segmented<ActivityType> label={t('sports.fields.type')} value={input.type} onChange={(v) => set({ type: v })} options={ACTIVITY_TYPES.map((a) => ({ value: a, label: t(`sports.types.${a}`) }))} />
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <Field label={t('sports.fields.date')}>{(id) => <Input id={id} type="date" value={input.date} max={today} onChange={(e) => e.target.value && set({ date: e.target.value })} />}</Field>
           <Field label={t('sports.fields.duration')} optionalLabel={t('common.optional')}>
             {(id) => <Input id={id} type="number" inputMode="numeric" min={1} max={1440} value={input.durationMin ?? ''} placeholder="min" onChange={(e) => set({ durationMin: e.target.value ? Math.max(1, Math.round(Number(e.target.value))) : null })} />}
@@ -120,7 +120,7 @@ export function ActivityDialog({ sport, activity, type, items, onClose }: { spor
                 </button>
               ))}
             </div>
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Field label={t('sports.fields.score')} optionalLabel={t('common.optional')}>
                 {(id) => <Input id={id} value={input.score} maxLength={60} placeholder={sport.kind === 'football' ? '3 x 2' : '6-4 6-3'} onChange={(e) => set({ score: e.target.value })} />}
               </Field>

@@ -265,7 +265,7 @@ function EventEditorForm({ target, onClose, cal }: { target: EditorTarget; onClo
 
           <Switch label={t('calendar.editor.allDay')} hint={t('calendar.editor.allDayHint')} checked={draft.allDay} onChange={(allDay) => change({ allDay, startTime: allDay ? null : draft.startTime ?? '09:00' })} />
 
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <Field label={t('calendar.editor.date')}>
               {(id) => <Input id={id} type="date" value={draft.start} onChange={(e) => e.target.value && change({ start: e.target.value })} />}
             </Field>
@@ -307,7 +307,7 @@ function EventEditorForm({ target, onClose, cal }: { target: EditorTarget; onClo
             </div>
           )}
 
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field label={t('calendar.editor.category')}>
               {(id) => (
                 <Select id={id} value={draft.categoryId} onChange={(e) => change({ categoryId: e.target.value })}>

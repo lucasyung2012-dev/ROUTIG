@@ -332,7 +332,7 @@ function LessonDialog({ subject, data, extras, lesson, onClose, onDeleted }: { s
       }
     >
       <div className="flex flex-col gap-4">
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label={t('academy.lessons.date')}>{(id) => <Input id={id} type="date" value={input.date} onChange={(e) => e.target.value && set({ date: e.target.value })} />}</Field>
           <Field label={t('academy.subject.teacher')}>
             {(id) => (
@@ -370,7 +370,7 @@ function LessonDialog({ subject, data, extras, lesson, onClose, onDeleted }: { s
           </div>
         )}
         <Field label={t('academy.lessons.notes')}>{(id) => <Textarea id={id} rows={4} value={input.notes} onChange={(e) => set({ notes: e.target.value })} />}</Field>
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label={t('academy.lessons.difficulties')}>{(id) => <Textarea id={id} rows={2} value={input.difficulties} onChange={(e) => set({ difficulties: e.target.value })} />}</Field>
           <Field label={t('academy.lessons.activities')}>{(id) => <Textarea id={id} rows={2} value={input.activities} onChange={(e) => set({ activities: e.target.value })} />}</Field>
         </div>
@@ -508,7 +508,7 @@ export function WorkTab({ subject, extras }: { subject: Subject; extras: Subject
   };
 
   return (
-    <div className="grid gap-5 lg:grid-cols-2">
+    <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
       <Surface className="flex flex-col gap-3">
         <h2 className="flex items-center gap-2 font-semibold text-fg">
           <FolderKanban className="h-5 w-5 text-amber" aria-hidden />
@@ -598,7 +598,7 @@ export function MaterialsTab({ subject, extras }: { subject: Subject; extras: Su
           <EmptyState title={t('academy.materials.emptyTitle')} body={t('academy.materials.empty')} />
         </Surface>
       ) : (
-        <ul className="grid gap-3 sm:grid-cols-2">
+        <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {extras.notes.map((n) => (
             <li key={n.id}>
               <Link to={`/notes/${n.id}`} className="block h-full rounded-2xl bg-surface p-4 shadow-soft ring-1 ring-line/70 transition hover:-translate-y-0.5 hover:shadow-lift">

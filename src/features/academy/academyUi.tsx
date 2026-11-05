@@ -123,7 +123,7 @@ export function ModelEditor({ value, onChange }: { value: GradingModel; onChange
   const total = value.components.reduce((a, c) => a + c.max, 0);
   return (
     <div className="flex flex-col gap-4">
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <Field label={t('academy.model.method')}>
           {(id) => (
             <Select id={id} value={value.method} onChange={(e) => set({ method: e.target.value as GradeMethod })}>
@@ -172,7 +172,7 @@ export function ModelEditor({ value, onChange }: { value: GradingModel; onChange
       <div className="flex flex-col gap-3 rounded-2xl bg-surface-2/50 p-3">
         <Switch label={t('academy.model.bonus')} hint={t('academy.model.bonusHint')} checked={value.bonus.enabled} onChange={(enabled) => set({ bonus: { ...value.bonus, enabled } })} />
         {value.bonus.enabled && (
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Field label={t('academy.model.bonusMax')}>{(id) => <DecimalInput id={id} value={value.bonus.max} allowEmpty={false} onChange={(v) => v !== null && set({ bonus: { ...value.bonus, max: v } })} />}</Field>
             <Field label={t('academy.model.bonusAbove')}>{(id) => <DecimalInput id={id} value={value.bonus.above} allowEmpty={false} onChange={(v) => v !== null && set({ bonus: { ...value.bonus, above: v } })} />}</Field>
           </div>

@@ -81,7 +81,7 @@ export function AssetDialog({ asset, onClose, onSaved }: { asset?: FinAsset; onC
         </>
       }
     >
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field label={t('finance.fields.name')}>{(id) => <Input id={id} autoFocus value={input.name} maxLength={120} placeholder={t('finance.namePlaceholder')} onChange={(e) => set({ name: e.target.value })} />}</Field>
         <Field label={t('finance.fields.ticker')} optionalLabel={t('common.optional')}>
           {(id) => <Input id={id} value={input.ticker} maxLength={20} placeholder="PETR4, IVVB11, AAPL" onChange={(e) => set({ ticker: e.target.value.toUpperCase() })} />}
@@ -181,7 +181,7 @@ export function TxDialog({ asset, tx, onClose }: { asset: FinAsset; tx?: FinTran
       <div className="flex flex-col gap-4">
         <Segmented<TxType> label={t('finance.fields.txType')} value={type} onChange={setType} options={TX_TYPES.map((x) => ({ value: x, label: t(`finance.txTypes.${x}`) }))} />
         <p className="text-xs text-muted">{t(`finance.txHints.${type}`)}</p>
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label={t('finance.fields.date')}>{(id) => <Input id={id} type="date" value={date} max={today} onChange={(e) => e.target.value && setDate(e.target.value)} />}</Field>
           {trade ? (
             <>
@@ -240,7 +240,7 @@ export function QuoteDialog({ asset, onClose }: { asset: FinAsset; onClose: () =
         </>
       }
     >
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field label={t('finance.fields.date')}>{(id) => <Input id={id} type="date" value={date} max={today} onChange={(e) => e.target.value && setDate(e.target.value)} />}</Field>
         <Field label={t('finance.fields.unitValue', { currency: asset.currency })}>{(id) => <Input id={id} inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value)} />}</Field>
         <div className="sm:col-span-2">
@@ -355,7 +355,7 @@ export function ImportDialog({ onClose }: { onClose: () => void }) {
             </p>
           )}
           {info && info.unknownColumns.length > 0 && <p className="text-xs text-muted">{t('finance.ignoredColumns', { columns: info.unknownColumns.join(', ') })}</p>}
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <Field label={t('finance.newAssetsCategory')}>
               {(id) => (
                 <Select id={id} value={category} onChange={(e) => setCategory(e.target.value as FinAsset['category'])}>

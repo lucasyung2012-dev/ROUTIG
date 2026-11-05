@@ -239,7 +239,7 @@ function Items({ sport, data, category }: { sport: Sport; data: SportsData; cate
           <EmptyState title={t('sports.noneTitle')} body={t(`sports.itemPlaceholder.${sport.kind}.${category}`)} />
         </Surface>
       ) : (
-        <ul className="grid gap-3 lg:grid-cols-2">
+        <ul className="grid grid-cols-1 gap-3 lg:grid-cols-2">
           {items.map((i) => {
             const count = category === 'position' ? used.positions.get(i.id) : used.items.get(i.id);
             return (
@@ -313,7 +313,7 @@ function Evolution({ sport, data }: { sport: Sport; data: SportsData }) {
           ))}
         </div>
       </Surface>
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Surface className="flex flex-col gap-2">
           <h2 className="font-semibold text-fg">{t('sports.evolution.confidence')}</h2>
           {confidence.length === 0 ? (
@@ -412,7 +412,7 @@ function Materials({ sport }: { sport: Sport }) {
           <EmptyState title={t('academy.materials.emptyTitle')} body={t('sports.materialsEmpty')} />
         </Surface>
       ) : (
-        <ul className="grid gap-3 sm:grid-cols-2">
+        <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {notes.map((n) => (
             <li key={n.id}>
               <Link to={`/notes/${n.id}`} className="block h-full rounded-2xl bg-surface p-4 shadow-soft ring-1 ring-line/70 transition hover:-translate-y-0.5 hover:shadow-lift">

@@ -248,7 +248,7 @@ export function YearView({ year, items, handlers }: { year: number; items: Calen
   for (const i of items) for (let d = i.date; d <= i.endDate; d = addDays(d, 1)) busy.set(d, (busy.get(d) ?? 0) + 1);
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
       {Array.from({ length: 12 }, (_, m) => {
         const anchor = `${year}-${String(m + 1).padStart(2, '0')}-01`;
         const days = monthGrid(anchor, settings.weekStartsOn);
@@ -303,7 +303,7 @@ export function AgendaView({ from, items, handlers }: { from: DateKey; items: Ca
       {dates.map((d) => {
         const list = items.filter((i) => (i.date < from ? from : i.date) === d);
         return (
-          <li key={d} className="grid gap-3 sm:grid-cols-[8rem_1fr]">
+          <li key={d} className="grid grid-cols-1 gap-3 sm:grid-cols-[8rem_1fr]">
             <button type="button" onClick={() => handlers.onPickDay(d)} className="flex items-baseline gap-2 text-left sm:flex-col sm:gap-0">
               <span className={cn('text-2xl font-semibold tabular tracking-tight', d === today ? 'text-accent' : 'text-fg')}>{Number(d.slice(8))}</span>
               <span className="text-xs font-medium capitalize text-muted">{formatDateKey(d, settings.locale, { weekday: 'long', month: 'short' })}</span>

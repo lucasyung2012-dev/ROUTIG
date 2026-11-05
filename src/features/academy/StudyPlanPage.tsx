@@ -259,7 +259,7 @@ function SessionDialog({ data, session, subjectId, onClose }: { data: AcademyDat
       }
     >
       <div className="flex flex-col gap-4">
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label={t('academy.assessment.subject')}>
             {(id) => (
               <Select id={id} value={input.subjectId} onChange={(e) => set({ subjectId: e.target.value, contentIds: [], assessmentId: null })}>
@@ -366,7 +366,7 @@ export function DistributeDialog({ data, onClose, examId: initialExamId }: { dat
         <p className="text-sm text-muted">{t('academy.plan.noUpcomingExams')}</p>
       ) : (
         <div className="flex flex-col gap-4">
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field label={t('academy.plan.exam')}>
               {(id) => (
                 <Select

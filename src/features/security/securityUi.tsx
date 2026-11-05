@@ -149,7 +149,7 @@ function AppPinDialog({ has, onClose }: { has: boolean; onClose: () => void }) {
     >
       <div className="flex flex-col gap-4">
         {has && <Field label={t('security.pin.current')}>{(id) => <Input id={id} type="password" inputMode="numeric" autoComplete="off" value={current} onChange={(e) => setCurrent(digits(e.target.value))} />}</Field>}
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label={t('security.pin.new')}>{(id) => <Input id={id} type="password" inputMode="numeric" autoComplete="off" value={pin} onChange={(e) => setPin(digits(e.target.value))} />}</Field>
           <Field label={t('security.pin.repeat')}>{(id) => <Input id={id} type="password" inputMode="numeric" autoComplete="off" value={again} onChange={(e) => setAgain(digits(e.target.value))} />}</Field>
         </div>

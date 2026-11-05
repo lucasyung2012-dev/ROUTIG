@@ -424,7 +424,7 @@ function RecoverPanel({ all, plan, groups, setGroups }: { all: RecoveryPlan | nu
         <p className="rounded-2xl bg-surface-2/70 p-4 text-fg">{t('backup.recoverNothing')}</p>
       ) : (
         <>
-          <ul className="grid gap-1.5 sm:grid-cols-2">
+          <ul className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
             {available.map((g) => (
               <li key={g}>
                 <label className="flex items-center gap-3 rounded-xl px-2 py-1.5 text-fg hover:bg-surface-2">

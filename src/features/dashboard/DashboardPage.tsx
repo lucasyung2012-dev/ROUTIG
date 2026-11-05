@@ -121,7 +121,7 @@ export function DashboardPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <section className="relative overflow-clip rounded-3xl bg-surface p-6 shadow-soft ring-1 ring-line/70 sm:p-8">
+      <section className="relative overflow-hidden rounded-3xl bg-surface p-6 shadow-soft ring-1 ring-line/70 sm:p-8">
         <div className="pointer-events-none absolute -right-10 -top-16 h-72 w-72 opacity-[0.16] sm:opacity-25" aria-hidden>
           <RoutigMark className="h-full w-full" />
         </div>

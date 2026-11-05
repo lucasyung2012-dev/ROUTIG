@@ -208,7 +208,7 @@ export function ItemDialog({ instrument, category, item, onClose }: { instrument
       }
     >
       <div className="flex flex-col gap-4">
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label={t('music.fields.name')}>{(id) => <Input id={id} autoFocus value={input.name} maxLength={120} placeholder={t(`music.namePlaceholder.${category}`)} onChange={(e) => set({ name: e.target.value })} />}</Field>
           <Field label={t('music.fields.status')}>
             {(id) => (
@@ -240,7 +240,7 @@ export function ItemDialog({ instrument, category, item, onClose }: { instrument
         <Field label={category === 'theory' ? t('music.fields.content') : t('music.fields.description')} optionalLabel={t('common.optional')}>
           {(id) => <Textarea id={id} rows={category === 'theory' ? 6 : 3} maxLength={20000} value={input.description} onChange={(e) => set({ description: e.target.value })} />}
         </Field>
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label={t('music.fields.difficulty')}>{() => <Dots value={input.difficulty} onChange={(difficulty) => set({ difficulty })} label={t('music.fields.difficulty')} />}</Field>
           <Field label={t('music.fields.confidence')} hint={t('music.confidenceHint')}>
             {() => <Dots value={input.confidence} onChange={(confidence) => set({ confidence })} label={t('music.fields.confidence')} />}
@@ -345,7 +345,7 @@ export function SongDialog({ instrument, song, onClose }: { instrument: Instrume
       }
     >
       <div className="flex flex-col gap-4">
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label={t('music.fields.songName')}>{(id) => <Input id={id} autoFocus value={input.name} maxLength={160} onChange={(e) => set({ name: e.target.value })} />}</Field>
           <Field label={t('music.fields.artist')} optionalLabel={t('common.optional')}>
             {(id) => <Input id={id} value={input.artist} maxLength={120} onChange={(e) => set({ artist: e.target.value })} />}
@@ -484,7 +484,7 @@ export function PracticeDialog({ instrument, session, songs, items, onClose }: {
       }
     >
       <div className="flex flex-col gap-4">
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label={t('music.fields.date')}>{(id) => <Input id={id} type="date" value={input.date} max={today} onChange={(e) => e.target.value && set({ date: e.target.value })} />}</Field>
           <Field label={t('music.fields.duration')}>
             {(id) => (

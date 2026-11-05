@@ -261,7 +261,7 @@ function TaskEditorDialog({ taskId, defaults, onCreated, onClose, onOpenOther }:
           </div>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <Field label={t('tasks.editor.status')}>
             {(id) => (
               <Select id={id} value={draft.statusId} onChange={(e) => change({ statusId: e.target.value })}>

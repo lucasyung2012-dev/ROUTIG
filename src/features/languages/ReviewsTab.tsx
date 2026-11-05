@@ -68,7 +68,7 @@ export function ReviewsTab({ lang }: { lang: Language }) {
           </Select>
         </div>
       </div>
-      <ul className="grid gap-3 sm:grid-cols-2">
+      <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {decks.map(({ deck, name }) => {
           const items = itemsOf(deck, data);
           const due = items.filter((i) => i.srs.due !== null && i.srs.due <= today).length;

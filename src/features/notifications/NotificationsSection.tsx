@@ -21,7 +21,7 @@ export function NotificationsSection() {
       <Surface className="flex flex-col gap-3">
         <h2 className="font-semibold text-fg">{t('notif.cfg.categories')}</h2>
         <p className="text-sm text-muted">{t('notif.cfg.categoriesHint')}</p>
-        <ul className="grid gap-2 sm:grid-cols-2">
+        <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           {NOTIF_CATEGORIES.map((k) => (
             <li key={k}>
               <Switch checked={!!c.enabled[k]} onChange={(v) => set({ enabled: { ...c.enabled, [k]: v } })} label={t(`notif.categories.${k}`)} hint={t(`notif.categoryHints.${k}`)} />
@@ -32,7 +32,7 @@ export function NotificationsSection() {
 
       <Surface className="flex flex-col gap-3">
         <h2 className="font-semibold text-fg">{t('notif.cfg.timing')}</h2>
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label={t('notif.cfg.dailyTime')} hint={t('notif.cfg.dailyTimeHint')}>
             {(id, d) => <Input id={id} aria-describedby={d} type="time" value={c.dailyTime} onChange={(e) => e.target.value && set({ dailyTime: e.target.value })} />}
           </Field>

@@ -124,7 +124,7 @@ export function ProjectsPage() {
           }
         />
       ) : view === 'list' ? (
-        <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {visible.map((p) => (
             <li key={p.id}>
               <ProjectCard project={p} data={data} />
@@ -403,7 +403,7 @@ function NewProjectDialog({ onClose }: { onClose: () => void }) {
         <Field label={t('projects.fields.name')}>
           {(id) => <Input id={id} autoFocus value={input.name} maxLength={200} placeholder={t('projects.namePlaceholder')} onChange={(e) => setInput({ ...input, name: e.target.value })} onKeyDown={(e) => e.key === 'Enter' && void create()} />}
         </Field>
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label={t('projects.fields.category')}>
             {(id) => (
               <Select id={id} value={input.category} onChange={(e) => setInput({ ...input, category: e.target.value })}>

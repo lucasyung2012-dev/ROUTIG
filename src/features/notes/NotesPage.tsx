@@ -99,7 +99,7 @@ export function NotesPage() {
         }
       />
 
-      <div className="grid gap-6 lg:grid-cols-[13rem_18rem_1fr]">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[13rem_18rem_1fr]">
         {/* Filtros: no iPad em pé e no celular somem quando uma nota está aberta. */}
         <aside className={cn('flex flex-col gap-5', current && 'hidden lg:flex')}>
           <Sidebar data={data} filter={filter} onFilter={setFilter} />
@@ -333,7 +333,7 @@ function TemplatesDialog({ data, onPick, onClose }: { data: NotesData; onPick: (
   const { t } = useSettings();
   return (
     <Dialog open onClose={onClose} closeLabel={t('common.close')} title={t('notes.templates')}>
-      <ul className="grid gap-2 sm:grid-cols-2">
+      <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         {data.templates.map((tpl) => (
           <li key={tpl.id} className="flex items-stretch gap-1">
             <button type="button" onClick={() => onPick(tpl)} className="flex min-h-[3.5rem] flex-1 flex-col justify-center rounded-xl bg-surface-2 px-4 py-3 text-left ring-1 ring-line/60 hover:bg-surface-3">

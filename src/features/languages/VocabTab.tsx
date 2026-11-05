@@ -77,7 +77,7 @@ export function VocabTab({ lang }: { lang: Language }) {
             </Select>
           </div>
         </div>
-        <div className="grid gap-2 sm:grid-cols-4">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-4">
           <Input aria-label={t('common.search')} placeholder={t('languages.vocab.search')} value={q} onChange={(e) => setQ(e.target.value)} />
           <Select aria-label={t('languages.vocab.pos')} value={pos} onChange={(e) => setPos(e.target.value as PartOfSpeech | '')}>
             <option value="">{t('languages.vocab.anyPos')}</option>
@@ -216,7 +216,7 @@ function VocabDialog({ lang, entry, onClose }: { lang: Language; entry: VocabEnt
       }
     >
       <div className="flex flex-col gap-4">
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label={mandarin ? t('languages.vocab.termPinyin') : t('languages.vocab.term')}>
             {(id) => (
               <div className="flex gap-2">
@@ -229,7 +229,7 @@ function VocabDialog({ lang, entry, onClose }: { lang: Language; entry: VocabEnt
         </div>
 
         {german && (
-          <div className="grid gap-3 rounded-2xl bg-surface-2/50 p-3 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 rounded-2xl bg-surface-2/50 p-3 sm:grid-cols-2">
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-subtle sm:col-span-2">{t('languages.vocab.germanTitle')}</p>
             <Field label={t('languages.vocab.article')}>
               {(id) => (
@@ -256,7 +256,7 @@ function VocabDialog({ lang, entry, onClose }: { lang: Language; entry: VocabEnt
         )}
 
         {mandarin && (
-          <div className="grid gap-3 rounded-2xl bg-surface-2/50 p-3 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 rounded-2xl bg-surface-2/50 p-3 sm:grid-cols-3">
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-subtle sm:col-span-3">{t('languages.vocab.mandarinTitle')}</p>
             <Field label={t('languages.vocab.characters')}>{(id) => <Input id={id} value={mandarin.characters} maxLength={100} placeholder="你好" className="text-lg" onChange={(e) => set({ mandarin: { ...mandarin, characters: e.target.value } })} />}</Field>
             <Field label={t('languages.vocab.pinyin')} hint={t('languages.vocab.pinyinHint')}>
@@ -277,11 +277,11 @@ function VocabDialog({ lang, entry, onClose }: { lang: Language; entry: VocabEnt
         )}
 
         <Field label={t('languages.vocab.meaning')} optionalLabel={t('common.optional')}>{(id) => <Textarea id={id} rows={2} value={input.meaning} maxLength={2000} placeholder={t('languages.vocab.meaningPlaceholder')} onChange={(e) => set({ meaning: e.target.value })} />}</Field>
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label={t('languages.vocab.example')}>{(id) => <Textarea id={id} rows={2} value={input.example} maxLength={2000} onChange={(e) => set({ example: e.target.value })} />}</Field>
           <Field label={t('languages.vocab.exampleTranslation')}>{(id) => <Textarea id={id} rows={2} value={input.exampleTranslation} maxLength={2000} onChange={(e) => set({ exampleTranslation: e.target.value })} />}</Field>
         </div>
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <Field label={t('languages.vocab.pos')}>
             {(id) => (
               <Select id={id} value={input.partOfSpeech ?? ''} onChange={(e) => set({ partOfSpeech: (e.target.value || null) as PartOfSpeech | null })}>

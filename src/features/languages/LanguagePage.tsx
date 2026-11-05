@@ -172,7 +172,7 @@ function Overview({ lang, data, onTab }: { lang: Language; data: LanguagesData; 
         {stat(t('languages.stats.days'), month.days)}
         {stat(t('languages.stats.total'), t('languages.minutes', { min: total.total }))}
       </div>
-      <div className="grid gap-5 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
         <Surface className="flex flex-col gap-3">
           <h2 className="font-semibold text-fg">{t('languages.goals')}</h2>
           {lang.goals.length === 0 ? (
@@ -253,7 +253,7 @@ function SkillsTab({ lang }: { lang: Language }) {
   return (
     <div className="flex flex-col gap-4">
       <p className="rounded-2xl bg-surface-2/60 p-3 text-sm text-muted">{t('languages.selfAssessment')}</p>
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {SKILLS.map((s) => (
           <Surface key={s} className="flex flex-col gap-3">
             <h2 className="font-semibold text-fg">{t(`languages.skills.${s}`)}</h2>
@@ -388,7 +388,7 @@ function SessionDialog({ lang, session, onClose, onDeleted }: { lang: Language; 
       }
     >
       <div className="flex flex-col gap-4">
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <Field label={t('academy.lessons.date')}>{(id) => <Input id={id} type="date" value={input.date} onChange={(e) => e.target.value && set({ date: e.target.value })} />}</Field>
           <Field label={t('languages.activity')}>
             {(id) => (
@@ -406,7 +406,7 @@ function SessionDialog({ lang, session, onClose, onDeleted }: { lang: Language; 
           </Field>
         </div>
         <Field label={t('languages.content')}>{(id) => <Input id={id} value={input.content} maxLength={2000} placeholder={t('languages.contentPlaceholder')} onChange={(e) => set({ content: e.target.value })} />}</Field>
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label={t('languages.result')}>{(id) => <Textarea id={id} rows={2} value={input.result} placeholder={t('languages.resultPlaceholder')} onChange={(e) => set({ result: e.target.value })} />}</Field>
           <Field label={t('academy.lessons.difficulties')}>{(id) => <Textarea id={id} rows={2} value={input.difficulties} onChange={(e) => set({ difficulties: e.target.value })} />}</Field>
         </div>
@@ -517,7 +517,7 @@ function EditLanguageDialog({ lang, onClose }: { lang: Language; onClose: () => 
       }
     >
       <div className="flex flex-col gap-4">
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label={t('languages.name')}>{(id) => <Input id={id} value={name} maxLength={60} onChange={(e) => setName(e.target.value)} />}</Field>
           <Field label={t('languages.code')} hint={t('languages.codeHint')}>
             {(id, d) => <Input id={id} aria-describedby={d} value={code} maxLength={12} onChange={(e) => setCode(e.target.value)} />}

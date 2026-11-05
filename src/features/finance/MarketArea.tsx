@@ -151,7 +151,7 @@ function MarketDialog({ entry, defaultKind, onClose }: { entry?: MarketEntry; de
       }
     >
       <div className="flex flex-col gap-4">
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label={t('finance.market.fields.kind')}>
             {(id) => (
               <Select id={id} value={input.kind} onChange={(e) => set({ kind: e.target.value as MarketKind })}>
@@ -168,7 +168,7 @@ function MarketDialog({ entry, defaultKind, onClose }: { entry?: MarketEntry; de
           </Field>
         </div>
         <Field label={t('finance.market.fields.title')}>{(id) => <Input id={id} autoFocus value={input.title} maxLength={200} placeholder={t(`finance.market.placeholders.${input.kind}`)} onChange={(e) => set({ title: e.target.value })} />}</Field>
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label={t('finance.market.fields.value')} optionalLabel={t('common.optional')}>
             {(id) => <Input id={id} value={input.value} maxLength={60} placeholder="10,50% a.a." onChange={(e) => set({ value: e.target.value })} />}
           </Field>
@@ -179,7 +179,7 @@ function MarketDialog({ entry, defaultKind, onClose }: { entry?: MarketEntry; de
           </Field>
         </div>
         <p className="text-xs text-muted">{t('finance.market.natureHint')}</p>
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label={t('finance.market.fields.source')} hint={t('finance.market.sourceHint')}>
             {(id, d) => <Input id={id} aria-describedby={d} value={input.source} maxLength={200} placeholder={t('finance.market.sourcePlaceholder')} onChange={(e) => set({ source: e.target.value })} />}
           </Field>

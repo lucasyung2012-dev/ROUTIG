@@ -44,7 +44,7 @@ export function SettingsIndexPage() {
   return (
     <div className="flex flex-col gap-8">
       <PageHeader title={t('settings.title')} description={t('settings.subtitle')} />
-      <ul className="grid gap-3 sm:grid-cols-2">
+      <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {SETTINGS_SECTIONS.map(({ id, icon: Icon }) => (
           <li key={id}>
             <Link
@@ -70,7 +70,7 @@ export function SettingsSectionPage() {
   if (!isSettingsSection(section)) return <Navigate to="/settings" replace />;
 
   return (
-    <div className="grid gap-8 lg:grid-cols-[220px_1fr]">
+    <div className="grid grid-cols-1 gap-8 lg:grid-cols-[220px_1fr]">
       <nav aria-label={t('settings.title')} className="hidden lg:block">
         <div className="sticky top-6 flex flex-col gap-0.5">
           <div className="px-3 pb-2 text-xs font-semibold uppercase tracking-[0.14em] text-subtle">{t('settings.title')}</div>
@@ -485,15 +485,16 @@ function AboutSection() {
       </Surface>
 
       <Surface className="divide-y divide-line/70">
-        <Row title={t('settings.about.version')}>
-          <span className="text-sm tabular text-muted">
-            {APP_VERSION} · {t('settings.about.build')}
-          </span>
-        </Row>
+        <div className="pb-5">
+          <div className="text-[0.9375rem] font-medium text-fg">{t('settings.about.version')}</div>
+          <p className="mt-1 text-sm leading-relaxed text-muted">
+            <span className="tabular font-medium text-fg">{APP_VERSION}</span> · {t('settings.about.build')}
+          </p>
+        </div>
         <div className="py-5">
           <div className="text-[0.9375rem] font-medium text-fg">{t('settings.about.upcoming')}</div>
           <p className="mt-1 text-sm text-muted">{t('settings.about.upcomingBody')}</p>
-          <ul className="mt-3 grid gap-1.5 sm:grid-cols-2">
+          <ul className="mt-3 grid grid-cols-1 gap-1.5 sm:grid-cols-2">
             {tl('settings.about.upcomingItems').map((item) => (
               <li key={item} className="flex items-center gap-2 text-sm text-muted">
                 <span className="h-1.5 w-1.5 rounded-full bg-subtle" aria-hidden />

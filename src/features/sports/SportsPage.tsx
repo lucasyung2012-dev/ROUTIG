@@ -63,7 +63,7 @@ export function SportsPage() {
           />
         </Surface>
       ) : (
-        <ul className="grid gap-4 sm:grid-cols-2">
+        <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {data.sports.map((s) => {
             const acts = data.activitiesOf(s.id);
             const month = sportStats(acts.filter((a) => a.date >= monthAgo));

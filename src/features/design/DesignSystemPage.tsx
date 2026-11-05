@@ -95,7 +95,7 @@ export function DesignSystemPage() {
       </Block>
 
       <Block title={t('design.inputs')}>
-        <Surface className="grid gap-5 sm:grid-cols-2">
+        <Surface className="grid grid-cols-1 gap-5 sm:grid-cols-2">
           <Field label={t('design.sampleInput')} hint={t('design.sampleBody')}>
             {(id, d) => <Input id={id} aria-describedby={d} placeholder={t('design.sampleInput')} />}
           </Field>
@@ -123,7 +123,7 @@ export function DesignSystemPage() {
       </Block>
 
       <Block title={t('design.states')} hint={t('design.statesHint')}>
-        <div className="grid gap-4 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
           <Surface>
             <div className="mb-2 text-sm font-medium text-fg">{t('design.loadingTitle')}</div>
             <LoadingState label={t('common.loading')} />

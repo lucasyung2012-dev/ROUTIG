@@ -229,7 +229,7 @@ function MetaRow({ draft, data, onChange }: { draft: NoteInput; data: NotesData;
         {draft.links.length > 0 && <span>· {t('notes.links')}: {draft.links.length}</span>}
         <span className="ml-auto text-xs text-accent group-open:hidden">▾</span>
       </summary>
-      <div className="grid gap-4 border-t border-line/60 p-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 border-t border-line/60 p-4 sm:grid-cols-2">
         <Field label={t('notes.notebook')}>
           {(id) => (
             <Select id={id} value={draft.notebookId ?? ''} onChange={(e) => onChange({ notebookId: e.target.value || null })}>
@@ -381,7 +381,7 @@ function HistoryDialog({ note, onClose }: { note: Note; onClose: () => void }) {
       {!versions?.length ? (
         <p className="py-6 text-center text-sm text-muted">{t('notes.noVersions')}</p>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-[14rem_1fr]">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-[14rem_1fr]">
           <ul className="flex max-h-80 flex-col gap-1 overflow-y-auto">
             {versions.map((v) => (
               <li key={v.id}>

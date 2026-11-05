@@ -37,7 +37,7 @@ export function ModuleRoadmapPage({ id }: { id: ModuleId }) {
         description={t(`moduleSummary.${id}`)}
       />
 
-      <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.4fr_1fr]">
         <Surface>
           <h2 className="text-balance text-lg font-semibold tracking-tight text-fg">
             {t('roadmap.title', { module: name, stage: def.stage, stageName: t(`stages.${def.stage}`) })}

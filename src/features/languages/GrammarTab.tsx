@@ -49,7 +49,7 @@ export function GrammarTab({ lang }: { lang: Language }) {
         topics.map((topic) => (
           <section key={topic} className="flex flex-col gap-2">
             <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-subtle">{topic || t('languages.grammar.noTopic')}</h3>
-            <ul className="grid gap-2 sm:grid-cols-2">
+            <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               {shown
                 .filter((g) => (g.topic || '') === topic)
                 .map((g) => {
@@ -158,7 +158,7 @@ function GrammarDialog({ lang, rule, onClose }: { lang: Language; rule: GrammarR
       }
     >
       <div className="flex flex-col gap-4">
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <Field label={t('languages.grammar.title')}>{(id) => <Input id={id} autoFocus={!rule} value={input.title} maxLength={200} placeholder={t('languages.grammar.titlePlaceholder')} onChange={(e) => set({ title: e.target.value })} />}</Field>
           <Field label={t('languages.grammar.topic')}>{(id) => <Input id={id} value={input.topic} maxLength={60} placeholder={t('languages.grammar.topicPlaceholder')} onChange={(e) => set({ topic: e.target.value })} />}</Field>
           <Field label={t('languages.level')}>
@@ -223,7 +223,7 @@ function GrammarDialog({ lang, rule, onClose }: { lang: Language; rule: GrammarR
               ))}
             </ol>
           )}
-          <div className="grid gap-2 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             <Input aria-label={t('languages.grammar.exerciseQuestion')} placeholder={t('languages.grammar.exerciseQuestion')} value={question} maxLength={2000} onChange={(e) => setQuestion(e.target.value)} />
             <div className="flex gap-2">
               <Input aria-label={t('languages.grammar.exerciseAnswer')} placeholder={t('languages.grammar.exerciseAnswer')} value={answer} maxLength={2000} onChange={(e) => setAnswer(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addExercise()} />

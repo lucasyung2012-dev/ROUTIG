@@ -109,7 +109,7 @@ export function AssetPage() {
 
         <Evolution assetId={asset.id} currency={cur} data={data} />
 
-        <div className="grid gap-4 lg:grid-cols-[3fr_2fr]">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[3fr_2fr]">
           <Surface className="flex flex-col gap-2">
             <h2 className="font-semibold text-fg">{t('finance.transactions')}</h2>
             {txs.length === 0 ? (

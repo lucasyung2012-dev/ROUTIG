@@ -147,7 +147,7 @@ function SubjectDetail({ subject, data }: { subject: Subject; data: AcademyData 
             </Surface>
           )}
           {(data.year?.periods ?? []).length === 0 && <p className="text-sm text-muted">{t('academy.subject.noPeriods')}</p>}
-          <div className="grid gap-4 lg:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             {(data.year?.periods ?? []).map((p) => (
               <PeriodCard key={p.id} subject={subject} period={p} data={data} current={p.id === currentPeriodId(data.year)} onAdd={() => setNewPeriod(p.id)} onOpen={(a) => setAssessment(a)} />
             ))}
@@ -197,7 +197,7 @@ function PeriodCard({ subject, period, data, current, onAdd, onOpen }: { subject
       </div>
       <GradeExplanation result={g} />
       {(showRecovery || showBonus) && (
-        <div className="grid gap-3 rounded-2xl bg-surface-2/50 p-3 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 rounded-2xl bg-surface-2/50 p-3 sm:grid-cols-2">
           {showRecovery && (
             <Field label={t('academy.subject.recovery')} hint={t('academy.subject.recoveryHint', { cap: formatGrade(model.recovery.cap, settings.locale) })}>
               {(id) => <DecimalInput id={id} value={res?.recoveryScore ?? null} placeholder="—" onChange={(v) => void setPeriodResult(subject.id, period.id, { recoveryScore: v }).catch(fail)} />}

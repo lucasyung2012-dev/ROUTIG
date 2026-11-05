@@ -520,7 +520,7 @@ function ConvertDialog({ item, suggestion, type, openItems, onClose }: { item: I
         {audioUrl && <audio controls src={audioUrl} className="w-full" aria-label={item.fileName ?? undefined} />}
         <Field label={t('inbox.titleLabel')}>{(id) => <Input id={id} value={title} maxLength={300} autoFocus={onlyFileName} onChange={(e) => setTitle(e.target.value)} />}</Field>
         {type !== 'note' && (
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label={t('inbox.dateLabel')} optionalLabel={type === 'task' ? t('common.optional') : undefined}>
             {(id) => <Input id={id} type="date" value={date} onChange={(e) => setDate(e.target.value)} />}
           </Field>

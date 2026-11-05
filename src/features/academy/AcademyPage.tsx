@@ -182,7 +182,7 @@ function Dashboard({ data, onNewSubject }: { data: AcademyData; onNewSubject: ()
             <EmptyState title={t('academy.dash.noSubjectsTitle')} body={t('academy.dash.noSubjects')} action={<Button variant="primary" icon={<Plus className="h-4 w-4" />} onClick={onNewSubject}>{t('academy.subject.new')}</Button>} />
           </Surface>
         ) : (
-          <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {grades.map(({ s, g }) => {
               const yg = data.yearGradeOf(s);
               const next = data.assessments.find((a) => a.subjectId === s.id && a.date && a.date >= today);
@@ -212,7 +212,7 @@ function Dashboard({ data, onNewSubject }: { data: AcademyData; onNewSubject: ()
         )}
       </section>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Próximas avaliações */}
         <Surface className="flex flex-col gap-3">
           <h2 className="flex items-center gap-2 text-base font-semibold text-fg">
@@ -317,7 +317,7 @@ function LearningPanels({ data }: { data: AcademyData }) {
   const subjectName = (id: string) => data.subjectById.get(id)?.name ?? '';
   if (extras.loading) return null;
   return (
-    <div className="grid gap-6 lg:grid-cols-2">
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
       <Surface className="flex flex-col gap-3">
         <h2 className="flex items-center gap-2 text-base font-semibold text-fg">
           <BookOpenCheck className="h-5 w-5 text-teal" aria-hidden />

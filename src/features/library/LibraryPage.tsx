@@ -141,7 +141,7 @@ export function LibraryPage() {
           <EmptyState title={t('library.noMatch')} />
         </Surface>
       ) : (
-        <ul className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
+        <ul className="grid grid-cols-1 gap-3 lg:grid-cols-2 xl:grid-cols-3">
           {shown.map((i) => (
             <li key={i.id} className="relative">
               <button type="button" onClick={() => setEditing({ item: i })} className="flex h-full w-full gap-3 rounded-2xl bg-surface p-3 text-left shadow-soft ring-1 ring-line/70 transition hover:shadow-lift">

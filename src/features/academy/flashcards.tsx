@@ -89,7 +89,7 @@ export function DecksPanel({ subject, onStart }: { subject?: Subject; onStart: (
           <EmptyState icon={<Layers className="h-6 w-6" />} title={t('academy.review.emptyTitle')} body={t('academy.review.empty')} />
         </Surface>
       ) : (
-        <ul className="grid gap-3 sm:grid-cols-2">
+        <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {fc.decks.map((d) => {
             const s = deckStats(fc.cardsOf(d.id), today);
             return (
@@ -279,7 +279,7 @@ function DeckDialog({ deck, subjectId, color, onClose }: { deck: Deck | null; su
     >
       <div className="flex flex-col gap-4">
         <Field label={t('academy.review.deckName')}>{(id) => <Input id={id} autoFocus={!deck} value={input.name} maxLength={80} onChange={(e) => setInput({ ...input, name: e.target.value })} />}</Field>
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label={t('academy.assessment.subject')}>
             {(id) => (
               <Select id={id} value={input.subjectId ?? ''} onChange={(e) => setInput({ ...input, subjectId: e.target.value || null })}>
@@ -362,7 +362,7 @@ function CardDialog({ deck, card, onClose }: { deck: Deck; card: Card | null; on
       <div className="flex flex-col gap-4">
         <Field label={t('academy.review.front')}>{(id) => <Textarea id={id} autoFocus rows={3} value={input.front} maxLength={4000} placeholder={t('academy.review.frontPlaceholder')} onChange={(e) => setInput({ ...input, front: e.target.value })} />}</Field>
         <Field label={t('academy.review.back')}>{(id) => <Textarea id={id} rows={3} value={input.back} maxLength={4000} placeholder={t('academy.review.backPlaceholder')} onChange={(e) => setInput({ ...input, back: e.target.value })} />}</Field>
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label={t('academy.review.category')}>{(id) => <Input id={id} value={input.category} maxLength={60} onChange={(e) => setInput({ ...input, category: e.target.value })} />}</Field>
           <Field label={t('academy.review.tags')}>{(id) => <Input id={id} value={tags} onChange={(e) => setTags(e.target.value)} />}</Field>
         </div>

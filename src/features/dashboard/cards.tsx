@@ -357,7 +357,7 @@ export function ModulesCard() {
       <h2 id="dash-modules" className="mb-4 text-xs font-semibold uppercase tracking-[0.16em] text-subtle">
         {t('dashboard.yourModules')}
       </h2>
-      <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+      <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {modules.map((id) => {
           const def = MODULES[id];
           const Icon = def.icon;

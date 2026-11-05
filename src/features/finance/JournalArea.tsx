@@ -144,7 +144,7 @@ function JournalDialog({ entry, assets, onClose }: { entry?: JournalEntry; asset
       }
     >
       <div className="flex flex-col gap-4">
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label={t('finance.fields.date')}>{(id) => <Input id={id} type="date" value={input.date} max={today} onChange={(e) => e.target.value && set({ date: e.target.value })} />}</Field>
           <Field label={t('finance.journal.fields.asset')} optionalLabel={t('common.optional')}>
             {(id) => (

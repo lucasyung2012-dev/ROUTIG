@@ -29,7 +29,7 @@ export function PrivacySection() {
         </div>
         <Switch checked={qp.on} onChange={qp.toggle} label={t('privacy.quick.now')} hint={t('privacy.quick.nowHint')} />
         <p className="text-sm font-medium text-fg">{t('privacy.quick.what')}</p>
-        <ul className="grid gap-2 sm:grid-cols-2">
+        <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           {QUICK_TARGETS.map((q) => (
             <li key={q}>
               <label className="flex items-center gap-3 rounded-xl px-2 py-1.5 text-sm text-fg hover:bg-surface-2">

@@ -110,7 +110,7 @@ export function GoalsPage() {
               <EmptyState title={t('goals.noMatch')} />
             </Surface>
           ) : (
-            <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
               {list.map((g) => {
                 const overdue = isGoalOverdue(g, today);
                 return (

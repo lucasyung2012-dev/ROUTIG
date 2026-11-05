@@ -305,7 +305,7 @@ function Overview({ now, before, modules, onOpen }: { now: Computed; before: Com
         <EmptyState title={t('insights.allHidden')} />
       </Surface>
     );
-  return <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">{modules.map((m) => <div key={m}>{cards[m]}</div>)}</div>;
+  return <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-3">{modules.map((m) => <div key={m}>{cards[m]}</div>)}</div>;
 }
 
 /* ---------- Análise por módulo ---------- */

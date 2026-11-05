@@ -76,7 +76,7 @@ function LearnList({ kind, items }: { kind: LearnKind; items: FinLearning[] }) {
           <EmptyState title={t('finance.academy.emptyTitle')} body={t(`finance.academy.empty.${kind}`)} />
         </Surface>
       ) : (
-        <ul className="grid gap-3 lg:grid-cols-2">
+        <ul className="grid grid-cols-1 gap-3 lg:grid-cols-2">
           {list.map((i) => {
             const lessons = kind === 'course' ? live.filter((l) => l.kind === 'lesson' && l.courseId === i.id) : [];
             const course = i.courseId ? courses.find((c) => c.id === i.courseId) : undefined;
@@ -162,7 +162,7 @@ function LearnDialog({ kind, item, courses, onClose }: { kind: LearnKind; item?:
     >
       <div className="flex flex-col gap-4">
         <Field label={t('finance.academy.fields.title')}>{(id) => <Input id={id} autoFocus value={input.title} maxLength={160} placeholder={t(`finance.academy.placeholders.${kind}`)} onChange={(e) => set({ title: e.target.value })} />}</Field>
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {kind === 'course' && (
             <Field label={t('finance.academy.fields.provider')} optionalLabel={t('common.optional')}>
               {(id) => <Input id={id} value={input.provider} maxLength={120} onChange={(e) => set({ provider: e.target.value })} />}
@@ -244,7 +244,7 @@ function Glossary({ terms }: { terms: FinTerm[] }) {
           <EmptyState title={t('finance.academy.emptyTitle')} body={live.length ? t('finance.academy.noMatch') : t('finance.academy.empty.glossary')} />
         </Surface>
       ) : (
-        <dl className="grid gap-3 lg:grid-cols-2">
+        <dl className="grid grid-cols-1 gap-3 lg:grid-cols-2">
           {shown.map((x) => (
             <button key={x.id} type="button" onClick={() => setEditing({ term: x })} className="flex flex-col gap-1 rounded-2xl bg-surface p-4 text-left shadow-soft ring-1 ring-line/70 transition hover:shadow-lift">
               <dt className="font-semibold text-fg">{x.term}</dt>
@@ -426,7 +426,7 @@ function Materials() {
           <EmptyState title={t('academy.materials.emptyTitle')} body={t('finance.academy.empty.materials')} />
         </Surface>
       ) : (
-        <ul className="grid gap-3 sm:grid-cols-2">
+        <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {notes.map((n) => (
             <li key={n.id}>
               <Link to={`/notes/${n.id}`} className="block h-full rounded-2xl bg-surface p-4 shadow-soft ring-1 ring-line/70 transition hover:-translate-y-0.5 hover:shadow-lift">

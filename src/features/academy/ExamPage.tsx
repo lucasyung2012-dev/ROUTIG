@@ -141,7 +141,7 @@ function PrepTab({ assessment, prep, data, contents, contentById }: { assessment
   const tried = prep.questions.filter((q) => q.result !== 'pending').length;
 
   return (
-    <div className="grid gap-5 lg:grid-cols-2">
+    <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
       <Surface className="flex flex-col gap-3">
         <h2 className="font-semibold text-fg">{t('academy.exam.covered')}</h2>
         <p className="text-sm text-muted">{t('academy.exam.coveredHint')}</p>
@@ -435,11 +435,11 @@ function PostTab({ assessment, prep, data, contents, onSave }: { assessment: Ass
           {assessment.score !== null ? t('academy.exam.resultValue', { score: formatGrade(assessment.score, settings.locale), max: formatGrade(assessment.maxScore, settings.locale) }) : t('academy.exam.resultMissing')}
         </p>
       </Surface>
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Field label={t('academy.lessons.difficulties')}>{(id) => <Textarea id={id} rows={4} defaultValue={post.difficulties} onBlur={(e) => e.target.value !== post.difficulties && set({ difficulties: e.target.value })} />}</Field>
         <Field label={t('academy.exam.postErrors')}>{(id) => <Textarea id={id} rows={4} defaultValue={post.errors} onBlur={(e) => e.target.value !== post.errors && set({ errors: e.target.value })} />}</Field>
       </div>
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Surface className="flex flex-col gap-2">
           <h3 className="text-sm font-semibold text-success">{t('academy.exam.mastered')}</h3>
           <ContentPickerFrom list={scope} value={post.masteredContentIds} onChange={(ids) => set({ masteredContentIds: ids, reviewContentIds: post.reviewContentIds.filter((x) => !ids.includes(x)) })} />

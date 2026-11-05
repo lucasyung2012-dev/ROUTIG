@@ -77,7 +77,7 @@ export function LogoComparePage() {
         </div>
 
         {mode === 'side' ? (
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Frame label={t('logo.original')}>
               <img src={logoPngUrl} alt={t('logo.original')} className="h-full w-full" />
             </Frame>

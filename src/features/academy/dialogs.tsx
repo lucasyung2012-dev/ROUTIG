@@ -104,7 +104,7 @@ export function YearDialog({ year, onClose }: { year: AcademicYear | null; onClo
       }
     >
       <div className="flex flex-col gap-5">
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <Field label={t('academy.year.label')} error={error ?? undefined}>
             {(id) => <Input id={id} value={label} maxLength={40} onChange={(e) => (setLabel(e.target.value), setError(null))} />}
           </Field>
@@ -216,7 +216,7 @@ export function SubjectDialog({ data, subject, onClose, onCreated }: { data: Aca
       }
     >
       <div className="flex flex-col gap-4">
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label={t('academy.subject.name')} error={error ?? undefined}>
             {(id) => <Input id={id} autoFocus={!subject} value={name} maxLength={80} placeholder={t('academy.subject.namePlaceholder')} onChange={(e) => (setName(e.target.value), setError(null))} />}
           </Field>
@@ -367,7 +367,7 @@ export function AssessmentDialog({ data, assessment, subjectId, periodId, onClos
       }
     >
       <div className="flex flex-col gap-4">
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label={t('academy.assessment.name')} error={error ?? undefined}>
             {(id) => <Input id={id} autoFocus={!assessment} value={input.name} maxLength={120} placeholder={t('academy.assessment.namePlaceholder')} onChange={(e) => set({ name: e.target.value })} />}
           </Field>

@@ -383,7 +383,7 @@ export function HabitDialog({ habit, preset, hasLogs, categories, onClose, onSav
       }
     >
       <div className="flex flex-col gap-5">
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label={t('habits.fields.name')}>{(id) => <Input id={id} autoFocus value={input.name} maxLength={120} placeholder={t('habits.namePlaceholder')} onChange={(e) => set({ name: e.target.value })} />}</Field>
           <Field label={t('habits.fields.category')} optionalLabel={t('common.optional')}>
             {(id) => (
@@ -412,7 +412,7 @@ export function HabitDialog({ habit, preset, hasLogs, categories, onClose, onSav
           />
           <p className="text-xs text-muted">{t(`habits.methodHints.${input.method}`)}</p>
           {habit && hasLogs && <p className="text-xs text-muted">{t('habits.methodLockedHint')}</p>}
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             {input.method === 'quantity' && (
               <Field label={t('habits.fields.unit')}>{(id) => <Input id={id} value={input.unit} maxLength={30} placeholder={t('habits.unitPlaceholder')} onChange={(e) => set({ unit: e.target.value })} />}</Field>
             )}
@@ -439,7 +439,7 @@ export function HabitDialog({ habit, preset, hasLogs, categories, onClose, onSav
 
         <section className="flex flex-col gap-3">
           <h3 className="text-sm font-semibold text-fg">{t('habits.fields.frequency')}</h3>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field label={t('habits.fields.period')}>
               {(id) => (
                 <Select id={id} value={f.period} onChange={(e) => setFreq({ period: e.target.value as HabitFrequency['period'] })}>

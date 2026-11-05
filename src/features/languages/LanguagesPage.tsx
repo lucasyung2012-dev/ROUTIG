@@ -67,7 +67,7 @@ export function LanguagesPage() {
         </Surface>
       ) : (
         <>
-          <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {data.languages.map((l) => {
               const week = sessionStats(data.sessionsOf(l.id).filter((s) => s.date >= weekAgo));
               const last = data.sessionsOf(l.id)[0];
@@ -166,7 +166,7 @@ function AddLanguageDialog({ onClose, usedColors }: { onClose: () => void; usedC
       }
     >
       <div className="flex flex-col gap-4">
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label={t('languages.name')}>{(id) => <Input id={id} autoFocus value={name} maxLength={60} placeholder={t('languages.namePlaceholder')} onChange={(e) => setName(e.target.value)} />}</Field>
           <Field label={t('languages.code')} hint={t('languages.codeHint')}>
             {(id, d) => <Input id={id} aria-describedby={d} value={code} maxLength={12} placeholder="fr, it, ja…" onChange={(e) => setCode(e.target.value)} />}

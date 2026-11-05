@@ -93,7 +93,7 @@ function Shell() {
             type="button"
             onClick={() => setPaletteOpen(true)}
             aria-label={t('search.open')}
-            className="ml-auto flex h-11 min-w-0 items-center gap-3 rounded-xl bg-surface-2/80 px-3.5 text-sm text-subtle ring-1 ring-inset ring-line transition hover:text-fg md:ml-0 md:w-80"
+            className="ml-auto flex h-11 w-11 shrink-0 items-center justify-center gap-3 rounded-xl bg-surface-2/80 text-sm sm:w-auto sm:min-w-0 sm:shrink sm:justify-start sm:px-3.5 text-subtle ring-1 ring-inset ring-line transition hover:text-fg md:ml-0 md:w-80"
           >
             <Search className="h-4 w-4 shrink-0" aria-hidden />
             <span className="hidden truncate sm:inline">{t('search.placeholder')}</span>
@@ -116,6 +116,7 @@ function Shell() {
               label={`${t('settings.appearance.theme')}: ${t(`theme.${settings.theme}`)}`}
               icon={themeIcon}
               onClick={() => update((s) => ({ ...s, theme: NEXT_THEME[s.theme] }))}
+              className="hidden sm:inline-flex"
             />
             <Link
               to="/profile"

@@ -20,6 +20,7 @@ import { useLanguages } from '@/features/languages/useLanguages';
 import { QuickLog } from '@/features/habits/habitsUi';
 import { useHabits } from '@/features/habits/useHabits';
 import { todayStatus } from '@/domain/habits';
+import { isDue } from '@/domain/srs';
 import { isGoalOverdue, isOpenGoal } from '@/domain/goals';
 import { GoalProgressView } from '@/features/goals/goalsUi';
 import { useGoals } from '@/features/goals/useGoals';
@@ -736,7 +737,7 @@ export function FinanceCard() {
     const db = getDb();
     const assets = await db.finAssets.filter((a) => !a.deletedAt && !a.archived).count();
     const toReview = await db.finJournal.filter((j) => !j.deletedAt && !j.reviewedAt && !!j.reviewOn && j.reviewOn <= today).count();
-    const terms = await db.finTerms.filter((x) => !x.deletedAt && x.srs.due <= today).count();
+    const terms = await db.finTerms.filter((x) => !x.deletedAt && isDue(x.srs, today)).count();
     return { assets, toReview, terms };
   }, [today]);
   return (

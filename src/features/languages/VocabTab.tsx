@@ -1,12 +1,12 @@
 import { useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Play, Plus, RotateCcw, Shuffle, Trash2, Volume2, X } from 'lucide-react';
+import { Play, Plus, RotateCcw, Shuffle, Trash2, Volume2 } from 'lucide-react';
 import { useSettings } from '@/app/SettingsProvider';
 import { getDb } from '@/data/db';
-import { answerVocab, createVocab, LanguageRuleError, resetVocab, restoreVocab, softDeleteVocab, updateVocab, vocabReviews } from '@/data/languagesRepo';
+import { createVocab, LanguageRuleError, resetVocab, restoreVocab, softDeleteVocab, updateVocab, vocabReviews } from '@/data/languagesRepo';
 import { formatDateKey, todayKey } from '@/domain/dates';
-import { emptyVocabInput, GERMAN_ARTICLES, numberedToPinyin, PARTS_OF_SPEECH, speechLang, tonesOf, vocabInputOf, type GermanArticle, type Language, type PartOfSpeech, type VocabEntry, type VocabInput } from '@/domain/languages';
-import { cardStage, masteryScore, previewIntervals, RATINGS, sessionQueue, type CardStage, type Rating } from '@/domain/srs';
+import { emptyVocabInput, GERMAN_ARTICLES, numberedToPinyin, PARTS_OF_SPEECH, tonesOf, vocabInputOf, type GermanArticle, type Language, type PartOfSpeech, type VocabEntry, type VocabInput } from '@/domain/languages';
+import { cardStage, masteryScore, type CardStage } from '@/domain/srs';
 import { Badge } from '@/ui/Badge';
 import { Button } from '@/ui/Button';
 import { Dialog } from '@/ui/Dialog';
@@ -17,27 +17,9 @@ import { Surface } from '@/ui/Surface';
 import { Switch } from '@/ui/Switch';
 import { useToast } from '@/ui/toast';
 import { cn } from '@/ui/cn';
+import { LanguageReviewSession } from './ReviewsTab';
+import { canSpeak, displayTerm, speak, speakTextOf } from './vocabUtils';
 
-const NEW_PER_SESSION = 20;
-
-/** Lê o texto em voz alta com a voz do aparelho (funciona sem internet quando a voz está instalada). */
-export function speak(text: string, code: string) {
-  if (typeof window === 'undefined' || !('speechSynthesis' in window) || !text.trim()) return;
-  window.speechSynthesis.cancel();
-  const u = new SpeechSynthesisUtterance(text);
-  u.lang = speechLang(code);
-  u.rate = 0.9;
-  window.speechSynthesis.speak(u);
-}
-
-export const canSpeak = () => typeof window !== 'undefined' && 'speechSynthesis' in window;
-
-/** Como a palavra aparece: "der Hund", "你好 · nǐ hǎo". */
-export function displayTerm(v: Pick<VocabEntry, 'term' | 'german' | 'mandarin'>): string {
-  if (v.german?.article) return `${v.german.article} ${v.term}`;
-  if (v.mandarin?.characters && v.mandarin.characters !== v.term) return `${v.mandarin.characters} · ${v.term}`;
-  return v.term;
-}
 
 export function useVocab(languageId: string) {
   const all = useLiveQuery(() => getDb().vocab.where('languageId').equals(languageId).toArray(), [languageId]);
@@ -135,14 +117,14 @@ export function VocabTab({ lang }: { lang: Language }) {
               <button type="button" onClick={() => setEditing(v)} className="flex min-w-0 flex-1 flex-col text-left">
                 <span className="flex flex-wrap items-baseline gap-x-2 text-[0.9375rem] font-semibold text-fg">
                   {displayTerm(v)}
-                  {v.mandarin?.pinyin && v.mandarin.characters && <span className="text-sm font-normal text-muted">{v.mandarin.pinyin}</span>}
+                  {v.mandarin?.pinyin && v.mandarin.characters && v.mandarin.pinyin !== v.term && <span className="text-sm font-normal text-muted">{v.mandarin.pinyin}</span>}
                   {v.plural && <span className="text-xs font-normal text-muted">{t('languages.vocab.pluralShort', { plural: v.plural })}</span>}
                 </span>
                 <span className="truncate text-sm text-muted">{v.translation || v.meaning}</span>
               </button>
               {v.partOfSpeech && <Badge>{t(`languages.vocab.posNames.${v.partOfSpeech}`)}</Badge>}
               <Badge tone={cardStage(v.srs) === 'mature' ? 'success' : cardStage(v.srs) === 'new' ? 'info' : 'neutral'}>{t(`academy.review.stages.${cardStage(v.srs)}`)}</Badge>
-              {canSpeak() && <IconButton size="sm" label={t('languages.vocab.listen')} icon={<Volume2 className="h-4 w-4" />} onClick={() => speak(v.mandarin?.characters || (v.german?.article ? `${v.german.article} ${v.term}` : v.term), lang.code)} />}
+              {canSpeak() && <IconButton size="sm" label={t('languages.vocab.listen')} icon={<Volume2 className="h-4 w-4" />} onClick={() => speak(speakTextOf(v), lang.code)} />}
             </li>
           ))}
         </ul>
@@ -163,7 +145,7 @@ export function VocabTab({ lang }: { lang: Language }) {
       )}
 
       {editing && <VocabDialog lang={lang} entry={editing === 'new' ? null : editing} onClose={() => setEditing(null)} />}
-      {session && <VocabSession lang={lang} manual={session.manual} direction={direction} onClose={() => setSession(null)} />}
+      {session && <LanguageReviewSession lang={lang} deck={{ kind: 'vocab' }} manual={session.manual} direction={direction} onClose={() => setSession(null)} />}
     </div>
   );
 }
@@ -349,120 +331,3 @@ function VocabDialog({ lang, entry, onClose }: { lang: Language; entry: VocabEnt
   );
 }
 
-/* ---------- Revisão de vocabulário ---------- */
-
-const RATING_STYLE: Record<Rating, string> = {
-  again: 'bg-danger/15 text-danger ring-danger/30',
-  hard: 'bg-warning/15 text-fg ring-warning/30',
-  good: 'bg-success/15 text-fg ring-success/30',
-  easy: 'bg-blue/15 text-fg ring-blue/30',
-};
-
-function VocabSession({ lang, manual, direction, onClose }: { lang: Language; manual: boolean; direction: 'forward' | 'backward'; onClose: () => void }) {
-  const { t } = useSettings();
-  const today = todayKey();
-  const all = useLiveQuery(() => getDb().vocab.where('languageId').equals(lang.id).filter((v) => !v.deletedAt).toArray(), [lang.id]);
-  const [order, setOrder] = useState<string[] | null>(null);
-  const [index, setIndex] = useState(0);
-  const [flipped, setFlipped] = useState(false);
-  const [answers, setAnswers] = useState<Rating[]>([]);
-  const [requeued, setRequeued] = useState<string[]>([]);
-  if (all && order === null) {
-    setOrder(manual ? [...all].sort(() => Math.random() - 0.5).map((v) => v.id) : sessionQueue(all, today, { newLimit: NEW_PER_SESSION, reviewLimit: 200 }).map((v) => v.id));
-  }
-  const queue = [...(order ?? []), ...requeued];
-  const v = all?.find((x) => x.id === queue[index]);
-  const done = order !== null && index >= queue.length;
-  const preview = v ? previewIntervals(v.srs, today) : null;
-
-  const answer = async (r: Rating) => {
-    if (!v) return;
-    await answerVocab(v.id, r, manual);
-    setAnswers((a) => [...a, r]);
-    if (r === 'again' && !requeued.includes(v.id)) setRequeued((q) => [...q, v.id]);
-    setFlipped(false);
-    setIndex((i) => i + 1);
-  };
-
-  const term = v ? displayTerm(v) : '';
-  const front = direction === 'forward' ? term : (v?.translation || v?.meaning || '');
-  return (
-    <Dialog open onClose={onClose} closeLabel={t('common.close')} title={manual ? t('academy.review.practiceTitle') : t('languages.vocab.sessionTitle', { lang: lang.name })} size="lg">
-      {!all || order === null ? (
-        <LoadingState label={t('common.loading')} lines={3} />
-      ) : done || !v ? (
-        <div className="flex flex-col items-center gap-4 py-6 text-center">
-          <p className="text-lg font-semibold text-fg">{queue.length === 0 ? t('academy.review.nothingDue') : t('academy.review.finished')}</p>
-          {answers.length > 0 && (
-            <div className="flex flex-wrap justify-center gap-2">
-              {RATINGS.map((r) => (
-                <Badge key={r}>
-                  {t(`academy.review.ratings.${r}`)}: {answers.filter((a) => a === r).length}
-                </Badge>
-              ))}
-            </div>
-          )}
-          <Button variant="primary" onClick={onClose}>
-            {t('common.done')}
-          </Button>
-        </div>
-      ) : (
-        <div className="flex flex-col gap-4">
-          <div className="flex items-center justify-between text-xs text-muted">
-            <span>{t('academy.review.progress', { n: index + 1, total: queue.length })}</span>
-            {manual && <Badge>{t('academy.review.manualTag')}</Badge>}
-          </div>
-          <div className="h-1.5 overflow-hidden rounded-full bg-surface-3" aria-hidden>
-            <div className="h-full rounded-full transition-all" style={{ width: `${(index / queue.length) * 100}%`, background: lang.color }} />
-          </div>
-          <button
-            type="button"
-            onClick={() => setFlipped(!flipped)}
-            className="flex min-h-[14rem] flex-col items-center justify-center gap-3 rounded-3xl bg-surface-2/60 p-6 text-center ring-1 ring-line"
-            aria-label={flipped ? t('academy.review.hideAnswer') : t('academy.review.showAnswer')}
-          >
-            <span className="text-2xl font-semibold text-fg">{front}</span>
-            {direction === 'forward' && v.mandarin?.pinyin && v.mandarin.characters && !flipped && <span className="text-sm text-muted">{t('languages.vocab.tapForPinyin')}</span>}
-            {flipped ? (
-              <span className="flex w-full flex-col gap-2 border-t border-line pt-4 text-fg">
-                <span className="text-xl">{direction === 'forward' ? v.translation || v.meaning : term}</span>
-                {v.mandarin?.pinyin && v.mandarin.characters && <span className="text-sm text-muted">{v.mandarin.pinyin}</span>}
-                {v.german && (v.german.cases || v.german.prepositions || v.german.government) && (
-                  <span className="text-sm text-muted">{[v.german.cases, v.german.prepositions, v.german.government].filter(Boolean).join(' · ')}</span>
-                )}
-                {v.plural && <span className="text-sm text-muted">{t('languages.vocab.pluralShort', { plural: v.plural })}</span>}
-                {v.example && <span className="text-sm italic text-muted">{v.example}</span>}
-              </span>
-            ) : (
-              <span className="text-sm text-muted">{t('academy.review.tapToShow')}</span>
-            )}
-          </button>
-          {canSpeak() && (
-            <Button size="sm" variant="ghost" className="w-fit self-center" icon={<Volume2 className="h-4 w-4" />} onClick={() => speak(v.mandarin?.characters || (v.german?.article ? `${v.german.article} ${v.term}` : v.term), lang.code)}>
-              {t('languages.vocab.listen')}
-            </Button>
-          )}
-          {flipped ? (
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              {RATINGS.map((r) => (
-                <button key={r} type="button" onClick={() => void answer(r)} className={cn('flex flex-col items-center gap-0.5 rounded-2xl px-3 py-3 text-sm font-semibold ring-1 transition hover:brightness-110', RATING_STYLE[r])}>
-                  {t(`academy.review.ratings.${r}`)}
-                  {!manual && preview && <span className="text-xs font-normal opacity-80">{t('academy.review.inDays', { days: preview[r] })}</span>}
-                </button>
-              ))}
-            </div>
-          ) : (
-            <Button variant="primary" size="lg" onClick={() => setFlipped(true)}>
-              {t('academy.review.showAnswer')}
-            </Button>
-          )}
-          <div className="flex justify-end">
-            <Button size="sm" variant="ghost" icon={<X className="h-4 w-4" />} onClick={onClose}>
-              {t('academy.review.stop')}
-            </Button>
-          </div>
-        </div>
-      )}
-    </Dialog>
-  );
-}

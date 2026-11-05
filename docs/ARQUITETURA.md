@@ -37,6 +37,10 @@
 | 9 | 2 | + `contents` (conteúdo programático em árvore), `lessons` (registro de aulas), `doubts`. Tarefas e projetos ganham `subjectId` opcional (atividades e trabalhos da disciplina, sem cópia) |
 | 10 | 2 | + `decks`, `cards` (estado da repetição espaçada em `srs`, índice `srs.due`), `cardReviews` (histórico de cada resposta) |
 | 11 | 2 | + `studySessions` (planejamento de estudos) |
+| 12 | 2 | + `examPreps` (preparação para provas e pós-avaliação) |
+| 13 | 2 | + `languages` (ordem manual), `languageSessions` (sessões de estudo de idioma) |
+| 14 | 2 | + `vocab` (vocabulário com repetição espaçada, índice `srs.due`; campos de alemão e mandarim) |
+| 15 | 2 | + `grammarRules` (regras de gramática com exemplos, exercícios e repetição espaçada). As respostas de vocabulário e gramática ficam em `cardReviews` |
 
 ## Navegação
 

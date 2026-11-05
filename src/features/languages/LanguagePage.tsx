@@ -19,9 +19,12 @@ import { Switch } from '@/ui/Switch';
 import { useToast } from '@/ui/toast';
 import { cn } from '@/ui/cn';
 import { useLanguages, type LanguagesData } from './useLanguages';
+import { GrammarTab } from './GrammarTab';
+import { MaterialsTab, PronunciationTab } from './PronunciationTab';
+import { ReviewsTab } from './ReviewsTab';
 import { VocabTab } from './VocabTab';
 
-const TABS = ['overview', 'vocab', 'skills', 'sessions', 'history'] as const;
+const TABS = ['overview', 'vocab', 'grammar', 'reviews', 'skills', 'sessions', 'pronunciation', 'materials', 'history'] as const;
 type Tab = (typeof TABS)[number];
 
 export function LanguagePage() {
@@ -123,8 +126,12 @@ function LanguageDetail({ lang, data }: { lang: Language; data: LanguagesData })
 
       {tab === 'overview' && <Overview lang={lang} data={data} onTab={setTab} />}
       {tab === 'vocab' && <VocabTab lang={lang} />}
+      {tab === 'grammar' && <GrammarTab lang={lang} />}
+      {tab === 'reviews' && <ReviewsTab lang={lang} />}
       {tab === 'skills' && <SkillsTab lang={lang} />}
       {tab === 'sessions' && <SessionsTab lang={lang} data={data} />}
+      {tab === 'pronunciation' && <PronunciationTab lang={lang} />}
+      {tab === 'materials' && <MaterialsTab lang={lang} />}
       {tab === 'history' && <HistoryTab lang={lang} data={data} />}
 
       {editing && <EditLanguageDialog lang={lang} onClose={() => setEditing(false)} />}

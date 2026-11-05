@@ -295,3 +295,68 @@ export function speechLang(code: string): string {
   const map: Record<string, string> = { pt: 'pt-BR', en: 'en-US', de: 'de-DE', es: 'es-ES', zh: 'zh-CN', fr: 'fr-FR', it: 'it-IT', ja: 'ja-JP', ko: 'ko-KR' };
   return map[c] ?? (c || 'en-US');
 }
+
+/* ---------- Gramática (Parte 10.4) ---------- */
+
+export interface GrammarExercise {
+  id: string;
+  question: string;
+  answer: string;
+  result: 'pending' | 'right' | 'wrong';
+}
+
+export interface GrammarRule extends BaseEntity {
+  languageId: string;
+  title: string;
+  /** Tema (ex.: verbos, casos, tempos verbais). */
+  topic: string;
+  level: CefrLevel | null;
+  explanation: string;
+  examples: string[];
+  exercises: GrammarExercise[];
+  notes: string;
+  /** Entra na revisão espaçada (Parte 10.7). */
+  srs: SrsState;
+}
+
+export type GrammarInput = Pick<GrammarRule, 'languageId' | 'title' | 'topic' | 'level' | 'explanation' | 'examples' | 'exercises' | 'notes'>;
+
+export const grammarInputSchema = z.object({
+  languageId: z.string().min(1),
+  title: z.string().trim().min(1).max(200),
+  topic: z.string().max(60),
+  level: z.enum(CEFR_LEVELS).nullable(),
+  explanation: z.string().max(20_000),
+  examples: z.array(z.string().trim().min(1).max(1000)).max(50),
+  exercises: z.array(z.object({ id: z.string(), question: z.string().trim().min(1).max(2000), answer: z.string().max(2000), result: z.enum(['pending', 'right', 'wrong']) })).max(200),
+  notes: z.string().max(8000),
+});
+
+export function emptyGrammarInput(languageId: string): GrammarInput {
+  return { languageId, title: '', topic: '', level: null, explanation: '', examples: [], exercises: [], notes: '' };
+}
+
+export function grammarInputOf(g: GrammarRule): GrammarInput {
+  const { languageId, title, topic, level, explanation, examples, exercises, notes } = g;
+  return { languageId, title, topic, level, explanation, examples, exercises, notes };
+}
+
+/* ---------- Revisão: baralhos do idioma (Parte 10.7) ---------- */
+
+/**
+ * Um "baralho" de revisão do idioma: tudo, a gramática, todo o vocabulário
+ * (`category` ausente), uma categoria do vocabulário ou as palavras sem categoria (`null`).
+ */
+export type LanguageDeck = { kind: 'all' } | { kind: 'vocab'; category?: string | null } | { kind: 'grammar' };
+
+export function deckKey(d: LanguageDeck): string {
+  return d.kind === 'vocab' ? `vocab:${d.category === undefined ? '*' : (d.category ?? '')}` : d.kind;
+}
+
+/** O baralho inclui esta palavra? */
+export function deckHasVocab(d: LanguageDeck, v: Pick<VocabEntry, 'category'>): boolean {
+  if (d.kind === 'all') return true;
+  if (d.kind !== 'vocab') return false;
+  if (d.category === undefined) return true;
+  return d.category === null ? !v.category : v.category === d.category;
+}

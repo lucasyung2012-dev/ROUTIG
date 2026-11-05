@@ -87,3 +87,40 @@ describe('vocabulário (Parte 10.3)', () => {
     expect((await vocabReviews(v.id)).map((r) => r.rating)).toEqual(['good']);
   });
 });
+
+describe('gramática e revisões (Partes 10.4 e 10.7)', () => {
+  it('não duplica regra no mesmo idioma, limpa exemplos vazios e revisa com repetição espaçada', async () => {
+    const { createGrammar, answerGrammar, softDeleteGrammar, restoreGrammar } = await import('@/data/grammarRepo');
+    const { emptyGrammarInput } = await import('@/domain/languages');
+    const de = await createLanguage({ name: 'Alemão', code: 'de', color: '#E5484D' });
+    const en = await createLanguage({ name: 'Inglês', code: 'en', color: '#438BEA' });
+    const g = await createGrammar({ ...emptyGrammarInput(de.id), title: 'Dativ', examples: ['Ich helfe dem Mann.', '  '] });
+    expect(g.examples).toEqual(['Ich helfe dem Mann.']);
+    await expect(createGrammar({ ...emptyGrammarInput(de.id), title: ' dativ ' })).rejects.toMatchObject({ code: 'duplicate' });
+    await createGrammar({ ...emptyGrammarInput(en.id), title: 'Dativ' });
+    await softDeleteGrammar(g.id);
+    await createGrammar({ ...emptyGrammarInput(de.id), title: 'Dativ' }).then((x) => softDeleteGrammar(x.id));
+    await restoreGrammar(g.id);
+
+    const free = await answerGrammar(g.id, 'easy', true, '2026-11-04');
+    expect(free.srs.reps).toBe(0);
+    const after = await answerGrammar(g.id, 'good', false, '2026-11-04');
+    expect(after.srs).toMatchObject({ due: '2026-11-05', reps: 1 });
+    const reviews = await getDb().cardReviews.where('cardId').equals(g.id).toArray();
+    expect(reviews.map((r) => [r.rating, r.manual])).toEqual([['easy', true], ['good', false]]);
+  });
+
+  it('cada baralho de revisão pega as palavras certas', async () => {
+    const { deckHasVocab, deckKey } = await import('@/domain/languages');
+    const food = { category: 'comida' };
+    const none = { category: '' };
+    expect(deckHasVocab({ kind: 'all' }, food)).toBe(true);
+    expect(deckHasVocab({ kind: 'vocab' }, none)).toBe(true);
+    expect(deckHasVocab({ kind: 'vocab', category: 'comida' }, food)).toBe(true);
+    expect(deckHasVocab({ kind: 'vocab', category: 'comida' }, none)).toBe(false);
+    expect(deckHasVocab({ kind: 'vocab', category: null }, none)).toBe(true);
+    expect(deckHasVocab({ kind: 'vocab', category: null }, food)).toBe(false);
+    expect(deckHasVocab({ kind: 'grammar' }, food)).toBe(false);
+    expect(new Set([deckKey({ kind: 'vocab' }), deckKey({ kind: 'vocab', category: null }), deckKey({ kind: 'all' }), deckKey({ kind: 'grammar' })]).size).toBe(4);
+  });
+});

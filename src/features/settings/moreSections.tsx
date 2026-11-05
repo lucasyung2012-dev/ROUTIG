@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { Wifi, WifiOff } from 'lucide-react';
-import { MODULES, NAV_MODULE_IDS, type ModuleId } from '@/app/modules';
+import { MODULES, NAV_MODULE_IDS } from '@/app/modules';
 import { useSettings } from '@/app/SettingsProvider';
 import { isModuleReady } from '@/app/version';
 import { Badge } from '@/ui/Badge';
@@ -24,11 +24,7 @@ function Row({ title, hint, children }: { title: string; hint?: ReactNode; child
 
 /* ---------- Módulos ---------- */
 
-/** Módulos prontos que têm opções próprias (o texto diz onde elas ficam). */
-const MODULE_OPTIONS = ['dashboard', 'tasks', 'calendar', 'academy', 'projects', 'notes', 'inbox'] as const;
-type ModuleWithOptions = (typeof MODULE_OPTIONS)[number];
-const hasOptions = (id: ModuleId): id is ModuleWithOptions => (MODULE_OPTIONS as readonly string[]).includes(id);
-
+/** Cada módulo e onde ficam as opções dele (o texto diz o caminho). */
 export function ModulesSection() {
   const { settings, t } = useSettings();
   return (
@@ -54,7 +50,7 @@ export function ModulesSection() {
                   <Badge tone={ready ? 'success' : 'neutral'}>{ready ? t('dashboard.readyLabel') : t('dashboard.stageLabel', { stage: def.stage })}</Badge>
                   {hidden && <Badge>{t('settings.modules.hidden')}</Badge>}
                 </div>
-                <p className="mt-1 text-sm leading-relaxed text-muted">{hasOptions(id) ? t(`settings.modules.options.${id}`) : t('settings.modules.notYet')}</p>
+                <p className="mt-1 text-sm leading-relaxed text-muted">{t(`settings.modules.options.${id}`)}</p>
               </div>
               {ready && (
                 <Link to={def.path} className="shrink-0 text-sm font-medium text-accent hover:underline">

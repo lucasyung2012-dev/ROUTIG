@@ -989,6 +989,7 @@ export const pt = {
       notes: 'Observações',
       reminders: 'Lembretes',
       remindersLater: 'O aviso aparece no sino e, se permitido, no aparelho (Settings → Notificações).',
+      allDayScope: 'Dia inteiro muda a forma do evento: escolha "Toda a série" ou "Esta e as próximas" para mudar isso.',
       reminderAtStart: 'Na hora',
       reminderMin: '{n} min antes',
       reminderHour: '{n} h antes',
@@ -4064,6 +4065,7 @@ export const pt = {
   insights: {
     allPrivate: 'Todos os módulos estão fora do Insights pela privacidade (Settings → Privacidade).',
     privateNote: '(fora pela privacidade)',
+    financeLocked: 'Finanças está trancado pelo PIN: os números de Finanças aparecem aqui depois de abrir Finanças com o PIN.',
     period: 'Período',
     periods: {
       week: 'Semana',
@@ -4374,6 +4376,8 @@ export const pt = {
       forgotTitle: 'Esqueceu o PIN?',
       forgotBody: 'Sem servidor, o PIN não pode ser recuperado nem enviado por e-mail. O único caminho é apagar os dados deste aparelho e depois restaurar um backup exportado (Settings → Backup).',
       back: 'Voltar para o PIN',
+      loadFailedTitle: 'Não deu para conferir o bloqueio',
+      loadFailed: 'Por segurança, o ROUTIG não abre sem saber se há um PIN. Recarregue; se continuar, feche e abra o app de novo.',
     },
   },
   transfer: {

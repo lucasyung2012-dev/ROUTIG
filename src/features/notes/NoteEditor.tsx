@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { getDb } from '@/data/db';
 import { useSettings } from '@/app/SettingsProvider';
 import { noteVersions, restoreNote, restoreVersion, saveAsTemplate, saveNote, softDeleteNote, type NoteInput } from '@/data/notesRepo';
-import { blocksToText, newBlock, noteText, textToBlocks, type Block, type Note } from '@/domain/notes';
+import { blocksToText, joinSegments, newBlock, noteText, quickSegments, textToBlocks, type Block, type Note, type QuickSegment } from '@/domain/notes';
 import { normalizeTags } from '@/domain/tasks';
 import { useEventEditor } from '@/features/calendar/EventEditor';
 import { useCalendarData } from '@/features/calendar/useCalendarData';
@@ -95,7 +95,11 @@ export function NoteEditor({ note, data, onDeleted }: { note: Note; data: NotesD
     toast.show(t('notes.movedToTrash'), 'success', { label: t('notes.undo'), run: () => void restoreNote(note.id) });
   };
 
-  const { text, rest } = blocksToText(draft.blocks);
+  // Modo rápido: trechos na ordem original, sempre com um espaço de texto no fim para continuar escrevendo.
+  const segments = quickSegments(draft.blocks);
+  const quickView: QuickSegment[] = segments[segments.length - 1]?.kind === 'text' ? segments : [...segments, { kind: 'text', blocks: [] }];
+  const setSegment = (i: number, replacement: QuickSegment[]) =>
+    change({ blocks: joinSegments(quickView.flatMap((s, j) => (j === i ? replacement : [s]))) });
 
   return (
     <div className="flex flex-col gap-4">
@@ -139,14 +143,21 @@ export function NoteEditor({ note, data, onDeleted }: { note: Note; data: NotesD
       <div className="min-h-[16rem] rounded-2xl bg-surface p-3 ring-1 ring-line/60 sm:p-5">
         {draft.mode === 'quick' ? (
           <div className="flex flex-col gap-4">
-            <AutoTextarea
-              value={text}
-              aria-label={t('notes.modeQuick')}
-              placeholder={t('notes.quickPlaceholder')}
-              onChange={(e) => change({ blocks: [...textToBlocks(e.target.value), ...rest] })}
-              className="min-h-[12rem] text-[0.9375rem] leading-relaxed text-fg placeholder:text-subtle"
-            />
-            {rest.length > 0 && <BlockEditor blocks={rest} hideAddBar allowEmpty onChange={(r) => change({ blocks: [...textToBlocks(text), ...r] })} />}
+            {/* Cada trecho fica no lugar: editar o texto não manda imagens, tabelas e desenhos para o fim. */}
+            {quickView.map((s, i) =>
+              s.kind === 'text' ? (
+                <AutoTextarea
+                  key={`t${i}`}
+                  value={blocksToText(s.blocks).text}
+                  aria-label={t('notes.modeQuick')}
+                  placeholder={i === 0 ? t('notes.quickPlaceholder') : undefined}
+                  onChange={(e) => setSegment(i, [{ kind: 'text', blocks: textToBlocks(e.target.value) }])}
+                  className={cn('text-[0.9375rem] leading-relaxed text-fg placeholder:text-subtle', i === quickView.length - 1 ? 'min-h-[8rem]' : 'min-h-[2.5rem]')}
+                />
+              ) : (
+                <BlockEditor key={s.block.id} blocks={[s.block]} hideAddBar allowEmpty onChange={(r) => setSegment(i, r.map((block) => ({ kind: 'block' as const, block })))} />
+              ),
+            )}
             <div className="flex flex-wrap gap-1.5 border-t border-line/60 pt-3">
               {([
                 ['image', ImagePlus],

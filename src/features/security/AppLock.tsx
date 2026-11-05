@@ -7,6 +7,7 @@ import { shouldRelock, type SecurityConfig } from '@/domain/security';
 import { Button } from '@/ui/Button';
 import { Field, Input } from '@/ui/Field';
 import { Surface } from '@/ui/Surface';
+import { ErrorState } from '@/ui/States';
 import { EraseForm } from './securityUi';
 
 interface AppLockApi {
@@ -31,6 +32,7 @@ export function AppLock({ children }: { children: ReactNode }) {
   const [cfg, setCfg] = useState<SecurityConfig | null>(null);
   const [locked, setLocked] = useState(true);
   const [opened, setOpened] = useState(false);
+  const [failed, setFailed] = useState(false);
   const cfgRef = useRef<SecurityConfig | null>(null);
   const hiddenAt = useRef<number | null>(null);
   const wrap = useRef<HTMLDivElement>(null);
@@ -51,10 +53,8 @@ export function AppLock({ children }: { children: ReactNode }) {
           setOpened(true);
         }
       })
-      .catch(() => {
-        setLocked(false);
-        setOpened(true);
-      });
+      // Se não der para saber se há PIN, o app não abre destravado: mostra o erro e pede para recarregar.
+      .catch(() => setFailed(true));
   }, []);
 
   useEffect(() => {
@@ -89,6 +89,7 @@ export function AppLock({ children }: { children: ReactNode }) {
   );
 
   const showLock = locked && !!cfg?.pin;
+  if (failed) return <LockError />;
   return (
     <Ctx.Provider value={api}>
       <div ref={wrap} className="h-full" aria-hidden={locked || undefined}>
@@ -103,6 +104,23 @@ export function AppLock({ children }: { children: ReactNode }) {
         />
       )}
     </Ctx.Provider>
+  );
+}
+
+function LockError() {
+  const { t } = useSettings();
+  return (
+    <div className="ambient flex h-full items-center justify-center p-6">
+      <ErrorState
+        title={t('security.lock.loadFailedTitle')}
+        body={t('security.lock.loadFailed')}
+        action={
+          <Button variant="primary" onClick={() => window.location.reload()}>
+            {t('errors.reload')}
+          </Button>
+        }
+      />
+    </div>
   );
 }
 

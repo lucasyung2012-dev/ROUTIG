@@ -177,6 +177,28 @@ export function blocksToText(blocks: Block[]): { text: string; rest: Block[] } {
   return { text: lines.join('\n'), rest };
 }
 
+/** Trecho do modo rápido: texto corrido (vários blocos de texto) ou um bloco que não é texto (imagem, tabela, desenho…). */
+export type QuickSegment = { kind: 'text'; blocks: Block[] } | { kind: 'block'; block: Block };
+
+const QUICK_TEXT_TYPES = new Set<BlockType>(['paragraph', 'heading', 'bullet', 'numbered', 'todo', 'quote', 'divider']);
+
+/** Divide a nota em trechos na ordem original, para editar o texto sem mover imagens, tabelas e desenhos. */
+export function quickSegments(blocks: Block[]): QuickSegment[] {
+  const out: QuickSegment[] = [];
+  for (const b of blocks) {
+    const last = out[out.length - 1];
+    if (QUICK_TEXT_TYPES.has(b.type)) {
+      if (last?.kind === 'text') last.blocks.push(b);
+      else out.push({ kind: 'text', blocks: [b] });
+    } else out.push({ kind: 'block', block: b });
+  }
+  return out;
+}
+
+export function joinSegments(segments: QuickSegment[]): Block[] {
+  return segments.flatMap((s) => (s.kind === 'text' ? s.blocks : [s.block]));
+}
+
 /** Texto puro da nota, para busca e prévia. */
 export function noteText(note: Pick<Note, 'title' | 'blocks'>): string {
   const parts: string[] = [note.title];

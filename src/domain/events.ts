@@ -24,6 +24,8 @@ export interface OccurrenceOverride {
   durationMin?: number;
   location?: string;
   description?: string;
+  categoryId?: string;
+  notes?: string;
   /** Ocorrência movida para outro dia. */
   date?: DateKey;
 }
@@ -94,6 +96,8 @@ export const eventInputSchema = z
         durationMin: z.number().int().min(5).max(24 * 60).optional(),
         location: z.string().max(300).optional(),
         description: z.string().max(20_000).optional(),
+        categoryId: z.string().min(1).optional(),
+        notes: z.string().max(20_000).optional(),
         date: dateKey.optional(),
       }),
     ),
@@ -155,6 +159,9 @@ export interface EventOccurrence {
   title: string;
   location: string;
   description: string;
+  /** Categoria e observações desta ocorrência (a da série, se não mudou só aqui). */
+  categoryId: string;
+  notes: string;
   overridden: boolean;
 }
 
@@ -173,6 +180,8 @@ function materialize(event: CalendarEvent, seriesDate: DateKey): EventOccurrence
     title: o.title ?? event.title,
     location: o.location ?? event.location,
     description: o.description ?? event.description,
+    categoryId: o.categoryId ?? event.categoryId,
+    notes: o.notes ?? event.notes,
     overridden: Object.keys(o).length > 0,
   };
 }

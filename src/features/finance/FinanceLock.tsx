@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Lock } from 'lucide-react';
 import { useSettings } from '@/app/SettingsProvider';
-import { checkFinancePin, hasFinancePin, removeFinancePin, setFinancePin } from '@/data/financePlanRepo';
+import { checkFinancePin, hasFinancePin, removeFinancePin, setFinancePin, tryFinanceUnlock } from '@/data/financePlanRepo';
 import { Button } from '@/ui/Button';
 import { ConfirmDialog } from '@/ui/ConfirmDialog';
 import { Dialog } from '@/ui/Dialog';
@@ -13,6 +13,11 @@ import { useToast } from '@/ui/toast';
 /** Desbloqueado até recarregar o app ou bloquear de novo. */
 let unlocked = false;
 
+/** Finanças está aberto nesta sessão? (o Insights só mostra Finanças com o PIN digitado) */
+export function isFinanceUnlocked(): boolean {
+  return unlocked;
+}
+
 /** Controle de acesso de Finanças (Parte 16.8): um PIN opcional, só deste aparelho. */
 export function FinanceLock({ children }: { children: ReactNode }) {
   const { t } = useSettings();
@@ -20,6 +25,7 @@ export function FinanceLock({ children }: { children: ReactNode }) {
   const [pin, setPin] = useState('');
   const [error, setError] = useState(false);
   const [forgot, setForgot] = useState(false);
+  const [waitSec, setWaitSec] = useState(0);
   useEffect(() => {
     if (unlocked) return;
     void hasFinancePin().then((has) => setState(has ? 'locked' : 'open'));
@@ -27,11 +33,13 @@ export function FinanceLock({ children }: { children: ReactNode }) {
   if (state === 'checking') return <LoadingState label={t('common.loading')} lines={3} />;
   if (state === 'open') return <>{children}</>;
   const tryPin = async () => {
-    if (await checkFinancePin(pin)) {
+    const r = await tryFinanceUnlock(pin);
+    if (r.ok) {
       unlocked = true;
       setState('open');
     } else {
       setError(true);
+      setWaitSec(r.waitSec);
       setPin('');
     }
   };
@@ -49,7 +57,7 @@ export function FinanceLock({ children }: { children: ReactNode }) {
             void tryPin();
           }}
         >
-          <Field label={t('finance.lock.pin')} error={error ? t('finance.lock.wrong') : undefined}>
+          <Field label={t('finance.lock.pin')} error={error ? (waitSec > 0 ? t('security.lock.wait', { count: waitSec }) : t('finance.lock.wrong')) : undefined}>
             {(id, d) => <Input id={id} aria-describedby={d} autoFocus type="password" inputMode="numeric" autoComplete="off" maxLength={8} value={pin} onChange={(e) => (setPin(e.target.value.replace(/\D/g, '')), setError(false))} className="text-center text-2xl tracking-[0.5em]" />}
           </Field>
           <Button type="submit" variant="primary" disabled={pin.length < 4}>

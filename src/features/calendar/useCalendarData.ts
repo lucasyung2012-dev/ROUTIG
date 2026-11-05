@@ -72,8 +72,8 @@ export function useCalendarData(): CalendarData {
     const itemsInRange: CalendarData['itemsInRange'] = (from, to, opts) => {
       const items: CalendarItem[] = [];
       for (const e of events) {
-        if (opts.categoryId && e.categoryId !== opts.categoryId) continue;
         for (const o of occurrencesInRange(e, from, to)) {
+          if (opts.categoryId && o.categoryId !== opts.categoryId) continue;
           const start = o.startTime ? toMinutes(o.startTime) : null;
           items.push({
             key: `e:${e.id}:${o.seriesDate}`,
@@ -85,9 +85,9 @@ export function useCalendarData(): CalendarData {
             end: start === null ? null : Math.min(start + o.durationMin, 24 * 60),
             title: o.title,
             location: o.location,
-            tone: toneOf(e.categoryId),
-            color: colorOf(e.categoryId),
-            categoryId: e.categoryId,
+            tone: toneOf(o.categoryId),
+            color: colorOf(o.categoryId),
+            categoryId: o.categoryId,
             done: false,
             occurrence: o,
             conflictWith: [],

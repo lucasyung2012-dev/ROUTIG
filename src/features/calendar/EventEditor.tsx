@@ -75,6 +75,8 @@ function draftFor(event: CalendarEvent, seriesDate: DateKey): EventInput {
     title: o.title ?? base.title,
     location: o.location ?? base.location,
     description: o.description ?? base.description,
+    categoryId: o.categoryId ?? base.categoryId,
+    notes: o.notes ?? base.notes,
     startTime: o.startTime !== undefined ? o.startTime : base.startTime,
     durationMin: o.durationMin ?? base.durationMin,
     start: date,
@@ -159,8 +161,15 @@ function EventEditorForm({ target, onClose, cal }: { target: EditorTarget; onClo
       } else if (s === 'this') {
         // Só guarda o que difere da série, para a ocorrência continuar acompanhando o resto.
         const base = inputOf(event);
+        // "Dia inteiro" muda a forma do evento: só vale para a série ou para "esta e as próximas".
+        if (draft.allDay !== base.allDay) {
+          toast.show(t('calendar.editor.allDayScope'), 'error');
+          return;
+        }
         const o: OccurrenceOverride = {};
         if (draft.title !== base.title) o.title = draft.title;
+        if (draft.categoryId !== base.categoryId) o.categoryId = draft.categoryId;
+        if (draft.notes !== base.notes) o.notes = draft.notes;
         if (draft.location !== base.location) o.location = draft.location;
         if (draft.description !== base.description) o.description = draft.description;
         if (draft.startTime !== base.startTime) o.startTime = draft.startTime;

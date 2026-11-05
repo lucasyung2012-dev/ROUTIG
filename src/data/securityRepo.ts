@@ -37,15 +37,13 @@ export class PinError extends Error {
 export async function setAppPin(pin: string, current?: string): Promise<void> {
   if (!isValidPin(pin)) throw new PinError('invalid');
   const cfg = await loadSecurity();
-  if (cfg.pin && !(current !== undefined && (await matches(cfg.pin, current)))) throw new PinError('wrong');
-  const salt = hex(crypto.getRandomValues(new Uint8Array(16)));
-  const next: PinHash = { salt, hash: await derive(pin, salt, ITERATIONS), iterations: ITERATIONS };
-  await saveSecurity({ ...cfg, pin: next, failed: 0, blockedUntil: null });
+  if (cfg.pin && !(current !== undefined && (await pinMatches(cfg.pin, current)))) throw new PinError('wrong');
+  await saveSecurity({ ...cfg, pin: await hashPin(pin), failed: 0, blockedUntil: null });
 }
 
 export async function removeAppPin(current: string): Promise<void> {
   const cfg = await loadSecurity();
-  if (cfg.pin && !(await matches(cfg.pin, current))) throw new PinError('wrong');
+  if (cfg.pin && !(await pinMatches(cfg.pin, current))) throw new PinError('wrong');
   await saveSecurity({ ...cfg, pin: null, failed: 0, blockedUntil: null });
 }
 
@@ -53,9 +51,16 @@ export async function setLockAfter(lockAfterMin: LockAfter): Promise<void> {
   await saveSecurity({ ...(await loadSecurity()), lockAfterMin });
 }
 
-async function matches(pin: PinHash, attempt: string): Promise<boolean> {
+/** Hash forte de um PIN (também usado pelo PIN de Finanças). */
+export async function hashPin(pin: string): Promise<PinHash> {
+  const salt = hex(crypto.getRandomValues(new Uint8Array(16)));
+  return { salt, hash: await derive(pin, salt, ITERATIONS), iterations: ITERATIONS };
+}
+
+export async function pinMatches(pin: PinHash, attempt: string): Promise<boolean> {
   return (await derive(attempt, pin.salt, pin.iterations)) === pin.hash;
 }
+
 
 export type UnlockResult = { ok: true } | { ok: false; waitSec: number };
 
@@ -65,7 +70,7 @@ export async function tryUnlock(attempt: string, now = new Date()): Promise<Unlo
   if (!cfg.pin) return { ok: true };
   const blocked = secondsBlocked(cfg, now);
   if (blocked > 0) return { ok: false, waitSec: blocked };
-  if (await matches(cfg.pin, attempt)) {
+  if (await pinMatches(cfg.pin, attempt)) {
     if (cfg.failed || cfg.blockedUntil) await saveSecurity({ ...cfg, failed: 0, blockedUntil: null });
     return { ok: true };
   }

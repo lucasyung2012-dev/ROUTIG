@@ -65,6 +65,13 @@ export async function removeEventCategory(id: string): Promise<number> {
   const cat = config.categories.find((c) => c.id === id);
   if (!cat || cat.builtin) throw new EventRuleError('invalid');
   const moved = await db.events.where('categoryId').equals(id).modify({ categoryId: 'other', updatedAt: nowIso() });
+  // Ocorrências que mudaram de categoria só naquela data também vão para "Outro".
+  await db.events
+    .filter((e) => Object.values(e.overrides ?? {}).some((o) => o.categoryId === id))
+    .modify((e) => {
+      for (const o of Object.values(e.overrides)) if (o.categoryId === id) o.categoryId = 'other';
+      e.updatedAt = nowIso();
+    });
   await saveCalendarConfig({ categories: config.categories.filter((c) => c.id !== id) });
   return moved;
 }

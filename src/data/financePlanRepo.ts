@@ -3,6 +3,8 @@ import { newId, nowIso } from '@/domain/ids';
 import type { ChangeEntry } from '@/domain/entity';
 import { journalInputSchema, type BudgetCategory, type BudgetEntry, type JournalEntry, type JournalInput } from '@/domain/finance';
 import { FinanceRuleError } from './financeRepo';
+import { hashPin, pinMatches, type UnlockResult } from './securityRepo';
+import { secondsBlocked, waitAfterFailures } from '@/domain/security';
 
 async function log(entry: Omit<ChangeEntry, 'at' | 'seq'>): Promise<void> {
   await getDb().changelog.add({ at: nowIso(), ...entry });
@@ -120,26 +122,68 @@ export async function savePlanPrefs(p: PlanPrefs): Promise<void> {
 
 const PIN_KEY = 'finance.pin';
 
+/** Formato guardado: hash forte (PBKDF2) + tentativas erradas. Até a V1.0.0 era um SHA-256 só (sem `iterations`). */
+interface FinancePinValue {
+  salt: string;
+  hash: string;
+  iterations?: number;
+  failed?: number;
+  blockedUntil?: string | null;
+}
+
 async function sha256(text: string): Promise<string> {
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
   return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-/** O PIN nunca é guardado: só o resultado do hash com um sal aleatório. */
+async function loadPin(): Promise<FinancePinValue | undefined> {
+  return (await getDb().kv.get(PIN_KEY))?.value as FinancePinValue | undefined;
+}
+
+async function savePin(v: FinancePinValue): Promise<void> {
+  await getDb().kv.put({ key: PIN_KEY, value: v, updatedAt: nowIso() });
+}
+
+/** Confere o PIN no formato novo (PBKDF2) ou no antigo (SHA-256); o antigo é convertido no primeiro acerto. */
+async function pinOk(v: FinancePinValue, pin: string): Promise<boolean> {
+  if (v.iterations) return pinMatches({ salt: v.salt, hash: v.hash, iterations: v.iterations }, pin);
+  if ((await sha256(`${v.salt}:${pin}`)) !== v.hash) return false;
+  await savePin({ ...(await hashPin(pin)), failed: 0, blockedUntil: null });
+  return true;
+}
+
+/** O PIN nunca é guardado: só o hash forte com sal (o mesmo do PIN do app). */
 export async function setFinancePin(pin: string): Promise<void> {
   if (!/^\d{4,8}$/.test(pin)) throw new FinanceRuleError('invalid');
-  const salt = [...crypto.getRandomValues(new Uint8Array(16))].map((b) => b.toString(16).padStart(2, '0')).join('');
-  await getDb().kv.put({ key: PIN_KEY, value: { salt, hash: await sha256(`${salt}:${pin}`) }, updatedAt: nowIso() });
+  await savePin({ ...(await hashPin(pin)), failed: 0, blockedUntil: null });
 }
 
 export async function hasFinancePin(): Promise<boolean> {
   return !!(await getDb().kv.get(PIN_KEY))?.value;
 }
 
+/** Confere sem contar tentativa (para trocar ou remover o PIN, com Finanças já aberto). */
 export async function checkFinancePin(pin: string): Promise<boolean> {
-  const v = (await getDb().kv.get(PIN_KEY))?.value as { salt: string; hash: string } | undefined;
+  const v = await loadPin();
   if (!v) return true;
-  return (await sha256(`${v.salt}:${pin}`)) === v.hash;
+  return pinOk(v, pin);
+}
+
+/** Desbloquear Finanças: erros seguidos fazem esperar cada vez mais, como no PIN do app. */
+export async function tryFinanceUnlock(pin: string, now = new Date()): Promise<UnlockResult> {
+  const v = await loadPin();
+  if (!v) return { ok: true };
+  const blocked = secondsBlocked({ blockedUntil: v.blockedUntil ?? null }, now);
+  if (blocked > 0) return { ok: false, waitSec: blocked };
+  if (await pinOk(v, pin)) {
+    const cur = await loadPin();
+    if (cur && (cur.failed || cur.blockedUntil)) await savePin({ ...cur, failed: 0, blockedUntil: null });
+    return { ok: true };
+  }
+  const failed = (v.failed ?? 0) + 1;
+  const wait = waitAfterFailures(failed);
+  await savePin({ ...v, failed, blockedUntil: wait ? new Date(now.getTime() + wait * 1000).toISOString() : null });
+  return { ok: false, waitSec: wait };
 }
 
 export async function removeFinancePin(): Promise<void> {

@@ -35,6 +35,8 @@ import { Surface } from '@/ui/Surface';
 import { cn } from '@/ui/cn';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { loadPrivacy } from '@/data/privacyRepo';
+import { hasFinancePin } from '@/data/financePlanRepo';
+import { isFinanceUnlocked } from '@/features/finance/FinanceLock';
 import { useInsightsData, type InsightsRaw } from './useInsightsData';
 
 const MODULES = ['focus', 'habits', 'tasks', 'academy', 'languages', 'music', 'sports', 'projects', 'goals', 'finance'] as const;
@@ -92,11 +94,12 @@ export function InsightsPage() {
   const [prefs, setPrefs] = usePrefs();
   const { hide, toggle } = useHideToggle();
   const privacy = useLiveQuery(() => loadPrivacy(), []);
+  const financePin = useLiveQuery(() => hasFinancePin(), []);
   const range = kind === 'custom' ? custom : rangeFor(kind, anchor, settings.weekStartsOn);
   const prev = previousRange(range);
   const now = useMemo(() => raw && compute(raw, range, today, settings.weekStartsOn), [raw, range.from, range.to, today, settings.weekStartsOn]);
   const before = useMemo(() => raw && compute(raw, prev, today, settings.weekStartsOn), [raw, prev.from, prev.to, today, settings.weekStartsOn]);
-  if (!raw || !now || !before || !privacy) return <LoadingState label={t('common.loading')} lines={6} />;
+  if (!raw || !now || !before || !privacy || financePin === undefined) return <LoadingState label={t('common.loading')} lines={6} />;
 
   const shift = (n: number) => {
     if (kind === 'week') setAnchor(addDays(anchor, 7 * n));
@@ -112,7 +115,9 @@ export function InsightsPage() {
           ? range.from.slice(0, 4)
           : `${formatDateKey(range.from, settings.locale, { day: 'numeric', month: 'short', year: 'numeric' })} – ${formatDateKey(range.to, settings.locale, { day: 'numeric', month: 'short', year: 'numeric' })}`;
   // Módulos tirados do Insights pela privacidade não aparecem em lugar nenhum daqui, nem no relatório (Parte 26.1).
-  const locked = MODULES.filter((m) => privacy.insightsHidden.includes(m));
+  // Com PIN de Finanças e Finanças trancado nesta sessão, os números de Finanças também ficam de fora.
+  const financeLocked = financePin && !isFinanceUnlocked();
+  const locked = MODULES.filter((m) => privacy.insightsHidden.includes(m) || (m === 'finance' && financeLocked));
   const allowed = MODULES.filter((m) => !locked.includes(m));
   const visible = allowed.filter((m) => !prefs.hidden.includes(m));
   const shownMod = allowed.includes(mod) ? mod : allowed[0];
@@ -157,6 +162,7 @@ export function InsightsPage() {
           <Segmented<Level> label={t('insights.level')} value={level} onChange={setLevel} options={(['overview', 'module', 'report'] as const).map((l) => ({ value: l, label: t(`insights.levels.${l}`) }))} />
         </Surface>
         <p className="text-xs text-muted print:hidden">{t('insights.integrity')}</p>
+        {financeLocked && <p className="text-xs text-muted print:hidden">{t('insights.financeLocked')}</p>}
 
         <div className="flex flex-col gap-6 print:gap-3" data-private="insights">
         {level === 'overview' && <Overview now={now} before={prefs.compare ? before : null} modules={visible} onOpen={(m) => (setMod(m), setLevel('module'))} />}

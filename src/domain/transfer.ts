@@ -11,7 +11,9 @@ import type { Recurrence } from './tasks';
 /* ---------- CSV ---------- */
 
 const csvCell = (v: string | number | null | undefined) => {
-  const s = v === null || v === undefined ? '' : String(v);
+  let s = v === null || v === undefined ? '' : String(v);
+  // Texto que começa como fórmula (=, +, -, @, tab) vira texto no Excel com um apóstrofo; números ficam números.
+  if (typeof v === 'string' && /^[=+\-@\t\r]/.test(s)) s = `'${s}`;
   return /[",;\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 };
 

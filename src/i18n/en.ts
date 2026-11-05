@@ -991,6 +991,7 @@ export const en: Messages = {
       notes: 'Notes',
       reminders: 'Reminders',
       remindersLater: 'The alert shows in the bell and, if allowed, on the device (Settings → Notifications).',
+      allDayScope: 'All-day changes the shape of the event: choose "The whole series" or "This and following" to change it.',
       reminderAtStart: 'At start',
       reminderMin: '{n} min before',
       reminderHour: '{n} h before',
@@ -4066,6 +4067,7 @@ export const en: Messages = {
   insights: {
     allPrivate: 'Every module is out of Insights by privacy (Settings → Privacy).',
     privateNote: '(out by privacy)',
+    financeLocked: 'Finance is locked by its PIN: Finance numbers show here after you open Finance with the PIN.',
     period: 'Period',
     periods: {
       week: 'Week',
@@ -4376,6 +4378,8 @@ export const en: Messages = {
       forgotTitle: 'Forgot the PIN?',
       forgotBody: 'Without a server, the PIN cannot be recovered or sent by email. The only way is to erase the data on this device and then restore an exported backup (Settings → Backup).',
       back: 'Back to the PIN',
+      loadFailedTitle: 'Could not check the lock',
+      loadFailed: 'For safety, ROUTIG does not open without knowing whether there is a PIN. Reload; if it keeps happening, close and reopen the app.',
     },
   },
   transfer: {

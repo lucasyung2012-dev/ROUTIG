@@ -76,7 +76,10 @@ export function FileActions({ item }: { item: LibraryItem }) {
         onClick={() =>
           void getDb()
             .files.get(item.fileId!)
-            .then((f) => (f ? saveFile(new File([f.blob], item.fileName || f.name, { type: f.mime })) : toast.show(t('library.errors.missingFile'), 'error')))
+            .then(async (f) => {
+              if (f) await saveFile(new File([f.blob], item.fileName || f.name, { type: f.mime }));
+              else toast.show(t('library.errors.missingFile'), 'error');
+            })
         }
       >
         {t('library.download')}

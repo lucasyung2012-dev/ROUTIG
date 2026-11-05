@@ -245,7 +245,16 @@ export function findDuplicates(title: string, candidates: Array<{ ref: EntityRef
 export async function sha256Hex(blob: Blob): Promise<string> {
   const subtle = typeof crypto !== 'undefined' ? crypto.subtle : undefined;
   if (!subtle) return `size:${blob.size}:${blob.type}`;
-  const buf = await blob.arrayBuffer();
+  // Navegadores antigos (e o ambiente de testes) não têm blob.arrayBuffer: lê pelo FileReader.
+  const buf =
+    typeof blob.arrayBuffer === 'function'
+      ? await blob.arrayBuffer()
+      : await new Promise<ArrayBuffer>((resolve, reject) => {
+          const r = new FileReader();
+          r.onload = () => resolve(r.result as ArrayBuffer);
+          r.onerror = () => reject(r.error);
+          r.readAsArrayBuffer(blob);
+        });
   const digest = await subtle.digest('SHA-256', buf);
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
 }

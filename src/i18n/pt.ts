@@ -611,7 +611,7 @@ export const pt = {
     },
     about: {
       version: 'Versão',
-      build: 'Etapa 5 concluída: todos os módulos ligados entre si, com busca, avisos, privacidade, backup, importação e dicas. Próximo: Etapa 6, testes no iPad e no iPhone.',
+      build: 'V1 concluída: as 6 etapas do roadmap, os 18 módulos ligados entre si e testados no iPad e no iPhone.',
       logoTitle: 'Logo oficial',
       logoBody: 'A versão vetorial do logo foi traçada sobre o PNG original. Compare as duas e aprove antes de ela entrar no app.',
       logoCompare: 'Comparar e aprovar',

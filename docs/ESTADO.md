@@ -2,7 +2,7 @@
 
 Leia este arquivo no começo de toda conversa nova sobre o ROUTIG. A especificação completa é o "ROUTIG — Prompt Master" (35 partes), fornecido pelo dono do produto. Decisões em [DECISOES.md](DECISOES.md), arquitetura em [ARQUITETURA.md](ARQUITETURA.md).
 
-**Atualizado:** 2026-11-05 (Etapa 6 em andamento: parte do navegador feita; falta o aparelho)
+**Atualizado:** 2026-11-05 (**V1 concluída**, versão 1.0.0)
 
 ## Estado da conversa (2026-11-04)
 
@@ -12,8 +12,9 @@ Leia este arquivo no começo de toda conversa nova sobre o ROUTIG. A especifica�
 - **Etapa 3 — Desenvolvimento pessoal:** concluída (versão 0.25.0). Habits (0.21.0), Goals (0.22.0), Focus (0.23.0), Música (0.24.0) e Esportes (0.25.0) publicados e testados. Goals veio antes de Música e Esportes para que as metas deles sejam objetivos do Goals, sem duplicar.
 - **Etapa 4 — Gestão pessoal:** concluída (versão 0.30.0). Finanças (0.26.0 a 0.28.0), Library (0.29.0) e Insights (0.30.0). **Todos os 18 módulos estão construídos.**
 - **Etapa 5 — Integração e acabamento:** concluída (versão 0.38.0). Busca global e ações rápidas (0.31.0), notificações (0.32.0), privacidade e segurança (0.33.0), backup e recuperação (0.34.0), importação e exportação (0.35.0), ligações entre módulos (0.36.0) e dicas nas telas (0.37.0). A personalização da Parte 5.2 já estava no Dashboard (cartões, indicadores, tamanhos, perfis com prévia).
-- **Etapa 6 — Testes gerais:** em andamento. Feito no navegador (2026-11-05, até 0.38.2): as 50 telas no tamanho do iPad e do iPhone, sem erros; fluxos principais (tarefa, busca, lixeira e restaurar, evento, nota com salvamento automático, Focus); backup com cópia, prévia e recuperação de uma nota apagada de vez; preparação para offline (tudo em cache, nada vem de fora); acessibilidade (nomes e alvos de toque). Corrigido: telas que rolavam para o lado no iPhone (grades sem coluna-base), topo apertado no iPhone (busca cortada e, com o Focus ligado, avatar fora da tela), texto da versão no Sobre, enfeite do Dashboard no iOS antigo, singular em 28 textos com número. Falta: os testes no aparelho em [TESTES-APARELHO.md](TESTES-APARELHO.md).
-- **Próximo passo:** Etapa 6 (testes gerais): o dono do produto testa no iPad e no iPhone (instalação na Tela de Início, offline, Apple Pencil, avisos do aparelho, sons do Focus, gravação de voz, arquivos, PIN ao voltar para o app, backup em Arquivos) e as correções entram aqui. Antes da sincronização, limpar os dados de teste do navegador (com confirmação). Fechando a Etapa 6, isso é a **V1**.
+- **Etapa 6 — Testes gerais:** concluída (versão 1.0.0). Feito no navegador (2026-11-05, até 0.38.2): as 50 telas no tamanho do iPad e do iPhone, sem erros; fluxos principais (tarefa, busca, lixeira e restaurar, evento, nota com salvamento automático, Focus); backup com cópia, prévia e recuperação de uma nota apagada de vez; preparação para offline (tudo em cache, nada vem de fora); acessibilidade (nomes e alvos de toque). Corrigido: telas que rolavam para o lado no iPhone (grades sem coluna-base), topo apertado no iPhone (busca cortada e, com o Focus ligado, avatar fora da tela), texto da versão no Sobre, enfeite do Dashboard no iOS antigo, singular em 28 textos com número. Testes no aparelho ([TESTES-APARELHO.md](TESTES-APARELHO.md)) feitos pelo dono do produto no iPad e no iPhone em 2026-11-05: tudo funcionando.
+- **V1 fechada (2026-11-05, versão 1.0.0, marca `v1.0.0` no GitHub).**
+- **Próximo passo:** o dono do produto manda o Prompt Master da V2 (uma reformulação grande). Antes de construir: análise curta e crítica (o que faz sentido, o que não faz, o que mudar, acrescentar ou reformular) e divisão em etapas. A sincronização pelo Google Drive e a praça (2D e depois 3D) entram no planejamento da V2. Os dados de teste do navegador de testes só são apagados com a confirmação do dono do produto.
 - **Como trabalhar:** o computador de desenvolvimento não tem Node. Escrever o código, enviar com `git push`, conferir o GitHub Actions (anotações de erro aparecem por arquivo e linha) e testar no app publicado.
 
 ## Etapa 1 — andamento
@@ -103,6 +104,7 @@ Leia este arquivo no começo de toda conversa nova sobre o ROUTIG. A especifica�
 | 0.37.0 | 2026-11-05 | Claude (Claude Code) | Tutoriais (Parte 29.4): uma dica curta e opcional na tela inicial de cada um dos 18 módulos, com "Entendi" (esconde aquela) e "Não mostrar dicas"; em Settings → Ajuda, ligar ou desligar e mostrar de novo as já vistas. A chave de dicas do onboarding, que não fazia nada, agora funciona. |
 | 0.38.0 | 2026-11-05 | Claude (Claude Code) | Fim da Etapa 5: texto do seletor de ligações da nota ("Ligar a…"), Sobre e roadmap atualizados (etapa atual: 6). |
 | 0.38.1–0.38.2 | 2026-11-05 | Claude (Claude Code) | Etapa 6 (navegador): correções de layout no iPhone, topo com Focus ligado, singular em textos com número, resumo das cópias de backup. Lista de testes no aparelho em docs/TESTES-APARELHO.md. |
+| 1.0.0 | 2026-11-05 | Claude (Claude Code) | **V1 concluída.** Etapa 6 fechada: testes no navegador (todas as telas no iPad e no iPhone, fluxos, dados, offline, acessibilidade) e no aparelho pelo dono do produto (instalação, offline, Apple Pencil, avisos, sons, microfone, arquivos, backup em Arquivos, PIN), tudo funcionando. |
 
 ## Calendar (Parte 6) — o que existe
 
@@ -159,4 +161,4 @@ Leia este arquivo no começo de toda conversa nova sobre o ROUTIG. A especifica�
    - ~~Etapa 4: Finanças, Library e Insights~~ (feito em 2026-11-04, versão 0.30.0).
    - ~~Etapa 5: integração e acabamento~~ (feito em 2026-11-05, versão 0.38.0).
 6. Sincronização pelo Google Drive: depois da Etapa 6.
-7. **V1 = tudo até a Etapa 6** (decidido em 2026-11-05). Depois, o dono do produto manda o Prompt Master da **V2**. Antes de construir a V2: uma análise curta e crítica com os pontos principais (o que faz sentido, o que não faz, o que mudar, acrescentar ou reformular), e só então começar. A V2 vai ser uma reformulação grande: depois da análise, dividir em etapas antes de construir.
+7. **V1 = tudo até a Etapa 6** (decidido em 2026-11-05). **Feito: V1 fechada em 2026-11-05 (1.0.0).** Depois, o dono do produto manda o Prompt Master da **V2**. Antes de construir a V2: uma análise curta e crítica com os pontos principais (o que faz sentido, o que não faz, o que mudar, acrescentar ou reformular), e só então começar. A V2 vai ser uma reformulação grande: depois da análise, dividir em etapas antes de construir.

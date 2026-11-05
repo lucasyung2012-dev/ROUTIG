@@ -613,7 +613,7 @@ export const en: Messages = {
     },
     about: {
       version: 'Version',
-      build: 'Stage 5 done: every module linked together, with search, alerts, privacy, backup, import and tips. Next: Stage 6, tests on iPad and iPhone.',
+      build: 'V1 complete: all 6 roadmap stages, the 18 modules linked together and tested on iPad and iPhone.',
       logoTitle: 'Official logo',
       logoBody: 'The vector logo was traced over the original PNG. Compare both and approve it before it is used in the app.',
       logoCompare: 'Compare and approve',

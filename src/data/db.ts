@@ -13,6 +13,7 @@ import type { Goal, GoalCheckin } from '@/domain/goals';
 import type { FocusSession } from '@/domain/focus';
 import type { Instrument, MusicItem, PracticeSession, Song } from '@/domain/music';
 import type { Sport, SportActivity, SportItem } from '@/domain/sports';
+import type { FinAsset, FinQuote, FinTransaction } from '@/domain/finance';
 
 /** Registro chave-valor (configurações, estado do onboarding, metadados). */
 export interface KvRecord {
@@ -74,6 +75,9 @@ export class RoutigDB extends Dexie {
   sports!: EntityTable<Sport, 'id'>;
   sportActivities!: EntityTable<SportActivity, 'id'>;
   sportItems!: EntityTable<SportItem, 'id'>;
+  finAssets!: EntityTable<FinAsset, 'id'>;
+  finTransactions!: EntityTable<FinTransaction, 'id'>;
+  finQuotes!: EntityTable<FinQuote, 'id'>;
 
   constructor(name = 'routig') {
     super(name);
@@ -181,10 +185,16 @@ export class RoutigDB extends Dexie {
       sportActivities: 'id, sportId, date, type',
       sportItems: 'id, sportId, category',
     });
+    // Etapa 4: Finanças (investimentos registrados por você, sem operar nada).
+    this.version(21).stores({
+      finAssets: 'id, category',
+      finTransactions: 'id, assetId, date',
+      finQuotes: 'id, assetId, date',
+    });
   }
 }
 
-export const DB_SCHEMA_VERSION = 20;
+export const DB_SCHEMA_VERSION = 21;
 
 let instance: RoutigDB | null = null;
 

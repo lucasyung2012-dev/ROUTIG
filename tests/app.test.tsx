@@ -88,11 +88,12 @@ describe('navegação (Parte 4)', () => {
     expect((await loadSettings()).nav.favorites).toEqual(['academy']);
   });
 
-  it('módulo ainda não construído mostra a etapa em que chega, sem fingir funcionar', async () => {
+  it('todos os módulos existem: Insights abre a análise real, sem página de "em breve"', async () => {
     await finishOnboarding();
     window.location.hash = '#/insights';
     render(<App />);
-    expect(await screen.findByText('Insights chega na Etapa 4: Gestão pessoal')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Insights' })).toBeInTheDocument();
+    expect(screen.queryByText(/chega na Etapa/)).not.toBeInTheDocument();
   });
 
   it('Academy sem ano letivo pede para criar o primeiro, sem dados inventados', async () => {

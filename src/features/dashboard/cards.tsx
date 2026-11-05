@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Activity, ArrowRight, CalendarDays, Diamond, FolderKanban, GraduationCap, Guitar, Inbox, Languages, ListTodo, NotebookPen, Play, Repeat, Sun, Target, Timer, Trophy, Wallet } from 'lucide-react';
+import { Activity, ArrowRight, CalendarDays, ChartLine, Diamond, FolderKanban, GraduationCap, Guitar, Inbox, Languages, ListTodo, NotebookPen, Play, Repeat, Sun, Target, Timer, Trophy, Wallet } from 'lucide-react';
 import { MODULES, TONE_CLASSES, type ModuleId } from '@/app/modules';
 import { useSettings } from '@/app/SettingsProvider';
 import { isModuleReady } from '@/app/version';
@@ -27,6 +27,8 @@ import { useGoals } from '@/features/goals/useGoals';
 import { useFocus } from '@/features/focus/FocusProvider';
 import { useMusic } from '@/features/music/useMusic';
 import { useSports } from '@/features/sports/useSports';
+import { useInsightsData } from '@/features/insights/useInsightsData';
+import { focusInsights, habitsInsights, rangeFor, sportsInsights, tasksInsights } from '@/domain/insights';
 import { formatClock, phaseElapsed, phaseRemaining } from '@/domain/focus';
 import { useProjectsData } from '@/features/projects/useProjectsData';
 import { TaskRow } from '@/features/tasks/TaskRow';
@@ -458,6 +460,8 @@ export function renderLiveCard(id: LiveCard): ReactNode {
       return <SportsCard />;
     case 'finance':
       return <FinanceCard />;
+    case 'insights':
+      return <InsightsCard />;
     case 'projects':
       return <ProjectsCard />;
     case 'milestones':
@@ -751,6 +755,41 @@ export function FinanceCard() {
           {counts.toReview > 0 && <li className="text-warning">{t('dashboard.financeReview', { count: counts.toReview })}</li>}
           <li className="text-xs text-muted">{t('dashboard.financePrivacy')}</li>
         </ul>
+      )}
+    </CardShell>
+  );
+}
+
+/** Insights (Parte 19): a semana atual em poucos números, só com o que foi registrado. */
+export function InsightsCard() {
+  const { t, settings } = useSettings();
+  const raw = useInsightsData();
+  const today = todayKey();
+  const r = rangeFor('week', today, settings.weekStartsOn);
+  const rows = raw
+    ? [
+        { label: t('insights.minutesFocus'), value: focusInsights(raw.focus, r).minutes },
+        { label: t('insights.tasksDone'), value: tasksInsights(raw.tasks, r).completed },
+        { label: t('insights.habitLogs'), value: habitsInsights(raw.habits, raw.habitLogs, r, today, settings.weekStartsOn).logs },
+        { label: t('insights.activities'), value: sportsInsights(raw.sports, raw.sportActivities, r).activities },
+      ]
+    : [];
+  return (
+    <CardShell title={t('dashboard.cards.insights')} icon={<ChartLine className="h-5 w-5" />} tone="rose" link={{ to: '/insights', label: t('common.open') }}>
+      {!raw ? (
+        <LoadingState label={t('common.loading')} lines={3} />
+      ) : (
+        <div className="flex flex-col gap-2">
+          <span className="text-xs text-muted">{t('dashboard.insightsWeek')}</span>
+          <ul className="grid grid-cols-2 gap-3">
+            {rows.map((x) => (
+              <li key={x.label} className="flex flex-col">
+                <span className="text-xl font-semibold tabular text-fg">{x.value}</span>
+                <span className="text-xs text-muted">{x.label}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
     </CardShell>
   );

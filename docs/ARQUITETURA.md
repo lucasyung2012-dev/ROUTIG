@@ -45,6 +45,7 @@
 | 17 | 3 | + `goals` (indicadores, marcos e ligações em `refs`), `goalCheckins` (valores, níveis e reflexões). Tarefas ligam pelo próprio `goalId` |
 | 18 | 3 | + `focusSessions` (sessões do Focus com `taskId` e `ref`). O timer em andamento e os ajustes ficam em `kv` (`focus.active`, `focus.config`) |
 | 19 | 3 | + `instruments`, `musicItems` (técnicas, acordes, ritmos, escalas, dedilhados, teoria), `songs` (repertório, partituras em `files`), `practiceSessions` |
+| 20 | 3 | + `sports`, `sportActivities` (treino, partida, torneio, evento), `sportItems` (técnicas, fundamentos, habilidades, posições) |
 
 ## Navegação
 

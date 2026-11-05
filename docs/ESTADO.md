@@ -9,8 +9,8 @@ Leia este arquivo no começo de toda conversa nova sobre o ROUTIG. A especifica�
 - **Etapa 0 — Fundação:** concluída. Logo vetorial e design system aprovados pelo dono do produto em 2026-11-02.
 - **Etapa 1 — Organização central:** concluída no código (versão 0.7.0). Tasks, Calendar, Inbox, Notes, Projects, Dashboard, Profile e Settings publicados. Falta o dono do produto testar no iPad o Dashboard, o Profile e as Settings novas.
 - **Etapa 2 — Aprendizagem:** concluída (versão 0.20.0). Academy (0.11.0 a 0.17.0) e Idiomas (0.18.0 a 0.20.0) publicados e testados. Idiomas tem visão geral, vocabulário, gramática, revisões (repetição espaçada de palavras e regras), habilidades, sessões, pronúncia (voz do aparelho e gravação da própria voz), materiais e histórico.
-- **Etapa 3 — Desenvolvimento pessoal:** em andamento. Ordem: Habits (0.21.0, pronto) → Goals (0.22.0, pronto) → Focus (0.23.0, pronto) → Música (0.24.0, pronta) → Esportes. Goals vem antes de Música e Esportes para que as "metas" deles sejam objetivos do Goals, sem duplicar.
-- **Próximo passo:** Esportes (Parte 12): tênis e futebol, registro rápido de treinos, partidas, torneios e eventos, sem foco em aparência corporal. Depois, a "praça" (recomendado: 2D primeiro, depois 3D com Three.js sobre o mesmo mapa; o menu continua para acessibilidade).
+- **Etapa 3 — Desenvolvimento pessoal:** concluída (versão 0.25.0). Habits (0.21.0), Goals (0.22.0), Focus (0.23.0), Música (0.24.0) e Esportes (0.25.0) publicados e testados. Goals veio antes de Música e Esportes para que as metas deles sejam objetivos do Goals, sem duplicar.
+- **Próximo passo:** a "praça" quando o dono do produto mandar o prompt (recomendado: 2D primeiro, depois 3D com Three.js sobre o mesmo mapa, com rodadas de ajuste testando no iPad; o menu continua para acessibilidade). Depois, Etapa 4 (Finanças, Library, Insights).
 - **Como trabalhar:** o computador de desenvolvimento não tem Node. Escrever o código, enviar com `git push`, conferir o GitHub Actions (anotações de erro aparecem por arquivo e linha) e testar no app publicado.
 
 ## Etapa 1 — andamento
@@ -85,6 +85,7 @@ Leia este arquivo no começo de toda conversa nova sobre o ROUTIG. A especifica�
 | 0.22.0 | 2026-11-04 | Claude (Claude Code) | Goals (Parte 15): objetivos mensuráveis (indicadores que sobem ou descem), qualitativos (sem porcentagem), de habilidade (nível autoavaliado) e por etapas (marcos); área, horizonte, status, prioridade e prazo; acompanhamento com valores, níveis e reflexões; chegar à meta só sugere concluir; ligações sem cópia com tarefas (campo Objetivo no editor), projetos, hábitos, idiomas e disciplinas; prazos e marcos no Calendar; cartão no Dashboard. Banco v17. |
 | 0.23.0 | 2026-11-04 | Claude (Claude Code) | Focus (Parte 13): timer Pomodoro, tempo definido e contínuo (conta pelo horário, guardado no aparelho, visível na barra de cima); pausas e início automático configuráveis; modo minimalista e ambientes imersivos em tela cheia (biblioteca, escritório, natureza, espaço de estudo, só CSS); sons gerados no aparelho (ruído branco, rosa, marrom, chuva e ondas); sessões ligadas à tarefa e ao módulo; registro manual; "Focar nesta tarefa" no editor; cartão no Dashboard. Banco v18. |
 | 0.24.0 | 2026-11-04 | Claude (Claude Code) | Música (Parte 11): violão como instrumento inicial (outros com a mesma estrutura); as 12 áreas do violão; repertório com cifra (leitura com rolagem automática), partitura (PDF ou imagem), vídeo e progresso informado; acordes com diagrama das casas; técnicas com evolução da confiança no histórico; registro de prática; metas pelo Goals; sessões do Focus ligadas ao instrumento; cartão no Dashboard. Banco v19. |
+| 0.25.0 | 2026-11-04 | Claude (Claude Code) | Esportes (Parte 12): tênis e futebol com as áreas da especificação (outros esportes com estrutura geral); registro rápido de treino, partida, torneio e evento; placar e resultado; técnicas, fundamentos, habilidades e posições com evolução da confiança; aba Evolução; sem medidas do corpo; metas pelo Goals; cartão no Dashboard. Etapa 3 concluída. Banco v20. |
 
 ## Calendar (Parte 6) — o que existe
 
@@ -137,5 +138,5 @@ Leia este arquivo no começo de toda conversa nova sobre o ROUTIG. A especifica�
 2. ~~Backup completo~~ (feito em 2026-11-03, versão 0.8.0).
 3. ~~Desenho do Notes completo~~ (feito em 2026-11-03, versão 0.9.0).
 4. ~~Etapa 2: Academy e Idiomas~~ (feito em 2026-11-04, versão 0.20.0).
-5. Etapa 3: Habits, Goals, Focus, Música e Esportes (em andamento).
+5. ~~Etapa 3: Habits, Goals, Focus, Música e Esportes~~ (feito em 2026-11-04, versão 0.25.0).
 6. Sincronização pelo Google Drive: depois da Etapa 6.

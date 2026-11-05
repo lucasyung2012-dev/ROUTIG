@@ -12,6 +12,36 @@ import { Surface } from '@/ui/Surface';
 import { cn } from '@/ui/cn';
 import { AssetDialog, ImportDialog, Money, Qty } from './financeUi';
 import { HideContext, useFinance, useHidden, type FinanceData } from './useFinance';
+import { FinanceAcademy } from './FinanceAcademy';
+import { MarketArea } from './MarketArea';
+import { Segmented } from '@/ui/Segmented';
+
+/** As áreas internas (Parte 16.1). */
+const AREAS = ['investments', 'academy', 'market'] as const;
+type Area = (typeof AREAS)[number];
+const AREA_KEY = 'routig.finance.area';
+
+function useArea(): [Area, (a: Area) => void] {
+  const [area, setArea] = useState<Area>(() => {
+    try {
+      const v = localStorage.getItem(AREA_KEY);
+      return (AREAS as readonly string[]).includes(v ?? '') ? (v as Area) : 'investments';
+    } catch {
+      return 'investments';
+    }
+  });
+  return [
+    area,
+    (a) => {
+      setArea(a);
+      try {
+        localStorage.setItem(AREA_KEY, a);
+      } catch {
+        /* preferência só desta sessão */
+      }
+    },
+  ];
+}
 
 /** Liga e desliga "ocultar valores" (padrão: escondidos). Guardado no aparelho. */
 export function useHideToggle() {
@@ -51,6 +81,7 @@ export function FinancePage() {
   const { hide, toggle } = useHideToggle();
   const [creating, setCreating] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [area, setArea] = useArea();
   if (data.loading) return <LoadingState label={t('common.loading')} lines={5} />;
   return (
     <HideContext.Provider value={hide}>
@@ -63,18 +94,26 @@ export function FinancePage() {
           actions={
             <>
               <HideButton hide={hide} toggle={toggle} />
-              <Button variant="secondary" size="sm" icon={<FileUp className="h-4 w-4" />} onClick={() => setImporting(true)}>
-                {t('finance.import')}
-              </Button>
-              <Button variant="primary" size="sm" icon={<Plus className="h-4 w-4" />} onClick={() => setCreating(true)}>
-                {t('finance.newAsset')}
-              </Button>
+              {area === 'investments' && (
+                <>
+                  <Button variant="secondary" size="sm" icon={<FileUp className="h-4 w-4" />} onClick={() => setImporting(true)}>
+                    {t('finance.import')}
+                  </Button>
+                  <Button variant="primary" size="sm" icon={<Plus className="h-4 w-4" />} onClick={() => setCreating(true)}>
+                    {t('finance.newAsset')}
+                  </Button>
+                </>
+              )}
             </>
           }
         />
         <Disclaimer />
-        <h2 className="text-lg font-semibold text-fg">{t('finance.areas.investments')}</h2>
-        {data.assets.length === 0 && data.archived.length === 0 ? (
+        <Segmented<Area> label={t('finance.areaLabel')} value={area} onChange={setArea} options={AREAS.map((a) => ({ value: a, label: t(`finance.areas.${a}`) }))} />
+        {area === 'academy' ? (
+          <FinanceAcademy />
+        ) : area === 'market' ? (
+          <MarketArea />
+        ) : data.assets.length === 0 && data.archived.length === 0 ? (
           <Surface tone="flat">
             <EmptyState icon={<Wallet className="h-6 w-6" />} title={t('finance.emptyTitle')} body={t('finance.empty')} />
           </Surface>

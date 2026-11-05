@@ -83,3 +83,27 @@ describe('finanças: regras e importação (Parte 16.4 e 16.8)', () => {
     expect(again.every((x) => x.duplicate && !x.include)).toBe(true);
   });
 });
+
+describe('finanças: Academia e Mercado (Partes 16.2 e 16.5)', () => {
+  it('glossário sem termo repetido e com revisão espaçada', async () => {
+    const { saveTerm, answerTerm } = await import('@/data/financeLearnRepo');
+    const x = await saveTerm(null, 'Liquidez', 'Facilidade de virar dinheiro', '');
+    await expect(saveTerm(null, ' liquidez ', 'outra', '')).rejects.toMatchObject({ code: 'duplicate' });
+    const after = await answerTerm(x.id, 'good', '2026-11-04');
+    expect(after.srs).toMatchObject({ due: '2026-11-05', reps: 1 });
+  });
+
+  it('aula ligada ao curso; mercado exige fonte e separa fato de análise', async () => {
+    const { saveLearning, saveMarket } = await import('@/data/financeLearnRepo');
+    const { emptyLearningInput } = await import('@/domain/finance');
+    const c = await saveLearning(null, { ...emptyLearningInput('course'), title: 'Curso X' });
+    const l = await saveLearning(null, { ...emptyLearningInput('lesson'), title: 'Aula 1', courseId: c.id });
+    expect(l.courseId).toBe(c.id);
+    const s = await saveLearning(null, { ...emptyLearningInput('summary'), title: 'Resumo', courseId: c.id });
+    expect(s.courseId).toBeNull();
+    const base = { kind: 'rates' as const, title: 'Selic', value: '10,50% a.a.', date: '2026-11-04', url: '', notes: '' };
+    await expect(saveMarket(null, { ...base, source: ' ', nature: 'fact' })).rejects.toMatchObject({ code: 'invalid' });
+    const m = await saveMarket(null, { ...base, source: 'Banco Central', nature: 'analysis' });
+    expect(m.nature).toBe('analysis');
+  });
+});

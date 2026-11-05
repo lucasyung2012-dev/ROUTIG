@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { DateKey } from './dates';
 import type { BaseEntity } from './entity';
+import type { SrsState } from './srs';
 
 /* ---------- Finanças (Parte 16): aprender, acompanhar e organizar. Nunca operar. ---------- */
 
@@ -352,3 +353,84 @@ export function rowError(r: Pick<ImportRow, 'date' | 'ticker' | 'type' | 'quanti
   if ((r.type === 'income' || r.type === 'fee') && r.amount <= 0) return 'amount';
   return null;
 }
+
+/* ---------- Academia Financeira (Parte 16.2) ---------- */
+
+export const LEARN_KINDS = ['course', 'lesson', 'summary', 'concept', 'learning'] as const;
+export type LearnKind = (typeof LEARN_KINDS)[number];
+
+export const LEARN_STATUSES = ['todo', 'doing', 'done'] as const;
+export type LearnStatus = (typeof LEARN_STATUSES)[number];
+
+export interface FinLearning extends BaseEntity {
+  kind: LearnKind;
+  title: string;
+  /** Explicação com as suas palavras (clara e progressiva). */
+  body: string;
+  /** Aula: o curso a que pertence. */
+  courseId: string | null;
+  status: LearnStatus;
+  /** Curso: onde é (site, canal, escola). */
+  provider: string;
+  url: string;
+  date: DateKey | null;
+}
+
+export const learningInputSchema = z.object({
+  kind: z.enum(LEARN_KINDS),
+  title: z.string().trim().min(1).max(160),
+  body: z.string().max(40_000),
+  courseId: z.string().nullable(),
+  status: z.enum(LEARN_STATUSES),
+  provider: z.string().trim().max(120),
+  url: z.union([z.literal(''), z.string().url().max(500).refine((u) => /^https?:\/\//i.test(u), 'http')]),
+  date: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .nullable(),
+});
+export type LearningInput = z.infer<typeof learningInputSchema>;
+
+export function emptyLearningInput(kind: LearnKind): LearningInput {
+  return { kind, title: '', body: '', courseId: null, status: 'todo', provider: '', url: '', date: null };
+}
+
+/** Glossário: cada termo entra na revisão espaçada (Parte 16.2: revisões). */
+export interface FinTerm extends BaseEntity {
+  term: string;
+  definition: string;
+  example: string;
+  srs: SrsState;
+}
+
+/* ---------- Mercado (Parte 16.5) ---------- */
+
+export const MARKET_KINDS = ['news', 'indicator', 'inflation', 'rates', 'currency', 'index', 'calendar', 'scenario'] as const;
+export type MarketKind = (typeof MARKET_KINDS)[number];
+
+export interface MarketEntry extends BaseEntity {
+  kind: MarketKind;
+  title: string;
+  /** Valor do indicador, quando houver (ex.: "10,50% a.a."). */
+  value: string;
+  /** Data do dado (ou do evento, no calendário econômico). */
+  date: DateKey;
+  /** Origem obrigatória: de onde veio a informação. */
+  source: string;
+  url: string;
+  /** Fato registrado ou análise/opinião (Parte 16.5: diferenciar). */
+  nature: 'fact' | 'analysis';
+  notes: string;
+}
+
+export const marketInputSchema = z.object({
+  kind: z.enum(MARKET_KINDS),
+  title: z.string().trim().min(1).max(200),
+  value: z.string().trim().max(60),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  source: z.string().trim().min(1).max(200),
+  url: z.union([z.literal(''), z.string().url().max(500).refine((u) => /^https?:\/\//i.test(u), 'http')]),
+  nature: z.enum(['fact', 'analysis']),
+  notes: z.string().max(10_000),
+});
+export type MarketInput = z.infer<typeof marketInputSchema>;

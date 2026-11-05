@@ -49,6 +49,7 @@
 | 21 | 4 | + `finAssets`, `finTransactions` (com `source` da importação), `finQuotes` (valor informado com data e fonte) |
 | 22 | 4 | + `finLearning` (cursos, aulas, resumos, conceitos, aprendizados), `finTerms` (glossário com repetição espaçada), `marketEntries` (fato ou análise, sempre com fonte) |
 | 23 | 4 | + `finJournal` (diário de investimentos), `budgetCategories`, `budgetEntries` (orçamento opcional). PIN de Finanças em `kv` só como hash com sal |
+| 24 | 4 | + `libraryItems` (arquivo em `files`, sem cópia; `refs` para os módulos; índice multi em tags e coleções), `libraryCollections` |
 
 ## Navegação
 

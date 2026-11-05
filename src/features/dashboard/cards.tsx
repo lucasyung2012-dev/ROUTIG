@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Activity, ArrowRight, CalendarDays, Diamond, FolderKanban, GraduationCap, Inbox, Languages, ListTodo, NotebookPen, Sun } from 'lucide-react';
+import { Activity, ArrowRight, CalendarDays, Diamond, FolderKanban, GraduationCap, Inbox, Languages, ListTodo, NotebookPen, Repeat, Sun } from 'lucide-react';
 import { MODULES, TONE_CLASSES, type ModuleId } from '@/app/modules';
 import { useSettings } from '@/app/SettingsProvider';
 import { isModuleReady } from '@/app/version';
@@ -17,6 +17,9 @@ import { useEventEditor } from '@/features/calendar/EventEditor';
 import { toneLook, useCalendarData } from '@/features/calendar/useCalendarData';
 import { useAcademyData } from '@/features/academy/useAcademyData';
 import { useLanguages } from '@/features/languages/useLanguages';
+import { QuickLog } from '@/features/habits/habitsUi';
+import { useHabits } from '@/features/habits/useHabits';
+import { todayStatus } from '@/domain/habits';
 import { useProjectsData } from '@/features/projects/useProjectsData';
 import { TaskRow } from '@/features/tasks/TaskRow';
 import { useTaskEditor } from '@/features/tasks/TaskEditor';
@@ -435,6 +438,8 @@ export function renderLiveCard(id: LiveCard): ReactNode {
       return <AcademyCard />;
     case 'languages':
       return <LanguagesCard />;
+    case 'habits':
+      return <HabitsCard />;
     case 'projects':
       return <ProjectsCard />;
     case 'milestones':
@@ -538,6 +543,43 @@ export function LanguagesCard() {
               </li>
             );
           })}
+        </ul>
+      )}
+    </CardShell>
+  );
+}
+
+/** Hábitos de hoje (Parte 14): os esperados hoje, com o registro rápido. */
+export function HabitsCard() {
+  const { t, settings } = useSettings();
+  const data = useHabits();
+  const today = todayKey();
+  const due = data.habits.filter((h) => todayStatus(h, data.logsOf(h.id), today, settings.weekStartsOn).due);
+  return (
+    <CardShell title={t('dashboard.cards.habits')} icon={<Repeat className="h-5 w-5" />} tone="teal" link={{ to: '/habits', label: t('common.open') }}>
+      {data.loading ? (
+        <LoadingState label={t('common.loading')} lines={3} />
+      ) : data.habits.length === 0 ? (
+        <p className="text-sm text-muted">{t('dashboard.habitsEmpty')}</p>
+      ) : due.length === 0 ? (
+        <p className="text-sm text-muted">{t('habits.nothingToday')}</p>
+      ) : (
+        <ul className="flex flex-col gap-1.5">
+          {due.map((h) => (
+            <li key={h.id} className="flex flex-wrap items-center gap-2">
+              <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: h.color }} aria-hidden />
+              <Link to={`/habits/${h.id}`} className="min-w-0 flex-1 truncate text-sm font-medium text-fg hover:text-accent">
+                {h.name}
+              </Link>
+              {h.method === 'check' || h.method === 'scale' ? (
+                <QuickLog habit={h} log={data.logsOf(h.id).get(today)} date={today} onOpen={() => undefined} />
+              ) : (
+                <Link to={`/habits/${h.id}`} className="text-xs font-medium text-accent hover:underline">
+                  {t('habits.log')}
+                </Link>
+              )}
+            </li>
+          ))}
         </ul>
       )}
     </CardShell>

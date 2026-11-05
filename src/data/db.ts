@@ -8,6 +8,7 @@ import type { Project } from '@/domain/projects';
 import type { HistoryEntry, Interest } from '@/domain/interests';
 import type { AcademicYear, Assessment, Card, CardReview, Content, Deck, Doubt, ExamPrep, Lesson, PeriodResult, StudySession, Subject, Teacher } from '@/domain/academy';
 import type { GrammarRule, Language, LanguageSession, VocabEntry } from '@/domain/languages';
+import type { Habit, HabitLog } from '@/domain/habits';
 
 /** Registro chave-valor (configurações, estado do onboarding, metadados). */
 export interface KvRecord {
@@ -57,6 +58,8 @@ export class RoutigDB extends Dexie {
   languageSessions!: EntityTable<LanguageSession, 'id'>;
   vocab!: EntityTable<VocabEntry, 'id'>;
   grammarRules!: EntityTable<GrammarRule, 'id'>;
+  habits!: EntityTable<Habit, 'id'>;
+  habitLogs!: EntityTable<HabitLog, 'id'>;
 
   constructor(name = 'routig') {
     super(name);
@@ -137,10 +140,15 @@ export class RoutigDB extends Dexie {
     this.version(15).stores({
       grammarRules: 'id, languageId, srs.due',
     });
+    // Etapa 3: Habits (hábitos e um registro por hábito por dia).
+    this.version(16).stores({
+      habits: 'id, order',
+      habitLogs: 'id, habitId, date, [habitId+date]',
+    });
   }
 }
 
-export const DB_SCHEMA_VERSION = 15;
+export const DB_SCHEMA_VERSION = 16;
 
 let instance: RoutigDB | null = null;
 

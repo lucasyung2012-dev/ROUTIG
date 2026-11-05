@@ -101,6 +101,7 @@ export function CalendarPage() {
       else if (i.kind === 'milestone' && i.projectId) navigate(`/projects/${i.projectId}`);
       else if (i.kind === 'assessment' && i.subjectId) navigate(`/academy/subjects/${i.subjectId}`);
       else if (i.kind === 'study') navigate('/academy/plan');
+      else if (i.kind === 'habit' && i.habitId) navigate(`/habits/${i.habitId}`);
       else if (i.occurrence) events.openEvent(i.occurrence.event.id, i.occurrence.seriesDate);
     },
     onNew: (date, startMin) => events.newEvent({ start: date, endDate: date, startTime: fromMinutes(startMin ?? 9 * 60) }),

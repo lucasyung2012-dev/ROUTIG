@@ -3,7 +3,8 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { useSettings } from '@/app/SettingsProvider';
 import { getDb } from '@/data/db';
 import { loadCalendarConfig, migrateCalendarConfig, type CalendarConfig } from '@/data/eventsRepo';
-import type { DateKey } from '@/domain/dates';
+import { addDays, type DateKey } from '@/domain/dates';
+import { isExpectedDay, isPausedOn, logMeets, scheduleAt } from '@/domain/habits';
 import { findConflicts, occurrencesInRange, toMinutes, type CalendarEvent, type EventCategory, type EventOccurrence, type EventTone } from '@/domain/events';
 import { isClosedKind, statusKind, type Task } from '@/domain/tasks';
 import { useTasksData, type TasksData } from '@/features/tasks/useTasksData';
@@ -11,7 +12,7 @@ import { useTasksData, type TasksData } from '@/features/tasks/useTasksData';
 /** Um item no calendário: ocorrência de evento ou tarefa com prazo (o registro original, nunca uma cópia). */
 export interface CalendarItem {
   key: string;
-  kind: 'event' | 'task' | 'milestone' | 'assessment' | 'study';
+  kind: 'event' | 'task' | 'milestone' | 'assessment' | 'study' | 'habit';
   date: DateKey;
   endDate: DateKey;
   allDay: boolean;
@@ -31,6 +32,8 @@ export interface CalendarItem {
   projectId?: string;
   /** Avaliação da Academy: abre a disciplina. */
   subjectId?: string;
+  /** Hábito: abre o hábito. */
+  habitId?: string;
   conflictWith: string[];
 }
 
@@ -52,6 +55,8 @@ export function useCalendarData(): CalendarData {
   const assessments = useLiveQuery(() => getDb().assessments.filter((a) => !a.deletedAt && !!a.date).toArray(), []);
   const subjects = useLiveQuery(() => getDb().subjects.filter((s) => !s.deletedAt).toArray(), []);
   const sessions = useLiveQuery(() => getDb().studySessions.filter((s) => !s.deletedAt).toArray(), []);
+  const habits = useLiveQuery(() => getDb().habits.filter((h) => !h.deletedAt && !h.archived && h.showInCalendar).toArray(), []);
+  const habitLogs = useLiveQuery(() => getDb().habitLogs.filter((l) => !l.deletedAt).toArray(), []);
   const tasks = useTasksData();
 
   return useMemo(() => {
@@ -178,6 +183,34 @@ export function useCalendarData(): CalendarData {
             conflictWith: [],
           });
         }
+        // Hábitos marcados para aparecer no Calendar (Parte 14.5): só os de dias certos, lidos do próprio hábito.
+        const doneDays = new Set((habitLogs ?? []).map((l) => `${l.habitId}:${l.date}`));
+        const logValue = new Map((habitLogs ?? []).map((l) => [`${l.habitId}:${l.date}`, l.value]));
+        for (const h of habits ?? []) {
+          for (let d = from < h.startDate ? h.startDate : from; d <= to; d = addDays(d, 1)) {
+            const s = scheduleAt(h, d);
+            if (!s || (s.period !== 'day' && s.period !== 'interval') || !isExpectedDay(s, d) || isPausedOn(h, d)) continue;
+            const start = h.time ? toMinutes(h.time) : null;
+            const key = `${h.id}:${d}`;
+            items.push({
+              key: `h:${key}`,
+              kind: 'habit',
+              date: d,
+              endDate: d,
+              allDay: start === null,
+              start,
+              end: start === null ? null : Math.min(start + 30, 24 * 60),
+              title: `↻ ${h.name}`,
+              location: '',
+              tone: 'teal',
+              color: h.color,
+              categoryId: null,
+              done: doneDays.has(key) && logMeets(h.method, s, logValue.get(key) ?? 0),
+              habitId: h.id,
+              conflictWith: [],
+            });
+          }
+        }
       }
       // Conflitos: só entre eventos com horário (tarefas não ocupam agenda).
       const slots = items
@@ -199,7 +232,7 @@ export function useCalendarData(): CalendarData {
       tasks,
       itemsInRange,
     };
-  }, [all, config, tasks, projects, assessments, subjects, sessions]);
+  }, [all, config, tasks, projects, assessments, subjects, sessions, habits, habitLogs]);
 }
 
 export function useCategoryName() {

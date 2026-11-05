@@ -270,7 +270,7 @@ export function BackupSection() {
 type Translate = ReturnType<typeof useSettings>['t'];
 
 function summary(counts: Record<string, number>, t: Translate): string {
-  return (['tasks', 'notes', 'events', 'projects'] as const).map((k) => `${counts[k] ?? 0} ${t(`backup.tables.${k}`).toLowerCase()}`).join(' · ');
+  return (['tasks', 'notes', 'events', 'projects'] as const).map((k) => `${t(`backup.tables.${k}`)}: ${counts[k] ?? 0}`).join(' · ');
 }
 
 function RestorePreview({ backup, source, ignored, current, onClose }: { backup: BackupFile; source: string; ignored: string[]; current: Record<string, number>; onClose: () => void }) {

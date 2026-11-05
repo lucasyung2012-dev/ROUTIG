@@ -5,6 +5,7 @@ import { useSettings } from '@/app/SettingsProvider';
 import type { ThemeSetting } from '@/domain/settings';
 import { Logo } from '@/brand/Logo';
 import { IconButton } from '@/ui/IconButton';
+import { cn } from '@/ui/cn';
 import { Sidebar } from './Sidebar';
 import { CommandPalette } from './CommandPalette';
 import { TaskEditorProvider } from '@/features/tasks/TaskEditor';
@@ -85,7 +86,7 @@ function Shell() {
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-2 border-b border-line/60 bg-bg/70 px-3 backdrop-blur-xl safe-top sm:px-6">
           <IconButton label={t('nav.openMenu')} icon={<Menu className="h-5 w-5" />} onClick={() => setMenuOpen(true)} className="md:hidden" />
-          <Link to="/" className="flex items-center gap-2 md:hidden" aria-label={t('modules.dashboard')}>
+          <Link to="/" className="hidden items-center gap-2 sm:flex md:hidden" aria-label={t('modules.dashboard')}>
             <Logo size={28} className="h-7 w-7" />
           </Link>
 
@@ -154,9 +155,13 @@ function FocusPill() {
     <Link
       to="/focus"
       aria-label={`${t('modules.focus')}: ${t(`focus.phases.${timer.phase}`)} ${clock}`}
-      className="mr-1 inline-flex h-9 items-center gap-1.5 rounded-full bg-accent/15 px-3 text-sm font-semibold tabular text-accent ring-1 ring-inset ring-accent/30 transition hover:bg-accent/25"
+      className={cn(
+        'inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full px-2.5 text-sm font-semibold tabular ring-1 ring-inset transition sm:mr-1 sm:px-3',
+        paused ? 'bg-surface-2 text-muted ring-line' : 'bg-accent/15 text-accent ring-accent/30 hover:bg-accent/25',
+      )}
     >
-      {paused ? <Pause className="h-3.5 w-3.5" aria-hidden /> : <Timer className="h-3.5 w-3.5" aria-hidden />}
+      {/* No celular só o tempo, para o topo caber; pausado fica cinza. */}
+      {paused ? <Pause className="hidden h-3.5 w-3.5 sm:block" aria-hidden /> : <Timer className="hidden h-3.5 w-3.5 sm:block" aria-hidden />}
       {clock}
     </Link>
   );

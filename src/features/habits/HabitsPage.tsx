@@ -164,7 +164,6 @@ function TodayView({ data, onLog }: { data: HabitsData; onLog: (h: Habit, d: Dat
   const row = ({ h, st }: (typeof rows)[number]) => {
     const paused = !!openPause(h) || h.startDate > today;
     const f = currentFrequency(h);
-    const periodic = f.period === 'week' || f.period === 'month' || f.period === 'year';
     return (
       <li key={h.id} className="flex flex-wrap items-center gap-3 rounded-2xl bg-surface p-4 shadow-soft ring-1 ring-line/70">
         <span className="h-10 w-1.5 shrink-0 rounded-full" style={{ background: h.color }} aria-hidden />
@@ -174,7 +173,7 @@ function TodayView({ data, onLog }: { data: HabitsData; onLog: (h: Habit, d: Dat
           </Link>
           <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-muted">
             <span>{freq(f, h)}</span>
-            {periodic && st.expected > 0 && <Badge tone={st.achieved >= st.expected ? 'success' : 'neutral'}>{t(`habits.periodProgress.${f.period}`, { done: Math.min(st.achieved, st.expected), total: st.expected })}</Badge>}
+            {(f.period === 'week' || f.period === 'month' || f.period === 'year') && st.expected > 0 && <Badge tone={st.achieved >= st.expected ? 'success' : 'neutral'}>{t(`habits.periodProgress.${f.period}`, { done: Math.min(st.achieved, st.expected), total: st.expected })}</Badge>}
             {paused && <Badge icon={<Pause className="h-3 w-3" />}>{h.startDate > today ? t('habits.startsOn', { date: formatDateKey(h.startDate, settings.locale) }) : t('habits.paused')}</Badge>}
             {h.category && <span>· {h.category}</span>}
           </div>

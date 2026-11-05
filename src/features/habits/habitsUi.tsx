@@ -324,7 +324,7 @@ export function LogDialog({ habit, date: initialDate, log: initialLog, logs, onC
 /* ---------- Criar e editar (Partes 14.1 e 14.2) ---------- */
 
 /** Exemplos da própria especificação: abrem o formulário preenchido, nada é criado sem salvar. */
-export const HABIT_EXAMPLES: Array<{ key: string; input: Partial<HabitInput> }> = [
+export const HABIT_EXAMPLES: Array<{ key: 'german' | 'reading' | 'guitar' | 'focus'; input: Partial<HabitInput> }> = [
   { key: 'german', input: { method: 'check', color: '#F59E0B', category: 'Idiomas' } },
   { key: 'reading', input: { method: 'quantity', unit: 'páginas', color: '#438BEA', category: 'Leitura', frequency: { period: 'day', times: 1, weekdays: [], intervalDays: 2, target: 20 } } },
   { key: 'guitar', input: { method: 'duration', color: '#EC6695', category: 'Música', frequency: { period: 'week', times: 4, weekdays: [], intervalDays: 2, target: 30 } } },

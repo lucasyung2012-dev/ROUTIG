@@ -1,21 +1,39 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { ArchiveRestore, Download, FileUp, ShieldCheck, Trash2, TriangleAlert } from 'lucide-react';
 import { useSettings } from '@/app/SettingsProvider';
 import {
   currentCounts,
+  deleteOldAutoCopies,
   deleteSnapshot,
   listExports,
   listSnapshots,
   loadBackupPrefs,
+  previewRecovery,
   readBackup,
+  recoverFromBackup,
   restoreBackup,
   saveBackupPrefs,
   saveSnapshot,
   snapshotText,
   type SnapshotInfo,
 } from '@/data/backupRepo';
-import { daysSince, hasUserData, isBackupStale, MAIN_TABLES, REMINDER_OPTIONS, type BackupFile, type BackupPrefs, type ReminderDays } from '@/domain/backup';
+import {
+  daysSince,
+  hasUserData,
+  isBackupStale,
+  KEEP_AUTO_OPTIONS,
+  MAIN_TABLES,
+  oldAutoCopies,
+  RECOVER_GROUP_IDS,
+  REMINDER_OPTIONS,
+  type BackupFile,
+  type BackupPrefs,
+  type KeepAuto,
+  type RecoverGroup,
+  type RecoveryPlan,
+  type ReminderDays,
+} from '@/domain/backup';
 import { formatBytes } from '@/services/storage';
 import { Badge } from '@/ui/Badge';
 import { Button } from '@/ui/Button';
@@ -23,6 +41,7 @@ import { ConfirmDialog } from '@/ui/ConfirmDialog';
 import { Dialog } from '@/ui/Dialog';
 import { Select } from '@/ui/Field';
 import { IconButton } from '@/ui/IconButton';
+import { Segmented } from '@/ui/Segmented';
 import { LoadingState } from '@/ui/States';
 import { Surface } from '@/ui/Surface';
 import { Switch } from '@/ui/Switch';
@@ -41,6 +60,7 @@ export function BackupSection() {
   const [busy, setBusy] = useState<'export' | 'snapshot' | 'read' | null>(null);
   const [preview, setPreview] = useState<{ backup: BackupFile; source: string; ignored: string[] } | null>(null);
   const [deleting, setDeleting] = useState<SnapshotInfo | null>(null);
+  const [pruning, setPruning] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
 
   if (!prefs || !snapshots || !exports || !counts) return <LoadingState label={t('common.loading')} lines={4} />;
@@ -158,6 +178,16 @@ export function BackupSection() {
       <Surface className="flex flex-col gap-3">
         <h2 className="text-[0.9375rem] font-semibold text-fg">{t('backup.snapshots')}</h2>
         <p className="text-sm leading-relaxed text-muted">{t('backup.snapshotsHint')}</p>
+        {snapshots.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2 text-sm">
+            <span className="text-muted">{t('backup.snapshotsTotal', { count: snapshots.length, size: formatBytes(snapshots.reduce((n, s) => n + s.size, 0), settings.locale) })}</span>
+            {oldAutoCopies(snapshots, KEEP_AUTO_OPTIONS[0]).length > 0 && (
+              <Button size="sm" variant="ghost" icon={<Trash2 className="h-4 w-4" />} onClick={() => setPruning(true)}>
+                {t('backup.prune')}
+              </Button>
+            )}
+          </div>
+        )}
         {snapshots.length === 0 ? (
           <p className="text-sm text-muted">{t('backup.snapshotsEmpty')}</p>
         ) : (
@@ -218,6 +248,7 @@ export function BackupSection() {
         )}
       </Surface>
 
+      {pruning && <PruneDialog snapshots={snapshots} onClose={() => setPruning(false)} />}
       {preview && <RestorePreview {...preview} current={counts} onClose={() => setPreview(null)} />}
       <ConfirmDialog
         open={!!deleting}
@@ -245,13 +276,37 @@ function summary(counts: Record<string, number>, t: Translate): string {
 function RestorePreview({ backup, source, ignored, current, onClose }: { backup: BackupFile; source: string; ignored: string[]; current: Record<string, number>; onClose: () => void }) {
   const { t, settings } = useSettings();
   const toast = useToast();
+  const [mode, setMode] = useState<'recover' | 'replace'>('recover');
   const [agreed, setAgreed] = useState(false);
   const [running, setRunning] = useState(false);
-  const others = (c: Record<string, number>) => Object.entries(c).reduce((sum, [k, n]) => ((MAIN_TABLES as readonly string[]).includes(k) ? sum : sum + n), 0);
-  const rows: { key: string; label: string; from: number; now: number }[] = [
-    ...MAIN_TABLES.map((k) => ({ key: k, label: t(`backup.tables.${k}`), from: backup.counts[k] ?? 0, now: current[k] ?? 0 })),
-    { key: 'other', label: t('backup.tables.other'), from: others(backup.counts), now: others(current) },
-  ];
+  const [all, setAll] = useState<RecoveryPlan | null>(null);
+  const [groups, setGroups] = useState<RecoverGroup[]>([]);
+  const [plan, setPlan] = useState<RecoveryPlan | null>(null);
+
+  // O que cada módulo recuperaria; começam marcados os que têm algo a recuperar.
+  useEffect(() => {
+    void previewRecovery(backup, RECOVER_GROUP_IDS).then((p) => {
+      setAll(p);
+      setGroups(RECOVER_GROUP_IDS.filter((g) => p.perGroup[g] > 0));
+    });
+  }, [backup]);
+  useEffect(() => {
+    void previewRecovery(backup, groups).then(setPlan);
+  }, [backup, groups]);
+  const recoverCount = plan ? Object.values(plan.perGroup).reduce((a, b) => a + b, 0) : 0;
+
+  const recover = async () => {
+    setRunning(true);
+    try {
+      const r = await recoverFromBackup(backup, groups);
+      toast.show(t('backup.recovered', { count: Object.values(r.plan.perGroup).reduce((a, b) => a + b, 0) }));
+      // As telas recarregam com o que voltou.
+      window.setTimeout(() => window.location.reload(), 1200);
+    } catch {
+      setRunning(false);
+      toast.show(t('backup.restoreFailed'), 'error');
+    }
+  };
   const created = backup.createdAt ? new Intl.DateTimeFormat(settings.locale, { dateStyle: 'long', timeStyle: 'short' }).format(new Date(backup.createdAt)) : '—';
 
   const restore = async () => {
@@ -279,9 +334,15 @@ function RestorePreview({ backup, source, ignored, current, onClose }: { backup:
           <Button variant="ghost" disabled={running} onClick={onClose}>
             {t('common.cancel')}
           </Button>
-          <Button variant="danger" disabled={!agreed} loading={running} onClick={() => void restore()}>
-            {t('backup.restoreConfirm')}
-          </Button>
+          {mode === 'replace' ? (
+            <Button variant="danger" disabled={!agreed} loading={running} onClick={() => void restore()}>
+              {t('backup.restoreConfirm')}
+            </Button>
+          ) : (
+            <Button variant="primary" disabled={recoverCount === 0} loading={running} onClick={() => void recover()}>
+              {t('backup.recoverConfirm', { count: recoverCount })}
+            </Button>
+          )}
         </>
       }
     >
@@ -292,6 +353,30 @@ function RestorePreview({ backup, source, ignored, current, onClose }: { backup:
           </Badge>
           <span className="text-muted">{t('backup.previewMeta', { date: created, version: backup.appVersion, source })}</span>
         </div>
+        <Segmented<'recover' | 'replace'>
+          label={t('backup.mode')}
+          value={mode}
+          onChange={setMode}
+          options={[
+            { value: 'recover', label: t('backup.modeRecover') },
+            { value: 'replace', label: t('backup.modeReplace') },
+          ]}
+        />
+        {mode === 'recover' ? <RecoverPanel all={all} plan={plan} groups={groups} setGroups={setGroups} /> : <ReplacePanel backup={backup} current={current} ignored={ignored} agreed={agreed} setAgreed={setAgreed} />}
+      </div>
+    </Dialog>
+  );
+}
+
+function ReplacePanel({ backup, current, ignored, agreed, setAgreed }: { backup: BackupFile; current: Record<string, number>; ignored: string[]; agreed: boolean; setAgreed: (v: boolean) => void }) {
+  const { t } = useSettings();
+  const others = (c: Record<string, number>) => Object.entries(c).reduce((sum, [k, n]) => ((MAIN_TABLES as readonly string[]).includes(k) ? sum : sum + n), 0);
+  const rows: { key: string; label: string; from: number; now: number }[] = [
+    ...MAIN_TABLES.map((k) => ({ key: k, label: t(`backup.tables.${k}`), from: backup.counts[k] ?? 0, now: current[k] ?? 0 })),
+    { key: 'other', label: t('backup.tables.other'), from: others(backup.counts), now: others(current) },
+  ];
+  return (
+      <div className="flex flex-col gap-4">
         <table className="w-full text-sm">
           <thead>
             <tr className="text-left text-xs text-subtle">
@@ -317,12 +402,94 @@ function RestorePreview({ backup, source, ignored, current, onClose }: { backup:
             <li>{t('backup.consequenceReplace')}</li>
             <li>{t('backup.consequenceSafety')}</li>
             <li>{t('backup.consequenceSettings')}</li>
+            <li>{t('backup.consequencePins')}</li>
           </ul>
         </div>
         <label className="flex items-start gap-3 text-sm text-fg">
           <input type="checkbox" className="mt-0.5 h-5 w-5 accent-[rgb(var(--accent))]" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} />
           {t('backup.agree')}
         </label>
+      </div>
+  );
+}
+
+function RecoverPanel({ all, plan, groups, setGroups }: { all: RecoveryPlan | null; plan: RecoveryPlan | null; groups: RecoverGroup[]; setGroups: (g: RecoverGroup[]) => void }) {
+  const { t } = useSettings();
+  if (!all || !plan) return <LoadingState label={t('common.loading')} lines={3} />;
+  const available = RECOVER_GROUP_IDS.filter((g) => all.perGroup[g] > 0);
+  return (
+    <div className="flex flex-col gap-3 text-sm">
+      <p className="leading-relaxed text-muted">{t('backup.recoverHint')}</p>
+      {available.length === 0 ? (
+        <p className="rounded-2xl bg-surface-2/70 p-4 text-fg">{t('backup.recoverNothing')}</p>
+      ) : (
+        <>
+          <ul className="grid gap-1.5 sm:grid-cols-2">
+            {available.map((g) => (
+              <li key={g}>
+                <label className="flex items-center gap-3 rounded-xl px-2 py-1.5 text-fg hover:bg-surface-2">
+                  <input type="checkbox" className="h-4 w-4 accent-[rgb(var(--accent))]" checked={groups.includes(g)} onChange={(e) => setGroups(e.target.checked ? [...groups, g] : groups.filter((x) => x !== g))} />
+                  <span className="min-w-0 flex-1">{t(`backup.groups.${g}`)}</span>
+                  <span className="tabular text-muted">{all.perGroup[g]}</span>
+                </label>
+              </li>
+            ))}
+          </ul>
+          {plan.files > 0 && <p className="text-muted">{t('backup.recoverFiles', { count: plan.files })}</p>}
+        </>
+      )}
+      <p className="text-xs text-muted">{t('backup.recoverTrash')}</p>
+    </div>
+  );
+}
+
+/** Apagar cópias automáticas antigas: só quando o usuário pede, vendo quantas vão embora. */
+function PruneDialog({ snapshots, onClose }: { snapshots: SnapshotInfo[]; onClose: () => void }) {
+  const { t, settings } = useSettings();
+  const toast = useToast();
+  const [keep, setKeep] = useState<KeepAuto>(KEEP_AUTO_OPTIONS[0]);
+  const [busy, setBusy] = useState(false);
+  const old = oldAutoCopies(snapshots, keep);
+  const size = formatBytes(old.reduce((n, s) => n + s.size, 0), settings.locale);
+  return (
+    <Dialog
+      open
+      onClose={onClose}
+      closeLabel={t('common.cancel')}
+      title={t('backup.pruneTitle')}
+      size="sm"
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>
+            {t('common.cancel')}
+          </Button>
+          <Button
+            variant="danger"
+            disabled={old.length === 0}
+            loading={busy}
+            onClick={() => {
+              setBusy(true);
+              void deleteOldAutoCopies(keep).then((n) => {
+                toast.show(t('backup.pruned', { count: n }));
+                onClose();
+              });
+            }}
+          >
+            {t('backup.pruneConfirm', { count: old.length })}
+          </Button>
+        </>
+      }
+    >
+      <div className="flex flex-col gap-3 text-sm">
+        <p className="leading-relaxed text-muted">{t('backup.pruneHint')}</p>
+        <Select aria-label={t('backup.pruneKeep')} value={keep} onChange={(e) => setKeep(Number(e.target.value) as KeepAuto)}>
+          {KEEP_AUTO_OPTIONS.map((k) => (
+            <option key={k} value={k}>
+              {t('backup.pruneKeepN', { count: k })}
+            </option>
+          ))}
+        </Select>
+        <p className="text-fg">{old.length === 0 ? t('backup.pruneNone') : t('backup.pruneWill', { count: old.length, size })}</p>
       </div>
     </Dialog>
   );

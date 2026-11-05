@@ -106,6 +106,87 @@ export async function parseBackup(text: string, knownTables: readonly string[], 
   };
 }
 
+/* ---------- Recuperar sem substituir ---------- */
+
+/** Tabelas de cada módulo, para recuperar só uma parte de um backup. */
+export const RECOVER_GROUPS = {
+  tasks: ['tasks', 'taskLists'],
+  calendar: ['events'],
+  notes: ['notes', 'noteVersions', 'notebooks', 'noteCollections', 'noteTemplates'],
+  projects: ['projects'],
+  inbox: ['inbox'],
+  profile: ['interests', 'historyEntries'],
+  academy: ['academicYears', 'subjects', 'teachers', 'assessments', 'periodResults', 'contents', 'lessons', 'doubts', 'decks', 'cards', 'cardReviews', 'studySessions', 'examPreps'],
+  languages: ['languages', 'languageSessions', 'vocab', 'grammarRules'],
+  habits: ['habits', 'habitLogs'],
+  goals: ['goals', 'goalCheckins'],
+  focus: ['focusSessions'],
+  music: ['instruments', 'musicItems', 'songs', 'practiceSessions'],
+  sports: ['sports', 'sportActivities', 'sportItems'],
+  finance: ['finAssets', 'finTransactions', 'finQuotes', 'finLearning', 'finTerms', 'marketEntries', 'finJournal', 'budgetCategories', 'budgetEntries'],
+  library: ['libraryItems', 'libraryCollections'],
+} as const satisfies Record<string, readonly string[]>;
+export type RecoverGroup = keyof typeof RECOVER_GROUPS;
+export const RECOVER_GROUP_IDS = Object.keys(RECOVER_GROUPS) as RecoverGroup[];
+
+export interface RecoveryPlan {
+  /** Linhas a acrescentar, por tabela (só as que não existem mais neste aparelho). */
+  add: Record<string, unknown[]>;
+  /** Quantos registros cada módulo recupera (sem contar arquivos). */
+  perGroup: Record<RecoverGroup, number>;
+  /** Arquivos que voltam junto, porque algum registro recuperado usa. */
+  files: number;
+}
+
+const idOf = (r: unknown) => (r && typeof r === 'object' ? (r as { id?: unknown }).id : undefined);
+
+/**
+ * Plano de "recuperar o que falta": de cada módulo escolhido, só os registros
+ * cujo id não existe agora. Nada que existe é alterado (nem os da lixeira).
+ * Os arquivos voltam só se um registro recuperado aponta para eles.
+ */
+export function planRecovery(backup: BackupTables, currentIds: Record<string, ReadonlySet<string>>, groups: readonly RecoverGroup[]): RecoveryPlan {
+  const add: Record<string, unknown[]> = {};
+  const perGroup = Object.fromEntries(RECOVER_GROUP_IDS.map((g) => [g, 0])) as Record<RecoverGroup, number>;
+  for (const g of groups) {
+    for (const table of RECOVER_GROUPS[g]) {
+      const have = currentIds[table] ?? new Set<string>();
+      const rows = (backup[table] ?? []).filter((r) => {
+        const id = idOf(r);
+        return typeof id === 'string' && !have.has(id);
+      });
+      if (rows.length) {
+        add[table] = rows;
+        perGroup[g] += rows.length;
+      }
+    }
+  }
+  const haveFiles = currentIds.files ?? new Set<string>();
+  const missingFiles = (backup.files ?? []).filter((f) => {
+    const id = idOf(f);
+    return typeof id === 'string' && !haveFiles.has(id);
+  });
+  if (missingFiles.length && Object.keys(add).length) {
+    const text = JSON.stringify(add);
+    const used = missingFiles.filter((f) => text.includes(`"${idOf(f) as string}"`));
+    if (used.length) add.files = used;
+  }
+  return { add, perGroup, files: add.files?.length ?? 0 };
+}
+
+/* ---------- Cópias internas antigas ---------- */
+
+export const KEEP_AUTO_OPTIONS = [7, 14, 30] as const;
+export type KeepAuto = (typeof KEEP_AUTO_OPTIONS)[number];
+
+/** Cópias automáticas além das `keep` mais novas. Manuais e "antes de restaurar" nunca entram. */
+export function oldAutoCopies<T extends { id: string; kind: string; createdAt: string }>(snaps: readonly T[], keep: number): T[] {
+  return snaps
+    .filter((s) => s.kind === 'auto')
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    .slice(keep);
+}
+
 /* ---------- Arquivos binários ---------- */
 
 export function bytesToBase64(bytes: Uint8Array): string {

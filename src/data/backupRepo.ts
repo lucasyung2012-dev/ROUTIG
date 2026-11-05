@@ -8,12 +8,16 @@ import {
   bytesToBase64,
   hasUserData,
   migrateBackupPrefs,
+  oldAutoCopies,
   parseBackup,
+  planRecovery,
   serializeBackup,
   type BackupFile,
   type BackupPrefs,
   type BackupTables,
   type ParsedBackup,
+  type RecoverGroup,
+  type RecoveryPlan,
 } from '@/domain/backup';
 
 const PREFS_KEY = 'backup.prefs';
@@ -192,15 +196,57 @@ export async function restoreBackup(backup: BackupFile): Promise<SnapshotInfo> {
       await table.clear();
       const rows = backup.tables[table.name];
       if (!rows?.length) continue;
-      if (table.name === 'files') {
-        await table.bulkAdd(
-          rows.map((r) => {
-            const { data, ...rest } = r as { data: string; mime?: string } & Record<string, unknown>;
-            return { ...rest, blob: new Blob([base64ToBytes(data)], { type: rest.mime ?? '' }) };
-          }),
-        );
-      } else await table.bulkAdd(rows);
+      await table.bulkAdd(table.name === 'files' ? rows.map(fileFromBackup) : rows);
     }
   });
   return safety;
+}
+
+/** Arquivo do backup (base64) de volta para Blob. */
+function fileFromBackup(r: unknown) {
+  const { data, ...rest } = r as { data: string; mime?: string } & Record<string, unknown>;
+  return { ...rest, blob: new Blob([base64ToBytes(data)], { type: rest.mime ?? '' }) };
+}
+
+/* ---------- Recuperar sem substituir ---------- */
+
+/** Ids que existem agora em cada tabela (inclusive os da lixeira). */
+export async function currentIds(): Promise<Record<string, Set<string>>> {
+  const db = getDb();
+  const out: Record<string, Set<string>> = {};
+  for (const table of db.tables) out[table.name] = new Set((await table.toCollection().primaryKeys()).filter((k): k is string => typeof k === 'string'));
+  return out;
+}
+
+export async function previewRecovery(backup: BackupFile, groups: readonly RecoverGroup[]): Promise<RecoveryPlan> {
+  return planRecovery(backup.tables, await currentIds(), groups);
+}
+
+/**
+ * Recupera do backup só o que falta neste aparelho, nos módulos escolhidos
+ * (Parte 25). Nada que existe é alterado. Antes, guarda uma cópia "antes de
+ * restaurar", para dar para voltar.
+ */
+export async function recoverFromBackup(backup: BackupFile, groups: readonly RecoverGroup[]): Promise<{ plan: RecoveryPlan; safety: SnapshotInfo | null }> {
+  const plan = await previewRecovery(backup, groups);
+  if (!Object.keys(plan.add).length) return { plan, safety: null };
+  const safety = await saveSnapshot('beforeRestore');
+  const db = getDb();
+  const tables = Object.keys(plan.add).map((name) => db.table(name));
+  await db.transaction('rw', tables, async () => {
+    for (const table of tables) {
+      const rows = plan.add[table.name] ?? [];
+      await table.bulkAdd(table.name === 'files' ? rows.map(fileFromBackup) : rows);
+    }
+  });
+  return { plan, safety };
+}
+
+/* ---------- Cópias automáticas antigas ---------- */
+
+/** Apaga as cópias automáticas além das `keep` mais novas. Só quando o usuário pede, com confirmação na tela. */
+export async function deleteOldAutoCopies(keep: number): Promise<number> {
+  const old = oldAutoCopies(await listSnapshots(), keep);
+  await getBackupDb().snapshots.bulkDelete(old.map((s) => s.id));
+  return old.length;
 }

@@ -1,3 +1,4 @@
+import { isFileUsed } from './libraryRepo';
 import { getDb } from './db';
 import { createTask } from './tasksRepo';
 import { createEvent } from './eventsRepo';
@@ -121,14 +122,12 @@ export const restoreItem = (id: string) => patch(id, { deletedAt: null }, { acti
 /** Exclusão definitiva. O arquivo só é apagado se nenhum outro item usar. */
 export async function purgeItem(id: string): Promise<void> {
   const db = getDb();
-  await db.transaction('rw', db.inbox, db.files, db.changelog, async () => {
+  await db.transaction('rw', [db.inbox, db.files, db.notes, db.projects, db.interests, db.songs, db.libraryItems, db.kv, db.changelog], async () => {
     const item = await db.inbox.get(id);
     if (!item) return;
     await db.inbox.delete(id);
-    if (item.fileId) {
-      const others = await db.inbox.filter((i) => i.fileId === item.fileId).count();
-      if (others === 0) await db.files.delete(item.fileId);
-    }
+    // Uma nota criada a partir deste item (ou a Library) pode usar o mesmo arquivo: só apaga se ninguém mais usa.
+    if (item.fileId && !(await isFileUsed(item.fileId))) await db.files.delete(item.fileId);
     await log({ entityType: ENTITY, entityId: id, action: 'purge' });
   });
 }

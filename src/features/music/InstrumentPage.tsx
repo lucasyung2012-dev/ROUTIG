@@ -22,6 +22,7 @@ import { useToast } from '@/ui/toast';
 import { cn } from '@/ui/cn';
 import { ChordDiagram, ChordSheetView, ItemDialog, PracticeDialog, SongDialog, VideoLink } from './musicUi';
 import { useMusic, type MusicData } from './useMusic';
+import { LibraryLinked } from '@/features/library/libraryUi';
 
 /** O ambiente do instrumento (Parte 11.2): as 12 áreas da especificação. */
 const TABS = ['overview', 'repertoire', ...MUSIC_CATEGORIES, 'practice', 'goals', 'materials', 'history'] as const;
@@ -445,6 +446,7 @@ function Materials({ ins, data }: { ins: Instrument; data: MusicData }) {
         </Button>
       </div>
       <p className="text-sm text-muted">{t('music.materialsHint')}</p>
+      <LibraryLinked refType="instrument" refId={ins.id} />
       {!notes?.length ? (
         <Surface tone="flat">
           <EmptyState title={t('academy.materials.emptyTitle')} body={t('music.materialsEmpty')} />

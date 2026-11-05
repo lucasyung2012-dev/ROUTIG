@@ -22,6 +22,7 @@ import { useToast } from '@/ui/toast';
 import { cn } from '@/ui/cn';
 import { ActivityDialog, SportItemDialog } from './sportsUi';
 import { useSports, type SportsData } from './useSports';
+import { LibraryLinked } from '@/features/library/libraryUi';
 
 const ACTIVITY_TABS: Record<string, ActivityType> = { training: 'training', match: 'match', tournament: 'tournament', event: 'event' };
 
@@ -405,6 +406,7 @@ function Materials({ sport }: { sport: Sport }) {
           {t('profile.sections.linkNote')}
         </Button>
       </div>
+      <LibraryLinked refType="sport" refId={sport.id} />
       {!notes?.length ? (
         <Surface tone="flat">
           <EmptyState title={t('academy.materials.emptyTitle')} body={t('sports.materialsEmpty')} />

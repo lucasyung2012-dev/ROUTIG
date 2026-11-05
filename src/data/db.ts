@@ -13,6 +13,7 @@ import type { Goal, GoalCheckin } from '@/domain/goals';
 import type { FocusSession } from '@/domain/focus';
 import type { Instrument, MusicItem, PracticeSession, Song } from '@/domain/music';
 import type { Sport, SportActivity, SportItem } from '@/domain/sports';
+import type { LibraryCollection, LibraryItem } from '@/domain/library';
 import type { BudgetCategory, BudgetEntry, FinAsset, FinLearning, FinQuote, FinTerm, FinTransaction, JournalEntry, MarketEntry } from '@/domain/finance';
 
 /** Registro chave-valor (configurações, estado do onboarding, metadados). */
@@ -84,6 +85,8 @@ export class RoutigDB extends Dexie {
   finJournal!: EntityTable<JournalEntry, 'id'>;
   budgetCategories!: EntityTable<BudgetCategory, 'id'>;
   budgetEntries!: EntityTable<BudgetEntry, 'id'>;
+  libraryItems!: EntityTable<LibraryItem, 'id'>;
+  libraryCollections!: EntityTable<LibraryCollection, 'id'>;
 
   constructor(name = 'routig') {
     super(name);
@@ -209,10 +212,15 @@ export class RoutigDB extends Dexie {
       budgetCategories: 'id',
       budgetEntries: 'id, date, categoryId',
     });
+    // Etapa 4: Library (materiais; os arquivos ficam em `files`, sem cópia).
+    this.version(24).stores({
+      libraryItems: 'id, kind, fileId, *tags, *collectionIds',
+      libraryCollections: 'id',
+    });
   }
 }
 
-export const DB_SCHEMA_VERSION = 23;
+export const DB_SCHEMA_VERSION = 24;
 
 let instance: RoutigDB | null = null;
 

@@ -26,6 +26,7 @@ import { useToast } from '@/ui/toast';
 import { cn } from '@/ui/cn';
 import { CheckinDialog, GoalDialog, GoalProgressView } from './goalsUi';
 import { useGoals, type GoalsData } from './useGoals';
+import { LibraryLinked } from '@/features/library/libraryUi';
 
 const TABS = ['overview', 'related', 'journal', 'materials', 'history'] as const;
 type Tab = (typeof TABS)[number];
@@ -464,6 +465,7 @@ function MaterialsTab({ goal }: { goal: Goal }) {
         </Button>
       </div>
       <p className="text-sm text-muted">{t('goals.materialsHint')}</p>
+      <LibraryLinked refType="goal" refId={goal.id} />
       {!notes?.length ? (
         <Surface tone="flat">
           <EmptyState title={t('academy.materials.emptyTitle')} body={t('goals.materialsEmpty')} />

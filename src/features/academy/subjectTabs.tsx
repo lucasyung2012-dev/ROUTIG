@@ -57,6 +57,7 @@ import { useToast } from '@/ui/toast';
 import { cn } from '@/ui/cn';
 import type { AcademyData } from './useAcademyData';
 import type { SubjectExtras } from './useSubjectExtras';
+import { LibraryLinked } from '@/features/library/libraryUi';
 
 /* ---------- Conteúdo programático (Parte 9.4) ---------- */
 
@@ -591,6 +592,7 @@ export function MaterialsTab({ subject, extras }: { subject: Subject; extras: Su
         </Button>
       </div>
       <p className="text-sm text-muted">{t('academy.materials.hint')}</p>
+      <LibraryLinked refType="subject" refId={subject.id} />
       {extras.notes.length === 0 ? (
         <Surface tone="flat">
           <EmptyState title={t('academy.materials.emptyTitle')} body={t('academy.materials.empty')} />

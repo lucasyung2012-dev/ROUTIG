@@ -16,6 +16,7 @@ import { Surface } from '@/ui/Surface';
 import { useToast } from '@/ui/toast';
 import { useVocab } from './VocabTab';
 import { canSpeak, speak, speakTextOf } from './vocabUtils';
+import { LibraryLinked } from '@/features/library/libraryUi';
 
 /** Pronúncia (Parte 10.2): ouvir o modelo na voz do aparelho, gravar a própria voz e comparar. */
 export function PronunciationTab({ lang }: { lang: Language }) {
@@ -180,6 +181,7 @@ export function MaterialsTab({ lang }: { lang: Language }) {
         </Button>
       </div>
       <p className="text-sm text-muted">{t('languages.materials.hint')}</p>
+      <LibraryLinked refType="language" refId={lang.id} />
       {!notes?.length ? (
         <Surface tone="flat">
           <EmptyState title={t('academy.materials.emptyTitle')} body={t('languages.materials.empty')} />

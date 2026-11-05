@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { Archive, ChevronLeft, ChevronRight, Pause, Plus, Repeat, RotateCcw, Sparkles } from 'lucide-react';
 import { useSettings } from '@/app/SettingsProvider';
 import { restoreHabit, setHabitArchived } from '@/data/habitsRepo';
-import { addDays, formatDateKey, monthGrid, startOfMonth, startOfWeek, todayKey, weekday, type DateKey } from '@/domain/dates';
+import { addDays, capitalizeFirst, formatDateKey, monthGrid, startOfMonth, startOfWeek, todayKey, weekday, type DateKey } from '@/domain/dates';
 import { currentFrequency, dayState, openPause, todayStatus, type Habit, type HabitInput } from '@/domain/habits';
 import { Badge } from '@/ui/Badge';
 import { Button } from '@/ui/Button';
@@ -214,7 +214,7 @@ function Nav({ label, onPrev, onNext, onToday, nextDisabled }: { label: string; 
   return (
     <div className="flex flex-wrap items-center gap-2">
       <IconButton label={t('habits.prev')} icon={<ChevronLeft className="h-4 w-4" />} onClick={onPrev} />
-      <span className="min-w-40 text-center text-sm font-semibold capitalize text-fg">{label}</span>
+      <span className="min-w-40 text-center text-sm font-semibold text-fg">{label}</span>
       <IconButton label={t('habits.next')} icon={<ChevronRight className="h-4 w-4" />} onClick={onNext} disabled={nextDisabled} />
       <Button size="sm" variant="ghost" onClick={onToday}>
         {t('habits.thisPeriod')}
@@ -253,10 +253,10 @@ function WeekView({ data, onLog }: { data: HabitsData; onLog: (h: Habit, d: Date
     <Surface className="flex flex-col gap-4">
       <Nav label={label} onPrev={() => setAnchor(addDays(anchor, -7))} onNext={() => setAnchor(addDays(anchor, 7))} onToday={() => setAnchor(startOfWeek(today, settings.weekStartsOn))} nextDisabled={addDays(anchor, 7) > today} />
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[560px] border-separate border-spacing-1">
+        <table className="w-full min-w-[420px] table-fixed border-separate border-spacing-1">
           <thead>
             <tr>
-              <th className="w-40 text-left text-xs font-medium text-subtle">{t('habits.habit')}</th>
+              <th className="w-28 text-left text-xs font-medium text-subtle sm:w-36">{t('habits.habit')}</th>
               {days.map((d) => (
                 <th key={d} className={cn('text-center text-xs font-medium capitalize', d === today ? 'text-accent' : 'text-subtle')}>
                   {names[weekday(d)]}
@@ -268,7 +268,7 @@ function WeekView({ data, onLog }: { data: HabitsData; onLog: (h: Habit, d: Date
           <tbody>
             {data.habits.map((h) => (
               <tr key={h.id}>
-                <td className="max-w-40 truncate pr-2 text-sm">
+                <td className="truncate pr-1 text-sm">
                   <Link to={`/habits/${h.id}`} className="font-medium text-fg hover:text-accent">
                     {h.name}
                   </Link>
@@ -296,7 +296,7 @@ function MonthView({ data, onLog }: { data: HabitsData; onLog: (h: Habit, d: Dat
   const today = todayKey();
   const [month, setMonth] = useState(() => startOfMonth(today));
   const grid = monthGrid(month, settings.weekStartsOn);
-  const label = new Intl.DateTimeFormat(settings.locale, { month: 'long', year: 'numeric' }).format(new Date(`${month}T12:00`));
+  const label = capitalizeFirst(new Intl.DateTimeFormat(settings.locale, { month: 'long', year: 'numeric' }).format(new Date(`${month}T12:00`)));
   const shift = (n: number) => {
     const d = new Date(`${month}T12:00`);
     d.setMonth(d.getMonth() + n);

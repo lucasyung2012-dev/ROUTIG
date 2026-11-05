@@ -1,4 +1,4 @@
-import { useState, type CSSProperties } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { Check, Minus, Plus, Trash2 } from 'lucide-react';
 import { useSettings } from '@/app/SettingsProvider';
 import { createHabit, HabitRuleError, restoreHabitLog, setHabitLog, softDeleteHabitLog, updateHabit } from '@/data/habitsRepo';
@@ -123,10 +123,18 @@ export function Heatmap({ habit, logs, from, to, onPick }: { habit: Habit; logs:
   const first = startOfWeek(from, settings.weekStartsOn);
   const weeks: DateKey[][] = [];
   for (let w = first; w <= to; w = addDays(w, 7)) weeks.push(Array.from({ length: 7 }, (_, i) => addDays(w, i)));
+  const month = new Intl.DateTimeFormat(settings.locale, { month: 'short' });
+  // Abre mostrando o fim (os dias mais recentes); o começo fica a um deslize.
+  const scroller = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = scroller.current;
+    if (el) el.scrollLeft = el.scrollWidth;
+  }, [from, to]);
   return (
-    <div className="overflow-x-auto pb-1">
+    <div ref={scroller} className="overflow-x-auto pb-1">
       <div className="inline-flex gap-[3px]">
         <div className="mr-1 flex flex-col gap-[3px] text-[0.625rem] leading-[11px] text-subtle" aria-hidden>
+          <span className="h-[11px]" />
           {Array.from({ length: 7 }, (_, i) => (
             <span key={i} className="h-[11px]">
               {i % 2 === 0 ? names[(i + settings.weekStartsOn) % 7] : ''}
@@ -135,6 +143,9 @@ export function Heatmap({ habit, logs, from, to, onPick }: { habit: Habit; logs:
         </div>
         {weeks.map((days) => (
           <div key={days[0]} className="flex flex-col gap-[3px]">
+            <span className="relative h-[11px] w-[11px] text-[0.625rem] leading-[11px] text-subtle" aria-hidden>
+              {days.some((d) => d.endsWith('-01') && d >= from && d <= to) && <span className="absolute left-0 whitespace-nowrap">{month.format(parseDateKey(days.find((d) => d.endsWith('-01'))!)).replace('.', '')}</span>}
+            </span>
             {days.map((d) => {
               if (d < from || d > to) return <span key={d} className="h-[11px] w-[11px]" />;
               const log = logs.get(d);

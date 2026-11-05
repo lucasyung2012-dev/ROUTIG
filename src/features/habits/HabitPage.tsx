@@ -4,7 +4,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { Archive, ChevronLeft, PenLine, Pause, Play, Plus, Trash2, X } from 'lucide-react';
 import { useSettings } from '@/app/SettingsProvider';
 import { addPause, habitHistory, pauseHabit, removePause, restoreHabit, resumeHabit, setHabitArchived, softDeleteHabit } from '@/data/habitsRepo';
-import { addDays, formatDateKey, monthGrid, startOfMonth, todayKey, type DateKey } from '@/domain/dates';
+import { addDays, capitalizeFirst, formatDateKey, monthGrid, startOfMonth, todayKey, type DateKey } from '@/domain/dates';
 import { consistency, currentFrequency, dayState, habitBuckets, habitPeriods, openPause, todayStatus, type Habit, type HabitBucket } from '@/domain/habits';
 import { Badge } from '@/ui/Badge';
 import { Button } from '@/ui/Button';
@@ -232,7 +232,7 @@ function CalendarTab({ habit, data, onPick }: { habit: Habit; data: HabitsData; 
         <Button size="sm" variant="secondary" onClick={() => shift(-1)} aria-label={t('habits.prev')}>
           ‹
         </Button>
-        <span className="min-w-40 text-center font-semibold capitalize text-fg">{new Intl.DateTimeFormat(settings.locale, { month: 'long', year: 'numeric' }).format(new Date(`${month}T12:00`))}</span>
+        <span className="min-w-40 text-center font-semibold text-fg">{capitalizeFirst(new Intl.DateTimeFormat(settings.locale, { month: 'long', year: 'numeric' }).format(new Date(`${month}T12:00`)))}</span>
         <Button size="sm" variant="secondary" onClick={() => shift(1)} disabled={month >= startOfMonth(today)} aria-label={t('habits.next')}>
           ›
         </Button>

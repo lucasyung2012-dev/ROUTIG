@@ -2,14 +2,15 @@
 
 Leia este arquivo no começo de toda conversa nova sobre o ROUTIG. A especificação completa é o "ROUTIG — Prompt Master" (35 partes), fornecido pelo dono do produto. Decisões em [DECISOES.md](DECISOES.md), arquitetura em [ARQUITETURA.md](ARQUITETURA.md).
 
-**Atualizado:** 2026-11-04 (fim da Etapa 2)
+**Atualizado:** 2026-11-04 (Etapa 3 em andamento)
 
 ## Estado da conversa (2026-11-04)
 
 - **Etapa 0 — Fundação:** concluída. Logo vetorial e design system aprovados pelo dono do produto em 2026-11-02.
 - **Etapa 1 — Organização central:** concluída no código (versão 0.7.0). Tasks, Calendar, Inbox, Notes, Projects, Dashboard, Profile e Settings publicados. Falta o dono do produto testar no iPad o Dashboard, o Profile e as Settings novas.
 - **Etapa 2 — Aprendizagem:** concluída (versão 0.20.0). Academy (0.11.0 a 0.17.0) e Idiomas (0.18.0 a 0.20.0) publicados e testados. Idiomas tem visão geral, vocabulário, gramática, revisões (repetição espaçada de palavras e regras), habilidades, sessões, pronúncia (voz do aparelho e gravação da própria voz), materiais e histórico.
-- **Próximo passo:** o dono do produto vai mandar o prompt da "praça" (interface em 2D e depois 3D, com zonas). Combinado: fazer a praça como etapa própria agora que a Etapa 2 acabou, mantendo o menu para acessibilidade. Depois, Etapa 3.
+- **Etapa 3 — Desenvolvimento pessoal:** em andamento. Ordem: Habits (0.21.0, pronto) → Goals → Focus → Música → Esportes. Goals vem antes de Música e Esportes para que as "metas" deles sejam objetivos do Goals, sem duplicar.
+- **Próximo passo:** Goals (Parte 15), com hábitos, tarefas e projetos relacionados. O dono do produto escolheu seguir a Etapa 3 antes da "praça" (2026-11-04); a praça (2D e depois 3D) entra quando ele mandar o prompt.
 - **Como trabalhar:** o computador de desenvolvimento não tem Node. Escrever o código, enviar com `git push`, conferir o GitHub Actions (anotações de erro aparecem por arquivo e linha) e testar no app publicado.
 
 ## Etapa 1 — andamento
@@ -80,6 +81,7 @@ Leia este arquivo no começo de toda conversa nova sobre o ROUTIG. A especifica�
 | 0.18.0 | 2026-11-04 | Claude (Claude Code) | Idiomas parte 1: idiomas (os 5 iniciais com um toque e qualquer outro), nível de referência (QECR, autoavaliação), objetivos, as quatro habilidades com nível e confiança, sessões de estudo, tempo por habilidade, histórico de evolução e cartão no Dashboard. Banco v13. |
 | 0.19.0 | 2026-11-04 | Claude (Claude Code) | Idiomas parte 2: vocabulário com repetição espaçada (categorias, fases, fonte, voz do aparelho), campos de alemão (artigo, plural, casos, regência) e de mandarim (caracteres, pinyin com números vira acentos, tons). Banco v14. |
 | 0.20.0 | 2026-11-04 | Claude (Claude Code) | Idiomas parte 3 e conferência da Parte 10: gramática (explicação, exemplos, exercícios), revisões por baralho (tudo, vocabulário, categoria, gramática) com treino livre, pronúncia (ouvir o modelo, gravar a própria voz, guardar nos materiais) e materiais. Notas mostram o idioma ou a disciplina ligados. Idiomas marcado como disponível; Etapa 2 concluída. Banco v15. |
+| 0.21.0 | 2026-11-04 | Claude (Claude Code) | Habits (Parte 14): conclusão, quantidade, duração ou escala; frequência por dia, dias da semana, semana, mês, ano ou a cada N dias (mudanças valem a partir do dia, sem reescrever o passado); pausas que não contam contra; sem sequências; vistas Hoje, Semana, Mês e Ano (calendário de consistência); gráficos e histórico; aparece no Calendar (opcional) e no Dashboard. Banco v16. |
 
 ## Calendar (Parte 6) — o que existe
 
@@ -132,4 +134,5 @@ Leia este arquivo no começo de toda conversa nova sobre o ROUTIG. A especifica�
 2. ~~Backup completo~~ (feito em 2026-11-03, versão 0.8.0).
 3. ~~Desenho do Notes completo~~ (feito em 2026-11-03, versão 0.9.0).
 4. ~~Etapa 2: Academy e Idiomas~~ (feito em 2026-11-04, versão 0.20.0).
-5. Sincronização pelo Google Drive: depois da Etapa 6.
+5. Etapa 3: Habits, Goals, Focus, Música e Esportes (em andamento).
+6. Sincronização pelo Google Drive: depois da Etapa 6.

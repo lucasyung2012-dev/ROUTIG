@@ -253,10 +253,10 @@ function WeekView({ data, onLog }: { data: HabitsData; onLog: (h: Habit, d: Date
     <Surface className="flex flex-col gap-4">
       <Nav label={label} onPrev={() => setAnchor(addDays(anchor, -7))} onNext={() => setAnchor(addDays(anchor, 7))} onToday={() => setAnchor(startOfWeek(today, settings.weekStartsOn))} nextDisabled={addDays(anchor, 7) > today} />
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[420px] table-fixed border-separate border-spacing-1">
+        <table className="w-full min-w-[360px] table-fixed border-separate border-spacing-1">
           <thead>
             <tr>
-              <th className="w-28 text-left text-xs font-medium text-subtle sm:w-36">{t('habits.habit')}</th>
+              <th className="w-24 text-left text-xs font-medium text-subtle lg:w-36">{t('habits.habit')}</th>
               {days.map((d) => (
                 <th key={d} className={cn('text-center text-xs font-medium capitalize', d === today ? 'text-accent' : 'text-subtle')}>
                   {names[weekday(d)]}

@@ -168,7 +168,7 @@ export async function convertToLibrary(id: string): Promise<{ libraryId: string;
   let libraryId: string;
   let existed = false;
   if (item.fileId) {
-    const r = await createFromStoredFile(item.fileId, item.text);
+    const r = await createFromStoredFile(item.fileId, item.text === item.fileName ? '' : item.text);
     libraryId = r.item.id;
     existed = r.existed;
   } else {

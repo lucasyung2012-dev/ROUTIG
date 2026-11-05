@@ -42,6 +42,7 @@ import { Logo } from '@/brand/Logo';
 import { Button } from '@/ui/Button';
 import { ErrorState } from '@/ui/States';
 import { ToastProvider } from '@/ui/toast';
+import { AppLock } from '@/features/security/AppLock';
 
 export function App({ extra }: { extra?: ReactNode }) {
   return (
@@ -92,65 +93,67 @@ function Gate() {
   if (!settings.onboarding.completed) return <Onboarding />;
 
   return (
-    <ErrorBoundary
-      fallback={(reset) => (
-        <div className="ambient flex h-full items-center justify-center p-6">
-          <ErrorState
-            title={t('errors.title')}
-            body={t('errors.body')}
-            action={
-              <Button variant="primary" onClick={reset}>
-                {t('errors.reload')}
-              </Button>
-            }
-          />
-        </div>
-      )}
-    >
-      <Routes>
-        <Route element={<AppShell />}>
-          <Route index element={<DashboardPage />} />
-          <Route path="tasks" element={<TasksPage />} />
-          <Route path="calendar" element={<CalendarPage />} />
-          <Route path="inbox" element={<InboxPage />} />
-          <Route path="notes" element={<NotesPage />} />
-          <Route path="notes/:id" element={<NotesPage />} />
-          <Route path="projects" element={<ProjectsPage />} />
-          <Route path="projects/:id" element={<ProjectPage />} />
-          <Route path="academy" element={<AcademyPage />} />
-          <Route path="academy/subjects/:id" element={<SubjectPage />} />
-          <Route path="academy/review" element={<ReviewHubPage />} />
-          <Route path="academy/plan" element={<StudyPlanPage />} />
-          <Route path="academy/assessments/:id" element={<ExamPage />} />
-          <Route path="languages" element={<LanguagesPage />} />
-          <Route path="languages/:id" element={<LanguagePage />} />
-          <Route path="habits" element={<HabitsPage />} />
-          <Route path="habits/:id" element={<HabitPage />} />
-          <Route path="goals" element={<GoalsPage />} />
-          <Route path="goals/:id" element={<GoalPage />} />
-          <Route path="focus" element={<FocusPage />} />
-          <Route path="music" element={<MusicPage />} />
-          <Route path="music/:id" element={<InstrumentPage />} />
-          <Route path="sports" element={<SportsPage />} />
-          <Route path="sports/:id" element={<SportPage />} />
-          <Route path="finance" element={<FinancePage />} />
-          <Route path="finance/assets/:id" element={<AssetPage />} />
-          <Route path="library" element={<LibraryPage />} />
-          <Route path="insights" element={<InsightsPage />} />
-          <Route path="academy/decks/:id" element={<DeckPage />} />
-          {NAV_MODULE_IDS.filter((id) => !['dashboard', 'tasks', 'calendar', 'inbox', 'notes', 'projects', 'academy', 'languages', 'habits', 'goals', 'focus', 'music', 'sports', 'finance', 'library', 'insights'].includes(id)).map((id) => (
-            <Route key={id} path={MODULES[id].path.slice(1)} element={<ModuleRoadmapPage id={id} />} />
-          ))}
-          <Route path="profile" element={<ProfilePage />} />
-          <Route path="profile/interests/:id" element={<InterestPage />} />
-          <Route path="settings" element={<SettingsIndexPage />} />
-          <Route path="settings/logo" element={<LogoComparePage />} />
-          <Route path="settings/:section" element={<SettingsSectionPage />} />
-          <Route path="design" element={<DesignSystemPage />} />
-          <Route path="*" element={<NotFound />} />
-        </Route>
-      </Routes>
-    </ErrorBoundary>
+    <AppLock>
+      <ErrorBoundary
+        fallback={(reset) => (
+          <div className="ambient flex h-full items-center justify-center p-6">
+            <ErrorState
+              title={t('errors.title')}
+              body={t('errors.body')}
+              action={
+                <Button variant="primary" onClick={reset}>
+                  {t('errors.reload')}
+                </Button>
+              }
+            />
+          </div>
+        )}
+      >
+        <Routes>
+          <Route element={<AppShell />}>
+            <Route index element={<DashboardPage />} />
+            <Route path="tasks" element={<TasksPage />} />
+            <Route path="calendar" element={<CalendarPage />} />
+            <Route path="inbox" element={<InboxPage />} />
+            <Route path="notes" element={<NotesPage />} />
+            <Route path="notes/:id" element={<NotesPage />} />
+            <Route path="projects" element={<ProjectsPage />} />
+            <Route path="projects/:id" element={<ProjectPage />} />
+            <Route path="academy" element={<AcademyPage />} />
+            <Route path="academy/subjects/:id" element={<SubjectPage />} />
+            <Route path="academy/review" element={<ReviewHubPage />} />
+            <Route path="academy/plan" element={<StudyPlanPage />} />
+            <Route path="academy/assessments/:id" element={<ExamPage />} />
+            <Route path="languages" element={<LanguagesPage />} />
+            <Route path="languages/:id" element={<LanguagePage />} />
+            <Route path="habits" element={<HabitsPage />} />
+            <Route path="habits/:id" element={<HabitPage />} />
+            <Route path="goals" element={<GoalsPage />} />
+            <Route path="goals/:id" element={<GoalPage />} />
+            <Route path="focus" element={<FocusPage />} />
+            <Route path="music" element={<MusicPage />} />
+            <Route path="music/:id" element={<InstrumentPage />} />
+            <Route path="sports" element={<SportsPage />} />
+            <Route path="sports/:id" element={<SportPage />} />
+            <Route path="finance" element={<FinancePage />} />
+            <Route path="finance/assets/:id" element={<AssetPage />} />
+            <Route path="library" element={<LibraryPage />} />
+            <Route path="insights" element={<InsightsPage />} />
+            <Route path="academy/decks/:id" element={<DeckPage />} />
+            {NAV_MODULE_IDS.filter((id) => !['dashboard', 'tasks', 'calendar', 'inbox', 'notes', 'projects', 'academy', 'languages', 'habits', 'goals', 'focus', 'music', 'sports', 'finance', 'library', 'insights'].includes(id)).map((id) => (
+              <Route key={id} path={MODULES[id].path.slice(1)} element={<ModuleRoadmapPage id={id} />} />
+            ))}
+            <Route path="profile" element={<ProfilePage />} />
+            <Route path="profile/interests/:id" element={<InterestPage />} />
+            <Route path="settings" element={<SettingsIndexPage />} />
+            <Route path="settings/logo" element={<LogoComparePage />} />
+            <Route path="settings/:section" element={<SettingsSectionPage />} />
+            <Route path="design" element={<DesignSystemPage />} />
+            <Route path="*" element={<NotFound />} />
+          </Route>
+        </Routes>
+      </ErrorBoundary>
+    </AppLock>
   );
 }
 

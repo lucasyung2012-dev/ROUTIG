@@ -42,7 +42,7 @@ export function NotificationBell() {
             )}
           </div>
           {muted && <p className="border-b border-line/70 px-4 py-2 text-xs text-muted">{t('notif.mutedUntil', { time: new Intl.DateTimeFormat(settings.locale, { dateStyle: 'short', timeStyle: 'short' }).format(new Date(n.config.muteUntil!)) })}</p>}
-          <ul className="min-h-0 flex-1 overflow-y-auto p-1.5">
+          <ul className="min-h-0 flex-1 overflow-y-auto p-1.5" data-private="notifications">
             {n.active.length === 0 ? (
               <li className="px-3 py-6 text-center text-sm text-muted">{t('notif.empty')}</li>
             ) : (

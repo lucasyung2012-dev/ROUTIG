@@ -33,6 +33,8 @@ import { Segmented } from '@/ui/Segmented';
 import { EmptyState, LoadingState } from '@/ui/States';
 import { Surface } from '@/ui/Surface';
 import { cn } from '@/ui/cn';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { loadPrivacy } from '@/data/privacyRepo';
 import { useInsightsData, type InsightsRaw } from './useInsightsData';
 
 const MODULES = ['focus', 'habits', 'tasks', 'academy', 'languages', 'music', 'sports', 'projects', 'goals', 'finance'] as const;
@@ -89,11 +91,12 @@ export function InsightsPage() {
   const [customizing, setCustomizing] = useState(false);
   const [prefs, setPrefs] = usePrefs();
   const { hide, toggle } = useHideToggle();
+  const privacy = useLiveQuery(() => loadPrivacy(), []);
   const range = kind === 'custom' ? custom : rangeFor(kind, anchor, settings.weekStartsOn);
   const prev = previousRange(range);
   const now = useMemo(() => raw && compute(raw, range, today, settings.weekStartsOn), [raw, range.from, range.to, today, settings.weekStartsOn]);
   const before = useMemo(() => raw && compute(raw, prev, today, settings.weekStartsOn), [raw, prev.from, prev.to, today, settings.weekStartsOn]);
-  if (!raw || !now || !before) return <LoadingState label={t('common.loading')} lines={6} />;
+  if (!raw || !now || !before || !privacy) return <LoadingState label={t('common.loading')} lines={6} />;
 
   const shift = (n: number) => {
     if (kind === 'week') setAnchor(addDays(anchor, 7 * n));
@@ -108,7 +111,11 @@ export function InsightsPage() {
         : kind === 'year'
           ? range.from.slice(0, 4)
           : `${formatDateKey(range.from, settings.locale, { day: 'numeric', month: 'short', year: 'numeric' })} – ${formatDateKey(range.to, settings.locale, { day: 'numeric', month: 'short', year: 'numeric' })}`;
-  const visible = MODULES.filter((m) => !prefs.hidden.includes(m));
+  // Módulos tirados do Insights pela privacidade não aparecem em lugar nenhum daqui, nem no relatório (Parte 26.1).
+  const locked = MODULES.filter((m) => privacy.insightsHidden.includes(m));
+  const allowed = MODULES.filter((m) => !locked.includes(m));
+  const visible = allowed.filter((m) => !prefs.hidden.includes(m));
+  const shownMod = allowed.includes(mod) ? mod : allowed[0];
 
   return (
     <HideContext.Provider value={hide}>
@@ -151,11 +158,13 @@ export function InsightsPage() {
         </Surface>
         <p className="text-xs text-muted print:hidden">{t('insights.integrity')}</p>
 
+        <div className="flex flex-col gap-6 print:gap-3" data-private="insights">
         {level === 'overview' && <Overview now={now} before={prefs.compare ? before : null} modules={visible} onOpen={(m) => (setMod(m), setLevel('module'))} />}
-        {level === 'module' && <ModuleView mod={mod} setMod={setMod} now={now} before={prefs.compare ? before : null} range={range} />}
+        {level === 'module' && (shownMod ? <ModuleView mod={shownMod} modules={allowed} setMod={setMod} now={now} before={prefs.compare ? before : null} range={range} /> : <Surface tone="flat"><EmptyState title={t('insights.allPrivate')} /></Surface>)}
         {level === 'report' && <Report now={now} before={prefs.compare ? before : null} label={label} modules={visible} />}
+        </div>
 
-        {customizing && <CustomizeDialog hidden={prefs.hidden} onChange={(hidden) => setPrefs({ ...prefs, hidden })} onClose={() => setCustomizing(false)} />}
+        {customizing && <CustomizeDialog hidden={prefs.hidden} locked={locked} onChange={(hidden) => setPrefs({ ...prefs, hidden })} onClose={() => setCustomizing(false)} />}
       </div>
     </HideContext.Provider>
   );
@@ -329,7 +338,7 @@ function Row({ label, value, sub }: { label: ReactNode; value: ReactNode; sub?: 
   );
 }
 
-function ModuleView({ mod, setMod, now, before, range }: { mod: Mod; setMod: (m: Mod) => void; now: Computed; before: Computed | null; range: Range }) {
+function ModuleView({ mod, modules, setMod, now, before, range }: { mod: Mod; modules: readonly Mod[]; setMod: (m: Mod) => void; now: Computed; before: Computed | null; range: Range }) {
   const { t, settings } = useSettings();
   const has = now[mod].has;
   const chartPoints: Partial<Record<Mod, Array<{ date: DateKey; value: number }>>> = {
@@ -345,7 +354,7 @@ function ModuleView({ mod, setMod, now, before, range }: { mod: Mod; setMod: (m:
   return (
     <div className="flex flex-col gap-4">
       <Select aria-label={t('insights.module')} value={mod} onChange={(e) => setMod(e.target.value as Mod)} className="h-10 w-auto max-w-60">
-        {MODULES.map((m) => (
+        {modules.map((m) => (
           <option key={m} value={m}>
             {t(`modules.${m}`)}
           </option>
@@ -477,7 +486,7 @@ function Report({ now, before, label, modules }: { now: Computed; before: Comput
 
 /* ---------- Cartões personalizáveis (Parte 19.4) ---------- */
 
-function CustomizeDialog({ hidden, onChange, onClose }: { hidden: Mod[]; onChange: (h: Mod[]) => void; onClose: () => void }) {
+function CustomizeDialog({ hidden, locked, onChange, onClose }: { hidden: Mod[]; locked: Mod[]; onChange: (h: Mod[]) => void; onClose: () => void }) {
   const { t } = useSettings();
   return (
     <Dialog open onClose={onClose} closeLabel={t('common.close')} title={t('insights.customize')} description={t('insights.customizeHint')} footer={<Button onClick={onClose}>{t('common.done')}</Button>}>
@@ -485,8 +494,9 @@ function CustomizeDialog({ hidden, onChange, onClose }: { hidden: Mod[]; onChang
         {MODULES.map((m) => (
           <li key={m}>
             <label className="flex items-center gap-3 text-sm text-fg">
-              <input type="checkbox" checked={!hidden.includes(m)} onChange={(e) => onChange(e.target.checked ? hidden.filter((x) => x !== m) : [...hidden, m])} className="h-4 w-4 accent-[rgb(var(--accent))]" />
+              <input type="checkbox" checked={!hidden.includes(m) && !locked.includes(m)} disabled={locked.includes(m)} onChange={(e) => onChange(e.target.checked ? hidden.filter((x) => x !== m) : [...hidden, m])} className="h-4 w-4 accent-[rgb(var(--accent))]" />
               {t(`modules.${m}`)}
+              {locked.includes(m) && <span className="text-xs text-muted">{t('insights.privateNote')}</span>}
             </label>
           </li>
         ))}

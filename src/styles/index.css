@@ -153,6 +153,15 @@ body {
   transition-duration: 1ms !important;
 }
 
+/* Privacidade rápida (Parte 26.4): as partes escolhidas ficam borradas e sem toque. */
+.qp-dashboard [data-private~='dashboard'],
+.qp-notifications [data-private~='notifications'],
+.qp-insights [data-private~='insights'] {
+  filter: blur(0.5rem);
+  user-select: none;
+  pointer-events: none;
+}
+
 /* Barra de rolagem discreta. */
 * {
   scrollbar-width: thin;

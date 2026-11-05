@@ -18,6 +18,7 @@ import { PlanningArea } from './PlanningArea';
 import { JournalArea } from './JournalArea';
 import { FinanceLock, PinDialog } from './FinanceLock';
 import { Segmented } from '@/ui/Segmented';
+import { useQuickPrivacy } from '@/features/security/QuickPrivacy';
 
 /** As áreas internas (Parte 16.1). */
 const AREAS = ['academy', 'investments', 'market', 'planning', 'journal'] as const;
@@ -49,12 +50,15 @@ function useArea(): [Area, (a: Area) => void] {
 /** Liga e desliga "ocultar valores" (padrão: escondidos). Guardado no aparelho. */
 export function useHideToggle() {
   const [hide, setHide] = useState(true);
+  // A privacidade rápida (Parte 26.4) esconde os valores enquanto estiver ligada.
+  const forced = useQuickPrivacy().hides('finance');
   useEffect(() => {
     void loadHideValues().then(setHide);
   }, []);
   return {
-    hide,
+    hide: hide || forced,
     toggle: () => {
+      if (forced) return;
       const next = !hide;
       setHide(next);
       void saveHideValues(next);
@@ -64,7 +68,8 @@ export function useHideToggle() {
 
 export function HideButton({ hide, toggle }: { hide: boolean; toggle: () => void }) {
   const { t } = useSettings();
-  return <IconButton label={hide ? t('finance.showValues') : t('finance.hideValues')} icon={hide ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />} onClick={toggle} />;
+  const forced = useQuickPrivacy().hides('finance');
+  return <IconButton disabled={forced} label={forced ? t('privacy.quick.financeForced') : hide ? t('finance.showValues') : t('finance.hideValues')} icon={hide ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />} onClick={toggle} />;
 }
 
 export function Disclaimer() {

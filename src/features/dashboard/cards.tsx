@@ -6,6 +6,8 @@ import { MODULES, TONE_CLASSES, type ModuleId } from '@/app/modules';
 import { useSettings } from '@/app/SettingsProvider';
 import { isModuleReady } from '@/app/version';
 import { getDb } from '@/data/db';
+import { loadPrivacy } from '@/data/privacyRepo';
+import type { PrivacyModule } from '@/domain/privacy';
 import { addDays, formatDateKey, toDateKey, todayKey } from '@/domain/dates';
 import { fromMinutes } from '@/domain/events';
 import type { KpiMetric, LiveCard } from '@/domain/dashboard';
@@ -54,7 +56,9 @@ export function CardShell({ title, icon, tone = 'violet', link, children }: { ti
           </Link>
         )}
       </div>
-      <div className="mt-4 min-w-0 flex-1">{children}</div>
+      <div className="mt-4 min-w-0 flex-1" data-private="dashboard">
+        {children}
+      </div>
     </section>
   );
 }
@@ -286,13 +290,17 @@ export function InboxCard() {
 
 const ACTIVITY_TYPES = ['task', 'event', 'note', 'project', 'inbox'] as const;
 type ActivityType = (typeof ACTIVITY_TYPES)[number];
+const ACTIVITY_MODULE: Record<ActivityType, PrivacyModule> = { task: 'tasks', event: 'events', note: 'notes', project: 'projects', inbox: 'inbox' };
 
 /** O que foi criado, alterado ou concluído por último (do histórico de alterações). */
 export function ActivityCard() {
   const { t, settings } = useSettings();
   const rows = useLiveQuery(async () => {
     const db = getDb();
-    const entries = (await db.changelog.orderBy('seq').reverse().limit(80).toArray()).filter((e) => (ACTIVITY_TYPES as readonly string[]).includes(e.entityType));
+    // Módulos escondidos do Dashboard pela privacidade não aparecem na atividade (Parte 26.1).
+    const priv = await loadPrivacy();
+    const allowed = ACTIVITY_TYPES.filter((type) => !priv.dashboardHidden.includes(ACTIVITY_MODULE[type])) as readonly string[];
+    const entries = (await db.changelog.orderBy('seq').reverse().limit(80).toArray()).filter((e) => allowed.includes(e.entityType));
     // Uma linha por registro: só a mudança mais recente de cada um.
     const seen = new Set<string>();
     const unique = entries.filter((e) => (seen.has(`${e.entityType}:${e.entityId}`) ? false : (seen.add(`${e.entityType}:${e.entityId}`), true))).slice(0, 8);
@@ -766,13 +774,15 @@ export function InsightsCard() {
   const raw = useInsightsData();
   const today = todayKey();
   const r = rangeFor('week', today, settings.weekStartsOn);
+  const privacy = useLiveQuery(() => loadPrivacy(), []);
+  // Sem os números de módulos que a privacidade tirou do Insights ou do Dashboard.
   const rows = raw
     ? [
-        { label: t('insights.minutesFocus'), value: focusInsights(raw.focus, r).minutes },
-        { label: t('insights.tasksDone'), value: tasksInsights(raw.tasks, r).completed },
-        { label: t('insights.habitLogs'), value: habitsInsights(raw.habits, raw.habitLogs, r, today, settings.weekStartsOn).logs },
-        { label: t('insights.activities'), value: sportsInsights(raw.sports, raw.sportActivities, r).activities },
-      ]
+        { mod: 'focus' as const, label: t('insights.minutesFocus'), value: focusInsights(raw.focus, r).minutes },
+        { mod: 'tasks' as const, label: t('insights.tasksDone'), value: tasksInsights(raw.tasks, r).completed },
+        { mod: 'habits' as const, label: t('insights.habitLogs'), value: habitsInsights(raw.habits, raw.habitLogs, r, today, settings.weekStartsOn).logs },
+        { mod: 'sports' as const, label: t('insights.activities'), value: sportsInsights(raw.sports, raw.sportActivities, r).activities },
+      ].filter((x) => !privacy?.insightsHidden.includes(x.mod) && !privacy?.dashboardHidden.includes(x.mod))
     : [];
   return (
     <CardShell title={t('dashboard.cards.insights')} icon={<ChartLine className="h-5 w-5" />} tone="rose" link={{ to: '/insights', label: t('common.open') }}>

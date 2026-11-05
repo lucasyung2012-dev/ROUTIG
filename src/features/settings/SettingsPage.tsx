@@ -1,5 +1,6 @@
 import { NotificationsSection } from '@/features/notifications/NotificationsSection';
 import { PrivacySection } from './PrivacySection';
+import { SecuritySection } from '@/features/security/securityUi';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, NavLink, Navigate, useParams } from 'react-router-dom';
 import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, Eye, EyeOff, Monitor, Moon, RotateCcw, Star, Sun } from 'lucide-react';
@@ -118,6 +119,8 @@ function SectionBody({ id }: { id: SettingsSectionId }) {
       return <NotificationsSection />;
     case 'privacy':
       return <PrivacySection />;
+    case 'security':
+      return <SecuritySection />;
     case 'modules':
       return <ModulesSection />;
     case 'backup':

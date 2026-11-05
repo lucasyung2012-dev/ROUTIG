@@ -24,6 +24,8 @@ import {
   type LiveCard,
 } from '@/domain/dashboard';
 import { newId } from '@/domain/ids';
+import { loadPrivacy } from '@/data/privacyRepo';
+import { dashboardHiddenIds } from '@/domain/privacy';
 import { Badge } from '@/ui/Badge';
 import { Button } from '@/ui/Button';
 import { ConfirmDialog } from '@/ui/ConfirmDialog';
@@ -76,7 +78,9 @@ export function DashboardPage() {
   const config = draft ?? saved;
   const editing = draft !== null;
   const profile = config?.profiles.find((p) => p.id === config.activeId) ?? config?.profiles[0];
-  const hidden = new Set<string>(settings.nav.hidden);
+  const privacy = useLiveQuery(() => loadPrivacy(), []);
+  // Módulos ocultos no menu ou escondidos do Dashboard pela privacidade (Parte 26.1).
+  const hidden = new Set<string>([...settings.nav.hidden, ...(privacy ? dashboardHiddenIds(privacy) : [])]);
   const visible = (profile?.cards ?? []).filter((c) => {
     const mod = moduleOf(c.id);
     return !mod || !hidden.has(mod);

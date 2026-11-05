@@ -14,6 +14,7 @@ import { runAutoBackupIfDue } from '@/data/backupRepo';
 import { FocusProvider, useFocus } from '@/features/focus/FocusProvider';
 import { NotificationsProvider } from '@/features/notifications/NotificationsProvider';
 import { NotificationBell } from '@/features/notifications/NotificationBell';
+import { QuickPrivacyButton, QuickPrivacyProvider } from '@/features/security/QuickPrivacy';
 import { formatClock, phaseElapsed, phaseRemaining } from '@/domain/focus';
 
 const NEXT_THEME: Record<ThemeSetting, ThemeSetting> = { auto: 'light', light: 'dark', dark: 'auto' };
@@ -25,7 +26,9 @@ export function AppShell() {
       <EventEditorProvider>
         <FocusProvider>
           <NotificationsProvider>
-            <Shell />
+            <QuickPrivacyProvider>
+              <Shell />
+            </QuickPrivacyProvider>
           </NotificationsProvider>
         </FocusProvider>
       </EventEditorProvider>
@@ -100,6 +103,7 @@ function Shell() {
             <QuickCreate />
             <FocusPill />
             <NotificationBell />
+            <QuickPrivacyButton />
 
             {!online && (
               <span className="mr-1 hidden items-center gap-1.5 rounded-full bg-warning/15 px-3 py-1 text-xs font-medium text-warning sm:inline-flex" role="status">

@@ -19,7 +19,7 @@ import {
 import { storeNoteFile } from '@/data/notesRepo';
 import { formatDateKey, toDateKey, todayKey } from '@/domain/dates';
 import { countByWeek, emptyInterestInput, INTEREST_STATUSES, type Interest, type InterestStatus, type TimelineItem, type WeekBucket } from '@/domain/interests';
-import { isClosedKind, statusKind } from '@/domain/tasks';
+import { completionTimes } from '@/domain/tasks';
 import { useObjectUrl } from '@/features/files/useObjectUrl';
 import { useTasksData } from '@/features/tasks/useTasksData';
 import { Badge } from '@/ui/Badge';
@@ -375,7 +375,7 @@ function EvolutionTab() {
   if (tasks.loading || !extra) return <LoadingState label={t('common.loading')} lines={4} />;
 
   const today = todayKey();
-  const doneDates = tasks.active.filter((x) => x.completedAt && isClosedKind(statusKind(tasks.config, x.statusId))).map((x) => toDateKey(new Date(x.completedAt!)));
+  const doneDates = tasks.active.flatMap((x) => completionTimes(x)).map((c) => toDateKey(new Date(c)));
   const taskWeeks = countByWeek(doneDates, today, 8);
   const noteWeeks = countByWeek(
     extra.notes.map((n) => toDateKey(new Date(n.createdAt))),

@@ -23,6 +23,9 @@ describe('insights (Parte 19)', () => {
     const r = { from: '2026-11-02', to: '2026-11-08' };
     const t = (completedAt: string | null) => ({ ...base, completedAt }) as never;
     expect(tasksInsights([t('2026-11-03T12:00:00Z'), t('2026-10-30T12:00:00Z'), t(null)], r)).toMatchObject({ completed: 1, created: 0 });
+    // Recorrente: cada ocorrência feita conta, e a última de uma série encerrada não conta duas vezes.
+    const rec = { ...base, completedAt: '2026-11-05T12:00:00Z', occurrences: [{ date: '2026-11-03', completedAt: '2026-11-03T12:00:00Z', kind: 'done' }, { date: '2026-11-04', completedAt: '2026-11-04T12:00:00Z', kind: 'skipped' }, { date: '2026-11-05', completedAt: '2026-11-05T12:00:00Z', kind: 'done' }] } as never;
+    expect(tasksInsights([rec], r)).toMatchObject({ completed: 2 });
   });
 
   it('média da Academy só com avaliações com nota no período, na escala da disciplina', () => {

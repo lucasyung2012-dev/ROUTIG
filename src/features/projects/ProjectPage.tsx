@@ -29,6 +29,7 @@ import { ColorPicker, ProjectCover, STATUS_TONE } from './ProjectsPage';
 import { AutoTextarea } from '@/features/notes/BlockEditor';
 import { useProjectsData, type ProjectsData } from './useProjectsData';
 import { LibraryLinked } from '@/features/library/libraryUi';
+import { LinkedGoals } from '@/features/goals/goalsUi';
 
 const TABS = ['overview', 'work', 'milestones', 'timeline', 'calendar', 'notes', 'materials', 'history'] as const;
 type Tab = (typeof TABS)[number];
@@ -182,16 +183,19 @@ function ProjectDetail({ project, data }: { project: Project; data: ProjectsData
       </div>
 
       {tab === 'overview' && (
-        <Overview
-          draft={draft}
-          change={change}
-          onTrash={async () => {
-            await flush();
-            await softDeleteProject(project.id);
-            navigate('/projects');
-            toast.show(t('projects.movedToTrash'), 'success', { label: t('projects.undo'), run: () => void restoreProject(project.id) });
-          }}
-        />
+        <>
+          <Overview
+            draft={draft}
+            change={change}
+            onTrash={async () => {
+              await flush();
+              await softDeleteProject(project.id);
+              navigate('/projects');
+              toast.show(t('projects.movedToTrash'), 'success', { label: t('projects.undo'), run: () => void restoreProject(project.id) });
+            }}
+          />
+          <LinkedGoals refType="project" refId={project.id} />
+        </>
       )}
       {tab === 'work' && <Work project={project} draft={draft} change={change} data={data} />}
       {tab === 'milestones' && <Milestones draft={draft} change={change} />}

@@ -63,7 +63,7 @@ export const en: Messages = {
   },
   moduleSummary: {
     dashboard: 'An overview of your routine, built from the real data in each module.',
-    calendar: 'Appointments, classes, exams and practice in one calendar, with recurrence and conflict warnings.',
+    calendar: 'Appointments, classes, exams, deadlines and habits in one calendar, with repeats and conflict warnings.',
     academy: 'Your whole school life: subjects, content, assessments, grades, reviews and exams.',
     languages: 'Self-directed language learning, with vocabulary, grammar and the four skills.',
     tasks: 'Tasks with priorities, due dates, lists, dependencies and recurrence.',
@@ -93,7 +93,7 @@ export const en: Messages = {
       'Day, week, month, year and agenda views',
       'Daily, weekly, monthly and yearly recurrence, with exceptions',
       'Edit only this occurrence, this and following, or the series',
-      'Tasks with due dates, exams and practice appear without copies',
+      'Tasks with due dates, exams, study sessions, milestones and habits show up without copies',
       'Time conflict warnings and school calendar',
     ],
     academy: [
@@ -158,7 +158,7 @@ export const en: Messages = {
       'Financial Academy, Investments, Market, Planning and Journal',
       'Brazilian and international assets, in several currencies',
       'Spreadsheet import with preview and correction',
-      'PIN protection with encryption and values hidden by default',
+      'Its own Finance PIN (a screen lock, no encryption) and values hidden by default',
       'No real financial transactions',
     ],
     notes: [
@@ -176,7 +176,7 @@ export const en: Messages = {
     insights: [
       'Overview, per-module analysis and period reports',
       'Weekly, monthly, yearly or custom',
-      'Clear difference between recorded, estimated and missing',
+      'Clear difference between recorded and missing: "no data" is not zero',
       'No invented data and no causal claims without evidence',
     ],
     inbox: [
@@ -558,7 +558,7 @@ export const en: Messages = {
       ],
       dataTitle: 'Your data on each device',
       dataNotes: [
-        'Data stays only on the device where it was created. There is no sync between devices yet (planned for after Stage 6, through Google Drive).',
+        'Data stays only on the device where it was created. There is no sync between devices yet (planned for V2, through Google Drive).',
         'On iPad and iPhone, the installed app and the Safari tab keep separate data. Pick one and always use it.',
         'Do not use private tabs and do not clear Safari website data: that deletes ROUTIG too.',
         'To move data to another device, export a backup in Settings, Backup, and restore it on the other device.',
@@ -625,7 +625,7 @@ export const en: Messages = {
       upcoming: 'Upcoming settings',
       upcomingBody: 'These do not exist yet, so they do not appear as controls:',
       upcomingItems: [
-        'Google Drive sync (after Stage 6)',
+        'Google Drive sync (V2)',
         'Integrations (future)',
         'AI (future)',
       ],
@@ -997,7 +997,7 @@ export const en: Messages = {
       reminderDay: '{n} day(s) before',
       link: 'Linked to',
       noLink: 'No link',
-      linkHint: 'Links to Academy, Sports, Focus and the other modules arrive when they are built.',
+      linkHint: 'Links the event to a task. Exams, study sessions, project milestones, habits and goal deadlines already show up in the calendar on their own.',
       openTask: 'Open task',
       save: 'Save',
       create: 'Create event',
@@ -1360,7 +1360,7 @@ export const en: Messages = {
       removeCover: 'Remove cover',
       tags: 'Tags',
       objectives: 'Objectives',
-      objectivesHint: 'One per line. Linking to the Goals module arrives when it is built.',
+      objectivesHint: 'One per line, as text. Goals linked to this project show just below.',
       participants: 'Participants',
       participantsHint: 'One per line. For the record only: nobody gets access to the app.',
     },
@@ -1516,7 +1516,7 @@ export const en: Messages = {
     sections: {
       about: 'About',
       objectives: 'Objectives',
-      objectivesHint: 'Plain text for now. When Goals arrives (Stage {stage}), you can link real goals.',
+      objectivesHint: 'Free text. For a goal with tracking and progress, create it in Goals.',
       objectivePlaceholder: 'E.g. play 5 full songs',
       addObjective: 'Add objective',
       removeObjective: 'Remove objective',
@@ -1524,7 +1524,7 @@ export const en: Messages = {
       projectsEmpty: 'No linked projects.',
       linkProject: 'Link a project…',
       materials: 'Materials',
-      materialsHint: 'Notes linked to this interest. The Library joins here when it arrives (Stage {stage}).',
+      materialsHint: 'Notes linked to this interest.',
       materialsEmpty: 'No linked notes.',
       linkNote: 'Link a note…',
       unlink: 'Unlink',

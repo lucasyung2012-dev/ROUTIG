@@ -13,7 +13,7 @@ import { fromMinutes } from '@/domain/events';
 import type { KpiMetric, LiveCard } from '@/domain/dashboard';
 import { notePreview } from '@/domain/notes';
 import { isClosedProject } from '@/domain/projects';
-import { compareTasks, isClosedKind, statusKind } from '@/domain/tasks';
+import { compareTasks, completionTimes, isClosedKind, statusKind } from '@/domain/tasks';
 import { visibleModules } from '@/domain/settings';
 import { useEventEditor } from '@/features/calendar/EventEditor';
 import { toneLook, useCalendarData } from '@/features/calendar/useCalendarData';
@@ -146,7 +146,7 @@ export function TasksCard() {
   const open = data.active.filter((x) => !isDoneStatus(data)(x.statusId));
   const overdue = open.filter((x) => x.dueDate && x.dueDate < today).length;
   const dueToday = open.filter((x) => x.dueDate === today).length;
-  const doneToday = data.active.filter((x) => x.completedAt && toDateKey(new Date(x.completedAt)) === today).length;
+  const doneToday = data.active.flatMap((x) => completionTimes(x)).filter((c) => toDateKey(new Date(c)) === today).length;
   const next = [...open].sort(compareTasks(data.config)).slice(0, 5);
   return (
     <CardShell title={t('dashboard.cards.tasks')} icon={<ListTodo className="h-5 w-5" />} link={{ to: '/tasks', label: t('dashboard.seeAll') }}>
@@ -420,7 +420,7 @@ export function KpiCard({ metric }: { metric: KpiMetric }) {
       case 'tasksToday':
         return db.tasks.filter((x) => !x.deletedAt && !closed.has(x.statusId) && x.dueDate === today).count();
       case 'tasksDoneWeek':
-        return db.tasks.filter((x) => !x.deletedAt && !!x.completedAt && toDateKey(new Date(x.completedAt)) >= weekAgo).count();
+        return (await db.tasks.filter((x) => !x.deletedAt).toArray()).flatMap((x) => completionTimes(x)).filter((c) => toDateKey(new Date(c)) >= weekAgo).length;
       case 'projectsActive':
         return db.projects.filter((p) => !p.deletedAt && p.status === 'active').count();
       case 'inboxOpen':

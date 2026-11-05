@@ -61,7 +61,7 @@ export const pt = {
   },
   moduleSummary: {
     dashboard: 'A visão geral da sua rotina, montada com os dados reais de cada módulo.',
-    calendar: 'Compromissos, aulas, provas e treinos num calendário só, com recorrências e aviso de conflitos.',
+    calendar: 'Compromissos, aulas, provas, prazos e hábitos num calendário só, com recorrências e aviso de conflitos.',
     academy: 'Sua vida escolar completa: disciplinas, conteúdos, avaliações, notas, revisões e provas.',
     languages: 'Estudo de idiomas por conta própria, com vocabulário, gramática e as quatro habilidades.',
     tasks: 'Tarefas com prioridades, prazos, listas, dependências e recorrência.',
@@ -91,7 +91,7 @@ export const pt = {
       'Visualizações de dia, semana, mês, ano e agenda',
       'Recorrência diária, semanal, mensal e anual, com exceções',
       'Editar só esta ocorrência, esta e as próximas ou a série',
-      'Tarefas com prazo, provas e treinos aparecem sem cópia',
+      'Tarefas com prazo, provas, sessões de estudo, marcos e hábitos aparecem sem cópia',
       'Aviso de conflito de horário e calendário escolar',
     ],
     academy: [
@@ -156,7 +156,7 @@ export const pt = {
       'Academia Financeira, Investimentos, Mercado, Planejamento e Diário',
       'Ativos brasileiros e internacionais, em várias moedas',
       'Importação de planilhas com prévia e correção',
-      'Proteção por PIN com criptografia e valores ocultos por padrão',
+      'PIN próprio de Finanças (trava de tela, sem criptografia) e valores ocultos por padrão',
       'Nenhuma operação financeira real',
     ],
     notes: [
@@ -174,7 +174,7 @@ export const pt = {
     insights: [
       'Visão geral, análise por módulo e relatórios por período',
       'Semanal, mensal, anual ou personalizado',
-      'Diferença clara entre registrado, estimado e ausente',
+      'Diferença clara entre registrado e ausente: "sem dados" não é zero',
       'Sem dado inventado e sem relação causal sem evidência',
     ],
     inbox: [
@@ -556,7 +556,7 @@ export const pt = {
       ],
       dataTitle: 'Seus dados em cada aparelho',
       dataNotes: [
-        'Os dados ficam só no aparelho onde foram criados. Ainda não há sincronização entre aparelhos (combinada para depois da Etapa 6, pelo Google Drive).',
+        'Os dados ficam só no aparelho onde foram criados. Ainda não há sincronização entre aparelhos (planejada para a V2, pelo Google Drive).',
         'No iPad e no iPhone, o app instalado e a aba do Safari guardam dados separados. Escolha um dos dois e use sempre ele.',
         'Não use aba anônima e não apague os dados de sites do Safari: isso apaga o ROUTIG também.',
         'Para levar os dados de um aparelho para outro, exporte um backup em Settings, Backup, e restaure no outro aparelho.',
@@ -623,7 +623,7 @@ export const pt = {
       upcoming: 'Próximas configurações',
       upcomingBody: 'Ainda não existem e por isso não aparecem como controles:',
       upcomingItems: [
-        'Sincronização pelo Google Drive (depois da Etapa 6)',
+        'Sincronização pelo Google Drive (V2)',
         'Integrações (futuro)',
         'IA (futuro)',
       ],
@@ -995,7 +995,7 @@ export const pt = {
       reminderDay: '{n} dia(s) antes',
       link: 'Ligado a',
       noLink: 'Sem ligação',
-      linkHint: 'Ligações com Academy, Esportes, Focus e os outros módulos chegam quando eles forem construídos.',
+      linkHint: 'Liga o evento a uma tarefa. Provas, sessões de estudo, marcos de projetos, hábitos e prazos de objetivos já aparecem sozinhos no calendário.',
       openTask: 'Abrir tarefa',
       save: 'Salvar',
       create: 'Criar evento',
@@ -1358,7 +1358,7 @@ export const pt = {
       removeCover: 'Tirar capa',
       tags: 'Tags',
       objectives: 'Objetivos',
-      objectivesHint: 'Um por linha. A ligação com o módulo Goals chega quando ele for construído.',
+      objectivesHint: 'Um por linha, em texto. Objetivos do Goals ligados a este projeto aparecem logo abaixo.',
       participants: 'Participantes',
       participantsHint: 'Um por linha. Só para registro: ninguém ganha acesso ao app.',
     },
@@ -1514,7 +1514,7 @@ export const pt = {
     sections: {
       about: 'Sobre',
       objectives: 'Objetivos',
-      objectivesHint: 'Por enquanto em texto. Quando o Goals chegar (Etapa {stage}), dá para ligar com objetivos de verdade.',
+      objectivesHint: 'Em texto livre. Para um objetivo com acompanhamento e progresso, crie-o no Goals.',
       objectivePlaceholder: 'Ex.: tocar 5 músicas inteiras',
       addObjective: 'Adicionar objetivo',
       removeObjective: 'Tirar objetivo',
@@ -1522,7 +1522,7 @@ export const pt = {
       projectsEmpty: 'Nenhum projeto ligado.',
       linkProject: 'Ligar um projeto…',
       materials: 'Materiais',
-      materialsHint: 'Notas ligadas a este interesse. A Library entra aqui quando chegar (Etapa {stage}).',
+      materialsHint: 'Notas ligadas a este interesse.',
       materialsEmpty: 'Nenhuma nota ligada.',
       linkNote: 'Ligar uma nota…',
       unlink: 'Desligar',

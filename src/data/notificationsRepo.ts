@@ -48,14 +48,20 @@ export async function gatherAlertInput(weekStartsOn: 0 | 1, now = new Date()): P
     db.assessments.filter((a) => !a.deletedAt && a.score === null && !!a.date).toArray(),
     db.subjects.toArray(),
     db.habits.filter((h) => !h.deletedAt && !h.archived).toArray(),
-    db.habitLogs.filter((l) => !l.deletedAt && l.date === today).toArray(),
+    // O período de um hábito pode ser a semana, o mês ou o ano: o que já foi feito nele conta.
+    db.habitLogs.where('date').between(addDays(today, -366), today, true, true).filter((l) => !l.deletedAt).toArray(),
     db.goals.filter((g) => !g.deletedAt).toArray(),
     loadBackupPrefs(),
     listExports(),
     currentCounts(),
   ]);
   const subjectName = new Map(subjects.map((s) => [s.id, s.name]));
-  const logsByHabit = new Map(habitLogs.map((l) => [l.habitId, new Map([[l.date, l]])]));
+  const logsByHabit = new Map<string, Map<DateKey, (typeof habitLogs)[number]>>();
+  for (const l of habitLogs) {
+    const m = logsByHabit.get(l.habitId) ?? new Map();
+    m.set(l.date, l);
+    logsByHabit.set(l.habitId, m);
+  }
   let storageUse: number | null = null;
   try {
     const est = await navigator.storage?.estimate?.();

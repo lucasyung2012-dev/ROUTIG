@@ -189,6 +189,13 @@ export function statusKind(config: TasksConfig, statusId: string): StatusKind {
 }
 
 /** Feita, cancelada ou arquivada: sai das listas de pendências. */
+/** Cada conclusão da tarefa (ISO): a atual e as ocorrências feitas de uma recorrente, sem contar a mesma duas vezes. */
+export function completionTimes(task: Pick<Task, 'completedAt' | 'occurrences'>): string[] {
+  const times = new Set((task.occurrences ?? []).filter((o) => o.kind === 'done').map((o) => o.completedAt));
+  if (task.completedAt) times.add(task.completedAt);
+  return [...times];
+}
+
 export function isClosedKind(kind: StatusKind): boolean {
   return kind === 'done' || kind === 'cancelled' || kind === 'archived';
 }

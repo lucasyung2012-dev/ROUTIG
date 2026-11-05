@@ -8,7 +8,7 @@ import type { Language, LanguageSession, VocabEntry, GrammarRule } from './langu
 import type { PracticeSession, Song, Instrument } from './music';
 import type { Project } from './projects';
 import type { Sport, SportActivity } from './sports';
-import type { Task } from './tasks';
+import { completionTimes, type Task } from './tasks';
 import type { FinAsset, FinTransaction, FinQuote, Currency } from './finance';
 import { computePosition } from './finance';
 import type { CardReview } from './academy';
@@ -89,8 +89,9 @@ export function habitsInsights(habits: Habit[], logs: HabitLog[], r: Range, toda
 
 export function tasksInsights(tasks: Task[], r: Range) {
   const all = tasks.filter((t) => !t.deletedAt);
-  const done = all.filter((t) => inRange(isoDay(t.completedAt), r));
-  return { has: all.length > 0, completed: done.length, created: all.filter((t) => inRange(isoDay(t.createdAt), r)).length, points: done.map((t) => ({ date: isoDay(t.completedAt)!, value: 1 })) };
+  // Tarefas recorrentes contam cada ocorrência concluída (a tarefa avança e volta a ficar aberta).
+  const days = all.flatMap((t) => completionTimes(t).map((c) => isoDay(c)!)).filter((d) => inRange(d, r));
+  return { has: all.length > 0, completed: days.length, created: all.filter((t) => inRange(isoDay(t.createdAt), r)).length, points: days.map((date) => ({ date, value: 1 })) };
 }
 
 export function projectsInsights(projects: Project[], r: Range) {

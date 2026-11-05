@@ -23,6 +23,7 @@ import { formatGrade, useAcademyData, type AcademyData } from './useAcademyData'
 import { ContentsTab, DoubtsTab, LessonsTab, MaterialsTab, WorkTab } from './subjectTabs';
 import { DecksPanel, ReviewSession } from './flashcards';
 import { useSubjectExtras, type SubjectExtras } from './useSubjectExtras';
+import { LinkedGoals } from '@/features/goals/goalsUi';
 
 /** Ambiente da disciplina (Parte 9.3). */
 const TABS = ['overview', 'contents', 'lessons', 'assessments', 'work', 'reviews', 'doubts', 'materials', 'history'] as const;
@@ -140,6 +141,7 @@ function SubjectDetail({ subject, data }: { subject: Subject; data: AcademyData 
       {tab === 'overview' && (
         <div className="flex flex-col gap-4">
           <OverviewSummary data={data} extras={extras} onTab={setTab} />
+          <LinkedGoals refType="subject" refId={subject.id} preset={{ area: 'academic' }} />
           {subject.notes && (
             <Surface tone="flat" className="flex flex-col gap-1">
               <h2 className="text-sm font-semibold text-fg">{subject.kind === 'subject' ? t('academy.subject.notes') : t('academy.subject.pathNotes')}</h2>

@@ -10,8 +10,8 @@ Leia este arquivo no começo de toda conversa nova sobre o ROUTIG. A especifica�
 - **Etapa 1 — Organização central:** concluída no código (versão 0.7.0). Tasks, Calendar, Inbox, Notes, Projects, Dashboard, Profile e Settings publicados. Falta o dono do produto testar no iPad o Dashboard, o Profile e as Settings novas.
 - **Etapa 2 — Aprendizagem:** concluída (versão 0.20.0). Academy (0.11.0 a 0.17.0) e Idiomas (0.18.0 a 0.20.0) publicados e testados. Idiomas tem visão geral, vocabulário, gramática, revisões (repetição espaçada de palavras e regras), habilidades, sessões, pronúncia (voz do aparelho e gravação da própria voz), materiais e histórico.
 - **Etapa 3 — Desenvolvimento pessoal:** concluída (versão 0.25.0). Habits (0.21.0), Goals (0.22.0), Focus (0.23.0), Música (0.24.0) e Esportes (0.25.0) publicados e testados. Goals veio antes de Música e Esportes para que as metas deles sejam objetivos do Goals, sem duplicar.
-- **Etapa 4 — Gestão pessoal:** em andamento. Finanças completa (0.26.0 a 0.28.0). Library pronta (0.29.0). Falta Insights.
-- **Próximo passo:** Insights (Parte 19), o último módulo da Etapa 4. A "praça" (2D e depois 3D) entra quando o dono do produto mandar o prompt.
+- **Etapa 4 — Gestão pessoal:** concluída (versão 0.30.0). Finanças (0.26.0 a 0.28.0), Library (0.29.0) e Insights (0.30.0). **Todos os 18 módulos estão construídos.**
+- **Próximo passo:** Etapa 5 (integração e acabamento: relacionamentos entre todos os módulos, busca global, personalização, notificações, backup e recuperação, importação e exportação; mais privacidade rápida, "apagar todos os dados deste aparelho" e tutoriais). A "praça" (2D e depois 3D) entra quando o dono do produto mandar o prompt.
 - **Como trabalhar:** o computador de desenvolvimento não tem Node. Escrever o código, enviar com `git push`, conferir o GitHub Actions (anotações de erro aparecem por arquivo e linha) e testar no app publicado.
 
 ## Etapa 1 — andamento
@@ -91,6 +91,7 @@ Leia este arquivo no começo de toda conversa nova sobre o ROUTIG. A especifica�
 | 0.27.0 | 2026-11-04 | Claude (Claude Code) | Finanças parte 2: Academia Financeira (cursos, aulas, resumos, conceitos, aprendizados, materiais, glossário com revisão) e Mercado (com fonte, data e fato × análise). Banco v22. |
 | 0.28.0 | 2026-11-04 | Claude (Claude Code) | Finanças parte 3: Planejamento (metas pelo Goals, reserva de emergência, orçamento opcional, histórico), Diário de Investimentos e PIN de acesso. Finanças completa com as 5 áreas. Banco v23. |
 | 0.29.0 | 2026-11-04 | Claude (Claude Code) | Library (Parte 18): 10 tipos de material; coleções, pastas, categorias, tags, busca e favoritos; importação com prévia e duplicatas (nada substituído, mesmo arquivo reaproveitado); um material em vários módulos (Materiais de disciplina, idioma, objetivo, instrumento e esporte); armazenamento; exclusão definitiva só com confirmação e sem apagar arquivo em uso. Corrigido: apagar de vez um item do Inbox apagava o arquivo de uma nota criada dele. Banco v24. |
+| 0.30.0 | 2026-11-04 | Claude (Claude Code) | Insights (Parte 19): visão geral, análise por módulo e relatório para imprimir; períodos semana, mês, ano e personalizado com comparação ao anterior; só dados registrados ("sem dados" diferente de zero, nada estimado, sem porcentagem artificial); cartões personalizáveis; cartão no Dashboard. Etapa 4 concluída. |
 
 ## Calendar (Parte 6) — o que existe
 
@@ -144,4 +145,5 @@ Leia este arquivo no começo de toda conversa nova sobre o ROUTIG. A especifica�
 3. ~~Desenho do Notes completo~~ (feito em 2026-11-03, versão 0.9.0).
 4. ~~Etapa 2: Academy e Idiomas~~ (feito em 2026-11-04, versão 0.20.0).
 5. ~~Etapa 3: Habits, Goals, Focus, Música e Esportes~~ (feito em 2026-11-04, versão 0.25.0).
+   - ~~Etapa 4: Finanças, Library e Insights~~ (feito em 2026-11-04, versão 0.30.0).
 6. Sincronização pelo Google Drive: depois da Etapa 6.

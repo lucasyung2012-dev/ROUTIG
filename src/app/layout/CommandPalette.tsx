@@ -48,6 +48,9 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
   const cal = useCalendarData();
   const allNotes = useLiveQuery(() => getDb().notes.toArray(), []);
   const allProjects = useLiveQuery(() => getDb().projects.toArray(), []);
+  const [query, setQuery] = useState('');
+  const [active, setActive] = useState(0);
+  const input = useRef<HTMLInputElement>(null);
   const privacy = useLiveQuery(() => loadPrivacy(), []);
   const hidden = privacy?.searchHidden ?? ['finance'];
   const [debounced, setDebounced] = useState('');
@@ -57,9 +60,6 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
   }, [query]);
   // Os outros módulos só são lidos com a busca aberta e algo digitado.
   const more = useLiveQuery(() => (open && debounced.trim().length >= 2 ? searchModules(debounced, hidden) : Promise.resolve([] as SearchHit[])), [open, debounced, hidden.join()]);
-  const [query, setQuery] = useState('');
-  const [active, setActive] = useState(0);
-  const input = useRef<HTMLInputElement>(null);
 
   const all = useMemo<Result[]>(() => {
     const modules = [...NAV_MODULE_IDS, ...SYSTEM_MODULE_IDS].map((id: ModuleId) => ({

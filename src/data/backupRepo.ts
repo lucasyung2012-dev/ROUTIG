@@ -161,7 +161,10 @@ export async function runAutoBackupIfDue(now = new Date()): Promise<SnapshotInfo
   const last = await getBackupDb().snapshots.where('kind').equals('auto').reverse().sortBy('createdAt');
   if (!autoBackupDue(last[0]?.createdAt ?? null, prefs, now)) return null;
   if (!hasUserData(await currentCounts())) return null;
-  return saveSnapshot('auto');
+  const snap = await saveSnapshot('auto');
+  // Limite escolhido pelo usuário em Settings → Backup (0 = guarda todas).
+  if (prefs.keepAuto > 0) await deleteOldAutoCopies(prefs.keepAuto);
+  return snap;
 }
 
 /* ---------- Exportação ---------- */

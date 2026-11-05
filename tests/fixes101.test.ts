@@ -7,6 +7,10 @@ import { gatherAlertInput } from '@/data/notificationsRepo';
 import { emptyHabitInput } from '@/domain/habits';
 import { parseCsv, toCsv } from '@/domain/transfer';
 import { joinSegments, quickSegments, textToBlocks, type Block } from '@/domain/notes';
+import { importTransactions, markDuplicates } from '@/data/financeRepo';
+import { parseTransactionsCsv } from '@/domain/finance';
+import { BackupDB, listSnapshots, runAutoBackupIfDue, saveBackupPrefs, saveSnapshot, setBackupDbForTests } from '@/data/backupRepo';
+import { DEFAULT_BACKUP_PREFS, migrateBackupPrefs } from '@/domain/backup';
 
 beforeEach(() => {
   setDbForTests(new RoutigDB(`test-fix101-${Math.random().toString(36).slice(2)}`));
@@ -57,5 +61,36 @@ describe('Calendar: "somente esta" guarda categoria e observações', () => {
     await removeEventCategory(cat.id);
     const after = (await getDb().events.get(e.id))!;
     expect(after.overrides['2026-11-16']?.categoryId).toBe('other');
+  });
+});
+
+describe('Finanças: importação com as regras do cadastro', () => {
+  it('venda acima da carteira e data futura não entram; compra e venda do mesmo arquivo, em ordem, entram', async () => {
+    const csv = 'data,ativo,tipo,quantidade,preco\n2026-11-02,BOVA11,compra,10,120\n2026-11-03,BOVA11,venda,4,125\n2026-11-03,BOVA11,venda,50,125\n2030-01-01,BOVA11,compra,1,100';
+    const rows = await markDuplicates(parseTransactionsCsv(csv).rows, '2026-11-05');
+    expect(rows.map((r) => r.error)).toEqual([null, null, 'oversell', 'future']);
+    expect(rows.map((r) => r.include)).toEqual([true, true, false, false]);
+    // Mesmo marcando tudo à mão, a gravação confere de novo.
+    const forced = rows.map((r) => ({ ...r, include: true, error: null }));
+    const res = await importTransactions(forced, { fileName: 'x.csv', category: 'etfs', currency: 'BRL', custody: '', today: '2026-11-05' });
+    expect(res.created).toBe(2);
+  });
+});
+
+describe('Backup: limite de cópias automáticas só quando escolhido', () => {
+  it('sem limite guarda todas; com limite 7, as automáticas mais antigas saem e a manual fica', async () => {
+    setBackupDbForTests(new BackupDB(`test-fix101-b-${Math.random().toString(36).slice(2)}`));
+    expect(migrateBackupPrefs({ keepAuto: 5 }).keepAuto).toBe(0);
+    await getDb().tasks.add({ id: 't', title: 'x' } as never);
+    await saveSnapshot('manual');
+    for (let i = 0; i < 8; i++) await saveSnapshot('auto');
+    const later = new Date(Date.now() + 2 * 86_400_000);
+    await runAutoBackupIfDue(later);
+    expect((await listSnapshots()).filter((s) => s.kind === 'auto')).toHaveLength(9);
+    await saveBackupPrefs({ ...DEFAULT_BACKUP_PREFS, keepAuto: 7 });
+    await runAutoBackupIfDue(new Date(later.getTime() + 2 * 86_400_000));
+    const left = await listSnapshots();
+    expect(left.filter((s) => s.kind === 'auto')).toHaveLength(7);
+    expect(left.filter((s) => s.kind === 'manual')).toHaveLength(1);
   });
 });

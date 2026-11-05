@@ -6,6 +6,7 @@ import type { ThemeSetting } from '@/domain/settings';
 import { Logo } from '@/brand/Logo';
 import { IconButton } from '@/ui/IconButton';
 import { cn } from '@/ui/cn';
+import { useToast } from '@/ui/toast';
 import { Sidebar } from './Sidebar';
 import { CommandPalette } from './CommandPalette';
 import { TaskEditorProvider } from '@/features/tasks/TaskEditor';
@@ -40,6 +41,7 @@ export function AppShell() {
 
 function Shell() {
   const { settings, update, t } = useSettings();
+  const toast = useToast();
   const [menuOpen, setMenuOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [online, setOnline] = useState(() => (typeof navigator === 'undefined' ? true : navigator.onLine));
@@ -49,7 +51,7 @@ function Shell() {
 
   // Cópia interna diária (Parte 25.2): alguns segundos depois de abrir, sem travar a tela.
   useEffect(() => {
-    const id = window.setTimeout(() => void runAutoBackupIfDue().catch(() => undefined), 4000);
+    const id = window.setTimeout(() => void runAutoBackupIfDue().catch(() => toast.show(t('backup.autoFailed'), 'error')), 4000);
     return () => window.clearTimeout(id);
   }, []);
 

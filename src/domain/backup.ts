@@ -215,9 +215,11 @@ export interface BackupPrefs {
   reminderDays: ReminderDays;
   /** Aviso adiado até este instante (ISO). */
   snoozedUntil: string | null;
+  /** Quantas cópias automáticas manter (0 = todas). Só apaga as mais antigas se o usuário escolher um número. */
+  keepAuto: 0 | KeepAuto;
 }
 
-export const DEFAULT_BACKUP_PREFS: BackupPrefs = { autoDaily: true, reminderDays: 7, snoozedUntil: null };
+export const DEFAULT_BACKUP_PREFS: BackupPrefs = { autoDaily: true, reminderDays: 7, snoozedUntil: null, keepAuto: 0 };
 
 export function migrateBackupPrefs(raw: unknown): BackupPrefs {
   const r = raw && typeof raw === 'object' ? (raw as Partial<BackupPrefs>) : {};
@@ -225,6 +227,7 @@ export function migrateBackupPrefs(raw: unknown): BackupPrefs {
     autoDaily: typeof r.autoDaily === 'boolean' ? r.autoDaily : DEFAULT_BACKUP_PREFS.autoDaily,
     reminderDays: (REMINDER_OPTIONS as readonly number[]).includes(r.reminderDays as number) ? (r.reminderDays as ReminderDays) : DEFAULT_BACKUP_PREFS.reminderDays,
     snoozedUntil: typeof r.snoozedUntil === 'string' ? r.snoozedUntil : null,
+    keepAuto: ([7, 14, 30] as number[]).includes(r.keepAuto as number) ? (r.keepAuto as KeepAuto) : 0,
   };
 }
 

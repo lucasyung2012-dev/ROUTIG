@@ -154,6 +154,22 @@ export function BackupSection() {
             </Select>
           </div>
         </div>
+        <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+          <div className="min-w-0">
+            <div className="text-[0.9375rem] font-medium text-fg">{t('backup.keepAuto')}</div>
+            <p className="mt-1 text-sm text-muted">{t('backup.keepAutoHint')}</p>
+          </div>
+          <div className="w-full shrink-0 sm:w-56">
+            <Select aria-label={t('backup.keepAuto')} value={prefs.keepAuto} onChange={(e) => setPrefs({ keepAuto: Number(e.target.value) as BackupPrefs['keepAuto'] })}>
+              <option value={0}>{t('backup.keepAll')}</option>
+              {KEEP_AUTO_OPTIONS.map((k) => (
+                <option key={k} value={k}>
+                  {t('backup.pruneKeepN', { count: k })}
+                </option>
+              ))}
+            </Select>
+          </div>
+        </div>
       </Surface>
 
       <Surface className="flex flex-col gap-3">

@@ -281,7 +281,8 @@ export function ImportDialog({ onClose }: { onClose: () => void }) {
       rs.map((r, j) => {
         if (j !== i) return r;
         const next = { ...r, ...p };
-        const error = rowError(next);
+        // Tipo desconhecido no arquivo continua erro até alguém escolher um tipo (não vira "Compra" sozinho).
+        const error = r.error === 'type' && p.type === undefined ? 'type' : rowError(next);
         return { ...next, error, include: error ? false : p.include ?? (r.error && !error ? true : next.include) };
       }),
     );
@@ -428,7 +429,7 @@ export function ImportDialog({ onClose }: { onClose: () => void }) {
                       <input aria-label={t('finance.columns.amount')} inputMode="decimal" value={r.amount || ''} onChange={(e) => setRow(i, { amount: num(e.target.value) })} className="w-24 rounded-lg bg-surface-2 px-2 py-1 ring-1 ring-inset ring-line" />
                     </td>
                     <td className="p-2 text-xs">
-                      {r.error ? <span className="text-danger">{t(`finance.rowErrors.${r.error as 'date' | 'ticker' | 'type' | 'quantity' | 'amount'}`)}</span> : r.duplicate ? (
+                      {r.error ? <span className="text-danger">{t(`finance.rowErrors.${r.error as 'date' | 'ticker' | 'type' | 'quantity' | 'amount' | 'future' | 'oversell'}`)}</span> : r.duplicate ? (
                         <span className="inline-flex items-center gap-1 text-warning">
                           <Copy className="h-3.5 w-3.5" aria-hidden />
                           {t('finance.duplicate')}

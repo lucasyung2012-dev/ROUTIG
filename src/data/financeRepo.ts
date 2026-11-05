@@ -1,6 +1,7 @@
 import { getDb } from './db';
 import { newId, nowIso } from '@/domain/ids';
 import type { ChangeEntry } from '@/domain/entity';
+import { todayKey } from '@/domain/dates';
 import { assetInputSchema, txFingerprint, txInputSchema, type AssetInput, type FinAsset, type FinQuote, type FinTransaction, type ImportRow, type TxInput } from '@/domain/finance';
 
 export class FinanceRuleError extends Error {
@@ -130,8 +131,42 @@ export const restoreQuote = (id: string) => setDeleted('finQuotes', 'finQuote', 
 
 /* ---------- Importação (Parte 16.4) ---------- */
 
-/** Marca as linhas que já existem (mesmo ativo, data, tipo, quantidade e preço). Não muda nada no banco. */
-export async function markDuplicates(rows: ImportRow[]): Promise<ImportRow[]> {
+/**
+ * Mesmas regras do cadastro manual: nada com data futura, e nenhuma venda maior do que a quantidade
+ * na carteira (contando o que já existe e as linhas do arquivo, em ordem de data). Não muda nada no banco.
+ */
+export async function validateImportRows(rows: ImportRow[], today: string): Promise<ImportRow[]> {
+  const db = getDb();
+  const assets = new Map((await db.finAssets.filter((a) => !a.deletedAt).toArray()).map((a) => [a.id, (a.ticker || a.name).toUpperCase()]));
+  const held = new Map<string, number>();
+  for (const t of await db.finTransactions.filter((x) => !x.deletedAt).toArray()) {
+    const k = assets.get(t.assetId);
+    if (!k) continue;
+    held.set(k, (held.get(k) ?? 0) + (t.type === 'buy' ? t.quantity : t.type === 'sell' ? -t.quantity : 0));
+  }
+  const out = rows.map((r) => ({ ...r }));
+  const order = out.map((_, i) => i).sort((a, b) => out[a]!.date.localeCompare(out[b]!.date));
+  for (const i of order) {
+    const r = out[i]!;
+    // Erros de leitura (data, ativo, tipo, valores) continuam; os de regra são refeitos a cada conferência.
+    if (r.error && r.error !== 'future' && r.error !== 'oversell') continue;
+    r.error = null;
+    if (r.date > today) r.error = 'future';
+    if (r.error || r.duplicate || !r.include) continue;
+    const k = r.ticker.toUpperCase();
+    const q = held.get(k) ?? 0;
+    if (r.type === 'sell' && r.quantity > q + 1e-9) r.error = 'oversell';
+    else held.set(k, q + (r.type === 'buy' ? r.quantity : r.type === 'sell' ? -r.quantity : 0));
+  }
+  return out.map((r) => (r.error ? { ...r, include: false } : r));
+}
+
+/** Marca as linhas que já existem (mesmo ativo, data, tipo, quantidade e preço) e confere as regras. Não muda nada no banco. */
+export async function markDuplicates(rows: ImportRow[], today = todayKey()): Promise<ImportRow[]> {
+  return validateImportRows(await markDuplicatesOnly(rows), today);
+}
+
+async function markDuplicatesOnly(rows: ImportRow[]): Promise<ImportRow[]> {
   const db = getDb();
   const assets = new Map((await db.finAssets.filter((a) => !a.deletedAt).toArray()).map((a) => [a.id, a]));
   const existing = new Set(
@@ -154,7 +189,8 @@ export async function markDuplicates(rows: ImportRow[]): Promise<ImportRow[]> {
  * Cada movimentação guarda a origem (nome do arquivo e data da importação).
  */
 export async function importTransactions(rows: ImportRow[], opts: { fileName: string; category: FinAsset['category']; currency: FinAsset['currency']; custody: string; today: string }): Promise<{ created: number; assets: number }> {
-  const chosen = rows.filter((r) => r.include && !r.error && r.date <= opts.today);
+  // Confere de novo na hora de gravar: a escolha do usuário vale, mas nenhuma regra é pulada.
+  const chosen = (await validateImportRows(rows, opts.today)).filter((r) => r.include && !r.error);
   const db = getDb();
   const source = `${opts.fileName.slice(0, 120)} · ${opts.today}`;
   return db.transaction('rw', db.finAssets, db.finTransactions, db.changelog, async () => {

@@ -2,7 +2,7 @@
 
 Leia este arquivo no começo de toda conversa nova sobre o ROUTIG. A especificação completa é o "ROUTIG — Prompt Master" (35 partes), fornecido pelo dono do produto. Decisões em [DECISOES.md](DECISOES.md), arquitetura em [ARQUITETURA.md](ARQUITETURA.md).
 
-**Atualizado:** 2026-11-05 (**V1 concluída**, versão 1.0.0)
+**Atualizado:** 2026-11-05 (**V1 concluída**, versão 1.0.1 com as correções da auditoria)
 
 ## Estado da conversa (2026-11-04)
 
@@ -105,6 +105,7 @@ Leia este arquivo no começo de toda conversa nova sobre o ROUTIG. A especifica�
 | 0.38.0 | 2026-11-05 | Claude (Claude Code) | Fim da Etapa 5: texto do seletor de ligações da nota ("Ligar a…"), Sobre e roadmap atualizados (etapa atual: 6). |
 | 0.38.1–0.38.2 | 2026-11-05 | Claude (Claude Code) | Etapa 6 (navegador): correções de layout no iPhone, topo com Focus ligado, singular em textos com número, resumo das cópias de backup. Lista de testes no aparelho em docs/TESTES-APARELHO.md. |
 | 1.0.0 | 2026-11-05 | Claude (Claude Code) | **V1 concluída.** Etapa 6 fechada: testes no navegador (todas as telas no iPad e no iPhone, fluxos, dados, offline, acessibilidade) e no aparelho pelo dono do produto (instalação, offline, Apple Pencil, avisos, sons, microfone, arquivos, backup em Arquivos, PIN), tudo funcionando. |
+| 1.0.1 | 2026-11-05 | Claude (Claude Code) | Correções da auditoria final da V1: texto que prometia criptografia em Finanças corrigido (e outros textos desatualizados); aviso de hábitos considera o período inteiro (semana/mês/ano); tarefas recorrentes concluídas contam no Insights, Dashboard e Profile; Settings → Módulos mostra as opções dos 16 módulos; CSV exportado neutraliza fórmulas; bloqueio do app não abre se não conseguir ler a configuração; PIN de Finanças com PBKDF2 e espera crescente (PIN antigo convertido no primeiro acerto); Insights não mostra Finanças trancado pelo PIN; modo Rápido do Notes mantém imagens, tabelas e desenhos no lugar; Calendar "somente esta" guarda categoria e observações (dia inteiro avisa que é só para a série); importação CSV de Finanças com as regras do cadastro (sem data futura, sem vender mais que a carteira); cópia automática avisa quando falha e tem limite opcional; objetivos ligados aparecem em Projects e nas disciplinas. |
 
 ## Calendar (Parte 6) — o que existe
 

@@ -10,7 +10,7 @@ describe('idiomas (Parte 10.1)', () => {
     expect(await createLanguages(LANGUAGE_PRESETS)).toBe(5);
     expect(await createLanguages(LANGUAGE_PRESETS)).toBe(0);
     await createLanguage({ name: 'Francês', code: 'fr', color: '#438BEA' });
-    const all = await getDb().languages.toArray();
+    const all = await getDb().languages.orderBy('order').toArray();
     expect(all.map((l) => l.name)).toEqual(['Português', 'Inglês', 'Alemão', 'Espanhol', 'Mandarim', 'Francês']);
     expect(all.find((l) => l.name === 'Português')?.native).toBe(true);
     await expect(createLanguage({ name: 'francês', code: 'fr', color: '#438BEA' })).rejects.toMatchObject({ code: 'duplicate' });

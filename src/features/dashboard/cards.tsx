@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Activity, ArrowRight, CalendarDays, Diamond, FolderKanban, GraduationCap, Inbox, Languages, ListTodo, NotebookPen, Play, Repeat, Sun, Target, Timer } from 'lucide-react';
+import { Activity, ArrowRight, CalendarDays, Diamond, FolderKanban, GraduationCap, Guitar, Inbox, Languages, ListTodo, NotebookPen, Play, Repeat, Sun, Target, Timer } from 'lucide-react';
 import { MODULES, TONE_CLASSES, type ModuleId } from '@/app/modules';
 import { useSettings } from '@/app/SettingsProvider';
 import { isModuleReady } from '@/app/version';
@@ -24,6 +24,7 @@ import { isGoalOverdue, isOpenGoal } from '@/domain/goals';
 import { GoalProgressView } from '@/features/goals/goalsUi';
 import { useGoals } from '@/features/goals/useGoals';
 import { useFocus } from '@/features/focus/FocusProvider';
+import { useMusic } from '@/features/music/useMusic';
 import { formatClock, phaseElapsed, phaseRemaining } from '@/domain/focus';
 import { useProjectsData } from '@/features/projects/useProjectsData';
 import { TaskRow } from '@/features/tasks/TaskRow';
@@ -449,6 +450,8 @@ export function renderLiveCard(id: LiveCard): ReactNode {
       return <GoalsCard />;
     case 'focus':
       return <FocusCard />;
+    case 'music':
+      return <MusicCard />;
     case 'projects':
       return <ProjectsCard />;
     case 'milestones':
@@ -651,6 +654,39 @@ export function FocusCard() {
           </Link>
         )}
       </div>
+    </CardShell>
+  );
+}
+
+/** Música (Parte 11): prática da semana e músicas em andamento de cada instrumento. */
+export function MusicCard() {
+  const { t } = useSettings();
+  const data = useMusic();
+  const weekAgo = addDays(todayKey(), -6);
+  return (
+    <CardShell title={t('dashboard.cards.music')} icon={<Guitar className="h-5 w-5" />} tone="rose" link={{ to: '/music', label: t('common.open') }}>
+      {data.loading ? (
+        <LoadingState label={t('common.loading')} lines={3} />
+      ) : data.instruments.length === 0 ? (
+        <p className="text-sm text-muted">{t('dashboard.musicEmpty')}</p>
+      ) : (
+        <ul className="flex flex-col gap-1">
+          {data.instruments.map((ins) => {
+            const min = data.practiceOf(ins.id).filter((p) => p.date >= weekAgo).reduce((a, p) => a + p.durationMin, 0);
+            const learning = data.songsOf(ins.id).filter((s) => s.status === 'learning' || s.status === 'reviewing').length;
+            return (
+              <li key={ins.id}>
+                <Link to={`/music/${ins.id}`} className="flex items-center gap-3 rounded-xl px-2 py-1.5 transition hover:bg-surface-2/70">
+                  <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: ins.color }} aria-hidden />
+                  <span className="min-w-0 flex-1 truncate text-sm font-medium text-fg">{ins.name}</span>
+                  <span className="text-xs text-muted">{t('music.learningCount', { count: learning })}</span>
+                  <span className="w-16 text-right text-xs tabular text-fg">{t('focus.min', { min })}</span>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      )}
     </CardShell>
   );
 }

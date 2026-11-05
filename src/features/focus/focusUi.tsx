@@ -58,11 +58,11 @@ export const ENVIRONMENT_LOOK: Record<FocusEnvironment, { style: CSSProperties; 
 
 /* ---------- Ligações (Parte 13.4: módulo e tarefa relacionados) ---------- */
 
-export const FOCUS_REF_TYPES = ['subject', 'language', 'project', 'habit', 'goal'] as const;
+export const FOCUS_REF_TYPES = ['subject', 'language', 'instrument', 'project', 'habit', 'goal'] as const;
 export type FocusRefType = (typeof FOCUS_REF_TYPES)[number];
 
 /** O tipo de ligação que combina com cada tipo de sessão (só sugere a ordem; qualquer ligação vale). */
-export const KIND_REF: Partial<Record<FocusKind, FocusRefType>> = { study: 'subject', languages: 'language', project: 'project' };
+export const KIND_REF: Partial<Record<FocusKind, FocusRefType>> = { study: 'subject', languages: 'language', music: 'instrument', project: 'project' };
 
 export function useFocusRefOptions() {
   return useLiveQuery(async () => {
@@ -71,6 +71,7 @@ export function useFocusRefOptions() {
     const out: Record<FocusRefType, Array<{ id: string; name: string }>> = {
       subject: (await db.subjects.filter((s) => !s.deletedAt).toArray()).map((s) => ({ id: s.id, name: `${s.name}${years.get(s.yearId) ? ` · ${years.get(s.yearId)}` : ''}` })),
       language: (await db.languages.filter((l) => !l.deletedAt).toArray()).map((l) => ({ id: l.id, name: l.name })),
+      instrument: (await db.instruments.filter((i) => !i.deletedAt).toArray()).map((i) => ({ id: i.id, name: i.name })),
       project: (await db.projects.filter((p) => !p.deletedAt).toArray()).map((p) => ({ id: p.id, name: p.name })),
       habit: (await db.habits.filter((h) => !h.deletedAt && !h.archived).toArray()).map((h) => ({ id: h.id, name: h.name })),
       goal: (await db.goals.filter((g) => !g.deletedAt && isOpenGoal(g)).toArray()).map((g) => ({ id: g.id, name: g.name })),
@@ -86,4 +87,4 @@ export function parseRefKey(v: string): EntityRef | null {
   return i > 0 ? { type: v.slice(0, i), id: v.slice(i + 1) } : null;
 }
 
-export const REF_PATH: Record<FocusRefType, string> = { subject: '/academy/subjects/', language: '/languages/', project: '/projects/', habit: '/habits/', goal: '/goals/' };
+export const REF_PATH: Record<FocusRefType, string> = { subject: '/academy/subjects/', language: '/languages/', instrument: '/music/', project: '/projects/', habit: '/habits/', goal: '/goals/' };

@@ -242,12 +242,13 @@ function useRefNames() {
       habit: (await db.habits.filter((h) => !h.deletedAt).toArray()).map((h) => ({ id: h.id, name: h.name, color: h.color })),
       language: (await db.languages.filter((l) => !l.deletedAt).toArray()).map((l) => ({ id: l.id, name: l.name, color: l.color })),
       subject: (await db.subjects.filter((s) => !s.deletedAt).toArray()).map((s) => ({ id: s.id, name: `${s.name}${years.get(s.yearId) ? ` · ${years.get(s.yearId)}` : ''}`, color: s.color })),
+      instrument: (await db.instruments.filter((i) => !i.deletedAt).toArray()).map((i) => ({ id: i.id, name: i.name, color: i.color })),
     };
     return opts;
   }, []);
 }
 
-const REF_PATH: Record<GoalRefType, string> = { project: '/projects/', habit: '/habits/', language: '/languages/', subject: '/academy/subjects/' };
+const REF_PATH: Record<GoalRefType, string> = { project: '/projects/', habit: '/habits/', language: '/languages/', subject: '/academy/subjects/', instrument: '/music/' };
 
 function RelatedSummary({ goal }: { goal: Goal }) {
   const { t } = useSettings();

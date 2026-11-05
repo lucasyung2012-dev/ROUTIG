@@ -24,7 +24,7 @@ export type GoalStatus = (typeof GOAL_STATUSES)[number];
 export const OPEN_STATUSES: readonly GoalStatus[] = ['idea', 'planned', 'active', 'paused'];
 
 /** O que um objetivo pode ter ligado: os registros originais, nunca cópias. Tarefas apontam para o objetivo pelo próprio `goalId`. */
-export const GOAL_REF_TYPES = ['project', 'habit', 'language', 'subject'] as const;
+export const GOAL_REF_TYPES = ['project', 'habit', 'language', 'subject', 'instrument'] as const;
 export type GoalRefType = (typeof GOAL_REF_TYPES)[number];
 
 /** Indicador de uma meta mensurável: de onde parte, aonde quer chegar. */

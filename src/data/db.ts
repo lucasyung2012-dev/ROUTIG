@@ -11,6 +11,7 @@ import type { GrammarRule, Language, LanguageSession, VocabEntry } from '@/domai
 import type { Habit, HabitLog } from '@/domain/habits';
 import type { Goal, GoalCheckin } from '@/domain/goals';
 import type { FocusSession } from '@/domain/focus';
+import type { Instrument, MusicItem, PracticeSession, Song } from '@/domain/music';
 
 /** Registro chave-valor (configurações, estado do onboarding, metadados). */
 export interface KvRecord {
@@ -65,6 +66,10 @@ export class RoutigDB extends Dexie {
   goals!: EntityTable<Goal, 'id'>;
   goalCheckins!: EntityTable<GoalCheckin, 'id'>;
   focusSessions!: EntityTable<FocusSession, 'id'>;
+  instruments!: EntityTable<Instrument, 'id'>;
+  musicItems!: EntityTable<MusicItem, 'id'>;
+  songs!: EntityTable<Song, 'id'>;
+  practiceSessions!: EntityTable<PracticeSession, 'id'>;
 
   constructor(name = 'routig') {
     super(name);
@@ -159,10 +164,17 @@ export class RoutigDB extends Dexie {
     this.version(18).stores({
       focusSessions: 'id, date, taskId, kind',
     });
+    // Etapa 3: Música (instrumentos, repertório, técnicas e prática).
+    this.version(19).stores({
+      instruments: 'id, order',
+      musicItems: 'id, instrumentId, category',
+      songs: 'id, instrumentId, status',
+      practiceSessions: 'id, instrumentId, date',
+    });
   }
 }
 
-export const DB_SCHEMA_VERSION = 18;
+export const DB_SCHEMA_VERSION = 19;
 
 let instance: RoutigDB | null = null;
 

@@ -17,6 +17,9 @@ import {
   type FocusTimer,
 } from '@/domain/focus';
 import { sound } from './sound';
+import { useSettings } from '@/app/SettingsProvider';
+import { loadNotifConfig, showDeviceNotification } from '@/data/notificationsRepo';
+import { inQuietHours } from '@/domain/notifications';
 
 type StartOptions = Parameters<typeof startTimer>[0];
 
@@ -52,6 +55,9 @@ export function FocusProvider({ children }: { children: ReactNode }) {
   const timerRef = useRef<FocusTimer | null>(null);
   const configRef = useRef(config);
   configRef.current = config;
+  const { t: tr } = useSettings();
+  const textRef = useRef({ focusDone: '', breakDone: '' });
+  textRef.current = { focusDone: tr('notif.focusDone'), breakDone: tr('notif.breakDone') };
 
   const setTimer = useCallback((t: FocusTimer | null) => {
     timerRef.current = t;
@@ -81,7 +87,10 @@ export function FocusProvider({ children }: { children: ReactNode }) {
       const t = timerRef.current;
       if (t && isPhaseOver(t, n)) {
         sound.chime();
-        setTimer(nextPhase(t, configRef.current, n).timer);
+        const next = nextPhase(t, configRef.current, n).timer;
+        setTimer(next);
+        // Com o app em segundo plano, o fim da fase também vira aviso do aparelho (se permitido).
+        if (document.hidden) void notifyPhaseEnd(t.phase === 'focus' ? textRef.current.focusDone : textRef.current.breakDone);
       }
     };
     tick();
@@ -168,4 +177,11 @@ export function useFocus(): FocusApi {
   const v = useContext(Ctx);
   if (!v) throw new Error('useFocus fora do FocusProvider');
   return v;
+}
+
+async function notifyPhaseEnd(body: string): Promise<void> {
+  const cfg = await loadNotifConfig();
+  const now = new Date();
+  if (!cfg.system || !cfg.enabled.focus || inQuietHours(cfg, now) || (cfg.muteUntil && new Date(cfg.muteUntil) > now)) return;
+  await showDeviceNotification('ROUTIG · Focus', cfg.hideContent ? '' : body, `focus:${now.getTime()}`);
 }

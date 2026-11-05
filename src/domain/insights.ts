@@ -1,4 +1,4 @@
-import { addDays, diffDays, startOfMonth, startOfWeek, type DateKey } from './dates';
+import { addDays, diffDays, startOfMonth, startOfWeek, toDateKey, type DateKey } from './dates';
 import type { Assessment, Content, StudySession, Subject, AcademicYear } from './academy';
 import type { FocusKind, FocusSession } from './focus';
 import { FOCUS_KINDS } from './focus';
@@ -45,7 +45,8 @@ export function previousRange(r: Range): Range {
 }
 
 export const inRange = (d: DateKey | null | undefined, r: Range) => !!d && d >= r.from && d <= r.to;
-const isoDay = (iso: string | null | undefined) => (iso ? iso.slice(0, 10) : null);
+/** Data local do instante (no fuso do aparelho), não a data de Greenwich. */
+const isoDay = (iso: string | null | undefined) => (iso ? toDateKey(new Date(iso)) : null);
 
 /** Agrupa valores por dia, semana ou mês dentro do período, com zeros onde não houve registro. */
 export function series(points: Array<{ date: DateKey; value: number }>, r: Range, weekStartsOn: 0 | 1): Array<{ start: DateKey; value: number }> {

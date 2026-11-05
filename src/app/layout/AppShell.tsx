@@ -12,6 +12,8 @@ import { EventEditorProvider } from '@/features/calendar/EventEditor';
 import { QuickCreate } from './QuickCreate';
 import { runAutoBackupIfDue } from '@/data/backupRepo';
 import { FocusProvider, useFocus } from '@/features/focus/FocusProvider';
+import { NotificationsProvider } from '@/features/notifications/NotificationsProvider';
+import { NotificationBell } from '@/features/notifications/NotificationBell';
 import { formatClock, phaseElapsed, phaseRemaining } from '@/domain/focus';
 
 const NEXT_THEME: Record<ThemeSetting, ThemeSetting> = { auto: 'light', light: 'dark', dark: 'auto' };
@@ -22,7 +24,9 @@ export function AppShell() {
     <TaskEditorProvider>
       <EventEditorProvider>
         <FocusProvider>
-          <Shell />
+          <NotificationsProvider>
+            <Shell />
+          </NotificationsProvider>
         </FocusProvider>
       </EventEditorProvider>
     </TaskEditorProvider>
@@ -95,6 +99,7 @@ function Shell() {
           <div className="ml-auto flex items-center gap-1">
             <QuickCreate />
             <FocusPill />
+            <NotificationBell />
 
             {!online && (
               <span className="mr-1 hidden items-center gap-1.5 rounded-full bg-warning/15 px-3 py-1 text-xs font-medium text-warning sm:inline-flex" role="status">

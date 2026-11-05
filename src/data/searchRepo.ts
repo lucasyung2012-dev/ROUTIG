@@ -1,7 +1,9 @@
+import { toDateKey } from '@/domain/dates';
 import { getDb } from './db';
 import { matchesAll, rankHits, snippetFor, type SearchableModule, type SearchHit } from '@/domain/search';
 
-const day = (iso: string | null | undefined) => (iso ? iso.slice(0, 10) : null);
+// Data local (não a de Greenwich): um registro das 22h não vira o dia seguinte.
+const day = (iso: string | null | undefined) => (iso ? toDateKey(new Date(iso)) : null);
 const LIMIT = 6;
 
 /**

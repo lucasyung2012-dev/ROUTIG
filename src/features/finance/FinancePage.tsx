@@ -23,10 +23,12 @@ import { useQuickPrivacy } from '@/features/security/QuickPrivacy';
 /** As áreas internas (Parte 16.1). */
 const AREAS = ['academy', 'investments', 'market', 'planning', 'journal'] as const;
 type Area = (typeof AREAS)[number];
+export type FinanceArea = Area;
 const AREA_KEY = 'routig.finance.area';
 
-function useArea(): [Area, (a: Area) => void] {
+function useArea(initial?: Area): [Area, (a: Area) => void] {
   const [area, setArea] = useState<Area>(() => {
+    if (initial) return initial;
     try {
       const v = localStorage.getItem(AREA_KEY);
       return (AREAS as readonly string[]).includes(v ?? '') ? (v as Area) : 'academy';
@@ -83,13 +85,14 @@ export function Disclaimer() {
 }
 
 /** Finanças (Parte 16): aprender, acompanhar e organizar. Nada aqui compra, vende ou recomenda. */
-export function FinancePage() {
+/** `initialArea`: abre numa área (salas de Finanças no parque). */
+export function FinancePage({ initialArea }: { initialArea?: FinanceArea } = {}) {
   const { t } = useSettings();
   const data = useFinance();
   const { hide, toggle } = useHideToggle();
   const [creating, setCreating] = useState(false);
   const [importing, setImporting] = useState(false);
-  const [area, setArea] = useArea();
+  const [area, setArea] = useArea(initialArea);
   const [pinOpen, setPinOpen] = useState(false);
   const [lockKey, setLockKey] = useState(0);
   if (data.loading) return <LoadingState label={t('common.loading')} lines={5} />;

@@ -26,6 +26,8 @@ import { createDashboardInterior, createProfileInterior, createSettingsInterior,
 import { InboxPanel } from './panels/InboxPanel';
 import { DashboardPanel, ProfilePanel, SettingsPanel } from './panels/CentralPanels';
 import { AcademyPanel, InsightsPanel, LanguagesPanel, LibraryPanel, NotesPanel } from './panels/NorthPanels';
+import { CalendarPanel, FinancePanel, ProjectsPanel, TasksPanel } from './panels/EastPanels';
+import { CALENDAR_SECTORS, FINANCE_SECTORS, PROJECTS_SECTORS, TASKS_SECTORS, createCalendarInterior, createFinanceInterior, createProjectsInterior, createTasksInterior, type CalendarSector, type FinanceSector, type ProjectsSector, type TasksSector } from './interiors/east';
 import { ACADEMY_SECTORS, INSIGHTS_SECTORS, LANGUAGES_SECTORS, LIBRARY_SECTORS, NOTES_SECTORS, createAcademyInterior, createInsightsInterior, createLanguagesInterior, createLibraryInterior, createNotesInterior, type AcademySector, type InsightsSector, type LanguagesSector, type LibrarySector, type NotesSector } from './interiors/north';
 import { useAcademyData } from '@/features/academy/useAcademyData';
 import { useLanguages } from '@/features/languages/useLanguages';
@@ -51,9 +53,18 @@ const SECTORS: Partial<Record<ModuleId, readonly string[]>> = {
   academy: ACADEMY_SECTORS,
   languages: LANGUAGES_SECTORS,
   insights: INSIGHTS_SECTORS,
+  calendar: CALENDAR_SECTORS,
+  tasks: TASKS_SECTORS,
+  projects: PROJECTS_SECTORS,
+  finance: FINANCE_SECTORS,
 };
 /** Setores cujo painel é uma tela grande (o módulo inteiro dentro do ambiente). */
-const WIDE = new Set(['dashboard:overview', 'dashboard:panels', 'profile:interests', 'profile:trajectory', 'profile:personalize', 'settings:identity', 'settings:appearance', 'settings:modules', 'settings:privacy', 'settings:data', 'settings:help', 'library:atrium', 'library:collections', 'library:consult', 'library:search', 'library:preserve', 'library:transfer', 'academy:hall', 'academy:review', 'academy:plan', 'languages:garden', ...INSIGHTS_SECTORS.map((s) => `insights:${s}`)]);
+const WIDE = new Set(['dashboard:overview', 'dashboard:panels', 'profile:interests', 'profile:trajectory', 'profile:personalize', 'settings:identity', 'settings:appearance', 'settings:modules', 'settings:privacy', 'settings:data', 'settings:help', 'library:atrium', 'library:collections', 'library:consult', 'library:search', 'library:preserve', 'library:transfer', 'academy:hall', 'academy:review', 'academy:plan', 'languages:garden', ...INSIGHTS_SECTORS.map((s) => `insights:${s}`),
+  ...CALENDAR_SECTORS.filter((s) => s !== 'atrium').map((s) => `calendar:${s}`),
+  ...TASKS_SECTORS.map((s) => `tasks:${s}`),
+  'projects:studio',
+  ...FINANCE_SECTORS.map((s) => `finance:${s}`),
+]);
 
 /**
  * Parque 3D — tela principal do ROUTIG (V2). Um mundo único com os prédios dos módulos;
@@ -131,6 +142,10 @@ export default function ParkPage() {
       academy: (kit) => createAcademyInterior(kit, sectorLabels<AcademySector>('park.academy.sectors', ACADEMY_SECTORS)),
       languages: (kit) => createLanguagesInterior(kit, sectorLabels<LanguagesSector>('park.languages.sectors', LANGUAGES_SECTORS)),
       insights: (kit) => createInsightsInterior(kit, sectorLabels<InsightsSector>('park.insights.sectors', INSIGHTS_SECTORS)),
+      calendar: (kit) => createCalendarInterior(kit, sectorLabels<CalendarSector>('park.calendar.sectors', CALENDAR_SECTORS)),
+      tasks: (kit) => createTasksInterior(kit, sectorLabels<TasksSector>('park.tasks.sectors', TASKS_SECTORS)),
+      projects: (kit) => createProjectsInterior(kit, sectorLabels<ProjectsSector>('park.projects.sectors', PROJECTS_SECTORS)),
+      finance: (kit) => createFinanceInterior(kit, sectorLabels<FinanceSector>('park.finance.sectors', FINANCE_SECTORS)),
     };
     try {
       engine.current = createEngine(canvas, {
@@ -191,6 +206,21 @@ export default function ParkPage() {
   const langsKey = langs.languages.map((l) => l.name).join('|');
   useEffect(() => engine.current?.setData('academy', { subjects: subjectsKey ? subjectsKey.split('|') : [] }), [subjectsKey]);
   useEffect(() => engine.current?.setData('languages', { languages: langsKey ? langsKey.split('|') : [] }), [langsKey]);
+  // Mesa digital do Tasks: as tarefas reais de hoje e atrasadas; estandes do Projects: os projetos ativos.
+  const tasksKey = JSON.stringify(
+    cal.loading
+      ? null
+      : cal.tasks.active.filter((x) => !isClosedKind(statusKind(cal.tasks.config, x.statusId)) && x.dueDate && x.dueDate <= today).map((x) => x.title),
+  );
+  useEffect(() => {
+    const list = JSON.parse(tasksKey) as string[] | null;
+    if (list) engine.current?.setData('tasks', { title: t('park.tasks.tableTitle', { count: list.length }), today: list, overdue: 0 });
+  }, [tasksKey]);
+  const projects = useLiveQuery(async () => (await getDb().projects.toArray()).filter((p) => !p.deletedAt && p.status !== 'archived' && p.status !== 'cancelled' && p.status !== 'done').map((p) => ({ name: p.name, color: p.color })), []);
+  const projectsKey = JSON.stringify(projects ?? null);
+  useEffect(() => {
+    if (projects) engine.current?.setData('projects', { projects });
+  }, [projectsKey]);
 
   const pick = picked ? buildingById(picked) : null;
   const sectors = inside ? (SECTORS[inside] ?? []) : [];
@@ -361,6 +391,10 @@ export default function ParkPage() {
             {inside === 'academy' && <AcademyPanel id={sector as AcademySector} />}
             {inside === 'languages' && <LanguagesPanel id={sector as LanguagesSector} />}
             {inside === 'insights' && <InsightsPanel id={sector as InsightsSector} />}
+            {inside === 'calendar' && <CalendarPanel id={sector as CalendarSector} />}
+            {inside === 'tasks' && <TasksPanel id={sector as TasksSector} />}
+            {inside === 'projects' && <ProjectsPanel id={sector as ProjectsSector} />}
+            {inside === 'finance' && <FinancePanel id={sector as FinanceSector} />}
           </div>
         </section>
       )}

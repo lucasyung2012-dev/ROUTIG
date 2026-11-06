@@ -4726,6 +4726,46 @@ export const en: Messages = {
         finance: 'Finance',
       },
     },
+    calendar: {
+      sectors: {
+        atrium: 'Time Atrium',
+        daily: 'Daily Room',
+        weekly: 'Weekly Gallery',
+        monthly: 'Monthly Room',
+        agenda: 'Agenda Gallery',
+        planning: 'Planning Center',
+        calendars: 'Yearly Room',
+      },
+    },
+    tasks: {
+      sectors: {
+        atrium: 'Tasks Atrium',
+        capture: 'Capture Station',
+        lists: 'Lists Room',
+        kanban: 'Kanban Center',
+        planning: 'Priorities Room',
+        recurrence: 'Tasks Calendar',
+        archive: 'Execution Archive',
+      },
+      tableTitle: 'Today and overdue: {count} tasks',
+      tableTitle_one: 'Today and overdue: 1 task',
+    },
+    projects: {
+      sectors: {
+        studio: 'Studio',
+        gallery: 'Projects Gallery',
+      },
+      none: 'No active project. Each active project gets a stand in the studio.',
+    },
+    finance: {
+      sectors: {
+        academy: 'Finance Academy',
+        investments: 'Investments',
+        market: 'Market',
+        planning: 'Planning',
+        journal: 'Investment Journal',
+      },
+    },
   },
   colors: {
     custom: 'Other color',

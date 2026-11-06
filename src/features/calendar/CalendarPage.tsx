@@ -25,6 +25,7 @@ const VIEWS = [
   { id: 'agenda', icon: List },
 ] as const;
 type ViewId = (typeof VIEWS)[number]['id'];
+export type CalendarView = ViewId;
 const VIEW_KEY = 'routig.calendar.view';
 
 function readView(): ViewId {
@@ -70,14 +71,15 @@ function step(view: ViewId, anchor: DateKey, dir: 1 | -1): DateKey {
   }
 }
 
-export function CalendarPage() {
+/** `initialView`: abre numa visão (salas do Observatório Temporal no parque). */
+export function CalendarPage({ initialView }: { initialView?: CalendarView } = {}) {
   const { t, settings } = useSettings();
   const cal = useCalendarData();
   const events = useEventEditor();
   const tasks = useTaskEditor();
   const categoryName = useCategoryName();
   const navigate = useNavigate();
-  const [view, setView] = useState<ViewId>(readView);
+  const [view, setView] = useState<ViewId>(() => initialView ?? readView());
   const [anchor, setAnchor] = useState<DateKey>(todayKey());
   const [showTasks, setShowTasks] = useState(true);
   const [categoryId, setCategoryId] = useState<string | null>(null);

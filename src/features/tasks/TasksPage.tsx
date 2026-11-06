@@ -28,6 +28,7 @@ const VIEWS = [
   { id: 'category', icon: Shapes },
 ] as const;
 type ViewId = (typeof VIEWS)[number]['id'];
+export type TasksView = ViewId;
 
 const VIEW_KEY = 'routig.tasks.view';
 
@@ -40,15 +41,16 @@ function readView(): ViewId {
   }
 }
 
-export function TasksPage() {
+/** `initialView` e `showClosed`: abre numa visão (salas do Centro de Operações no parque). */
+export function TasksPage({ initialView, showClosed: closed }: { initialView?: TasksView; showClosed?: boolean } = {}) {
   const { t } = useSettings();
   const toast = useToast();
   const data = useTasksData();
   const editor = useTaskEditor();
   const actions = useTaskActions(data);
   const statusName = useStatusName();
-  const [view, setView] = useState<ViewId>(readView);
-  const [filter, setFilter] = useState<TaskFilter>(EMPTY_FILTER);
+  const [view, setView] = useState<ViewId>(() => initialView ?? readView());
+  const [filter, setFilter] = useState<TaskFilter>(() => ({ ...EMPTY_FILTER, showClosed: !!closed }));
   const [quick, setQuick] = useState('');
   const [quickDue, setQuickDue] = useState<'' | 'today' | 'tomorrow'>('');
   const [trashOpen, setTrashOpen] = useState(false);

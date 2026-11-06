@@ -10,6 +10,7 @@ import { Builder, Kit, cloud, forest, setWaterNight, shrubs, sky, stars, water, 
 import { birds, drone, fountain, rain } from './life';
 import { dashboardBuilding, inboxBuilding, profileBuilding, settingsBuilding, type DetailedBuilding } from './buildings/central';
 import { academyBuilding, insightsBuilding, languagesBuilding, libraryBuilding, notesBuilding } from './buildings/north';
+import { calendarBuilding, financeBuilding, projectsBuilding, tasksBuilding } from './buildings/east';
 import { prototypeBuilding } from './buildings/prototype';
 import type { Obstacle } from './camera';
 
@@ -43,6 +44,10 @@ const DETAILED: Partial<Record<ModuleId, (kit: Kit) => DetailedBuilding>> = {
   academy: academyBuilding,
   languages: languagesBuilding,
   insights: insightsBuilding,
+  calendar: calendarBuilding,
+  tasks: tasksBuilding,
+  projects: projectsBuilding,
+  finance: financeBuilding,
 };
 
 export interface PlacedBuilding {
@@ -352,6 +357,7 @@ export function createWorld(kit: Kit): World {
     obstacles.push({ x: def.x, z: def.z, r: core, h: top });
   }
   obstacles.push({ x: LAKE.x, z: LAKE.z, r: LAKE.radius - 1, h: -1 });
+  root.add(walkway(kit, buildings.get('tasks')?.def, buildings.get('calendar')?.def));
 
   const trees = forest(kit, plants());
   root.add(trees.group, ...meadows(kit));
@@ -430,4 +436,35 @@ export function createWorld(kit: Kit): World {
       lodItems.forEach((l) => (l.far = (l.obj instanceof THREE.InstancedMesh ? 150 : 190) * far));
     },
   };
+}
+
+/** Passarela coberta entre dois prédios (Tasks ↔ Calendar: agendamento compartilhado). */
+function walkway(kit: Kit, a?: ParkBuilding, c?: ParkBuilding): THREE.Group {
+  const b = new Builder();
+  if (a && c) {
+    const dx = c.x - a.x;
+    const dz = c.z - a.z;
+    const d = Math.hypot(dx, dz);
+    const ux = dx / d;
+    const uz = dz / d;
+    const from = a.radius * 0.62;
+    const to = d - c.radius * 0.62;
+    const len = to - from;
+    const mx = a.x + ux * (from + len / 2);
+    const mz = a.z + uz * (from + len / 2);
+    const ry = Math.atan2(ux, uz);
+    const y = heightAt(mx, mz);
+    b.add(kit.mat('#DCD3C0', { rough: 0.85 }), new THREE.BoxGeometry(4, 0.12, len), [mx, y + 0.06, mz], [0, ry, 0]);
+    b.add(kit.mat('#CBD5E1', { metal: 0.85, rough: 0.25 }), new THREE.BoxGeometry(4.6, 0.25, len), [mx, y + 3.6, mz], [0, ry, 0]);
+    b.add(kit.mat('#22D3EE', { glow: true }), new THREE.BoxGeometry(0.08, 0.06, len), [mx + Math.cos(ry) * 2.3, y + 3.45, mz - Math.sin(ry) * 2.3], [0, ry, 0]);
+    for (let k = 0; k <= Math.floor(len / 6); k++) {
+      const s = from + (k * len) / Math.max(1, Math.floor(len / 6));
+      for (const side of [-1, 1]) {
+        const px = a.x + ux * s + uz * side * 2.1;
+        const pz = a.z + uz * s - ux * side * 2.1;
+        b.add(kit.mat('#2B3442', { metal: 0.5, rough: 0.4 }), new THREE.CylinderGeometry(0.1, 0.1, 3.5, 6), [px, heightAt(px, pz) + 1.75, pz]);
+      }
+    }
+  }
+  return b.build();
 }

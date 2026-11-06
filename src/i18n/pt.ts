@@ -4724,6 +4724,46 @@ export const pt = {
         finance: 'Finanças',
       },
     },
+    calendar: {
+      sectors: {
+        atrium: 'Átrio Temporal',
+        daily: 'Sala Diária',
+        weekly: 'Galeria Semanal',
+        monthly: 'Sala Mensal',
+        agenda: 'Galeria de Agenda',
+        planning: 'Centro de Planejamento',
+        calendars: 'Sala Anual',
+      },
+    },
+    tasks: {
+      sectors: {
+        atrium: 'Átrio de Tarefas',
+        capture: 'Estação de Captura',
+        lists: 'Sala de Listas',
+        kanban: 'Centro Kanban',
+        planning: 'Sala de Prioridades',
+        recurrence: 'Calendário de Tarefas',
+        archive: 'Arquivo de Execução',
+      },
+      tableTitle: 'Hoje e atrasadas: {count} tarefas',
+      tableTitle_one: 'Hoje e atrasadas: 1 tarefa',
+    },
+    projects: {
+      sectors: {
+        studio: 'Estúdio',
+        gallery: 'Galeria de Projetos',
+      },
+      none: 'Nenhum projeto ativo. Cada projeto ativo ganha um estande no estúdio.',
+    },
+    finance: {
+      sectors: {
+        academy: 'Academia Financeira',
+        investments: 'Investimentos',
+        market: 'Mercado',
+        planning: 'Planejamento',
+        journal: 'Diário de Investimentos',
+      },
+    },
   },
   colors: {
     custom: 'Outra cor',

@@ -14,7 +14,8 @@ beforeEach(() => {
 
 describe('dicas nas telas (Parte 29.4)', () => {
   it('só na tela inicial de cada módulo', () => {
-    expect(tipModuleFor('/')).toBe('dashboard');
+    expect(tipModuleFor('/dashboard')).toBe('dashboard');
+    expect(tipModuleFor('/')).toBeNull();
     expect(tipModuleFor('/tasks')).toBe('tasks');
     expect(tipModuleFor('/projects/abc')).toBeNull();
     expect(tipModuleFor('/settings/privacy')).toBeNull();

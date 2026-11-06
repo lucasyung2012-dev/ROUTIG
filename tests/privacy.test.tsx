@@ -17,7 +17,7 @@ beforeEach(() => {
   name = `test-priv-${Math.random().toString(36).slice(2)}`;
   setDbForTests(new RoutigDB(name));
   setBackupDbForTests(new BackupDB(`${name}-backups`));
-  window.location.hash = '#/';
+  window.location.hash = '#/dashboard';
 });
 
 describe('privacidade (Parte 26.1)', () => {

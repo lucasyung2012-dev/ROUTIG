@@ -4,6 +4,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { Footprints, Home, LogIn, LogOut, Menu, Navigation, SlidersHorizontal, X } from 'lucide-react';
 import { MODULES, NAV_MODULE_IDS, type ModuleId } from '@/app/modules';
 import { useSettings } from '@/app/SettingsProvider';
+import type { MessageKey } from '@/i18n';
 import { getDb } from '@/data/db';
 import { capitalizeFirst, todayKey } from '@/domain/dates';
 import { isClosedKind, statusKind } from '@/domain/tasks';
@@ -99,7 +100,7 @@ export default function ParkPage() {
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const sectorLabels = <T extends string>(prefix: string, ids: readonly T[]) => Object.fromEntries(ids.map((s) => [s, t(`${prefix}.${s}`)])) as Record<T, string>;
+    const sectorLabels = <T extends string>(prefix: string, ids: readonly T[]) => Object.fromEntries(ids.map((s) => [s, t(`${prefix}.${s}` as MessageKey)])) as Record<T, string>;
     const interiors: Partial<Record<ModuleId, InteriorFactory>> = {
       inbox: (kit) =>
         createInboxInterior(kit, {
@@ -173,6 +174,7 @@ export default function ParkPage() {
   const pick = picked ? buildingById(picked) : null;
   const sectors = inside ? (SECTORS[inside] ?? []) : [];
   const wide = inside && sector ? WIDE.has(`${inside}:${sector}`) : false;
+  const sectorName = (b: ModuleId, s: string) => t((b === 'settings' ? `park.settings.rooms.${s}` : `park.${b}.sectors.${s}`) as MessageKey);
   const chooseSector = (s: string) => {
     setSector(s);
     engine.current?.focusSector(s);
@@ -230,7 +232,7 @@ export default function ParkPage() {
                 aria-pressed={sector === s}
                 className={cn('h-10 shrink-0 rounded-full px-4 text-sm font-medium shadow-soft', sector === s ? 'bg-accent text-accent-fg' : 'bg-surface/90 text-fg')}
               >
-                {t(`park.${inside === 'settings' ? 'settings.rooms' : `${inside}.sectors`}.${s}`)}
+                {sectorName(inside, s)}
               </button>
             ))}
           </nav>
@@ -311,12 +313,12 @@ export default function ParkPage() {
             'absolute inset-x-3 bottom-3 mx-auto flex flex-col rounded-2xl bg-surface shadow-lift ring-1 ring-line safe-bottom',
             wide ? 'max-h-[70vh] max-w-4xl md:inset-x-6 md:bottom-4 md:top-[8.5rem] md:max-h-none' : 'max-h-[50vh] max-w-lg sm:bottom-auto sm:left-auto sm:right-3 sm:top-[8.5rem] sm:mx-0 sm:max-h-[calc(100%-10rem)] sm:w-[26rem]',
           )}
-          aria-label={t(`park.${inside === 'settings' ? 'settings.rooms' : `${inside}.sectors`}.${sector}`)}
+          aria-label={sectorName(inside, sector)}
         >
           <header className="flex items-start gap-2 border-b border-line/70 p-4">
             <div className="min-w-0 flex-1">
-              <h2 className="text-base font-semibold text-fg">{t(`park.${inside === 'settings' ? 'settings.rooms' : `${inside}.sectors`}.${sector}`)}</h2>
-              {inside === 'inbox' && <p className="text-xs text-muted">{t(`park.inbox.hints.${sector}`)}</p>}
+              <h2 className="text-base font-semibold text-fg">{sectorName(inside, sector)}</h2>
+              {inside === 'inbox' && <p className="text-xs text-muted">{t(`park.inbox.hints.${sector}` as MessageKey)}</p>}
             </div>
             <IconButton
               size="sm"

@@ -210,6 +210,8 @@ export type TreeSpecies = 'round' | 'conifer' | 'slender' | 'blossom';
 export interface Plant {
   x: number;
   z: number;
+  /** Altura do chão (relevo); 0 se omitida. */
+  y?: number;
   s: number;
   species: TreeSpecies;
 }
@@ -263,7 +265,7 @@ export function forest(kit: Kit, plants: Plant[]): Forest {
     const crownMat = kit.own(new THREE.MeshStandardMaterial({ color: def.color, vertexColors: true, roughness: 0.9 }));
     const crown = new THREE.InstancedMesh(crownGeo, crownMat, list.length);
     list.forEach((p, i) => {
-      m4.compose(new THREE.Vector3(p.x, 0, p.z), new THREE.Quaternion(), new THREE.Vector3(p.s, def.trunkH * p.s, p.s));
+      m4.compose(new THREE.Vector3(p.x, p.y ?? 0, p.z), new THREE.Quaternion(), new THREE.Vector3(p.s, def.trunkH * p.s, p.s));
       trunk.setMatrixAt(i, m4);
     });
     trunk.castShadow = crown.castShadow = true;
@@ -283,7 +285,7 @@ export function forest(kit: Kit, plants: Plant[]): Forest {
         const sway = Math.sin(t * 1.1 + p.x * 0.3 + p.z * 0.2) * 0.04;
         e.set(sway, 0, sway * 0.7);
         q.setFromEuler(e);
-        pos.set(p.x, c.crownY * p.s, p.z);
+        pos.set(p.x, (p.y ?? 0) + c.crownY * p.s, p.z);
         sc.setScalar(p.s);
         m4.compose(pos, q, sc);
         c.mesh.setMatrixAt(i, m4);

@@ -26,7 +26,9 @@ export function Sidebar({ mobileOpen, onCloseMobile }: SidebarProps) {
   const content = (compact: boolean) => (
     <div className="flex h-full flex-col">
       <div className={cn('flex h-16 shrink-0 items-center gap-3', compact ? 'justify-center px-2' : 'px-5')}>
-        <Logo size={34} className="h-[34px] w-[34px]" />
+        <NavLink to="/" end aria-label={t('park.title')} title={t('park.title')} className="shrink-0 rounded-xl">
+          <Logo size={34} className="h-[34px] w-[34px]" />
+        </NavLink>
         {!compact && (
           <div className="min-w-0 leading-tight">
             <div className="text-[0.95rem] font-bold tracking-[0.18em] text-fg">{t('app.name')}</div>

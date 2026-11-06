@@ -1,9 +1,9 @@
 import { lazy, Suspense, type ReactNode } from 'react';
-import { HashRouter, Link, Route, Routes } from 'react-router-dom';
+import { HashRouter, Link, Navigate, Route, Routes } from 'react-router-dom';
 import { NAV_MODULE_IDS, MODULES } from '@/app/modules';
 import { SettingsProvider, useSettings } from '@/app/SettingsProvider';
 import { ErrorBoundary } from '@/app/ErrorBoundary';
-import { AppShell } from '@/app/layout/AppShell';
+import { AppProviders, AppShell } from '@/app/layout/AppShell';
 import { DashboardPage } from '@/features/dashboard/DashboardPage';
 import { ModuleRoadmapPage } from '@/features/roadmap/ModuleRoadmapPage';
 import { TasksPage } from '@/features/tasks/TasksPage';
@@ -44,8 +44,7 @@ import { ErrorState } from '@/ui/States';
 import { ToastProvider } from '@/ui/toast';
 import { AppLock } from '@/features/security/AppLock';
 
-const ParkLab = lazy(() => import('@/features/park/ParkLab'));
-const ReceptionLab = lazy(() => import('@/features/park/ReceptionLab'));
+const ParkPage = lazy(() => import('@/features/park/ParkPage'));
 
 export function App({ extra }: { extra?: ReactNode }) {
   return (
@@ -113,25 +112,21 @@ function Gate() {
         )}
       >
         <Routes>
-          {/* Prova técnica da V2 (Etapa 0): parque 3D em tela cheia, carregado só aqui. */}
+          {/* Tela principal (V2): o parque 3D em tela cheia; o 3D só é carregado aqui. */}
           <Route
-            path="lab/park"
+            index
             element={
-              <Suspense fallback={<div className="ambient flex h-full items-center justify-center text-sm text-muted">{t('common.loading')}</div>}>
-                <ParkLab />
-              </Suspense>
+              <AppProviders>
+                <Suspense fallback={<div className="ambient flex h-full items-center justify-center text-sm text-muted">{t('common.loading')}</div>}>
+                  <ParkPage />
+                </Suspense>
+              </AppProviders>
             }
           />
-          <Route
-            path="lab/recepcao"
-            element={
-              <Suspense fallback={<div className="ambient flex h-full items-center justify-center text-sm text-muted">{t('common.loading')}</div>}>
-                <ReceptionLab />
-              </Suspense>
-            }
-          />
+          {/* Endereços das provas da Etapa 0 levam ao parque. */}
+          <Route path="lab/*" element={<Navigate to="/" replace />} />
           <Route element={<AppShell />}>
-            <Route index element={<DashboardPage />} />
+            <Route path="dashboard" element={<DashboardPage />} />
             <Route path="tasks" element={<TasksPage />} />
             <Route path="calendar" element={<CalendarPage />} />
             <Route path="inbox" element={<InboxPage />} />

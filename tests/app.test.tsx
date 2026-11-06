@@ -11,7 +11,7 @@ let dbName = '';
 beforeEach(() => {
   dbName = `test-app-${Math.random().toString(36).slice(2)}`;
   setDbForTests(new RoutigDB(dbName));
-  window.location.hash = '#/';
+  window.location.hash = '#/dashboard';
   document.documentElement.removeAttribute('data-theme');
 });
 
@@ -174,5 +174,17 @@ describe('aparência (Parte 3.3)', () => {
     render(<App />);
     expect(await screen.findByText(/Vetor aprovado em .*2026/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Aprovar vetor/ })).not.toBeInTheDocument();
+  });
+});
+
+describe('parque como tela principal (V2)', () => {
+  it('abre o parque no início; sem 3D, todos os módulos continuam acessíveis', async () => {
+    await finishOnboarding();
+    window.location.hash = '#/';
+    render(<App />);
+    expect(await screen.findByRole('alert', {}, { timeout: 8000 })).toHaveTextContent('WebGL');
+    const nav = screen.getByRole('navigation', { name: 'Menu' });
+    expect(within(nav).getByRole('link', { name: 'Dashboard' })).toHaveAttribute('href', '#/dashboard');
+    expect(within(nav).getAllByRole('link').length).toBe(18);
   });
 });

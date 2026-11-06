@@ -1,6 +1,6 @@
 import type { InboxItem } from '@/domain/inbox';
 import { toDateKey, type DateKey } from '@/domain/dates';
-import type { Destination, ReceptionData } from './receptionInterior';
+import type { Destination, ReceptionData } from './interiors/inbox';
 
 const destOf = (i: InboxItem): Destination | null => {
   const ty = i.processedTo?.type;

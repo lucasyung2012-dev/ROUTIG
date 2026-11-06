@@ -64,7 +64,7 @@ export interface ModuleDef {
 }
 
 export const MODULES: Record<ModuleId, ModuleDef> = {
-  dashboard: { id: 'dashboard', icon: LayoutDashboard, tone: 'violet', stage: 1, path: '/', hideable: false },
+  dashboard: { id: 'dashboard', icon: LayoutDashboard, tone: 'violet', stage: 1, path: '/dashboard', hideable: false },
   calendar: { id: 'calendar', icon: CalendarDays, tone: 'blue', stage: 1, path: '/calendar', hideable: true },
   academy: { id: 'academy', icon: GraduationCap, tone: 'violet', stage: 2, path: '/academy', hideable: true },
   languages: { id: 'languages', icon: Languages, tone: 'teal', stage: 2, path: '/languages', hideable: true },

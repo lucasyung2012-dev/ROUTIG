@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import { Menu, Monitor, Moon, Pause, Search, Sun, Timer, WifiOff } from 'lucide-react';
 import { useSettings } from '@/app/SettingsProvider';
@@ -22,20 +22,26 @@ import { formatClock, phaseElapsed, phaseRemaining } from '@/domain/focus';
 
 const NEXT_THEME: Record<ThemeSetting, ThemeSetting> = { auto: 'light', light: 'dark', dark: 'auto' };
 
-/** Envolve o app com o editor de tarefas, que pode ser aberto de qualquer tela. */
-export function AppShell() {
+/** Editores e serviços que podem ser abertos de qualquer tela (também de dentro do parque). */
+export function AppProviders({ children }: { children: ReactNode }) {
   return (
     <TaskEditorProvider>
       <EventEditorProvider>
         <FocusProvider>
           <NotificationsProvider>
-            <QuickPrivacyProvider>
-              <Shell />
-            </QuickPrivacyProvider>
+            <QuickPrivacyProvider>{children}</QuickPrivacyProvider>
           </NotificationsProvider>
         </FocusProvider>
       </EventEditorProvider>
     </TaskEditorProvider>
+  );
+}
+
+export function AppShell() {
+  return (
+    <AppProviders>
+      <Shell />
+    </AppProviders>
   );
 }
 
@@ -88,7 +94,7 @@ function Shell() {
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-2 border-b border-line/60 bg-bg/70 px-3 backdrop-blur-xl safe-top sm:px-6">
           <IconButton label={t('nav.openMenu')} icon={<Menu className="h-5 w-5" />} onClick={() => setMenuOpen(true)} className="md:hidden" />
-          <Link to="/" className="hidden items-center gap-2 sm:flex md:hidden" aria-label={t('modules.dashboard')}>
+          <Link to="/" className="hidden items-center gap-2 sm:flex md:hidden" aria-label={t('park.title')}>
             <Logo size={28} className="h-7 w-7" />
           </Link>
 

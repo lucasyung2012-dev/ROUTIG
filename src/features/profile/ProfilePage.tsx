@@ -73,7 +73,7 @@ export function ProfilePage() {
 
 /* ---------- Cartão do perfil (nome, avatar, descrição) ---------- */
 
-function ProfileCard() {
+export function ProfileCard() {
   const { settings, t, update } = useSettings();
   const toast = useToast();
   const input = useRef<HTMLInputElement>(null);
@@ -140,7 +140,7 @@ function ProfileCard() {
 
 /* ---------- Interesses ---------- */
 
-function InterestsTab() {
+export function InterestsTab() {
   const { t } = useSettings();
   const all = useLiveQuery(() => getDb().interests.toArray(), []);
   const cats = useInterestCategories();
@@ -364,7 +364,7 @@ function InterestsTrashDialog({ items, onClose }: { items: Interest[]; onClose: 
 
 /* ---------- Minha evolução ---------- */
 
-function EvolutionTab() {
+export function EvolutionTab() {
   const { t, settings } = useSettings();
   const tasks = useTasksData();
   const extra = useLiveQuery(async () => {
@@ -461,7 +461,7 @@ function WeekBars({ title, weeks, color, locale }: { title: string; weeks: WeekB
 
 /* ---------- Minha história ---------- */
 
-function HistoryTab() {
+export function HistoryTab() {
   const { t, settings } = useSettings();
   const toast = useToast();
   const items = useLiveQuery(() => loadTimeline(), []);

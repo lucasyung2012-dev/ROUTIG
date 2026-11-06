@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { NAV_MODULE_IDS } from '@/app/modules';
-import { layoutProblems, PARK_BUILDINGS, PARK_REGIONS, treePositions } from '@/domain/park';
+import { LAKE, PLAZA_RADIUS, entranceOf, heightAt, layoutProblems, parkPaths, PARK_BUILDINGS, PARK_REGIONS, treePositions } from '@/domain/park';
 import { Vector3 } from 'three';
 import type { InboxItem } from '@/domain/inbox';
 import { receptionData } from '@/features/park/receptionData';
@@ -20,9 +20,21 @@ describe('parque 3D (V2, Etapa 0): planta', () => {
     expect(a).toEqual(treePositions(120));
     expect(a.length).toBe(120);
   });
+
+  it('cada prédio tem entrada no próprio lote, fora do lago, ligada a um caminho; praça plana', () => {
+    const ends = parkPaths().map((p) => p[p.length - 1]!);
+    for (const b of PARK_BUILDINGS) {
+      const e = entranceOf(b);
+      expect(Math.hypot(e.x - b.x, e.z - b.z)).toBeLessThan(b.radius);
+      expect(Math.hypot(e.x - LAKE.x, e.z - LAKE.z)).toBeGreaterThan(LAKE.radius);
+      expect(ends.some((p) => Math.hypot(p.x - e.x, p.z - e.z) < 0.01)).toBe(true);
+    }
+    expect(heightAt(0, 0)).toBe(0);
+    expect(heightAt(PLAZA_RADIUS, 0)).toBe(0);
+  });
 });
 
-describe('fatia vertical (V2, Etapa 0): Central de Recepção', () => {
+describe('parque (V2): Central de Recepção', () => {
   const base = { createdAt: '2026-11-05T12:00:00.000Z', updatedAt: '2026-11-05T12:00:00.000Z', deletedAt: null, rev: 1, kind: 'text', url: null, fileId: null, fileName: null, mime: null, size: null, snoozedUntil: null, processedTo: null } as const;
   const item = (id: string, over: Partial<InboxItem>): InboxItem => ({ ...base, id, text: id, status: 'open', ...over });
 

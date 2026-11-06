@@ -454,3 +454,38 @@ Em cada bloco: construir, testar, publicar e conferir no navegador. Depois, voc�
   - Arquivo Pessoal do Profile (etapa do Profile);
   - os outros 14 prédios ainda têm a forma provisória (Blocos 2 a 4);
   - minimapa, clima, estações, sons (Bloco 5).
+
+## 9. Blocos 2 a 5 — o que foi feito (06/11/2026)
+
+- **Bloco 2 (Norte):**
+  - Biblioteca Digital: três níveis em volta do átrio.
+  - Ateliê de Conhecimento: o editor e o Apple Pencil abrem na tela do Notes, sem o 3D por trás.
+  - Academy: salas com os nomes das disciplinas reais.
+  - Idiomas: quiosques com os idiomas reais.
+  - Insights: observatório na colina; cada setor abre a análise do módulo.
+- **Bloco 3 (Leste):**
+  - Observatório Temporal: relógio astronômico na hora real; cada sala abre uma visão do Calendar.
+  - Centro de Operações: mesa digital com as tarefas reais de hoje; cada sala abre uma visão do Tasks (Kanban, prioridades, arquivo…).
+  - Projects: estandes com nome e cor de cada projeto ativo.
+  - Finanças: salas = áreas do módulo.
+  - Passarela coberta entre Tasks e Calendar.
+- **Bloco 4 (Oeste e Sul):**
+  - Jardim da Concentração: com o guia do Tempo de Uso do iPad; a PWA não bloqueia apps.
+  - Estufa de Hábitos, Jardim das Conquistas, pavilhão de Música com anfiteatro voltado ao lago e Complexo Esportivo com quadra e campo.
+  - Placas com os nomes reais de hábitos, metas, instrumentos e modalidades.
+  - Salas de análise abrem o Insights do módulo.
+- **Bloco 5 (sistemas):**
+  - Minimapa em maquete inclinada, com câmera e 3 níveis de zoom.
+  - Clima: sol, nublado, chuva, neblina.
+  - Estações pela data (hemisfério sul) ou escolhidas.
+  - Luzes de fim de ano na praça (20/12 a 06/01).
+  - Sons do parque no motor do Focus: vento, chuva, pássaros; nunca por cima de uma sessão de foco.
+  - Preferências do parque guardadas no aparelho.
+- **Medido no navegador do computador (tamanho iPad, qualidade alta):**
+  - parque inteiro visível: 59 quadros/s, cerca de 198 desenhos por quadro e 312 mil triângulos;
+  - interiores: 25–50 desenhos.
+- **Limites e pendências:**
+  - 198 desenhos com o parque inteiro passa da meta de cerca de 150: falta medir no iPad e no iPhone reais e, se pesar, reduzir o detalhe dos prédios distantes.
+  - Personagem visível na primeira pessoa: ainda não feito.
+  - Os destinos novos do Inbox (Academy, Idiomas, Projects, Goals, Music, Sports) dependem das etapas dos módulos.
+  - Salas novas do prompt (Rotinas e Execução no Habits; Arquivo Pessoal no Profile; Contas, Transações e Relatórios no Finanças) chegam com as etapas dos módulos: hoje nenhuma sala sem função foi criada para elas.

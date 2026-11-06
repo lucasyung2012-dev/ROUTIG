@@ -15,7 +15,7 @@ import { Button } from '@/ui/Button';
 import { IconButton } from '@/ui/IconButton';
 import { Select } from '@/ui/Field';
 import { Segmented } from '@/ui/Segmented';
-
+import { Switch } from '@/ui/Switch';
 import { useFocus } from '@/features/focus/FocusProvider';
 import { sound } from '@/features/focus/sound';
 import { Minimap } from './Minimap';
@@ -68,7 +68,7 @@ function writePrefs(p: ParkPrefs) {
   }
 }
 
-
+function autoQuality(): Quality {
   return window.matchMedia?.('(pointer: coarse)').matches ? 'medium' : 'high';
 }
 
@@ -529,7 +529,7 @@ export default function ParkPage() {
         </div>
       )}
 
-
+      {menu && <ModuleMenu onClose={() => setMenu(false)} />}
     </div>
   );
 }

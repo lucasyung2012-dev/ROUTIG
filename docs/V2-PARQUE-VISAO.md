@@ -71,3 +71,12 @@ Em vez de melhorar tudo um pouco, faço **um pedaço no nível de detalhe final*
 - **Praça central + fonte ROUTIG + Central de Recepção (Inbox) por fora e por dentro**, com vegetação, água, luz de dia e de noite e câmera cinematográfica entrando no prédio.
 
 Isso responde de verdade às duas perguntas: *fica bonito do jeito que você imagina?* e *roda leve no iPad?* Se sim, o mesmo método é aplicado aos outros 17 prédios na Etapa 4.
+
+## 5. Fatia vertical: o que foi feito (05/11/2026)
+
+Página de teste: **Settings → Sobre → Protótipos da V2 → Central de Recepção** (`#/lab/recepcao`).
+
+- **Fora:** praça com anéis e raios de pedra, bancos, postes que acendem à noite, canteiros com flores; fonte em três níveis com água animada e jatos; **logo do ROUTIG em 3D** (mesmos traços e degradê do logo oficial) girando no topo; Central de Recepção com embasamento em degraus, rampa, tambor de vidro com aletas, faixa ciano, andar superior, cobertura em balanço com anel turquesa, jardim no telhado, mastro com antena girando, marquise e letreiro; caminhos curvos; relevo suave; 4 espécies de árvore balançando; nuvens, pássaros, drone; dia, entardecer, noite e chuva; abertura cinematográfica.
+- **Dentro:** átrio circular de vidro com claraboia, balcão em arco, holograma com os números reais do Inbox e cinco setores. Os objetos refletem os dados: caixas na Triagem = itens na entrada; caixas no Arquivo = arquivados; cápsulas nos tubos da Distribuição = itens por destino; quadros da Galeria = itens recentes. Os painéis gravam de verdade (capturar, arquivar, voltar para a entrada, buscar).
+- **Medido no navegador do computador** (qualidade alta): 60 quadros/s; fora ~52 desenhos e ~85 mil triângulos; dentro ~25–40 desenhos. **Falta medir no iPad e no iPhone reais.**
+- **Limites honestos:** estilo estilizado (low-poly), não fotorrealista; os setores por dentro ainda são simples perto do exterior; sem sons ambientes, estações, minimapa nem personagem (ficam para a Etapa 4).

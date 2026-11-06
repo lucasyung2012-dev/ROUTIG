@@ -160,7 +160,7 @@ export function stripDateTime(text: string): string {
       '$1',
     )
     .replace(rx('(?:no\\s+)?dia\\s+\\d{1,2}'), '$1')
-    .replace(rx('(?:em\\s+)?\\d{1,2}/\\d{1,2}(?:/\\d{2,4})?', 'g'), '$1')
+    .replace(rx('(?:(?:em|no|na)\\s+)?(?:dia\\s+)?\\d{1,2}/\\d{1,2}(?:/\\d{2,4})?', 'g'), '$1')
     .replace(/\s+/g, ' ')
     .replace(/\s+([,.;:!?])/g, '$1')
     .trim();

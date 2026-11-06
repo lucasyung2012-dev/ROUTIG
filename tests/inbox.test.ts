@@ -32,6 +32,8 @@ describe('sugestões (lógica local, Parte 20.2)', () => {
     expect(suggest({ kind: 'text', text: 'entregar redação amanhã', url: null }, TODAY).title).toBe('entregar redação');
     expect(suggest({ kind: 'text', text: 'prova de história dia 15 às 8h', url: null }, TODAY).title).toBe('prova de história');
     expect(suggest({ kind: 'text', text: 'festa 20/12', url: null }, TODAY).title).toBe('festa');
+    expect(suggest({ kind: 'text', text: 'Prova de matemática dia 13/11 às 8h #escola', url: null }, TODAY).title).toBe('Prova de matemática');
+    expect(suggest({ kind: 'text', text: 'reunião no dia 20/11/2026', url: null }, TODAY).title).toBe('reunião');
   });
 
   it('separa tags e limpa o título', () => {

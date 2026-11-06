@@ -4,6 +4,12 @@ Leia este arquivo no começo de toda conversa nova sobre o ROUTIG. A especifica�
 
 **Atualizado:** 2026-11-05 (**V1 concluída**, versão 1.0.1 com as correções da auditoria)
 
+## Estado da conversa (2026-11-06)
+
+- **V2, parque:** plano aprovado em `docs/V2-PARQUE-PLANO.md` (mapa das 18 áreas, 10 prédios detalhados, câmera). **Bloco 1 publicado** (seção 8): parque como tela inicial (`#/`), Dashboard em `#/dashboard`, região Central detalhada com interiores e painéis reais, câmera livre e primeira pessoa. CI verde; testado no navegador do computador (iPad e iPhone: 60 quadros/s).
+- **Aguardando:** o Lucas testar o Bloco 1 no iPad e no iPhone (quadros/s por qualidade, câmera, primeira pessoa, interiores, visual).
+- **Próximo:** Bloco 2 (Norte: Library e Notes pelo plano; Academy, Idiomas e Insights pelo prompt principal), depois Blocos 3 (Leste), 4 (Oeste e Sul) e 5 (minimapa, clima, estações, sons). Etapa 0 restante (cripto, Google, migração) fica depois do parque.
+
 ## Estado da conversa (2026-11-04)
 
 - **Etapa 0 — Fundação:** concluída. Logo vetorial e design system aprovados pelo dono do produto em 2026-11-02.

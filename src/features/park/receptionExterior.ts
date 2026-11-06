@@ -382,7 +382,6 @@ function plants(): Plant[] {
   }
   return out;
 }
-}
 
 function birds(kit: Kit, count: number): { mesh: THREE.InstancedMesh; tick: (t: number) => void } {
   const g = new THREE.BufferGeometry();

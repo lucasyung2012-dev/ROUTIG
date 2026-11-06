@@ -231,6 +231,7 @@ export function createReception(
     }
     outside.environment = cfg.env ? envTex : null;
     inside.scene.environment = cfg.env ? envTex : null;
+    inside.scene.environmentIntensity = 0.55;
     ext.setDetail(q);
     inside.setDetail(q);
     fpsCap = cfg.fpsCap;
@@ -265,6 +266,8 @@ export function createReception(
     (outside.fog as THREE.Fog).color.set(l.skyBottom);
     if (raining) (outside.fog as THREE.Fog).color.lerp(new THREE.Color('#9AA5B4'), 0.6);
     renderer.toneMappingExposure = 1.05 - l.glow * 0.15;
+    // O reflexo do ambiente também escurece à noite (senão a cena continua clara).
+    outside.environmentIntensity = 1 - l.glow * 0.85;
     return l;
   };
   let current = applyLight(1);

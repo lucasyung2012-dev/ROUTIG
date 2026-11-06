@@ -86,8 +86,8 @@ export function createInterior(kit: Kit, labels: InteriorLabels): Interior {
   const sk = sky(kit);
   sk.set(new THREE.Color('#5AA9E6'), new THREE.Color('#E3F2F9'));
   scene.add(sk.mesh);
-  scene.add(new THREE.HemisphereLight('#FFFFFF', '#B9C7D6', 1.2));
-  const key = new THREE.DirectionalLight('#FFF6E8', 1.6);
+  scene.add(new THREE.HemisphereLight('#FFFFFF', '#9FB0C4', 0.85));
+  const key = new THREE.DirectionalLight('#FFF6E8', 1.2);
   key.position.set(6, 20, 4);
   key.shadow.mapSize.set(1024, 1024);
   Object.assign(key.shadow.camera, { left: -14, right: 14, top: 14, bottom: -14, near: 1, far: 40 });
@@ -158,7 +158,6 @@ export function createInterior(kit: Kit, labels: InteriorLabels): Interior {
   // Holograma sobre o balcão (números reais).
   const holo = canvasPlane(kit, 3.4, 2.0, 320);
   holo.mesh.position.set(0, 3.1, 0);
-  (holo.mesh.material as THREE.MeshBasicMaterial).blending = THREE.AdditiveBlending;
   scene.add(holo.mesh);
   const emitter = new THREE.Mesh(kit.own(new THREE.CylinderGeometry(0.45, 0.6, 0.12, 32)), cyan);
   emitter.position.y = 1.2;
@@ -206,7 +205,9 @@ export function createInterior(kit: Kit, labels: InteriorLabels): Interior {
       case 'archive':
         // Estantes.
         for (const s of [-1, 1]) {
-          sb.add(white, new THREE.BoxGeometry(1.4, 3.0, 0.5), [s * 0.85, 1.5, 0]);
+          // Estante aberta: fundo e laterais finos (as caixas ficam à vista).
+          sb.add(white, new THREE.BoxGeometry(1.4, 3.0, 0.05), [s * 0.85, 1.5, -0.23]);
+          for (const e of [-1, 1]) sb.add(white, new THREE.BoxGeometry(0.05, 3.0, 0.5), [s * 0.85 + e * 0.7, 1.5, 0]);
           for (let k = 0; k < 5; k++) sb.add(silver, new THREE.BoxGeometry(1.42, 0.04, 0.52), [s * 0.85, 0.3 + k * 0.62, 0.01]);
         }
         break;
@@ -273,7 +274,7 @@ export function createInterior(kit: Kit, labels: InteriorLabels): Interior {
     ctx.strokeStyle = 'rgba(34,211,238,0.85)';
     ctx.lineWidth = 4;
     ctx.strokeRect(6, 6, w - 12, h - 12);
-    ctx.fillStyle = 'rgba(34,211,238,0.12)';
+    ctx.fillStyle = 'rgba(8,22,48,0.82)';
     ctx.fillRect(6, 6, w - 12, h - 12);
     ctx.fillStyle = '#BFF6FF';
     ctx.textAlign = 'center';
@@ -351,9 +352,10 @@ export function createInterior(kit: Kit, labels: InteriorLabels): Interior {
     scene,
     sectorGroups,
     view: (id) => {
-      if (id === 'overview') return { cam: new THREE.Vector3(0, 5, 11), target: new THREE.Vector3(0, 1.6, 0) };
+      if (id === 'overview') return { cam: new THREE.Vector3(0, 5.6, 11), target: new THREE.Vector3(0, 1.2, -1) };
+      // Um pouco de lado e do alto: vê o setor inteiro por cima do balcão e do holograma.
       const a = angleOf(id);
-      return { cam: at(a, 2.4, 3.0), target: at(a, SECTOR_R, 1.5) };
+      return { cam: at(a + 0.25, 1.2, 4.4), target: at(a, SECTOR_R, 1.2) };
     },
     setData: (d) => {
       data = d;

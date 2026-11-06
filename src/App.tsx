@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { lazy, Suspense, type ReactNode } from 'react';
 import { HashRouter, Link, Route, Routes } from 'react-router-dom';
 import { NAV_MODULE_IDS, MODULES } from '@/app/modules';
 import { SettingsProvider, useSettings } from '@/app/SettingsProvider';
@@ -43,6 +43,8 @@ import { Button } from '@/ui/Button';
 import { ErrorState } from '@/ui/States';
 import { ToastProvider } from '@/ui/toast';
 import { AppLock } from '@/features/security/AppLock';
+
+const ParkLab = lazy(() => import('@/features/park/ParkLab'));
 
 export function App({ extra }: { extra?: ReactNode }) {
   return (
@@ -110,6 +112,15 @@ function Gate() {
         )}
       >
         <Routes>
+          {/* Prova técnica da V2 (Etapa 0): parque 3D em tela cheia, carregado só aqui. */}
+          <Route
+            path="lab/park"
+            element={
+              <Suspense fallback={<div className="ambient flex h-full items-center justify-center text-sm text-muted">{t('common.loading')}</div>}>
+                <ParkLab />
+              </Suspense>
+            }
+          />
           <Route element={<AppShell />}>
             <Route index element={<DashboardPage />} />
             <Route path="tasks" element={<TasksPage />} />

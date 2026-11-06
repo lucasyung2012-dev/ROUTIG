@@ -4522,6 +4522,37 @@ export const pt = {
       settings: { title: 'Settings', body: 'Aparência, menu, avisos, privacidade, PIN, backup e importar ou exportar ficam aqui. Toda opção daqui muda alguma coisa de verdade no app.' },
     },
   },
+  lab: {
+    park: {
+      title: 'Parque 3D · protótipo (V2)',
+      canvas: 'Parque do ROUTIG em 3D',
+      noWebgl: 'Este aparelho não conseguiu abrir o 3D (WebGL indisponível).',
+      back: 'Voltar',
+      goTo: 'Ir para…',
+      plaza: 'Praça central',
+      day: 'Dia',
+      night: 'Noite',
+      labels: 'Nomes dos prédios',
+      quality: 'Qualidade',
+      q: {
+        low: 'Baixa',
+        medium: 'Média',
+        high: 'Alta',
+      },
+      fps: '{fps} quadros por segundo',
+      calls: '{calls} desenhos por quadro',
+      tris: '{tris} triângulos',
+      gestures: 'Um dedo desloca · pinça aproxima · dois dedos giram e inclinam · toque num prédio para escolher.',
+      flyTo: 'Ir até lá',
+      regions: {
+        central: 'Região central',
+        north: 'Região norte',
+        east: 'Região leste',
+        south: 'Região sul',
+        west: 'Região oeste',
+      },
+    },
+  },
   colors: {
     custom: 'Outra cor',
     names: {

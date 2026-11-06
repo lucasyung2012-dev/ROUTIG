@@ -4524,6 +4524,37 @@ export const en: Messages = {
       settings: { title: 'Settings', body: 'Appearance, menu, alerts, privacy, PIN, backup and import or export live here. Every option here really changes something in the app.' },
     },
   },
+  lab: {
+    park: {
+      title: '3D park · prototype (V2)',
+      canvas: 'ROUTIG park in 3D',
+      noWebgl: 'This device could not open 3D (WebGL unavailable).',
+      back: 'Back',
+      goTo: 'Go to…',
+      plaza: 'Central plaza',
+      day: 'Day',
+      night: 'Night',
+      labels: 'Building names',
+      quality: 'Quality',
+      q: {
+        low: 'Low',
+        medium: 'Medium',
+        high: 'High',
+      },
+      fps: '{fps} frames per second',
+      calls: '{calls} draws per frame',
+      tris: '{tris} triangles',
+      gestures: 'One finger moves · pinch zooms · two fingers rotate and tilt · tap a building to pick it.',
+      flyTo: 'Go there',
+      regions: {
+        central: 'Central region',
+        north: 'North region',
+        east: 'East region',
+        south: 'South region',
+        west: 'West region',
+      },
+    },
+  },
   colors: {
     custom: 'Other color',
     names: {

@@ -431,3 +431,26 @@ A cobertura é feita de placas triangulares que convergem visualmente para o top
 | 5 | Minimapa, clima, estações, eventos, sons, busca, personalização |
 
 Em cada bloco: construir, testar, publicar e conferir no navegador. Depois, você testa no aparelho. Quando um interior precisar de uma função que o módulo ainda não tem, ela é feita junto com o prédio.
+
+---
+
+## 8. Bloco 1 — o que foi feito (06/11/2026)
+
+- **Parque como tela inicial** (`#/`); Dashboard em `#/dashboard`; botão Menu com a navegação 2D; aparelho sem 3D vê a lista de módulos.
+- **Mundo único e amplo** (raio 230 m): lotes por módulo nos lugares da seção 2, relevo (colina do Insights e morros na borda), lago com orla, pedras, ninfeias e píer, caminhos curvos com postes, cerca de 1.100 árvores por região, canteiros de flores, praça maior com a fonte ROUTIG.
+- **Região Central detalhada:** Central de Recepção (refeita), Observatório Central, Pavilhão da Identidade e Settings, por fora e por dentro.
+- **Interiores com painéis reais:**
+  - Inbox: capturar, triagem, distribuição, arquivo, busca;
+  - Dashboard: completo, troca de perfil, ações rápidas;
+  - Profile: cartão, interesses, linha do tempo, conquistas;
+  - Settings: as seções de configuração em seis salas.
+- **Câmera livre** (gira, inclina, aproxima de 4 a 380 m, sem atravessar chão e prédios) e **primeira pessoa** (controle na tela, WASD, colisão, botão "Entrar" perto das portas).
+- **Medido no navegador do computador (qualidade alta):**
+  - iPad: 60 quadros/s, cerca de 97 desenhos;
+  - iPhone: 60 quadros/s, cerca de 76 desenhos;
+  - interiores: 35–55 desenhos.
+- **Falta:**
+  - medir no iPad e no iPhone reais;
+  - Arquivo Pessoal do Profile (etapa do Profile);
+  - os outros 14 prédios ainda têm a forma provisória (Blocos 2 a 4);
+  - minimapa, clima, estações, sons (Bloco 5).

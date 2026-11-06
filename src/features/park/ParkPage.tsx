@@ -252,7 +252,7 @@ export default function ParkPage() {
 
       {/* Medições (para os testes de desempenho) */}
       {showStats && (
-        <div className="pointer-events-none absolute bottom-3 left-3 rounded-xl bg-black/60 px-3 py-2 font-mono text-[0.7rem] leading-relaxed text-white safe-bottom">
+        <div className={cn('pointer-events-none absolute bottom-3 rounded-xl bg-black/60 px-3 py-2 font-mono text-[0.7rem] leading-relaxed text-white safe-bottom', camMode === 'walk' ? 'right-3' : 'left-3')}>
           {stats ? (
             <>
               <div>{t('park.fps', { fps: stats.fps })}</div>
@@ -267,7 +267,7 @@ export default function ParkPage() {
 
       {/* Primeira pessoa: controle de andar (toque) e dica */}
       {camMode === 'walk' && <Joystick onMove={(x, y) => engine.current?.setMove(x, y)} label={t('park.joystick')} />}
-      {camMode === 'walk' && !near && <p className="pointer-events-none absolute bottom-3 right-3 hidden max-w-xs rounded-xl bg-black/50 px-3 py-2 text-[0.7rem] text-white md:block">{t('park.walkHint')}</p>}
+      {camMode === 'walk' && !near && <p className="pointer-events-none absolute bottom-24 right-3 hidden max-w-xs rounded-xl bg-black/50 px-3 py-2 text-[0.7rem] text-white md:block">{t('park.walkHint')}</p>}
       {camMode === 'walk' && near && !inside && (
         <div className="absolute inset-x-0 bottom-36 flex justify-center">
           <Button variant="primary" icon={<LogIn className="h-4 w-4" />} onClick={() => engine.current?.enter(near)}>

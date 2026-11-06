@@ -311,7 +311,7 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
       if (rig.mode() === 'walk') {
         let best: ModuleId | null = null;
         world.buildings.forEach((b, id) => {
-          if (opts.interiors[id] && Math.hypot(camera.position.x - b.entrance.x, camera.position.z - b.entrance.z) < 7) best = id;
+          if (opts.interiors[id] && Math.hypot(camera.position.x - b.entrance.x, camera.position.z - b.entrance.z) < 13) best = id;
         });
         if (best !== near) {
           near = best;

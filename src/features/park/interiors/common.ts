@@ -108,9 +108,10 @@ export function canvasPlane(kit: Kit, w: number, h: number, px = 256, opaque = f
   return { mesh, ctx, tex };
 }
 
-/** Placa do setor (nome), com a cor do prédio. */
-export function sectorSign(kit: Kit, label: string, accent: string, w = 2.6): THREE.Mesh {
+/** Placa do setor (nome), com a cor do prédio. Duas faces: legível dos dois lados. */
+export function sectorSign(kit: Kit, label: string, accent: string, w = 2.6): THREE.Object3D {
   const s = canvasPlane(kit, w, w * 0.25, 128);
+  (s.mesh.material as THREE.MeshBasicMaterial).side = THREE.FrontSide;
   const c = s.ctx.canvas;
   s.ctx.fillStyle = 'rgba(12,24,44,0.94)';
   s.ctx.fillRect(0, 0, c.width, c.height);
@@ -122,7 +123,11 @@ export function sectorSign(kit: Kit, label: string, accent: string, w = 2.6): TH
   s.ctx.textBaseline = 'middle';
   s.ctx.fillText(label, c.width / 2, c.height / 2 - 3, c.width - 30);
   s.tex.needsUpdate = true;
-  return s.mesh;
+  const back = new THREE.Mesh(s.mesh.geometry, s.mesh.material);
+  back.rotation.y = Math.PI;
+  const g = new THREE.Group();
+  g.add(s.mesh, back);
+  return g;
 }
 
 /** Quebra um texto em linhas que cabem na largura. */
@@ -157,7 +162,7 @@ export function markSector(g: THREE.Object3D, id: string) {
 }
 
 /** Câmera para um setor: recua na direção para onde o setor olha, do alto, vendo-o inteiro. */
-export function sectorView(x: number, z: number, face: number, back = 9, height = 4.6) {
+export function sectorView(x: number, z: number, face: number, back = 12, height = 5.6) {
   return {
     cam: new THREE.Vector3(x + Math.sin(face) * back, height, z + Math.cos(face) * back),
     target: new THREE.Vector3(x, 1.2, z),

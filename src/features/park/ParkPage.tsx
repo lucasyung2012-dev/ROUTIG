@@ -183,10 +183,10 @@ export default function ParkPage() {
   if (failed) return <NoWebgl />;
 
   return (
-    <div className="fixed inset-0 overflow-hidden bg-[#0B1026] text-fg" style={{ touchAction: 'none' }}>
+    <div className="fixed inset-0 overflow-hidden bg-[#0B1026] text-fg" style={{ touchAction: 'none' }} onScroll={(e) => e.currentTarget.scrollTo(0, 0)}>
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" aria-label={t('park.canvas')} />
 
-      <div ref={labelsRef} className={labels && !inside ? 'pointer-events-none absolute inset-0' : 'hidden'} aria-hidden>
+      <div ref={labelsRef} className={labels && !inside ? 'pointer-events-none absolute inset-0 overflow-hidden' : 'hidden'} aria-hidden>
         {PARK_BUILDINGS.map((b) => (
           <span key={b.id} data-id={b.id} className="absolute left-0 top-0 whitespace-nowrap rounded-full bg-black/55 px-2.5 py-1 text-[0.72rem] font-semibold text-white opacity-0 transition-opacity">
             {t(`park.names.${b.id}`)}
@@ -311,7 +311,7 @@ export default function ParkPage() {
         <section
           className={cn(
             'absolute inset-x-3 bottom-3 mx-auto flex flex-col rounded-2xl bg-surface shadow-lift ring-1 ring-line safe-bottom',
-            wide ? 'max-h-[70vh] max-w-4xl md:inset-x-6 md:bottom-4 md:top-[8.5rem] md:max-h-none' : 'max-h-[50vh] max-w-lg sm:bottom-auto sm:left-auto sm:right-3 sm:top-[8.5rem] sm:mx-0 sm:max-h-[calc(100%-10rem)] sm:w-[26rem]',
+            wide ? 'max-h-[70vh] max-w-4xl md:inset-x-6 md:bottom-4 md:max-h-[calc(100%-10rem)]' : 'max-h-[50vh] max-w-lg sm:bottom-auto sm:left-auto sm:right-3 sm:top-[8.5rem] sm:mx-0 sm:max-h-[calc(100%-10rem)] sm:w-[26rem]',
           )}
           aria-label={sectorName(inside, sector)}
         >

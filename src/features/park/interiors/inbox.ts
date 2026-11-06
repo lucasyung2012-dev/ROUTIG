@@ -80,7 +80,7 @@ export function createInboxInterior(kit: Kit, labels: InboxLabels): InteriorScen
   pots(kit, b, [[-8, 17], [8, 17], [-18, 9], [18, 9], [-18, -9], [18, -9], [-6, -19], [6, -19]]);
   bench(kit, b, -6, 11, 0);
   bench(kit, b, 6, 11, 0);
-  pendants(kit, b, [[-12, 8], [12, 8], [-12, -8], [12, -8], [0, 17]], 6.2, H);
+  pendants(kit, b, [[-12, 8], [12, 8], [-12, -8], [12, -8]], 6.2, H);
 
   const sectorGroups: THREE.Group[] = [];
   const add = (id: InboxSector, build: (sb: Builder, g: THREE.Group) => void) => {

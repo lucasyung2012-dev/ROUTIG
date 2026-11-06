@@ -66,7 +66,7 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
   const outside = new THREE.Scene();
   const world = createWorld(kit);
   outside.add(world.root);
-  outside.fog = new THREE.Fog('#DCEFF8', 180, 560);
+  outside.fog = new THREE.Fog('#DCEFF8', 320, 950);
 
   const pmrem = new THREE.PMREMGenerator(renderer);
   const envTex = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
@@ -266,8 +266,8 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
     const fog = outside.fog as THREE.Fog;
     fog.color.set(l.skyBottom);
     if (raining) fog.color.lerp(new THREE.Color('#9AA5B4'), 0.6);
-    renderer.toneMappingExposure = 1.05 - l.glow * 0.15;
-    outside.environmentIntensity = 1 - l.glow * 0.85;
+    renderer.toneMappingExposure = 0.95 - l.glow * 0.08;
+    outside.environmentIntensity = 0.7 - l.glow * 0.55;
     return l;
   };
   let current = applyLight(1);

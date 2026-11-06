@@ -26,7 +26,7 @@ export interface Light {
 }
 
 export const TIMES: Record<TimeOfDay, Light> = {
-  day: { skyTop: '#4F9FE0', skyBottom: '#DCEFF8', sun: '#FFF6E5', sunI: 2.2, hemiI: 1.0, sunDir: [0.45, 0.8, 0.35], glow: 0 },
+  day: { skyTop: '#4F9FE0', skyBottom: '#D6ECF7', sun: '#FFF6E5', sunI: 1.8, hemiI: 0.75, sunDir: [0.45, 0.8, 0.35], glow: 0 },
   dusk: { skyTop: '#3B4C8C', skyBottom: '#F6A86B', sun: '#FFB27A', sunI: 1.3, hemiI: 0.6, sunDir: [-0.9, 0.25, 0.25], glow: 0.55 },
   night: { skyTop: '#060B22', skyBottom: '#1B2550', sun: '#9DB4FF', sunI: 0.35, hemiI: 0.22, sunDir: [-0.4, 0.8, -0.5], glow: 1 },
 };

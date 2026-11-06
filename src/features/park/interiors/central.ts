@@ -59,8 +59,8 @@ export function createDashboardInterior(kit: Kit, labels: Record<DashboardSector
   const sofa = kit.mat('#3B4A6B', { rough: 0.8 });
   const plan: Record<DashboardSector, Placed> = {
     atrium: { x: 0, z: 0, face: 0 },
-    overview: { x: 0, z: 11, face: Math.PI },
-    panels: { x: 0, z: -11, face: 0 },
+    overview: { x: 0, z: -11, face: 0 },
+    panels: { x: 0, z: 11, face: Math.PI },
     profiles: { x: -11.5, z: -1, face: Math.PI / 2 },
     actions: { x: 11.5, z: -1, face: -Math.PI / 2 },
   };
@@ -151,7 +151,7 @@ export function createDashboardInterior(kit: Kit, labels: Record<DashboardSector
   };
   draw();
 
-  const overview = { cam: new THREE.Vector3(0, 6.5, R - 2), target: new THREE.Vector3(0, 1.4, -2) };
+  const overview = { cam: new THREE.Vector3(0, 6.6, 8.5), target: new THREE.Vector3(0, 1.6, -7) };
   return {
     scene,
     sectors: DASHBOARD_SECTORS,

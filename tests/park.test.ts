@@ -65,3 +65,16 @@ describe('parque (V2): Central de Recepção', () => {
     logo.dispose();
   });
 });
+
+describe('parque (V2): estações e eventos', () => {
+  it('estação pela data no hemisfério sul e fim de ano decorativo', async () => {
+    const { seasonOf, festiveOn } = await import('@/features/park/world');
+    expect(seasonOf(new Date(2026, 0, 15))).toBe('summer');
+    expect(seasonOf(new Date(2026, 4, 1))).toBe('autumn');
+    expect(seasonOf(new Date(2026, 6, 10))).toBe('winter');
+    expect(seasonOf(new Date(2026, 10, 6))).toBe('spring');
+    expect(festiveOn(new Date(2026, 11, 24))).toBe(true);
+    expect(festiveOn(new Date(2027, 0, 3))).toBe(true);
+    expect(festiveOn(new Date(2026, 10, 6))).toBe(false);
+  });
+});

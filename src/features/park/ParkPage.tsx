@@ -15,12 +15,15 @@ import { Button } from '@/ui/Button';
 import { IconButton } from '@/ui/IconButton';
 import { Select } from '@/ui/Field';
 import { Segmented } from '@/ui/Segmented';
-import { Switch } from '@/ui/Switch';
+
+import { useFocus } from '@/features/focus/FocusProvider';
+import { sound } from '@/features/focus/sound';
+import { Minimap } from './Minimap';
 import { useToast } from '@/ui/toast';
 import { cn } from '@/ui/cn';
 import type { CamMode } from './camera';
 import { createEngine, type Engine, type InteriorFactory, type Stats } from './engine';
-import type { Quality, TimeOfDay } from './world';
+import { festiveOn, seasonOf, type Quality, type Season, type TimeOfDay, type Weather } from './world';
 import { createInboxInterior, DESTINATIONS, INBOX_SECTORS, type InboxSector } from './interiors/inbox';
 import { createDashboardInterior, createProfileInterior, createSettingsInterior, DASHBOARD_SECTORS, PROFILE_SECTORS, SETTINGS_ROOMS, type DashboardData, type DashboardSector, type ProfileSector, type SettingsRoom } from './interiors/central';
 import { InboxPanel } from './panels/InboxPanel';
@@ -39,7 +42,33 @@ import { useAcademyData } from '@/features/academy/useAcademyData';
 import { useLanguages } from '@/features/languages/useLanguages';
 import { receptionData } from './receptionData';
 
-function autoQuality(): Quality {
+/** Preferências do parque neste aparelho (qualidade é do aparelho; o resto é gosto pessoal). */
+interface ParkPrefs {
+  quality?: Quality;
+  labels?: boolean;
+  stats?: boolean;
+  weather?: Weather;
+  season?: Season | 'auto';
+  sound?: boolean;
+  minimap?: boolean;
+}
+const PREFS_KEY = 'routig.park.prefs';
+function readPrefs(): ParkPrefs {
+  try {
+    return JSON.parse(localStorage.getItem(PREFS_KEY) ?? '{}') as ParkPrefs;
+  } catch {
+    return {};
+  }
+}
+function writePrefs(p: ParkPrefs) {
+  try {
+    localStorage.setItem(PREFS_KEY, JSON.stringify(p));
+  } catch {
+    /* sem armazenamento: só não lembra */
+  }
+}
+
+
   return window.matchMedia?.('(pointer: coarse)').matches ? 'medium' : 'high';
 }
 
@@ -97,13 +126,17 @@ export default function ParkPage() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const labelsRef = useRef<HTMLDivElement>(null);
   const engine = useRef<Engine | null>(null);
-  const [quality, setQuality] = useState<Quality>(autoQuality);
+  const saved = useMemo(readPrefs, []);
+  const [quality, setQuality] = useState<Quality>(() => saved.quality ?? autoQuality());
   const [time, setTime] = useState<TimeOfDay>(timeNow);
-  const [rain, setRain] = useState(false);
-  const [labels, setLabels] = useState(true);
+  const [weather, setWeather] = useState<Weather>(saved.weather ?? 'clear');
+  const [seasonMode, setSeasonMode] = useState<Season | 'auto'>(saved.season ?? 'auto');
+  const [ambient, setAmbient] = useState(saved.sound ?? false);
+  const [minimap, setMinimap] = useState(saved.minimap ?? true);
+  const [labels, setLabels] = useState(saved.labels ?? true);
   const [camMode, setCamMode] = useState<CamMode>('orbit');
   const [stats, setStats] = useState<Stats | null>(null);
-  const [showStats, setShowStats] = useState(true);
+  const [showStats, setShowStats] = useState(saved.stats ?? true);
   const [picked, setPicked] = useState<ModuleId | null>(null);
   const [inside, setInside] = useState<ModuleId | null>(null);
   const [sector, setSector] = useState<string | null>(null);
@@ -214,7 +247,28 @@ export default function ParkPage() {
 
   useEffect(() => engine.current?.setQuality(quality), [quality]);
   useEffect(() => engine.current?.setTime(time), [time]);
-  useEffect(() => engine.current?.setRain(rain), [rain]);
+  useEffect(() => engine.current?.setWeather(weather), [weather]);
+  useEffect(() => engine.current?.setSeason(seasonMode === 'auto' ? seasonOf(new Date()) : seasonMode), [seasonMode]);
+  useEffect(() => engine.current?.setFestive(festiveOn(new Date())), []);
+  useEffect(() => writePrefs({ quality, labels, stats: showStats, weather, season: seasonMode, sound: ambient, minimap }), [quality, labels, showStats, weather, seasonMode, ambient, minimap]);
+  // Som ambiente do parque: o mesmo motor de sons do Focus (sem duplicar). Durante uma sessão de foco, o Focus manda no som.
+  const focus = useFocus();
+  const focusRunning = !!focus.timer;
+  useEffect(() => {
+    if (!ambient || focusRunning) {
+      if (!focusRunning) sound.stop();
+      return;
+    }
+    sound.play(weather === 'rain' ? 'rain' : 'waves', weather === 'rain' ? 0.14 : 0.08);
+    // Pássaros de vez em quando, de dia e sem chuva.
+    const id = window.setInterval(() => {
+      if (time !== 'night' && (weather === 'clear' || weather === 'cloudy') && Math.random() < 0.6) sound.chirp(0.05);
+    }, 5000);
+    return () => window.clearInterval(id);
+  }, [ambient, focusRunning, weather, time]);
+  useEffect(() => () => {
+    if (!focusRunning) sound.stop();
+  }, []);
   useEffect(() => engine.current?.setCamMode(camMode), [camMode]);
   useEffect(() => {
     if (inboxData) engine.current?.setData('inbox', inboxData);
@@ -336,10 +390,31 @@ export default function ParkPage() {
 
       {/* Opções do ambiente */}
       {options && (
-        <div className="absolute right-3 top-[4.25rem] z-10 flex w-72 flex-col gap-3 rounded-2xl bg-surface p-4 shadow-lift ring-1 ring-line safe-top" role="dialog" aria-label={t('park.options')}>
+        <div className="absolute right-3 top-[4.25rem] z-10 flex max-h-[calc(100%-6rem)] w-72 flex-col gap-3 overflow-y-auto rounded-2xl bg-surface p-4 shadow-lift ring-1 ring-line safe-top" role="dialog" aria-label={t('park.options')}>
           <Segmented<TimeOfDay> label={t('park.time')} value={time} onChange={setTime} options={(['day', 'dusk', 'night'] as const).map((v) => ({ value: v, label: t(`park.times.${v}`) }))} className="w-full" />
           <Segmented<Quality> label={t('park.quality')} value={quality} onChange={setQuality} options={(['low', 'medium', 'high'] as const).map((q) => ({ value: q, label: t(`park.q.${q}`) }))} className="w-full" />
-          <Switch label={t('park.rain')} checked={rain} onChange={setRain} />
+          <Segmented<Weather> label={t('park.weather')} value={weather} onChange={setWeather} options={(['clear', 'cloudy', 'rain', 'fog'] as const).map((v) => ({ value: v, label: t(`park.weathers.${v}`) }))} className="w-full" />
+          <label className="flex items-center justify-between gap-3 text-sm text-fg">
+            <span>{t('park.season')}</span>
+            <Select value={seasonMode} onChange={(e) => setSeasonMode(e.target.value as Season | 'auto')} className="h-9 w-40">
+              {(['auto', 'spring', 'summer', 'autumn', 'winter'] as const).map((v) => (
+                <option key={v} value={v}>
+                  {t(`park.seasons.${v}`)}
+                </option>
+              ))}
+            </Select>
+          </label>
+          <Switch
+            label={t('park.sound')}
+            hint={t('park.soundHint')}
+            checked={ambient}
+            onChange={(on) => {
+              // O iPad só libera som depois de um toque: este é o toque.
+              if (on) sound.unlock();
+              setAmbient(on);
+            }}
+          />
+          <Switch label={t('park.minimapToggle')} checked={minimap} onChange={setMinimap} />
           <Switch label={t('park.labels')} checked={labels} onChange={setLabels} />
           <Switch label={t('park.showStats')} checked={showStats} onChange={setShowStats} />
         </div>
@@ -448,7 +523,13 @@ export default function ParkPage() {
         </section>
       )}
 
-      {menu && <ModuleMenu onClose={() => setMenu(false)} />}
+      {minimap && !inside && !options && camMode === 'orbit' && (
+        <div className="absolute right-3 top-[4.5rem] safe-top">
+          <Minimap engine={engine} onPick={setPicked} />
+        </div>
+      )}
+
+
     </div>
   );
 }

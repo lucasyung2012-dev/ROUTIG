@@ -125,6 +125,29 @@ class SoundEngine {
     this.current = 'none';
   }
 
+  /** Um canto curto de pássaro (som ambiente do parque, só de dia). */
+  chirp(volume: number): void {
+    const ctx = this.ctx;
+    if (!ctx) return;
+    const notes = 2 + Math.floor(Math.random() * 3);
+    for (let i = 0; i < notes; i++) {
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      const t0 = ctx.currentTime + i * (0.09 + Math.random() * 0.05);
+      const f0 = 2600 + Math.random() * 1400;
+      o.type = 'sine';
+      o.frequency.setValueAtTime(f0, t0);
+      o.frequency.exponentialRampToValueAtTime(f0 * (1.25 + Math.random() * 0.3), t0 + 0.07);
+      g.gain.setValueAtTime(0, t0);
+      g.gain.linearRampToValueAtTime(volume, t0 + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.09);
+      o.connect(g);
+      g.connect(ctx.destination);
+      o.start(t0);
+      o.stop(t0 + 0.1);
+    }
+  }
+
   /** Dois toques curtos no fim de cada fase. */
   chime(): void {
     const ctx = this.ctx;

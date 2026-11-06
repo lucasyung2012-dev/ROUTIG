@@ -9,7 +9,7 @@ import type { ModuleId } from '@/app/modules';
 import { PARK_RADIUS, heightAt } from '@/domain/park';
 import { Kit } from './kit';
 import { createCameraRig, type CamMode } from './camera';
-import { TIMES, createWorld, type Light, type Quality, type TimeOfDay } from './world';
+import { TIMES, createWorld, type Light, type Quality, type Season, type TimeOfDay, type Weather } from './world';
 import type { InteriorScene } from './interiors/common';
 
 export interface Stats {
@@ -36,7 +36,11 @@ export interface EngineOpts {
 export interface Engine {
   setQuality: (q: Quality) => void;
   setTime: (t: TimeOfDay) => void;
-  setRain: (on: boolean) => void;
+  setWeather: (w: Weather) => void;
+  setSeason: (s: Season) => void;
+  setFestive: (on: boolean) => void;
+  /** Posição e direção da câmera no parque (para o minimapa). */
+  cameraInfo: () => { x: number; z: number; yaw: number; inside: boolean };
   setCamMode: (m: CamMode) => void;
   setMove: (x: number, y: number) => void;
   flyTo: (id: ModuleId | 'plaza') => void;
@@ -247,7 +251,7 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
 
   /* ---------- Hora do dia e chuva (transição suave) ---------- */
   let time: TimeOfDay = 'day';
-  let raining = false;
+  let weather: Weather = 'clear';
   let blend = 1;
   let from: Light = { ...TIMES.day };
   const lerpColor = (a: string, b: string, k: number) => `#${new THREE.Color(a).lerp(new THREE.Color(b), k).getHexString()}`;
@@ -265,7 +269,9 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
     world.setLight(l);
     const fog = outside.fog as THREE.Fog;
     fog.color.set(l.skyBottom);
-    if (raining) fog.color.lerp(new THREE.Color('#9AA5B4'), 0.6);
+    if (weather !== 'clear') fog.color.lerp(new THREE.Color('#9AA5B4'), weather === 'cloudy' ? 0.35 : 0.65);
+    fog.near = weather === 'fog' ? 30 : weather === 'rain' ? 160 : 320;
+    fog.far = weather === 'fog' ? 240 : weather === 'rain' ? 620 : 950;
     renderer.toneMappingExposure = 0.95 - l.glow * 0.08;
     outside.environmentIntensity = 0.7 - l.glow * 0.55;
     return l;
@@ -277,9 +283,9 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
     blend = opts.reduceMotion ? 1 : 0;
     current = applyLight(blend);
   };
-  const setRain = (on: boolean) => {
-    raining = on;
-    world.setRain(on);
+  const setWeather = (w: Weather) => {
+    weather = w;
+    world.setWeather(w);
     current = applyLight(blend);
   };
 
@@ -340,7 +346,14 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
   return {
     setQuality,
     setTime,
-    setRain,
+    setWeather,
+    setSeason: (s) => world.setSeason(s),
+    setFestive: (on) => world.setFestive(on),
+    cameraInfo: () => {
+      const dir = new THREE.Vector3();
+      camera.getWorldDirection(dir);
+      return { x: camera.position.x, z: camera.position.z, yaw: Math.atan2(dir.x, dir.z), inside: !!inside };
+    },
     setCamMode: (m) => rig.setMode(m),
     setMove: rig.setMove,
     flyTo,

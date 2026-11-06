@@ -17,6 +17,25 @@ import type { Obstacle } from './camera';
 
 export type TimeOfDay = 'day' | 'dusk' | 'night';
 export type Quality = 'low' | 'medium' | 'high';
+export type Weather = 'clear' | 'cloudy' | 'rain' | 'fog';
+export type Season = 'spring' | 'summer' | 'autumn' | 'winter';
+
+/** Estação pela data, no hemisfério sul (Brasil). */
+export function seasonOf(d: Date): Season {
+  const m = d.getMonth() + 1;
+  const day = d.getDate();
+  const md = m * 100 + day;
+  if (md >= 1221 || md < 320) return 'summer';
+  if (md < 621) return 'autumn';
+  if (md < 922) return 'winter';
+  return 'spring';
+}
+
+/** Evento especial pela data: fim de ano (20/12 a 06/01), só decorativo. */
+export function festiveOn(d: Date): boolean {
+  const md = (d.getMonth() + 1) * 100 + d.getDate();
+  return md >= 1220 || md <= 106;
+}
 
 export interface Light {
   skyTop: string;
@@ -74,7 +93,9 @@ export interface World {
   pickables: THREE.Object3D[];
   tick: (t: number, dt: number, focus: THREE.Vector3, cam: THREE.Vector3) => void;
   setLight: (l: Light) => void;
-  setRain: (on: boolean) => void;
+  setWeather: (w: Weather) => void;
+  setSeason: (s: Season) => void;
+  setFestive: (on: boolean) => void;
   setDetail: (q: Quality) => void;
 }
 
@@ -366,7 +387,22 @@ export function createWorld(kit: Kit): World {
   root.add(walkway(kit, buildings.get('tasks')?.def, buildings.get('calendar')?.def));
 
   const trees = forest(kit, plants());
-  root.add(trees.group, ...meadows(kit));
+  const meadow = meadows(kit);
+  root.add(trees.group, ...meadow);
+  // Luzes de fim de ano em volta da praça (só aparecem no evento).
+  const festive = new THREE.InstancedMesh(kit.own(new THREE.SphereGeometry(0.22, 8, 6)), kit.own(new THREE.MeshBasicMaterial()), 120);
+  {
+    const m4 = new THREE.Matrix4();
+    const c = new THREE.Color();
+    for (let i = 0; i < 120; i++) {
+      const a = (i / 120) * Math.PI * 2;
+      m4.makeTranslation(Math.sin(a) * (PLAZA_RADIUS + 0.6), 1.2 + Math.sin(i * 0.9) * 0.15, Math.cos(a) * (PLAZA_RADIUS + 0.6));
+      festive.setMatrixAt(i, m4);
+      festive.setColorAt(i, c.set(['#F43F5E', '#FBBF24', '#22D3EE', '#A78BFA', '#34D399'][i % 5]!));
+    }
+  }
+  festive.visible = false;
+  root.add(festive);
 
   const clouds = Array.from({ length: 12 }, (_, i) => {
     const c = cloud(kit, i + 1);
@@ -382,7 +418,9 @@ export function createWorld(kit: Kit): World {
   rn.lines.scale.set(2, 1, 2);
   root.add(bd.mesh, dr.group, rn.lines);
 
-  let raining = false;
+  let weather: Weather = 'clear';
+  const GREY: Record<Weather, number> = { clear: 0, cloudy: 0.4, rain: 0.6, fog: 0.7 };
+  const SUN: Record<Weather, number> = { clear: 1, cloudy: 0.6, rain: 0.45, fog: 0.5 };
   const skyTop = new THREE.Color();
   const skyBottom = new THREE.Color();
   const sunDir = new THREE.Vector3(...TIMES.day.sunDir).normalize();
@@ -405,7 +443,7 @@ export function createWorld(kit: Kit): World {
         c.position.x += dt * (1.6 + (i % 3) * 0.5);
         if (c.position.x > 380) c.position.x = -380;
       });
-      if (raining) rn.tick(dt, focus);
+      if (weather === 'rain') rn.tick(dt, focus);
       // A sombra acompanha onde a câmera olha (um mapa de sombra pequeno e nítido).
       sun.target.position.copy(focus);
       sun.position.copy(focus).addScaledVector(sunDir, 200);
@@ -414,24 +452,42 @@ export function createWorld(kit: Kit): World {
     setLight: (l) => {
       skyTop.set(l.skyTop);
       skyBottom.set(l.skyBottom);
-      if (raining) {
-        skyTop.lerp(new THREE.Color('#5B6676'), 0.6);
-        skyBottom.lerp(new THREE.Color('#9AA5B4'), 0.6);
+      const g = GREY[weather];
+      if (g > 0) {
+        skyTop.lerp(new THREE.Color('#5B6676'), g);
+        skyBottom.lerp(new THREE.Color('#9AA5B4'), g);
       }
       sk.set(skyTop, skyBottom);
       sun.color.set(l.sun);
-      sun.intensity = l.sunI * (raining ? 0.45 : 1);
+      sun.intensity = l.sunI * SUN[weather];
       hemi.intensity = l.hemiI;
       sunDir.set(...l.sunDir).normalize();
-      (st.material as THREE.PointsMaterial).opacity = l.glow;
+      (st.material as THREE.PointsMaterial).opacity = weather === 'clear' ? l.glow : l.glow * 0.2;
       kit.glowing.forEach((m) => (m.emissiveIntensity = 0.15 + l.glow * 1.6));
       setWaterNight(lk.water.mesh, l.glow * 0.8);
       f.waters.forEach((w) => setWaterNight(w, l.glow * 0.8));
-      clouds.forEach((c) => (c.material as THREE.MeshStandardMaterial).color.set(raining ? '#AAB4C0' : l.glow > 0.5 ? '#3A4466' : '#FFFFFF'));
+      clouds.forEach((c) => (c.material as THREE.MeshStandardMaterial).color.set(g > 0 ? (l.glow > 0.5 ? '#2E3446' : '#AAB4C0') : l.glow > 0.5 ? '#3A4466' : '#FFFFFF'));
     },
-    setRain: (on) => {
-      raining = on;
-      rn.lines.visible = on;
+    setWeather: (w) => {
+      weather = w;
+      rn.lines.visible = w === 'rain';
+      bd.mesh.visible = w === 'clear' || w === 'cloudy';
+      clouds.forEach((c) => (c.visible = true));
+      clouds.forEach((c) => c.scale.setScalar(w === 'clear' ? 2.2 : 3.2));
+    },
+    setSeason: (s) => {
+      // Cor das copas e das floradas pela estação (só visual).
+      const crowns: Record<Season, Partial<Record<TreeSpecies, string>>> = {
+        spring: { round: '#5DAF55', conifer: '#2F7A4A', slender: '#7BC25A', blossom: '#F7A8CC' },
+        summer: { round: '#4C9A4F', conifer: '#2F7A4A', slender: '#6BAA4E', blossom: '#8CC06A' },
+        autumn: { round: '#C98A3A', conifer: '#3E7A4A', slender: '#D9A441', blossom: '#D9643A' },
+        winter: { round: '#7FA08A', conifer: '#3D6B50', slender: '#94AE98', blossom: '#B7C7BD' },
+      };
+      trees.setSeason(crowns[s]);
+      meadow[0]!.visible = s !== 'winter';
+    },
+    setFestive: (on) => {
+      festive.visible = on;
     },
     setDetail: (q) => {
       trees.setCount(q === 'low' ? 0.35 : q === 'medium' ? 0.7 : 1);

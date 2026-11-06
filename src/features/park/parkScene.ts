@@ -263,6 +263,8 @@ export function createPark(canvas: HTMLCanvasElement, opts: { quality: ParkQuali
   // Prédios.
   const buildingGroups = PARK_BUILDINGS.map(building);
   buildingGroups.forEach((g) => scene.add(g));
+  // Topo real de cada prédio: o nome fica logo acima dele (não sobre o prédio de trás).
+  const tops = new Map<ModuleId, number>(buildingGroups.map((g) => [g.userData.id as ModuleId, new THREE.Box3().setFromObject(g).max.y + 1.2] as [ModuleId, number]));
 
   // Árvores em instâncias: dois desenhos (tronco e copa) para todas.
   const trees = treePositions(MAX_TREES);
@@ -409,9 +411,9 @@ export function createPark(canvas: HTMLCanvasElement, opts: { quality: ParkQuali
     project: () =>
       buildingGroups.map((g) => {
         const b = PARK_BUILDINGS.find((x) => x.id === g.userData.id)!;
-        v.set(b.x, 11, b.z).project(camera);
+        v.set(b.x, tops.get(b.id) ?? 8, b.z).project(camera);
         const dist = camera.position.distanceTo(g.position);
-        return { id: b.id, x: ((v.x + 1) / 2) * canvas.clientWidth, y: ((1 - v.y) / 2) * canvas.clientHeight, visible: v.z < 1 && dist < 110 };
+        return { id: b.id, x: ((v.x + 1) / 2) * canvas.clientWidth, y: ((1 - v.y) / 2) * canvas.clientHeight, visible: v.z < 1 && dist < 170 };
       }),
     dispose: () => {
       cancelAnimationFrame(raf);

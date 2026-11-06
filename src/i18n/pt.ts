@@ -4667,6 +4667,63 @@ export const pt = {
         help: 'Ajuda e sobre',
       },
     },
+    library: {
+      sectors: {
+        atrium: 'Grande Átrio',
+        collections: 'Galeria de Coleções',
+        consult: 'Centro de Consulta',
+        search: 'Sala de Pesquisa',
+        preserve: 'Arquivo de Preservação',
+        transfer: 'Centro de Transferência',
+      },
+      preserveHint: 'A preservação dos seus arquivos é feita pelas cópias de segurança. A Library já evita arquivos repetidos; versões e verificação de integridade por arquivo chegam na etapa da Library.',
+    },
+    notes: {
+      sectors: {
+        reception: 'Recepção de Cadernos',
+        writing: 'Estúdio de Escrita',
+        advanced: 'Oficina de Edição',
+        handwriting: 'Ateliê Manuscrito',
+        organize: 'Sala de Organização',
+        versions: 'Arquivo de Versões',
+      },
+      hints: {
+        reception: 'Suas notas mais recentes. O editor abre na tela do Notes, sem o 3D por trás.',
+        writing: 'Editor rápido para escrever no dia a dia.',
+        advanced: 'Editor em blocos: tabelas, imagens, equações, diagramas e áudio.',
+        handwriting: 'Escrita à mão e desenho com Apple Pencil. Abre na tela do Notes, exatamente como hoje, sem o 3D por trás.',
+        organize: 'Pastas, etiquetas, coleções e modelos ficam no Notes.',
+        versions: 'Cada nota guarda o histórico de versões: abra a nota e use Histórico.',
+      },
+      empty: 'Nenhuma nota ainda.',
+    },
+    academy: {
+      sectors: {
+        hall: 'Saguão de Estudos',
+        rooms: 'Salas das Disciplinas',
+        review: 'Sala de Revisão',
+        plan: 'Plano de Estudos',
+      },
+      noSubjects: 'Nenhuma disciplina no ano atual. As salas ganham o nome de cada disciplina criada.',
+    },
+    languages: {
+      sectors: {
+        garden: 'Jardim Central',
+        spaces: 'Espaços dos Idiomas',
+      },
+      none: 'Nenhum idioma ainda. Cada idioma ganha um quiosque no jardim.',
+    },
+    insights: {
+      sectors: {
+        overview: 'Visão Geral',
+        productivity: 'Produtividade',
+        learning: 'Aprendizagem',
+        habits: 'Hábitos e Rotinas',
+        goals: 'Metas',
+        activities: 'Atividades e Interesses',
+        finance: 'Finanças',
+      },
+    },
   },
   colors: {
     custom: 'Outra cor',

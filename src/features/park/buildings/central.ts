@@ -24,19 +24,19 @@ const PAVING = '#DDD6C6';
 const rnd = seededRandom(101);
 
 /** Piso do lote, meio-fio e canteiros simples (todo prédio detalhado tem o seu). */
-function lotBase(kit: Kit, b: Builder, radius: number, color = PAVING) {
+export function lotBase(kit: Kit, b: Builder, radius: number, color = PAVING) {
   b.add(kit.mat(color, { rough: 0.85 }), new THREE.CircleGeometry(radius, 64), [0, 0.04, 0], [-Math.PI / 2, 0, 0]);
   b.add(kit.mat('#C9C1AE', { rough: 0.8 }), new THREE.TorusGeometry(radius, 0.15, 6, 96), [0, 0.06, 0], [-Math.PI / 2, 0, 0]);
 }
 
-function signPlane(kit: Kit, lines: string[], w: number, h: number, accent: string): THREE.Mesh {
+export function signPlane(kit: Kit, lines: string[], w: number, h: number, accent: string): THREE.Mesh {
   const tex = signTexture(kit, lines, { bg: 'rgba(12,24,44,0.94)', fg: '#F1FAFF', accent, w: 1024, h: Math.round((1024 * h) / w) });
   const mat = kit.own(new THREE.MeshStandardMaterial({ map: tex, emissiveMap: tex, emissive: new THREE.Color('#ffffff'), emissiveIntensity: 0.5, roughness: 0.4 }));
   return new THREE.Mesh(kit.own(new THREE.PlaneGeometry(w, h)), mat);
 }
 
 /** Vegetação em volta: arbustos e flores em anéis, fora do núcleo. */
-function planting(kit: Kit, rMin: number, rMax: number, n: number, palette: string[], skipFront = 0.5): THREE.Object3D[] {
+export function planting(kit: Kit, rMin: number, rMax: number, n: number, palette: string[], skipFront = 0.5): THREE.Object3D[] {
   const bush: Array<{ x: number; z: number; s: number; color: string }> = [];
   const flower: typeof bush = [];
   for (let i = 0; i < n; i++) {

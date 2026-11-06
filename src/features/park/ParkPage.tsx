@@ -25,6 +25,10 @@ import { createInboxInterior, DESTINATIONS, INBOX_SECTORS, type InboxSector } fr
 import { createDashboardInterior, createProfileInterior, createSettingsInterior, DASHBOARD_SECTORS, PROFILE_SECTORS, SETTINGS_ROOMS, type DashboardData, type DashboardSector, type ProfileSector, type SettingsRoom } from './interiors/central';
 import { InboxPanel } from './panels/InboxPanel';
 import { DashboardPanel, ProfilePanel, SettingsPanel } from './panels/CentralPanels';
+import { AcademyPanel, InsightsPanel, LanguagesPanel, LibraryPanel, NotesPanel } from './panels/NorthPanels';
+import { ACADEMY_SECTORS, INSIGHTS_SECTORS, LANGUAGES_SECTORS, LIBRARY_SECTORS, NOTES_SECTORS, createAcademyInterior, createInsightsInterior, createLanguagesInterior, createLibraryInterior, createNotesInterior, type AcademySector, type InsightsSector, type LanguagesSector, type LibrarySector, type NotesSector } from './interiors/north';
+import { useAcademyData } from '@/features/academy/useAcademyData';
+import { useLanguages } from '@/features/languages/useLanguages';
 import { receptionData } from './receptionData';
 
 function autoQuality(): Quality {
@@ -42,9 +46,14 @@ const SECTORS: Partial<Record<ModuleId, readonly string[]>> = {
   dashboard: DASHBOARD_SECTORS,
   profile: PROFILE_SECTORS,
   settings: SETTINGS_ROOMS,
+  library: LIBRARY_SECTORS,
+  notes: NOTES_SECTORS,
+  academy: ACADEMY_SECTORS,
+  languages: LANGUAGES_SECTORS,
+  insights: INSIGHTS_SECTORS,
 };
 /** Setores cujo painel é uma tela grande (o módulo inteiro dentro do ambiente). */
-const WIDE = new Set(['dashboard:overview', 'dashboard:panels', 'profile:interests', 'profile:trajectory', 'profile:personalize', 'settings:identity', 'settings:appearance', 'settings:modules', 'settings:privacy', 'settings:data', 'settings:help']);
+const WIDE = new Set(['dashboard:overview', 'dashboard:panels', 'profile:interests', 'profile:trajectory', 'profile:personalize', 'settings:identity', 'settings:appearance', 'settings:modules', 'settings:privacy', 'settings:data', 'settings:help', 'library:atrium', 'library:collections', 'library:consult', 'library:search', 'library:preserve', 'library:transfer', 'academy:hall', 'academy:review', 'academy:plan', 'languages:garden', ...INSIGHTS_SECTORS.map((s) => `insights:${s}`)]);
 
 /**
  * Parque 3D — tela principal do ROUTIG (V2). Um mundo único com os prédios dos módulos;
@@ -117,6 +126,11 @@ export default function ParkPage() {
       dashboard: (kit) => createDashboardInterior(kit, sectorLabels<DashboardSector>('park.dashboard.sectors', DASHBOARD_SECTORS)),
       profile: (kit) => createProfileInterior(kit, sectorLabels<ProfileSector>('park.profile.sectors', PROFILE_SECTORS)),
       settings: (kit) => createSettingsInterior(kit, sectorLabels<SettingsRoom>('park.settings.rooms', SETTINGS_ROOMS)),
+      library: (kit) => createLibraryInterior(kit, sectorLabels<LibrarySector>('park.library.sectors', LIBRARY_SECTORS)),
+      notes: (kit) => createNotesInterior(kit, sectorLabels<NotesSector>('park.notes.sectors', NOTES_SECTORS)),
+      academy: (kit) => createAcademyInterior(kit, sectorLabels<AcademySector>('park.academy.sectors', ACADEMY_SECTORS)),
+      languages: (kit) => createLanguagesInterior(kit, sectorLabels<LanguagesSector>('park.languages.sectors', LANGUAGES_SECTORS)),
+      insights: (kit) => createInsightsInterior(kit, sectorLabels<InsightsSector>('park.insights.sectors', INSIGHTS_SECTORS)),
     };
     try {
       engine.current = createEngine(canvas, {
@@ -170,6 +184,13 @@ export default function ParkPage() {
   useEffect(() => {
     if (dashData) engine.current?.setData('dashboard', dashData);
   }, [dashKey]);
+  // Nomes das salas da Academy e dos quiosques de Idiomas: as disciplinas e os idiomas reais.
+  const academy = useAcademyData();
+  const langs = useLanguages();
+  const subjectsKey = academy.subjects.map((s) => s.name).join('|');
+  const langsKey = langs.languages.map((l) => l.name).join('|');
+  useEffect(() => engine.current?.setData('academy', { subjects: subjectsKey ? subjectsKey.split('|') : [] }), [subjectsKey]);
+  useEffect(() => engine.current?.setData('languages', { languages: langsKey ? langsKey.split('|') : [] }), [langsKey]);
 
   const pick = picked ? buildingById(picked) : null;
   const sectors = inside ? (SECTORS[inside] ?? []) : [];
@@ -335,6 +356,11 @@ export default function ParkPage() {
             {inside === 'dashboard' && <DashboardPanel id={sector as DashboardSector} />}
             {inside === 'profile' && <ProfilePanel id={sector as ProfileSector} />}
             {inside === 'settings' && <SettingsPanel id={sector as SettingsRoom} />}
+            {inside === 'library' && <LibraryPanel id={sector as LibrarySector} />}
+            {inside === 'notes' && <NotesPanel id={sector as NotesSector} />}
+            {inside === 'academy' && <AcademyPanel id={sector as AcademySector} />}
+            {inside === 'languages' && <LanguagesPanel id={sector as LanguagesSector} />}
+            {inside === 'insights' && <InsightsPanel id={sector as InsightsSector} />}
           </div>
         </section>
       )}

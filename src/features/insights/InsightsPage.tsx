@@ -41,6 +41,7 @@ import { useInsightsData, type InsightsRaw } from './useInsightsData';
 
 const MODULES = ['focus', 'habits', 'tasks', 'academy', 'languages', 'music', 'sports', 'projects', 'goals', 'finance'] as const;
 type Mod = (typeof MODULES)[number];
+export type InsightsModule = Mod;
 type Level = 'overview' | 'module' | 'report';
 const PREFS_KEY = 'routig.insights';
 
@@ -81,15 +82,16 @@ function usePrefs() {
 }
 
 /** Insights (Parte 19): visão geral, análise por módulo e relatório, por período. */
-export function InsightsPage() {
+/** `initialModule`: abre já na análise de um módulo (setores do Observatório no parque). */
+export function InsightsPage({ initialModule }: { initialModule?: InsightsModule } = {}) {
   const { t, settings } = useSettings();
   const raw = useInsightsData();
   const today = todayKey();
-  const [level, setLevel] = useState<Level>('overview');
+  const [level, setLevel] = useState<Level>(initialModule ? 'module' : 'overview');
   const [kind, setKind] = useState<PeriodKind>('week');
   const [anchor, setAnchor] = useState(today);
   const [custom, setCustom] = useState<Range>({ from: addDays(today, -29), to: today });
-  const [mod, setMod] = useState<Mod>('focus');
+  const [mod, setMod] = useState<Mod>(initialModule ?? 'focus');
   const [customizing, setCustomizing] = useState(false);
   const [prefs, setPrefs] = usePrefs();
   const { hide, toggle } = useHideToggle();

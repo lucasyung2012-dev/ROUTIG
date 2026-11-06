@@ -4669,6 +4669,63 @@ export const en: Messages = {
         help: 'Help and about',
       },
     },
+    library: {
+      sectors: {
+        atrium: 'Great Atrium',
+        collections: 'Collections Gallery',
+        consult: 'Reading Center',
+        search: 'Research Room',
+        preserve: 'Preservation Archive',
+        transfer: 'Transfer Center',
+      },
+      preserveHint: 'Your files are preserved by backups. The Library already avoids duplicate files; per-file versions and integrity checks arrive with the Library stage.',
+    },
+    notes: {
+      sectors: {
+        reception: 'Notebooks Desk',
+        writing: 'Writing Studio',
+        advanced: 'Editing Workshop',
+        handwriting: 'Handwriting Atelier',
+        organize: 'Organization Room',
+        versions: 'Versions Archive',
+      },
+      hints: {
+        reception: 'Your latest notes. The editor opens in Notes, with no 3D behind it.',
+        writing: 'Quick editor for everyday writing.',
+        advanced: 'Block editor: tables, images, equations, diagrams and audio.',
+        handwriting: 'Handwriting and drawing with Apple Pencil. Opens in Notes exactly as today, with no 3D behind it.',
+        organize: 'Folders, tags, collections and templates live in Notes.',
+        versions: 'Every note keeps its version history: open the note and use History.',
+      },
+      empty: 'No notes yet.',
+    },
+    academy: {
+      sectors: {
+        hall: 'Study Hall',
+        rooms: 'Subject Rooms',
+        review: 'Review Room',
+        plan: 'Study Plan',
+      },
+      noSubjects: 'No subjects in the current year. Rooms take the name of each subject you create.',
+    },
+    languages: {
+      sectors: {
+        garden: 'Central Garden',
+        spaces: 'Language Spaces',
+      },
+      none: 'No languages yet. Each language gets a kiosk in the garden.',
+    },
+    insights: {
+      sectors: {
+        overview: 'Overview',
+        productivity: 'Productivity',
+        learning: 'Learning',
+        habits: 'Habits and Routines',
+        goals: 'Goals',
+        activities: 'Activities and Interests',
+        finance: 'Finance',
+      },
+    },
   },
   colors: {
     custom: 'Other color',

@@ -9,6 +9,7 @@ import { LAKE, PARK_BUILDINGS, PARK_RADIUS, PLAZA_RADIUS, entranceOf, facingOf, 
 import { Builder, Kit, cloud, forest, setWaterNight, shrubs, sky, stars, water, type Plant, type TreeSpecies } from './kit';
 import { birds, drone, fountain, rain } from './life';
 import { dashboardBuilding, inboxBuilding, profileBuilding, settingsBuilding, type DetailedBuilding } from './buildings/central';
+import { academyBuilding, insightsBuilding, languagesBuilding, libraryBuilding, notesBuilding } from './buildings/north';
 import { prototypeBuilding } from './buildings/prototype';
 import type { Obstacle } from './camera';
 
@@ -37,6 +38,11 @@ const DETAILED: Partial<Record<ModuleId, (kit: Kit) => DetailedBuilding>> = {
   dashboard: dashboardBuilding,
   profile: profileBuilding,
   settings: settingsBuilding,
+  library: libraryBuilding,
+  notes: notesBuilding,
+  academy: academyBuilding,
+  languages: languagesBuilding,
+  insights: insightsBuilding,
 };
 
 export interface PlacedBuilding {

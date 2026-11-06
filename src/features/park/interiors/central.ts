@@ -7,13 +7,13 @@ import * as THREE from 'three';
 import { Builder, type Kit } from '../kit';
 import { bench, canvasPlane, createRoom, finishRoom, markSector, pendants, pots, sectorGroup, sectorSign, sectorView, setDetailCommon, type InteriorScene } from './common';
 
-interface Placed {
+export interface Placed {
   x: number;
   z: number;
   face: number;
 }
 
-function sectorsFrom<T extends string>(kit: Kit, scene: THREE.Scene, plan: Record<T, Placed>, ids: readonly T[], labels: Record<T, string>, accent: string, build: (id: T, sb: Builder, g: THREE.Group) => void): THREE.Group[] {
+export function sectorsFrom<T extends string>(kit: Kit, scene: THREE.Scene, plan: Record<T, Placed>, ids: readonly T[], labels: Record<T, string>, accent: string, build: (id: T, sb: Builder, g: THREE.Group) => void): THREE.Group[] {
   return ids.map((id) => {
     const p = plan[id];
     const g = sectorGroup(id, p.x, p.z, p.face);
@@ -31,7 +31,7 @@ function sectorsFrom<T extends string>(kit: Kit, scene: THREE.Scene, plan: Recor
   });
 }
 
-const viewOf = (plan: Record<string, Placed>, id: string, overview: { cam: THREE.Vector3; target: THREE.Vector3 }) => {
+export const viewOf = (plan: Record<string, Placed>, id: string, overview: { cam: THREE.Vector3; target: THREE.Vector3 }) => {
   const p = plan[id];
   return p ? sectorView(p.x, p.z, p.face) : overview;
 };

@@ -4764,6 +4764,53 @@ export const pt = {
         journal: 'Diário de Investimentos',
       },
     },
+    focus: {
+      sectors: {
+        garden: 'Jardim Central',
+        history: 'Sala de Histórico',
+        distraction: 'Bloqueio de Distrações',
+      },
+      distraction: {
+        intro: 'O ROUTIG é um site e não consegue bloquear outros apps. O próprio iPad consegue: siga estes passos uma vez.',
+        step1: 'Abra Ajustes → Tempo de Uso e toque em "Limites de Apps" para escolher os apps que distraem e um tempo diário.',
+        step2: 'Em Ajustes → Foco, crie um Foco "Estudo" e escolha quais apps e pessoas podem avisar durante ele.',
+        step3: 'No mesmo Foco, em "Telas de Início", mostre só a página com os apps de estudo.',
+        step4: 'Antes de começar uma sessão no ROUTIG, ligue o Foco "Estudo" na Central de Controle.',
+        limit: 'O ROUTIG não sabe se o Foco do iPad está ligado: o bloqueio é do sistema, e quem liga é você.',
+      },
+    },
+    habits: {
+      sectors: {
+        atrium: 'Átrio de Crescimento',
+        greenhouse: 'Estufa de Hábitos',
+        evolution: 'Galeria de Evolução',
+        analysis: 'Análise',
+      },
+    },
+    goals: {
+      sectors: {
+        garden: 'Jardim das Metas',
+        achieved: 'Conquistas',
+        analysis: 'Análise',
+      },
+      noneDone: 'Nenhuma meta concluída ainda. Elas aparecem aqui quando forem concluídas.',
+    },
+    music: {
+      sectors: {
+        atrium: 'Átrio',
+        instruments: 'Espaços dos Instrumentos',
+        analysis: 'Análise',
+      },
+      none: 'Nenhum instrumento ainda. Cada instrumento ganha um espaço no pavilhão.',
+    },
+    sports: {
+      sectors: {
+        atrium: 'Átrio Esportivo',
+        modalities: 'Pavilhão de Modalidades',
+        analysis: 'Galeria de Análises',
+      },
+      none: 'Nenhuma modalidade ainda. Cada modalidade ganha um espaço no complexo.',
+    },
   },
   colors: {
     custom: 'Outra cor',

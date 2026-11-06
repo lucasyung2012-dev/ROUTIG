@@ -11,6 +11,7 @@ import { birds, drone, fountain, rain } from './life';
 import { dashboardBuilding, inboxBuilding, profileBuilding, settingsBuilding, type DetailedBuilding } from './buildings/central';
 import { academyBuilding, insightsBuilding, languagesBuilding, libraryBuilding, notesBuilding } from './buildings/north';
 import { calendarBuilding, financeBuilding, projectsBuilding, tasksBuilding } from './buildings/east';
+import { focusBuilding, goalsBuilding, habitsBuilding, musicBuilding, sportsBuilding } from './buildings/westsouth';
 import { prototypeBuilding } from './buildings/prototype';
 import type { Obstacle } from './camera';
 
@@ -48,6 +49,11 @@ const DETAILED: Partial<Record<ModuleId, (kit: Kit) => DetailedBuilding>> = {
   tasks: tasksBuilding,
   projects: projectsBuilding,
   finance: financeBuilding,
+  focus: focusBuilding,
+  habits: habitsBuilding,
+  goals: goalsBuilding,
+  music: musicBuilding,
+  sports: sportsBuilding,
 };
 
 export interface PlacedBuilding {

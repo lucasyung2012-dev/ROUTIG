@@ -4766,6 +4766,53 @@ export const en: Messages = {
         journal: 'Investment Journal',
       },
     },
+    focus: {
+      sectors: {
+        garden: 'Central Garden',
+        history: 'History Room',
+        distraction: 'Distraction Block',
+      },
+      distraction: {
+        intro: 'ROUTIG is a website and cannot block other apps. The iPad itself can: follow these steps once.',
+        step1: 'Open Settings → Screen Time and tap "App Limits" to choose the distracting apps and a daily time.',
+        step2: 'In Settings → Focus, create a "Study" Focus and choose which apps and people may notify you during it.',
+        step3: 'In the same Focus, under "Home Screen", show only the page with your study apps.',
+        step4: 'Before starting a session in ROUTIG, turn on the "Study" Focus in Control Center.',
+        limit: 'ROUTIG cannot tell whether the iPad Focus is on: the block is the system’s, and you turn it on.',
+      },
+    },
+    habits: {
+      sectors: {
+        atrium: 'Growth Atrium',
+        greenhouse: 'Habits Greenhouse',
+        evolution: 'Evolution Gallery',
+        analysis: 'Analysis',
+      },
+    },
+    goals: {
+      sectors: {
+        garden: 'Goals Garden',
+        achieved: 'Achievements',
+        analysis: 'Analysis',
+      },
+      noneDone: 'No goal completed yet. They show up here once completed.',
+    },
+    music: {
+      sectors: {
+        atrium: 'Atrium',
+        instruments: 'Instrument Spaces',
+        analysis: 'Analysis',
+      },
+      none: 'No instruments yet. Each instrument gets a space in the pavilion.',
+    },
+    sports: {
+      sectors: {
+        atrium: 'Sports Atrium',
+        modalities: 'Sports Pavilion',
+        analysis: 'Analysis Gallery',
+      },
+      none: 'No sports yet. Each sport gets a space in the complex.',
+    },
   },
   colors: {
     custom: 'Other color',

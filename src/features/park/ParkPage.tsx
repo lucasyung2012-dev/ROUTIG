@@ -27,6 +27,12 @@ import { InboxPanel } from './panels/InboxPanel';
 import { DashboardPanel, ProfilePanel, SettingsPanel } from './panels/CentralPanels';
 import { AcademyPanel, InsightsPanel, LanguagesPanel, LibraryPanel, NotesPanel } from './panels/NorthPanels';
 import { CalendarPanel, FinancePanel, ProjectsPanel, TasksPanel } from './panels/EastPanels';
+import { FocusPanel, GoalsPanel, HabitsPanel, MusicPanel, SportsPanel } from './panels/WestSouthPanels';
+import { FOCUS_SECTORS, GOALS_SECTORS, HABITS_SECTORS, MUSIC_SECTORS, SPORTS_SECTORS, createFocusInterior, createGoalsInterior, createHabitsInterior, createMusicInterior, createSportsInterior, type FocusSector, type GoalsSector, type HabitsSector, type MusicSector, type SportsSector } from './interiors/westsouth';
+import { useHabits } from '@/features/habits/useHabits';
+import { useGoals } from '@/features/goals/useGoals';
+import { useMusic } from '@/features/music/useMusic';
+import { useSports } from '@/features/sports/useSports';
 import { CALENDAR_SECTORS, FINANCE_SECTORS, PROJECTS_SECTORS, TASKS_SECTORS, createCalendarInterior, createFinanceInterior, createProjectsInterior, createTasksInterior, type CalendarSector, type FinanceSector, type ProjectsSector, type TasksSector } from './interiors/east';
 import { ACADEMY_SECTORS, INSIGHTS_SECTORS, LANGUAGES_SECTORS, LIBRARY_SECTORS, NOTES_SECTORS, createAcademyInterior, createInsightsInterior, createLanguagesInterior, createLibraryInterior, createNotesInterior, type AcademySector, type InsightsSector, type LanguagesSector, type LibrarySector, type NotesSector } from './interiors/north';
 import { useAcademyData } from '@/features/academy/useAcademyData';
@@ -57,6 +63,11 @@ const SECTORS: Partial<Record<ModuleId, readonly string[]>> = {
   tasks: TASKS_SECTORS,
   projects: PROJECTS_SECTORS,
   finance: FINANCE_SECTORS,
+  focus: FOCUS_SECTORS,
+  habits: HABITS_SECTORS,
+  goals: GOALS_SECTORS,
+  music: MUSIC_SECTORS,
+  sports: SPORTS_SECTORS,
 };
 /** Setores cujo painel é uma tela grande (o módulo inteiro dentro do ambiente). */
 const WIDE = new Set(['dashboard:overview', 'dashboard:panels', 'profile:interests', 'profile:trajectory', 'profile:personalize', 'settings:identity', 'settings:appearance', 'settings:modules', 'settings:privacy', 'settings:data', 'settings:help', 'library:atrium', 'library:collections', 'library:consult', 'library:search', 'library:preserve', 'library:transfer', 'academy:hall', 'academy:review', 'academy:plan', 'languages:garden', ...INSIGHTS_SECTORS.map((s) => `insights:${s}`),
@@ -64,6 +75,15 @@ const WIDE = new Set(['dashboard:overview', 'dashboard:panels', 'profile:interes
   ...TASKS_SECTORS.map((s) => `tasks:${s}`),
   'projects:studio',
   ...FINANCE_SECTORS.map((s) => `finance:${s}`),
+  'focus:garden',
+  'focus:history',
+  ...HABITS_SECTORS.map((s) => `habits:${s}`),
+  'goals:garden',
+  'goals:analysis',
+  'music:atrium',
+  'music:analysis',
+  'sports:atrium',
+  'sports:analysis',
 ]);
 
 /**
@@ -146,6 +166,11 @@ export default function ParkPage() {
       tasks: (kit) => createTasksInterior(kit, sectorLabels<TasksSector>('park.tasks.sectors', TASKS_SECTORS)),
       projects: (kit) => createProjectsInterior(kit, sectorLabels<ProjectsSector>('park.projects.sectors', PROJECTS_SECTORS)),
       finance: (kit) => createFinanceInterior(kit, sectorLabels<FinanceSector>('park.finance.sectors', FINANCE_SECTORS)),
+      focus: (kit) => createFocusInterior(kit, sectorLabels<FocusSector>('park.focus.sectors', FOCUS_SECTORS)),
+      habits: (kit) => createHabitsInterior(kit, sectorLabels<HabitsSector>('park.habits.sectors', HABITS_SECTORS)),
+      goals: (kit) => createGoalsInterior(kit, sectorLabels<GoalsSector>('park.goals.sectors', GOALS_SECTORS)),
+      music: (kit) => createMusicInterior(kit, sectorLabels<MusicSector>('park.music.sectors', MUSIC_SECTORS)),
+      sports: (kit) => createSportsInterior(kit, sectorLabels<SportsSector>('park.sports.sectors', SPORTS_SECTORS)),
     };
     try {
       engine.current = createEngine(canvas, {
@@ -221,6 +246,25 @@ export default function ParkPage() {
   useEffect(() => {
     if (projects) engine.current?.setData('projects', { projects });
   }, [projectsKey]);
+
+  // Placas com os nomes reais: hábitos, metas ativas, instrumentos e modalidades.
+  const habitsData = useHabits();
+  const goalsData = useGoals();
+  const musicData = useMusic();
+  const sportsData = useSports();
+  const namesKey = JSON.stringify([
+    habitsData.habits.map((h) => h.name),
+    goalsData.goals.filter((g) => g.status !== 'done' && g.status !== 'cancelled' && g.status !== 'archived').map((g) => g.name),
+    musicData.instruments.filter((i) => !i.deletedAt).map((i) => i.name),
+    sportsData.sports.map((s) => s.name),
+  ]);
+  useEffect(() => {
+    const [h, g, m, sp] = JSON.parse(namesKey) as string[][];
+    engine.current?.setData('habits', { names: h ?? [] });
+    engine.current?.setData('goals', { names: g ?? [] });
+    engine.current?.setData('music', { names: m ?? [] });
+    engine.current?.setData('sports', { names: sp ?? [] });
+  }, [namesKey]);
 
   const pick = picked ? buildingById(picked) : null;
   const sectors = inside ? (SECTORS[inside] ?? []) : [];
@@ -395,6 +439,11 @@ export default function ParkPage() {
             {inside === 'tasks' && <TasksPanel id={sector as TasksSector} />}
             {inside === 'projects' && <ProjectsPanel id={sector as ProjectsSector} />}
             {inside === 'finance' && <FinancePanel id={sector as FinanceSector} />}
+            {inside === 'focus' && <FocusPanel id={sector as FocusSector} />}
+            {inside === 'habits' && <HabitsPanel id={sector as HabitsSector} />}
+            {inside === 'goals' && <GoalsPanel id={sector as GoalsSector} />}
+            {inside === 'music' && <MusicPanel id={sector as MusicSector} />}
+            {inside === 'sports' && <SportsPanel id={sector as SportsSector} />}
           </div>
         </section>
       )}

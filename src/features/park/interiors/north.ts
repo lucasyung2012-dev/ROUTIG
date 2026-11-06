@@ -9,7 +9,7 @@ import { canvasPlane, createRoom, finishRoom, pendants, pots, bench, setDetailCo
 import { sectorsFrom, viewOf, type Placed } from './central';
 
 /** Placa com texto que muda com os dados (nome de disciplina, idioma). */
-function nameBoard(kit: Kit, w: number, accent: string) {
+export function nameBoard(kit: Kit, w: number, accent: string) {
   const p = canvasPlane(kit, w, w * 0.28, 112);
   const draw = (text: string) => {
     const c = p.ctx.canvas;

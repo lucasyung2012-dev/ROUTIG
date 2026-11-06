@@ -17,13 +17,16 @@ import { dayLook, HABIT_EXAMPLES, HabitDialog, Heatmap, Legend, LogDialog, Quick
 import { useHabits, type HabitsData } from './useHabits';
 
 type View = 'today' | 'week' | 'month' | 'year';
+export type HabitsView = View;
 const VIEW_KEY = 'routig.habits.view';
 
 /** Habits (Parte 14): acompanhar sem pressão. Nada de sequência para "não quebrar". */
-export function HabitsPage() {
+/** `initialView`: abre numa visão (salas da Estufa de Hábitos no parque). */
+export function HabitsPage({ initialView }: { initialView?: HabitsView } = {}) {
   const { t } = useSettings();
   const data = useHabits();
   const [view, setView] = useState<View>(() => {
+    if (initialView) return initialView;
     try {
       const v = localStorage.getItem(VIEW_KEY);
       return v === 'week' || v === 'month' || v === 'year' ? v : 'today';

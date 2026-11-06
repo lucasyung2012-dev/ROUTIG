@@ -101,7 +101,8 @@ export function createLibraryInterior(kit: Kit, labels: Record<LibrarySector, st
     }
   });
   finishRoom(room);
-  const overview = { cam: new THREE.Vector3(0, 9, R - 2.5), target: new THREE.Vector3(0, 3, -2) };
+  // Entrada: no fundo do átrio vazado, vendo os três níveis de galerias (sem ficar sob um mezanino).
+  const overview = { cam: new THREE.Vector3(0, 3.4, 7.6), target: new THREE.Vector3(0, 4.5, -8) };
   return {
     scene,
     sectors: LIBRARY_SECTORS,
@@ -355,7 +356,7 @@ export function createInsightsInterior(kit: Kit, labels: Record<InsightsSector, 
   // Cúpula interna e o telescópio no centro.
   b.add(kit.mat('#FBE4E8', { rough: 0.6, side: THREE.BackSide }), new THREE.SphereGeometry(R, 32, 12, 0, Math.PI * 2, 0, Math.PI / 2), [0, H, 0], [0, 0, 0], [1, 0.45, 1]);
   b.add(silver, new THREE.CylinderGeometry(0.6, 1.2, 3, 16), [0, 1.5, 0]);
-  b.add(silver, new THREE.CylinderGeometry(0.7, 0.9, 5, 20), [0, 4.2, 0.8], [-0.7, 0, 0]);
+  b.add(silver, new THREE.CylinderGeometry(0.7, 0.9, 5, 20), [0, 4.2, -0.8], [0.7, 0, 0]);
   b.add(kit.mat('#FDA4AF', { glow: true }), new THREE.TorusGeometry(3.2, 0.06, 6, 64), [0, 0.05, 0], [-Math.PI / 2, 0, 0]);
   const plan = ring(INSIGHTS_SECTORS, 10, true);
   const groups = sectorsFrom(kit, scene, plan, INSIGHTS_SECTORS, labels, '#F43F5E', (_id, sb) => {
@@ -364,7 +365,7 @@ export function createInsightsInterior(kit: Kit, labels: Record<InsightsSector, 
     sb.add(kit.mat('#FDA4AF', { glow: true }), new THREE.BoxGeometry(2, 0.9, 0.05), [0, 1.35, -0.25], [-0.35, 0, 0]);
   });
   finishRoom(room);
-  const overview = { cam: new THREE.Vector3(0, 6.5, R - 2), target: new THREE.Vector3(0, 1.5, -1) };
+  const overview = { cam: new THREE.Vector3(3.5, 7.5, R - 2.5), target: new THREE.Vector3(0, 1.5, -4) };
   return {
     scene,
     sectors: INSIGHTS_SECTORS,

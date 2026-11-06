@@ -620,6 +620,9 @@ export const pt = {
       designSystem: 'Design system',
       designSystemBody: 'Cores, tipografia, componentes e estados usados em todo o app.',
       openDesignSystem: 'Ver design system',
+      labTitle: 'Protótipos da V2',
+      labBody: 'Testes da Etapa 0 da V2, para experimentar no iPad e no iPhone. Não mexem nos seus dados e podem mudar a qualquer momento.',
+      labPark: 'Parque 3D',
       upcoming: 'Próximas configurações',
       upcomingBody: 'Ainda não existem e por isso não aparecem como controles:',
       upcomingItems: [

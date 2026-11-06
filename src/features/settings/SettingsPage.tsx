@@ -484,6 +484,19 @@ function AboutSection() {
         </Link>
       </Surface>
 
+      {/* Protótipos da V2 (Etapa 0): acesso também pelo app instalado, que não tem barra de endereço. */}
+      <Surface className="flex flex-col gap-3">
+        <div>
+          <h2 className="text-[0.9375rem] font-semibold text-fg">{t('settings.about.labTitle')}</h2>
+          <p className="mt-1 text-sm leading-relaxed text-muted">{t('settings.about.labBody')}</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Link to="/lab/park" className="inline-flex h-11 shrink-0 items-center rounded-xl bg-surface-2 px-4 text-[0.9375rem] font-medium text-fg ring-1 ring-inset ring-line hover:bg-surface-3">
+            {t('settings.about.labPark')}
+          </Link>
+        </div>
+      </Surface>
+
       <Surface className="divide-y divide-line/70">
         <div className="pb-5">
           <div className="text-[0.9375rem] font-medium text-fg">{t('settings.about.version')}</div>

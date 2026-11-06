@@ -622,6 +622,9 @@ export const en: Messages = {
       designSystem: 'Design system',
       designSystemBody: 'Colors, typography, components and states used across the app.',
       openDesignSystem: 'View design system',
+      labTitle: 'V2 prototypes',
+      labBody: 'V2 Stage 0 tests, to try on iPad and iPhone. They do not touch your data and may change at any time.',
+      labPark: '3D park',
       upcoming: 'Upcoming settings',
       upcomingBody: 'These do not exist yet, so they do not appear as controls:',
       upcomingItems: [

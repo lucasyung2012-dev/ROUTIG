@@ -494,6 +494,9 @@ function AboutSection() {
           <Link to="/lab/park" className="inline-flex h-11 shrink-0 items-center rounded-xl bg-surface-2 px-4 text-[0.9375rem] font-medium text-fg ring-1 ring-inset ring-line hover:bg-surface-3">
             {t('settings.about.labPark')}
           </Link>
+          <Link to="/lab/recepcao" className="inline-flex h-11 shrink-0 items-center rounded-xl bg-surface-2 px-4 text-[0.9375rem] font-medium text-fg ring-1 ring-inset ring-line hover:bg-surface-3">
+            {t('settings.about.labReception')}
+          </Link>
         </div>
       </Surface>
 

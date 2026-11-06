@@ -45,6 +45,7 @@ import { ToastProvider } from '@/ui/toast';
 import { AppLock } from '@/features/security/AppLock';
 
 const ParkLab = lazy(() => import('@/features/park/ParkLab'));
+const ReceptionLab = lazy(() => import('@/features/park/ReceptionLab'));
 
 export function App({ extra }: { extra?: ReactNode }) {
   return (
@@ -118,6 +119,14 @@ function Gate() {
             element={
               <Suspense fallback={<div className="ambient flex h-full items-center justify-center text-sm text-muted">{t('common.loading')}</div>}>
                 <ParkLab />
+              </Suspense>
+            }
+          />
+          <Route
+            path="lab/recepcao"
+            element={
+              <Suspense fallback={<div className="ambient flex h-full items-center justify-center text-sm text-muted">{t('common.loading')}</div>}>
+                <ReceptionLab />
               </Suspense>
             }
           />

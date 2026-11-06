@@ -122,8 +122,9 @@ export default function ReceptionLab() {
         </div>
       )}
 
-      {/* Barra de cima */}
-      <div className="absolute inset-x-0 top-0 flex flex-wrap items-center gap-2 bg-gradient-to-b from-black/60 to-transparent p-3 safe-top">
+      {/* Barra de cima e, dentro do prédio, os setores logo abaixo (sem sobrepor no iPhone) */}
+      <div className="absolute inset-x-0 top-0 bg-gradient-to-b from-black/60 to-transparent safe-top">
+      <div className="flex flex-wrap items-center gap-2 p-3">
         {mode === 'outside' ? (
           <Link to="/settings" className="inline-flex h-11 items-center gap-2 rounded-xl bg-surface/90 px-3 text-sm font-medium text-fg shadow-soft">
             <ArrowLeft className="h-4 w-4" aria-hidden />
@@ -146,10 +147,8 @@ export default function ReceptionLab() {
           <Segmented<ParkQuality> label={t('lab.park.quality')} value={quality} onChange={setQuality} options={(['low', 'medium', 'high'] as const).map((q) => ({ value: q, label: t(`lab.park.q.${q}`) }))} className="bg-surface/90" />
         </div>
       </div>
-
-      {/* Setores (dentro) */}
       {mode === 'inside' && (
-        <nav aria-label={t('lab.reception.sectorsNav')} className="absolute inset-x-0 top-[4.5rem] flex gap-2 overflow-x-auto px-3 pb-1 safe-top">
+        <nav aria-label={t('lab.reception.sectorsNav')} className="flex gap-2 overflow-x-auto px-3 pb-2">
           {SECTORS.map((s) => (
             <button
               key={s}
@@ -163,6 +162,7 @@ export default function ReceptionLab() {
           ))}
         </nav>
       )}
+      </div>
 
       {/* Medições */}
       <div className="absolute bottom-3 left-3 rounded-xl bg-black/60 px-3 py-2 font-mono text-[0.7rem] leading-relaxed text-white safe-bottom">

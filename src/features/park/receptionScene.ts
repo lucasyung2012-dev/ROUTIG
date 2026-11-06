@@ -181,8 +181,14 @@ export function createReception(
     window.setTimeout(swap, 280);
   };
 
+  /** Tela em pé (iPhone) mostra menos na largura: a câmera recua para caber o setor. */
+  const fit = (v: { cam: THREE.Vector3; target: THREE.Vector3 }) => {
+    const k = camera.aspect < 0.9 ? 1 + (0.9 - camera.aspect) * 1.1 : 1;
+    return { cam: v.target.clone().add(v.cam.clone().sub(v.target).multiplyScalar(k)), target: v.target };
+  };
+
   const focusSector = (id: SectorId | 'overview') => {
-    const v = inside.view(id);
+    const v = fit(inside.view(id));
     glideTo(v.cam, v.target, 1100);
   };
 
@@ -192,7 +198,7 @@ export function createReception(
     const door = new THREE.Vector3(RECEPTION.x, 2.2, RECEPTION.z);
     glideTo(ENTRANCE.clone(), door, 1600, () =>
       fadeSwap('inside', () => {
-        const v = inside.view('overview');
+        const v = fit(inside.view('overview'));
         camera.position.copy(v.cam);
         controls.target.copy(v.target);
       }),

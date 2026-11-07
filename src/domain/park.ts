@@ -49,31 +49,49 @@ export interface Point {
   z: number;
 }
 
-export const PARK_RADIUS = 240;
+/**
+ * Escala da planta: as distâncias entre prédios, praças, lago e trilhas foram abertas 60% (cada
+ * prédio com a sua área, sem lotes colados); os lotes e a praça mantêm o tamanho real.
+ */
+export const PARK_SCALE = 1.6;
+/** Raio médio do campus; o contorno real é irregular (parkEdgeAt). */
+export const PARK_RADIUS = 240 * PARK_SCALE;
+
+/** Contorno do campus (raio por ângulo; hoje redondo). */
+export function parkEdgeAt(angle: number): number {
+  // Contorno redondo (o campus é grande; o realismo vem do relevo, da mata e das casas).
+  void angle;
+  return PARK_RADIUS;
+}
+
+/** Ponto além do contorno do campus (com folga em metros). */
+export function beyondEdge(x: number, z: number, pad = 0): boolean {
+  return Math.hypot(x, z) > parkEdgeAt(Math.atan2(z, x)) + pad;
+}
 export const PLAZA_RADIUS = 26;
 /** Lago principal: centro e raio médio; a margem real é orgânica (lakeRadiusAt). */
-export const LAKE = { x: -125, z: 95, radius: 36 };
+export const LAKE = { x: -125 * PARK_SCALE, z: 95 * PARK_SCALE, radius: 36 * PARK_SCALE };
 /** Lagos ornamentais menores (Sul, contemplação). */
 export const PONDS: Array<Point & { radius: number }> = [
-  { x: -15, z: 162, radius: 9 },
-  { x: -92, z: 150, radius: 8 },
+  { x: -15 * PARK_SCALE, z: 162 * PARK_SCALE, radius: 11 },
+  { x: -92 * PARK_SCALE, z: 150 * PARK_SCALE, radius: 10 },
 ];
 
 /** Centro de cada região (para caminhos e identidade paisagística). */
 export const REGION_HUB: Record<ParkRegion, Point> = {
   central: { x: 0, z: 0 },
-  north: { x: 0, z: -110 },
-  east: { x: 110, z: 15 },
-  south: { x: 5, z: 160 },
-  west: { x: -120, z: -10 },
+  north: { x: 0, z: -176 },
+  east: { x: 176, z: 24 },
+  south: { x: 8, z: 256 },
+  west: { x: -192, z: -16 },
 };
 
 /** Pátios compartilhados dos núcleos (as entradas dos prédios do núcleo olham para eles). */
 export const COURTS: Record<string, Point> = {
-  learning: { x: -8, z: -132 },
-  east: { x: 128, z: 20 },
-  planning: { x: 20, z: 160 },
-  growth: { x: -75, z: 150 },
+  learning: { x: -12.8, z: -211.2 },
+  east: { x: 204.8, z: 32 },
+  planning: { x: 32, z: 256 },
+  growth: { x: -120, z: 240 },
 };
 
 const b = (id: ModuleId, region: ParkRegion, x: number, z: number, radius: number, shape: BuildingShape, color: string, faces: Point): ParkBuilding => ({ id, region, x, z, radius, shape, color, faces });
@@ -82,28 +100,28 @@ const PLAZA = { x: 0, z: 0 };
 /** Os 18 prédios, em núcleos por função (V2.1, seção 7). */
 export const PARK_BUILDINGS: ParkBuilding[] = [
   // Centro: núcleo principal em volta da praça monumental.
-  b('dashboard', 'central', 0, -60, 30, 'tower', '#7C5CFC', PLAZA),
-  b('profile', 'central', -55, 35, 26, 'house', '#A78BFA', PLAZA),
-  b('inbox', 'central', 55, 35, 27, 'reception', '#22B8CF', PLAZA),
+  b('dashboard', 'central', 0, -96, 30, 'tower', '#7C5CFC', PLAZA),
+  b('profile', 'central', -88, 56, 26, 'house', '#A78BFA', PLAZA),
+  b('inbox', 'central', 88, 56, 27, 'reception', '#22B8CF', PLAZA),
   // Norte: aprendizagem na mata tropical (Academy e Library dividem o pátio de estudos).
-  b('academy', 'north', -45, -150, 33, 'campus', '#6366F1', COURTS.learning!),
-  b('library', 'north', 30, -150, 30, 'library', '#3B82F6', COURTS.learning!),
-  b('notes', 'north', 95, -125, 28, 'stack', '#F59E0B', { x: 60, z: -100 }),
-  b('focus', 'north', -115, -115, 28, 'pavilion', '#10B981', { x: -80, z: -95 }),
+  b('academy', 'north', -72, -240, 33, 'campus', '#6366F1', COURTS.learning!),
+  b('library', 'north', 48, -240, 30, 'library', '#3B82F6', COURTS.learning!),
+  b('notes', 'north', 152, -200, 28, 'stack', '#F59E0B', { x: 96, z: -160 }),
+  b('focus', 'north', -184, -184, 28, 'pavilion', '#10B981', { x: -128, z: -152 }),
   // Leste: criação e comunicação em gramados abertos.
-  b('languages', 'east', 140, -45, 28, 'pagoda', '#14B8A6', COURTS.east!),
-  b('projects', 'east', 165, 25, 28, 'twist', '#F97316', COURTS.east!),
-  b('music', 'east', 125, 95, 31, 'amphitheater', '#EC4899', { x: 95, z: 60 }),
+  b('languages', 'east', 224, -72, 28, 'pagoda', '#14B8A6', COURTS.east!),
+  b('projects', 'east', 264, 40, 28, 'twist', '#F97316', COURTS.east!),
+  b('music', 'east', 200, 152, 31, 'amphitheater', '#EC4899', { x: 152, z: 96 }),
   // Oeste: esporte nas colinas.
-  b('sports', 'west', -165, 0, 40, 'stadium', '#EF4444', { x: -110, z: 0 }),
+  b('sports', 'west', -264, 0, 40, 'stadium', '#EF4444', { x: -176, z: 0 }),
   // Sul: organização e desenvolvimento, perto do lago e dos lagos ornamentais.
-  b('habits', 'south', -45, 115, 28, 'greenhouse', '#22C55E', COURTS.growth!),
-  b('goals', 'south', -60, 180, 28, 'terraces', '#EAB308', COURTS.growth!),
-  b('calendar', 'south', 15, 118, 27, 'slab', '#0EA5E9', COURTS.planning!),
-  b('tasks', 'south', 70, 140, 28, 'cubes', '#8B5CF6', COURTS.planning!),
-  b('insights', 'south', 5, 192, 24, 'observatory', '#F43F5E', COURTS.planning!),
-  b('finance', 'south', 72, 200, 24, 'hexTower', '#2563EB', COURTS.planning!),
-  b('settings', 'south', -115, 182, 24, 'gear', '#94A3B8', COURTS.growth!),
+  b('habits', 'south', -72, 184, 28, 'greenhouse', '#22C55E', COURTS.growth!),
+  b('goals', 'south', -96, 288, 28, 'terraces', '#EAB308', COURTS.growth!),
+  b('calendar', 'south', 24, 188.8, 27, 'slab', '#0EA5E9', COURTS.planning!),
+  b('tasks', 'south', 112, 224, 28, 'cubes', '#8B5CF6', COURTS.planning!),
+  b('insights', 'south', 8, 307.2, 24, 'observatory', '#F43F5E', COURTS.planning!),
+  b('finance', 'south', 115.2, 320, 24, 'hexTower', '#2563EB', COURTS.planning!),
+  b('settings', 'south', -184, 291.2, 24, 'gear', '#94A3B8', COURTS.growth!),
 ];
 
 export const dist = (a: Point, c: Point) => Math.hypot(a.x - c.x, a.z - c.z);
@@ -131,7 +149,8 @@ function smooth(e0: number, e1: number, x: number): number {
 
 /** Margem orgânica do lago: enseadas e penínsulas (raio por ângulo). */
 export function lakeRadiusAt(angle: number): number {
-  return LAKE.radius + Math.sin(angle * 3 + 0.6) * 6 + Math.sin(angle * 5 + 2.1) * 3.5 + Math.cos(angle * 2 - 0.4) * 4;
+  const k = PARK_SCALE;
+  return LAKE.radius + (Math.sin(angle * 3 + 0.6) * 6 + Math.sin(angle * 5 + 2.1) * 3.5 + Math.cos(angle * 2 - 0.4) * 4 + Math.sin(angle * 7 + 1.3) * 1.8) * k;
 }
 
 /** Ponto dentro d'água (lago principal ou lagos ornamentais), com folga em metros. */
@@ -143,14 +162,18 @@ export function inWater(x: number, z: number, pad = 0): boolean {
 }
 
 /** Relevo bruto por região: Oeste com colinas, Norte ondulado, Leste suave, Sul quase plano, Centro plano. */
-function rawHeight(x: number, z: number): number {
+function rawHeight(xm: number, zm: number): number {
+  // O relevo foi desenhado na planta original: calcula nela e estica junto com o campus.
+  const x = xm / PARK_SCALE;
+  const z = zm / PARK_SCALE;
   const r = Math.hypot(x, z);
+  const edgeR = parkEdgeAt(Math.atan2(z, x)) / PARK_SCALE;
   const west = smooth(-60, -150, x) * (1 - smooth(120, 220, Math.abs(z)));
   const north = smooth(-60, -140, z);
   const east = smooth(60, 140, x);
   const hills = west * (6 + Math.sin(x * 0.045) * Math.cos(z * 0.04) * 6 + Math.sin(z * 0.08) * 2.5) + north * (2.2 + Math.sin(x * 0.06 + 1) * Math.cos(z * 0.05) * 2.2) + east * (1 + Math.sin(x * 0.03) * Math.sin(z * 0.035) * 1.6);
   const core = smooth(45, 80, r);
-  const edge = smooth(PARK_RADIUS - 5, PARK_RADIUS + 70, r);
+  const edge = smooth(edgeR - 5, edgeR + 70, r);
   const outer = edge * (10 + Math.sin(x * 0.03) * Math.cos(z * 0.025) * 9 + Math.sin((x + z) * 0.012) * 6);
   return Math.max(0, hills * core) + outer;
 }
@@ -202,7 +225,7 @@ export function parkPaths(): ParkPath[] {
   const out: ParkPath[] = [];
   // Avenidas: praça → núcleo de cada região. A do Norte contorna o Observatório Central pelo
   // oeste e a do Sul passa entre a Estufa de Hábitos e o Observatório Temporal (nada cruza lote).
-  const P = (x: number, z: number): Point => ({ x, z });
+  const P = (x: number, z: number): Point => ({ x: x * PARK_SCALE, z: z * PARK_SCALE });
   out.push({ kind: 'main', points: [edgeOfPlaza(P(-0.55, -1)), P(-36, -62), P(-28, -95), REGION_HUB.north] });
   out.push({ kind: 'main', points: [edgeOfPlaza(REGION_HUB.east), mid(edgeOfPlaza(REGION_HUB.east), REGION_HUB.east, 0.08), REGION_HUB.east] });
   out.push({ kind: 'main', points: [edgeOfPlaza(P(0, 1)), P(-12, 70), P(-18, 100), P(-12, 140), REGION_HUB.south] });
@@ -224,7 +247,7 @@ export function parkPaths(): ParkPath[] {
       seen.add(key);
       const hub = REGION_HUB[p.region];
       // Ao pátio do crescimento, contornando o lago ornamental.
-      if (court === COURTS.growth) out.push({ kind: 'secondary', points: [hub, { x: -20, z: 142 }, { x: -55, z: 140 }, court] });
+      if (court === COURTS.growth) out.push({ kind: 'secondary', points: [hub, P(-20, 142), P(-55, 140), court] });
       else if (dist(hub, court) > 8) out.push({ kind: 'secondary', points: [hub, mid(hub, court, 0.1), court] });
     }
     out.push({ kind: 'secondary', points: [court, mid(court, e, 0.12), e] });
@@ -245,7 +268,7 @@ export function parkPaths(): ParkPath[] {
   }
   out.push({ kind: 'trail', points: loop });
   // Trilhas das colinas do Oeste e da mata do Norte.
-  out.push({ kind: 'trail', points: [{ x: -120, z: -10 }, { x: -170, z: -60 }, { x: -205, z: -40 }, { x: -200, z: 40 }, { x: -150, z: 60 }] });
+  out.push({ kind: 'trail', points: [P(-120, -10), P(-170, -60), P(-205, -40), P(-200, 40), P(-150, 60)] });
   out.push({ kind: 'trail', points: [P(-80, -95), P(-88, -150), P(-60, -200), P(10, -215), P(55, -170), P(60, -100)] });
   // Trilha dos lagos ornamentais.
   out.push({ kind: 'trail', points: [P(-75, 150), P(-92, 165), P(-35, 150), P(-30, 176), P(-15, 180), P(5, 172), P(20, 160)] });
@@ -262,24 +285,24 @@ export interface Poi extends Point {
 }
 
 export const POIS: Poi[] = [
-  { id: 'cafe-praca', kind: 'cafe', x: 38, z: -18, view: 0 },
-  { id: 'leitura-norte', kind: 'reading', x: -8, z: -128, view: Math.PI },
-  { id: 'pergola-sul', kind: 'pergola', x: -30, z: 150, view: 0 },
-  { id: 'mirante-colina', kind: 'viewpoint', x: -205, z: -40, view: Math.PI / 2 },
-  { id: 'mirante-lago', kind: 'viewpoint', x: -78, z: 70, view: -Math.PI * 0.75 },
-  { id: 'quiosque-leste', kind: 'kiosk', x: 95, z: -8, view: 0 },
-  { id: 'praca-leste', kind: 'plaza', x: 128, z: 20, view: 0 },
-  { id: 'palco-musica', kind: 'stage', x: 92, z: 58, view: 0.7 },
-  { id: 'cafe-sul', kind: 'cafe', x: 40, z: 175, view: 0 },
+  { id: 'cafe-praca', kind: 'cafe', x: 60.8, z: -28.8, view: 0 },
+  { id: 'leitura-norte', kind: 'reading', x: -12.8, z: -204.8, view: Math.PI },
+  { id: 'pergola-sul', kind: 'pergola', x: -48, z: 240, view: 0 },
+  { id: 'mirante-colina', kind: 'viewpoint', x: -328, z: -64, view: Math.PI / 2 },
+  { id: 'mirante-lago', kind: 'viewpoint', x: -124.8, z: 112, view: -Math.PI * 0.75 },
+  { id: 'quiosque-leste', kind: 'kiosk', x: 152, z: -12.8, view: 0 },
+  { id: 'praca-leste', kind: 'plaza', x: 204.8, z: 32, view: 0 },
+  { id: 'palco-musica', kind: 'stage', x: 147.2, z: 92.8, view: 0.7 },
+  { id: 'cafe-sul', kind: 'cafe', x: 64, z: 280, view: 0 },
 ];
 
 /** Residências (fora da área explorável): as pessoas do campus saem e voltam para elas. */
 export function residences(): Array<Point & { id: string; floors: 1 | 2; rot: number; style: number }> {
   const rnd = seededRandom(404);
   const out: Array<Point & { id: string; floors: 1 | 2; rot: number; style: number }> = [];
-  for (let i = 0; i < 44; i++) {
-    const a = (i / 44) * Math.PI * 2 + (rnd() - 0.5) * 0.06;
-    const r = PARK_RADIUS + 26 + rnd() * 18;
+  for (let i = 0; i < 52; i++) {
+    const a = (i / 52) * Math.PI * 2 + (rnd() - 0.5) * 0.06;
+    const r = parkEdgeAt(a) + 30 + rnd() * 18;
     out.push({ id: `casa-${i}`, x: Math.cos(a) * r, z: Math.sin(a) * r, floors: rnd() > 0.5 ? 2 : 1, rot: Math.atan2(-Math.cos(a), -Math.sin(a)), style: Math.floor(rnd() * 4) });
   }
   return out;
@@ -289,7 +312,7 @@ export function residences(): Array<Point & { id: string; floors: 1 | 2; rot: nu
 export function layoutProblems(buildings: ParkBuilding[] = PARK_BUILDINGS): string[] {
   const out: string[] = [];
   buildings.forEach((p, i) => {
-    if (dist(p, { x: 0, z: 0 }) + p.radius > PARK_RADIUS) out.push(`${p.id}: fora do parque`);
+    if (dist(p, { x: 0, z: 0 }) + p.radius > parkEdgeAt(Math.atan2(p.z, p.x))) out.push(`${p.id}: fora do parque`);
     if (dist(p, { x: 0, z: 0 }) < PLAZA_RADIUS + p.radius) out.push(`${p.id}: na praça`);
     if (dist(p, LAKE) < LAKE.radius + 14 + p.radius) out.push(`${p.id}: no lago`);
     if (PONDS.some((q) => dist(p, q) < q.radius + p.radius)) out.push(`${p.id}: num lago ornamental`);
@@ -326,7 +349,7 @@ export function samplePath(path: Point[], step = 4): Point[] {
 export function treeDensity(x: number, z: number): number {
   const a = Math.atan2(x, -z);
   const r = Math.hypot(x, z);
-  if (r < 60) return 0.35;
+  if (r < 60 * PARK_SCALE) return 0.35;
   if (Math.abs(a) < Math.PI / 4) return 1; // norte
   if (a > 0 && a < (3 * Math.PI) / 4) return 0.35; // leste
   if (a < 0 && a > (-3 * Math.PI) / 4) return 0.9; // oeste
@@ -352,7 +375,7 @@ export function treePositions(count: number, seed = 7): Array<{ x: number; z: nu
   let guard = 0;
   while (out.length < count && guard++ < count * 80) {
     const a = rnd() * Math.PI * 2;
-    const r = Math.sqrt(rnd()) * (PARK_RADIUS + 60);
+    const r = Math.sqrt(rnd()) * (PARK_RADIUS * 1.2 + 60);
     const p = { x: Math.cos(a) * r, z: Math.sin(a) * r };
     if (rnd() > treeDensity(p.x, p.z)) continue;
     if (dist(p, { x: 0, z: 0 }) < PLAZA_RADIUS + 8) continue;
@@ -360,7 +383,8 @@ export function treePositions(count: number, seed = 7): Array<{ x: number; z: nu
     if (PARK_BUILDINGS.some((q) => dist(p, q) < q.radius * 0.85)) continue;
     if (POIS.some((q) => dist(p, q) < 9)) continue;
     if (Object.values(COURTS).some((q) => dist(p, q) < 10)) continue;
-    if (r > PARK_RADIUS + 18 && r < PARK_RADIUS + 50) continue; // faixa das residências
+    const edge = parkEdgeAt(a);
+    if (r > edge + 18 && r < edge + 56) continue; // faixa das residências
     if (near(pathGrid, p, 4.5) || near(grid, p, 4.2)) continue;
     const k = key(p.x, p.z);
     grid.set(k, [...(grid.get(k) ?? []), p]);

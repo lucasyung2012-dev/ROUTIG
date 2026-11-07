@@ -109,7 +109,7 @@ const QUALITY = {
   high: { pixelRatio: 2, shadows: true, shadowSize: 2048, env: true, fpsCap: 60 },
 } as const;
 
-const HOME = { cam: new THREE.Vector3(46, 40, 76), target: new THREE.Vector3(0, 4, -12) };
+const HOME = { cam: new THREE.Vector3(52, 42, 84), target: new THREE.Vector3(0, 4, -14) };
 
 export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engine {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
@@ -127,9 +127,9 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
   const envTex = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
   pmrem.dispose();
 
-  const camera = new THREE.PerspectiveCamera(48, 1, 0.3, 1400);
+  const camera = new THREE.PerspectiveCamera(48, 1, 0.3, 2800);
   const rig = createCameraRig(camera, canvas, opts.reduceMotion, opts.onPosture);
-  const outsideWorld = () => rig.setWorld({ ground: heightAt, obstacles: world.obstacles, limit: { x: 0, z: 0, r: PARK_RADIUS + 30 }, ceiling: Infinity, minDistance: 4, maxDistance: 380, blocked: (x, z) => inWater(x, z, 0.8) });
+  const outsideWorld = () => rig.setWorld({ ground: heightAt, obstacles: world.obstacles, limit: { x: 0, z: 0, r: PARK_RADIUS + 30 }, ceiling: Infinity, minDistance: 4, maxDistance: 520, blocked: (x, z) => inWater(x, z, 0.8) });
   outsideWorld();
 
   /* ---------- Pessoas: avatar (terceira pessoa) e moradores ---------- */
@@ -612,7 +612,7 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
   let frames = 0;
   let statsAt = performance.now();
   let near: ModuleId | null = null;
-  const wcam = new THREE.PerspectiveCamera(55, 1, 0.3, 1400);
+  const wcam = new THREE.PerspectiveCamera(55, 1, 0.3, 2800);
   const toWorld = new THREE.Matrix4();
   const wq = new THREE.Quaternion();
   const up = new THREE.Vector3(0, 1, 0);
@@ -835,7 +835,7 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
             const x = (tr.x + half) * k;
             const y = (tr.z + half) * k;
             const grd = o.createRadialGradient(x - r * 0.3, y - r * 0.3, r * 0.1, x, y, r);
-            const base = tr.species === 'blossom' ? [196, 120, 160] : tr.species === 'palm' ? [92, 140, 70] : [52, 105, 52];
+            const base: [number, number, number] = tr.species === 'blossom' ? [196, 120, 160] : tr.species === 'palm' ? [92, 140, 70] : [52, 105, 52];
             grd.addColorStop(0, `rgba(${base[0] + 40},${base[1] + 45},${base[2] + 30},0.95)`);
             grd.addColorStop(0.75, `rgba(${base[0]},${base[1]},${base[2]},0.92)`);
             grd.addColorStop(1, `rgba(${base[0] - 25},${base[1] - 35},${base[2] - 25},0)`);

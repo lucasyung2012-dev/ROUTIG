@@ -4,7 +4,7 @@
  * câmera são desenhados (limite por aparelho e modo gráfico).
  */
 import { activityAt, campusPeople, poseFor, routeBetween, routeHome, spotFor, type Activity, type Conditions, type Person, type PersonPose } from '@/domain/parkPeople';
-import { heightAt, type Point } from '@/domain/park';
+import { PARK_SCALE, heightAt, type Point } from '@/domain/park';
 import type { Figure } from './people';
 import type { Seat } from './camera';
 
@@ -81,7 +81,7 @@ export function createTown(seats: Seat[] = []): Town {
 
   const strollRoute = (a: Agent): Point[] => {
     // Passeio: ida e volta entre dois pontos de convivência, pelos caminhos.
-    const targets = [{ x: -78, z: 70 }, { x: 0, z: -110 }, { x: 110, z: 15 }, { x: 5, z: 160 }, { x: -120, z: -10 }];
+    const targets = [[-78, 70], [0, -110], [110, 15], [5, 160], [-120, -10]].map(([x, z]) => ({ x: x! * PARK_SCALE, z: z! * PARK_SCALE }));
     const t = targets[(a.p.id + a.block) % targets.length]!;
     return routeBetween({ x: a.x, z: a.z }, t);
   };

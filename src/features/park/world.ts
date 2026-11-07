@@ -5,7 +5,7 @@
  */
 import * as THREE from 'three';
 import type { ModuleId } from '@/app/modules';
-import { LAKE, PARK_BUILDINGS, PARK_RADIUS, PATH_WIDTH, PLAZA_RADIUS, PONDS, entranceOf, facingOf, heightAt, inWater, lakeRadiusAt, parkPaths, samplePath, seededRandom, treePositions, type ParkBuilding, type Point } from '@/domain/park';
+import { LAKE, PARK_BUILDINGS, PARK_RADIUS, PARK_SCALE, PATH_WIDTH, PLAZA_RADIUS, PONDS, entranceOf, facingOf, heightAt, inWater, lakeRadiusAt, parkPaths, samplePath, seededRandom, treePositions, type ParkBuilding, type Point } from '@/domain/park';
 import { amenities, houses, type Seat, type Viewpoint } from './buildings/amenities';
 import { Builder, Kit, cloud, forest, setWaterNight, setWaterWeather, shrubs, sky, stars, water, type Plant, type TreeSpecies } from './kit';
 import { birds, butterflies, drone, fountain, leaves, rain } from './life';
@@ -238,8 +238,8 @@ function mist(kit: Kit): { mesh: THREE.InstancedMesh; tick: (center: THREE.Vecto
 
 
 function terrain(kit: Kit): THREE.Mesh {
-  const size = 820;
-  const seg = 170;
+  const size = Math.round(PARK_RADIUS * 2 + 420);
+  const seg = 230;
   const g = new THREE.PlaneGeometry(size, size, seg, seg);
   g.rotateX(-Math.PI / 2);
   const pos = g.attributes.position!;
@@ -266,7 +266,7 @@ function terrain(kit: Kit): THREE.Mesh {
     pos.setY(i, y - 0.03);
     const a = Math.atan2(x, -z);
     const r = Math.hypot(x, z);
-    const pick = r < 55 ? base.central : Math.abs(a) < Math.PI / 4 ? base.north : a > 0 && a < (3 * Math.PI) / 4 ? base.east : a < 0 && a > (-3 * Math.PI) / 4 ? base.west : base.south;
+    const pick = r < 55 * PARK_SCALE ? base.central : Math.abs(a) < Math.PI / 4 ? base.north : a > 0 && a < (3 * Math.PI) / 4 ? base.east : a < 0 && a > (-3 * Math.PI) / 4 ? base.west : base.south;
     c.copy(pick);
     const n = Math.sin(x * 0.21) * Math.cos(z * 0.17) * 0.5 + Math.sin(x * 0.05 + z * 0.07) * 0.5;
     c.multiplyScalar(0.9 + n * 0.1);
@@ -482,11 +482,11 @@ function lake(kit: Kit): { group: THREE.Group; water: ReturnType<typeof water>; 
 /* ---------- Vegetação por região ---------- */
 
 function plants(): Plant[] {
-  const pts = treePositions(1250);
+  const pts = treePositions(2000);
   return pts.map((p, i) => {
     const a = Math.atan2(p.x, -p.z);
     const r = Math.hypot(p.x, p.z);
-    const central = r < 60;
+    const central = r < 60 * PARK_SCALE;
     const north = Math.abs(a) < Math.PI / 4;
     const east = a > Math.PI / 4 && a < (3 * Math.PI) / 4;
     const west = a < -Math.PI / 4 && a > (-3 * Math.PI) / 4;
@@ -632,7 +632,7 @@ export function createWorld(kit: Kit): World {
 
   const clouds = Array.from({ length: 12 }, (_, i) => {
     const c = cloud(kit, i + 1);
-    c.position.set(-300 + i * 55, 70 + (i % 3) * 12, -200 + ((i * 97) % 400));
+    c.position.set(-480 + i * 80, 80 + (i % 3) * 14, -320 + ((i * 97) % 640));
     c.scale.setScalar(2.2 + (i % 3) * 0.7);
     root.add(c);
     return c;
@@ -650,7 +650,7 @@ export function createWorld(kit: Kit): World {
   const ms = mist(kit);
   root.add(ms.mesh);
   // Borboletas nos jardins (Sul, pérgola, praça, mirante do lago) e folhas caindo no outono ou com vento.
-  const bf = butterflies(kit, [[-30, 150], [-15, 148], [40, 145], [-45, 135], [15, 20], [-18, -14], [-78, 70], [-8, -128], [5, 175]].map(([x, z]) => ({ x: x!, y: heightAt(x!, z!), z: z! })));
+  const bf = butterflies(kit, [[-30, 150], [-15, 148], [40, 145], [-45, 135], [15, 20], [-18, -14], [-78, 70], [-8, -128], [5, 175]].map(([x, z]) => ({ x: x! * PARK_SCALE, y: heightAt(x! * PARK_SCALE, z! * PARK_SCALE), z: z! * PARK_SCALE })));
   const lv = leaves(kit);
   root.add(bf.mesh, lv.mesh);
   let season: Season = 'summer';
@@ -685,7 +685,7 @@ export function createWorld(kit: Kit): World {
       dr.tick(t);
       clouds.forEach((c, i) => {
         c.position.x += dt * (1.6 + (i % 3) * 0.5 + weather.wind * 9);
-        if (c.position.x > 380) c.position.x = -380;
+        if (c.position.x > 600) c.position.x = -600;
       });
       if (weather.rain > 0.02) rn.tick(dt, focus, weather.wind);
       ms.tick(focus, weather.fog, t);

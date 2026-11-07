@@ -113,7 +113,7 @@ export function sky(kit: Kit): { mesh: THREE.Mesh; set: (top: THREE.Color, botto
       fragmentShader: 'uniform vec3 top; uniform vec3 bottom; varying vec3 vP; void main(){ float h = clamp(vP.y * 1.4 + 0.15, 0.0, 1.0); gl_FragColor = vec4(mix(bottom, top, pow(h, 0.8)), 1.0); }',
     }),
   );
-  const mesh = new THREE.Mesh(kit.own(new THREE.SphereGeometry(400, 32, 16)), mat);
+  const mesh = new THREE.Mesh(kit.own(new THREE.SphereGeometry(1300, 32, 16)), mat);
   return { mesh, set: (t, b) => (mat.uniforms.top!.value.copy(t), mat.uniforms.bottom!.value.copy(b)) };
 }
 

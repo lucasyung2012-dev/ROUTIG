@@ -8,7 +8,7 @@ import { cn } from '@/ui/cn';
 import type { Engine } from './engine';
 
 const ZOOMS = [1, 2, 3.4] as const;
-const R = PARK_RADIUS + 50;
+const R = PARK_RADIUS + 70;
 
 /**
  * Minimapa de verdade: uma foto do próprio parque vista de cima (prédios com a forma real,

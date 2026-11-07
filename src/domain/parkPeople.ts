@@ -4,7 +4,7 @@
  * dos caminhos), param nos espaços de convivência e voltam para casa (fora da área explorável).
  * Tudo determinístico por dia e hora: a mesma hora mostra o mesmo campus. Sem missões.
  */
-import { COURTS, PARK_BUILDINGS, PLAZA_RADIUS, POIS, dist, inWater, parkPaths, residences, seededRandom, type Point } from './park';
+import { COURTS, PARK_BUILDINGS, PARK_SCALE, PLAZA_RADIUS, POIS, dist, inWater, parkPaths, residences, seededRandom, type Point } from './park';
 
 export type Activity = 'home' | 'cafe' | 'read' | 'study' | 'sport' | 'music' | 'view' | 'chat' | 'stroll' | 'picnic' | 'draw' | 'photo';
 export type PersonPose = 'stand' | 'walk' | 'sit' | 'read' | 'play' | 'wave' | 'exercise' | 'draw' | 'photo';
@@ -79,6 +79,8 @@ const poi = (id: string): Point => {
   const p = POIS.find((x) => x.id === id)!;
   return { x: p.x, z: p.z };
 };
+/** Ponto da planta original na escala atual do campus. */
+const sp = (x: number, z: number): Point => ({ x: x * PARK_SCALE, z: z * PARK_SCALE });
 const sports = PARK_BUILDINGS.find((b) => b.id === 'sports')!;
 
 export const ACTIVITY_SPOTS: Record<Exclude<Activity, 'home' | 'stroll'>, Point[]> = {
@@ -89,10 +91,10 @@ export const ACTIVITY_SPOTS: Record<Exclude<Activity, 'home' | 'stroll'>, Point[
   music: [poi('palco-musica')],
   view: [poi('mirante-colina'), poi('mirante-lago')],
   chat: [{ x: 14, z: 12 }, { x: -14, z: -12 }, poi('praca-leste')],
-  picnic: [{ x: -45, z: 140 }, { x: 40, z: 145 }],
+  picnic: [sp(-45, 140), sp(40, 145)],
   // Desenhar nos jardins (pérgola, gramado do Sul, beira do lago) e fotografar a arquitetura.
-  draw: [poi('pergola-sul'), { x: -45, z: 140 }, poi('mirante-lago')],
-  photo: [{ x: 0, z: -28 }, { x: 30, z: 20 }, { x: 10, z: -120 }],
+  draw: [poi('pergola-sul'), sp(-45, 140), poi('mirante-lago')],
+  photo: [sp(0, -34), sp(30, 20), sp(10, -120)],
 };
 
 /** Atividades com teto (café, pérgola, leitura): a chuva leva as pessoas para elas. */

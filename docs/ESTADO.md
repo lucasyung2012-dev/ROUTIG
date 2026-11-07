@@ -19,6 +19,7 @@ Leia este arquivo no começo de toda conversa nova sobre o ROUTIG. A especifica�
   - Árvores e arbustos com folhagem; caminhos refeitos sem cruzar lotes nem água (teste novo); postes, cafés, quiosques, bancos e arquibancada em ordem.
   - **Conta Google e sincronização** (Configurações → Conta e sincronização), conforme D1/D2/D10/D11.
 - **Aguardando o Lucas:** criar o ID do cliente no Google Cloud (docs/GOOGLE-CLOUD.md) para testar login e sincronização de verdade. Sem ele, só a junção e a criptografia foram testadas (testes automáticos).
+- **Pedido do Lucas para a próxima conversa (2026-11-07):** minimapa de verdade, como um mapa: o desenho (planta) de cada prédio, a praça com a fonte, os caminhos, o lago e os lagos menores, manchas de vegetação e árvores, mais detalhes. Hoje ele mostra só círculos coloridos.
 - **Ainda não feito:** exteriores dos 18 prédios redesenhados com os pavimentos da seção 10; personagem com modelo realista (hoje figura articulada estilizada); sincronizar os arquivos da Library.
 - **Não verificado:** iPad e iPhone reais; som.
 

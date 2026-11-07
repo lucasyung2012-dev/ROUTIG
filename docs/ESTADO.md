@@ -2,7 +2,22 @@
 
 Leia este arquivo no começo de toda conversa nova sobre o ROUTIG. A especificação completa é o "ROUTIG — Prompt Master" (35 partes), fornecido pelo dono do produto. Decisões em [DECISOES.md](DECISOES.md), arquitetura em [ARQUITETURA.md](ARQUITETURA.md).
 
-**Atualizado:** 2026-11-08 (arquitetura própria de cada prédio e objetos funcionais; login e sincronização prontos, aguardando o ID do cliente Google)
+**Atualizado:** 2026-11-07 (parque vivo: som, gente, bichos, bairro e entradas; login e sincronização prontos, aguardando o ID do cliente Google)
+
+## Estado da conversa (2026-11-07, parque vivo: som, gente, bichos, bairro e entradas)
+
+- **Feito e publicado (CI verde):**
+  - Avatar: cabelo e capuz no lugar (a nuca estava na lateral), rosto visível (o corpo vira para onde anda; a câmera gira em volta), pele lisa, mãos com dedos, tênis com solado e cadarço; pessoas com barra da camiseta, gola, cinto, punhos, meias; sentar natural (três jeitos); inclinação do tronco corrigida (antes ia para trás na corrida).
+  - Entrar nos prédios: portas de vidro de correr com sensor (abrem para o visitante e para moradores) e portões de ferro nos jardins; o avatar anda até o vão e entra, e sai pela porta andando; subir e descer pela escada em caracol com passos.
+  - Elevadores: torre e lounge no lado livre e mais plano de cada prédio (fora de caminho, água, outros prédios), piso nivelado com base de pedra e calçada até o caminho.
+  - Sons: passos por piso (pedra, grama, madeira, piso, poça), folhas ao vento, trânsito e carros passando, buzina, ônibus freando, crianças no parquinho, sabiá, bem-te-vi e pardal, grilos, sapos, cigarras no verão, portas, portões, latidos, patos, pombos, gato, campainha de bicicleta, skate.
+  - Gente: ciclistas, skatistas e corredores em circuito; cachorros com guia passeando com os donos; jardineiro regando os canteiros; vendedores nos carrinhos de pipoca e de coco; parquinho (balanço, escorregador, gangorra, areia, cavalinho, bancos, cerca) com crianças brincando e pais; moradores voltando para casa pela faixa e pela calçada até a porta.
+  - Bichos: pombos (voam quando alguém chega perto), patos no lago, gato de rua.
+  - Bairro: avenida externa e dez ruas transversais com calçadas, semáforos que trocam e carros que param no vermelho, ônibus parando nos pontos (abrigos com propaganda acesa), bancas, hidrantes, lixeiras, placas com nome de rua; carros detalhados com faróis e lanternas.
+  - Chão: poças depois da chuva, grama gasta nos atalhos e na frente dos bancos, folhas secas no outono; janelas do bairro só acendem à noite; lixeiras ao lado dos bancos; bebedouro, estação de reciclagem e extintor detalhados nos andares.
+- **Testado no navegador:** avatar de frente (rosto, mãos, tênis), praça com carrinhos, vendedores e jardineiro, pombo no chão, nenhum obstáculo novo nos caminhos.
+- **Não verificado:** sons; entrar pela porta andando e subir a escada (o painel do navegador parou de desenhar quadros com a janela fora de foco); parquinho, bairro e elevadores novos vistos de perto; peso por quadro em terceira pessoa (a última medida, na vista de cima de todo o parque, deu ~1,5 mi triângulos e ~1.000 chamadas de desenho).
+- **Próximo:** revisão do 2D (dashboard, interface, módulos); ID do cliente Google (docs/GOOGLE-CLOUD.md).
 
 ## Estado da conversa (2026-11-08, riqueza de detalhes, pessoas e leveza)
 

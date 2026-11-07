@@ -4,6 +4,22 @@ Leia este arquivo no começo de toda conversa nova sobre o ROUTIG. A especifica�
 
 **Atualizado:** 2026-11-07 (V2.1 + rodada de ajustes do Lucas; login e sincronização prontos, aguardando o ID do cliente Google)
 
+## Estado da conversa (2026-11-08, realismo do parque)
+
+- **Feito e publicado (CI verde):**
+  - Minimapa = foto aérea do próprio parque; parque 60% maior (prédios com área própria), redondo.
+  - Água da seção 6.3 (reflexo, ondas, raso/fundo, transparência); pedras e juncos; lago não fica mais coberto pelo morro.
+  - Grama em tufos só nos gramados; jardins organizados; árvores e arbustos com folhagem.
+  - Personagens com rosto, piscada e expressões; cumprimento com fala e sorriso; 4 penteados.
+  - Quadra de tênis e campo de futebol com jogos de dia; moradores entram nos prédios (estudar, trabalhar, treinar) e aparecem lá dentro.
+  - Barreiras invisíveis nos interiores corrigidas; sentar em todos os bancos (praça e arquibancada).
+  - Caminhos sem cruzar lotes ou água e sem pontas soltas (testes automáticos).
+  - Bairro em volta: rua com calçadas e postes, casas de frente para a rua, prédios de 4 a 8 andares, caminhos dos portões até a rua.
+  - Exteriores com os andares da seção 10 e o elemento de cada prédio.
+  - Salas dos andares com decoração e objetos do assunto.
+- **Ainda não feito:** os térreos continuam os da V2 (sem a mesma decoração das salas dos andares); realismo é de modelagem em código (sem modelos 3D nem texturas de foto).
+- **Não verificado:** iPad e iPhone reais; jogos de tênis e futebol e moradores dentro dos prédios não foram vistos no navegador.
+
 ## Estado da conversa (2026-11-07, ajustes da V2.1)
 
 - **Feito e publicado (CI verde):**

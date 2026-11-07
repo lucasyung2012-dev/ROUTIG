@@ -544,7 +544,7 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
       return floorSeat(p) ? { kind: 'sit' } : null;
     }
 
-    if (near2(world.seats, p, 1.8)) return { kind: 'sit' };
+    if (near2(world.seats, p, 2.4)) return { kind: 'sit' };
     if (near2(world.viewpoints, p, 4)) return { kind: 'view' };
     const who = town.nearest(p, 2.6);
     if (who) return { kind: 'person', name: who.name, activity: who.activity };
@@ -600,7 +600,7 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
       if (s) rig.sit({ ...s, face: s.face + Math.PI });
       return;
     }
-    const seat = near2(world.seats, p, 1.8);
+    const seat = near2(world.seats, p, 2.4);
     if (seat) return rig.sit({ ...seat, face: seat.face + Math.PI });
     const vp = near2(world.viewpoints, p, 4);
     if (vp) {

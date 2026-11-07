@@ -665,6 +665,18 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
       rig.place(th.x, th.z + 0.4, Math.PI);
       useThing(th);
     }
+    // 'probe:x,z': o que existe na vertical desse ponto (de cima para baixo), em data-probe.
+    if (typeof cmd === 'string' && cmd.startsWith('probe:')) {
+      const [px, pz] = cmd.slice(6).split(',').map(Number);
+      const ray = new THREE.Raycaster(new THREE.Vector3(px, 80, pz), new THREE.Vector3(0, -1, 0));
+      const hits = ray.intersectObject(world.root, true).slice(0, 8).map((h) => {
+        const m = (h.object as THREE.Mesh).material as THREE.MeshStandardMaterial;
+        let vis = true;
+        for (let o: THREE.Object3D | null = h.object; o; o = o.parent) if (!o.visible) vis = false;
+        return { y: +h.point.y.toFixed(3), type: h.object.type, color: m?.color?.getHexString?.(), side: m?.side, vis, opacity: m?.opacity, depth: m?.depthTest };
+      });
+      document.documentElement.dataset.probe = JSON.stringify({ ground: heightAt(px!, pz!), hits });
+    }
     // 'cam:x,y,z,tx,ty,tz': câmera livre exatamente nesse ponto, olhando para o alvo.
     if (typeof cmd === 'string' && cmd.startsWith('cam:') && !inside) {
       const v = cmd.slice(4).split(',').map(Number);

@@ -269,7 +269,7 @@ export default function ParkPage() {
     };
     // Andares da V2.1 em cima de cada térreo (salas ligadas aos painéis reais).
     for (const [id, make] of Object.entries(base) as Array<[ModuleId, InteriorFactory]>)
-      interiors[id] = (kit) => withFloors(kit, make(kit), id, (key) => t(`park.floorRooms.${id}.${key}` as MessageKey), t('park.terrace'), (n) => t(`park.floorNames.f${n}` as MessageKey));
+      interiors[id] = (kit) => withFloors(kit, make(kit), id, (key) => t(`park.floorRooms.${id}.${key}` as MessageKey), t('park.terrace'), (n) => t(`park.floorNames.f${n}` as MessageKey), t('park.elevators'));
     try {
       engine.current = createEngine(canvas, {
         quality,

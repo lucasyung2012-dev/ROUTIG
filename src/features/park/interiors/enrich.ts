@@ -202,6 +202,28 @@ export interface Lobby {
   plant: [number, number];
   lamp: [number, number];
   sig: { x: number; z: number; face: number };
+  /** Canto de apoio junto à porta dos fundos (bebedouro, lixeiras, extintor); sem ele no mezanino. */
+  service?: [number, number];
+}
+
+/** Apoio do andar: bebedouro, lixeiras de reciclagem e extintor na parede (encostados no vidro). */
+function service(c: Ctx, x: number, y: number, z: number) {
+  const m = mats(c);
+  // Bebedouro com galão.
+  c.b.add(m.white, new THREE.BoxGeometry(0.35, 1.0, 0.35), [x, y + 0.5, z]);
+  c.b.add(c.kit.mat('#9FD3E8', { glass: true }), new THREE.CylinderGeometry(0.14, 0.14, 0.42, 16), [x, y + 1.22, z]);
+  c.b.add(m.dark, new THREE.BoxGeometry(0.2, 0.06, 0.04), [x, y + 0.8, z + 0.18]);
+  // Lixeiras de reciclagem (azul, vermelho, verde, amarelo).
+  ['#2563EB', '#DC2626', '#16A34A', '#EAB308'].forEach((col, k) => {
+    const bx = x + 0.55 + k * 0.42;
+    c.b.add(c.kit.mat(col, { rough: 0.5 }), new THREE.BoxGeometry(0.36, 0.7, 0.36), [bx, y + 0.35, z]);
+    c.b.add(m.dark, new THREE.BoxGeometry(0.38, 0.04, 0.38), [bx, y + 0.72, z]);
+  });
+  // Extintor no suporte, com placa.
+  const ex = x + 2.35;
+  c.b.add(c.kit.mat('#DC2626', { rough: 0.35, metal: 0.2 }), new THREE.CylinderGeometry(0.09, 0.09, 0.5, 14), [ex, y + 0.55, z]);
+  c.b.add(m.dark, new THREE.CylinderGeometry(0.02, 0.02, 0.1, 6), [ex, y + 0.85, z]);
+  c.b.add(c.kit.mat('#DC2626', { rough: 0.6 }), new THREE.BoxGeometry(0.3, 0.3, 0.02), [ex, y + 1.45, z - 0.05]);
 }
 
 /**
@@ -254,4 +276,14 @@ export function enrichLevel(kit: Kit, b: Builder, seats: Seat[], id: ModuleId, L
   tallPlant(c, lobby.plant[0], y, lobby.plant[1], 0.9);
   things.push(floorLamp(kit, root, L, lobby.lamp[0], y, lobby.lamp[1], warm));
   SIGNATURE[id]?.(c, lobby.sig.x, y, lobby.sig.z, lobby.sig.face);
+  if (lobby.service) service(c, lobby.service[0], y, lobby.service[1]);
+  // Teto técnico: sprinklers, detectores de fumaça e grelhas do ar-condicionado em anel.
+  const sprk = kit.mat('#D6DBE1', { metal: 0.6, rough: 0.3 });
+  for (let k = 0; k < 20; k++) {
+    const a = (k / 20) * Math.PI * 2 + 0.15;
+    const r = Math.max(r0, apo * 0.35) + (k % 2 ? 0.9 : 2.2);
+    b.add(sprk, new THREE.CylinderGeometry(0.035, 0.05, 0.06, 8), [Math.sin(a) * r, ceiling - 0.03, Math.cos(a) * r]);
+    if (k % 5 === 0) b.add(m.white, new THREE.CylinderGeometry(0.07, 0.07, 0.035, 14), [Math.sin(a + 0.1) * r, ceiling - 0.02, Math.cos(a + 0.1) * r]);
+    if (k % 4 === 2) b.add(m.white, new THREE.BoxGeometry(0.55, 0.02, 0.55), [Math.sin(a) * (r + 1.2), ceiling - 0.01, Math.cos(a) * (r + 1.2)], [0, a, 0]);
+  }
 }

@@ -4794,6 +4794,7 @@ export const en: Messages = {
     floorNames: { f0: 'Ground floor', f1: '1st floor', f2: '2nd floor', f3: '3rd floor' },
     floorsNav: 'Floors',
     terrace: 'Terrace',
+    elevators: 'Elevators',
     use: {
       piano: 'Play the piano',
       drums: 'Play the drums',

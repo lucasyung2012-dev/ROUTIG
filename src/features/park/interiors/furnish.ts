@@ -305,6 +305,14 @@ export function decorate(kit: Kit, b: Builder, key: string, w: number, d: number
   }
   b.add(metal, new THREE.CylinderGeometry(0.01, 0.01, 0.8, 4), [0, 3.55, 0]);
   b.add(glow, new THREE.SphereGeometry(0.22, 14, 10), [0, 3.1, 0]);
+  // Detalhes de uso: relógio de parede, lixeira no canto, grelha do ar e sprinkler no teto.
+  b.add(kit.mat('#F8FAFC', { rough: 0.4 }), new THREE.CylinderGeometry(0.2, 0.2, 0.04, 24), [0, 3.25, back + 0.08], [Math.PI / 2, 0, 0]);
+  b.add(metal, new THREE.TorusGeometry(0.2, 0.015, 6, 24), [0, 3.25, back + 0.1]);
+  b.add(metal, new THREE.BoxGeometry(0.015, 0.13, 0.01), [0, 3.3, back + 0.11], [0, 0, (seed % 12) * 0.52]);
+  b.add(metal, new THREE.BoxGeometry(0.012, 0.17, 0.01), [0, 3.32, back + 0.115], [0, 0, (seed % 7) * 0.9]);
+  b.add(kit.mat('#64748B', { rough: 0.5 }), new THREE.CylinderGeometry(0.15, 0.12, 0.38, 14), [-(w / 2 - 0.35), 0.19, back + 0.45]);
+  b.add(kit.mat('#E5E7EB', { rough: 0.5 }), new THREE.BoxGeometry(0.6, 0.02, 0.6), [w * 0.25, 3.98, -d * 0.1]);
+  b.add(metal, new THREE.CylinderGeometry(0.03, 0.045, 0.05, 8), [-w * 0.25, 3.98, d * 0.15]);
   // Objetos do assunto.
   const dark = kit.mat('#2B3442', { rough: 0.5 });
   const white = kit.mat('#F4F5F7', { rough: 0.5 });

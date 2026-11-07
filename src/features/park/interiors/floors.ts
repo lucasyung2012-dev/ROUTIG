@@ -179,7 +179,7 @@ interface Slot {
  * Monta os andares em cima de um interior, cada prédio na sua arquitetura (forms.ts).
  * `label(key)` dá o nome da sala no idioma atual; `terrace` e `floorName(n)` também vêm traduzidos.
  */
-export function withFloors(kit: Kit, scene: InteriorScene, id: ModuleId, label: (key: string) => string, terrace: string, floorName: (n: number) => string): InteriorScene {
+export function withFloors(kit: Kit, scene: InteriorScene, id: ModuleId, label: (key: string) => string, terrace: string, floorName: (n: number) => string, elevators = 'Elevadores'): InteriorScene {
   const plan = FLOOR_PLANS[id];
   if (!plan?.length) return scene;
   const form = FORMS[id];
@@ -411,6 +411,14 @@ export function withFloors(kit: Kit, scene: InteriorScene, id: ModuleId, label: 
     const ceiling = y + STOREY - 0.35;
     enrichLevel(kit, b, seats, id, L, top, y, lobby, form.plan === 'atrium' || form.plan === 'garden' ? inner : 0, apo, ceiling, accent, style.warm, thingRoot, things);
 
+    {
+      const s = sectorSign(kit, floorName(L), accent, 1.8);
+      s.position.set(0, y + 3.0, -backR + 0.45);
+      scene.scene.add(s);
+      // Placa verde de saída de emergência acesa.
+      b.add(kit.mat('#16A34A', { glow: true }), new THREE.BoxGeometry(0.7, 0.24, 0.05), [-1.6, y + 2.55, -backR + 0.4]);
+      b.add(kit.mat('#F8FAFC', { glow: true }), new THREE.BoxGeometry(0.16, 0.12, 0.01), [-1.75, y + 2.55, -backR + 0.43]);
+    }
     const bridge = (x: number, z: number) => Math.abs(x) < 1.1 && z < -backR + 0.4 && z > tower.z + 1.2;
     const atDoor = (a: number) => doors.some((d) => Math.abs(Math.atan2(Math.sin(a - d), Math.cos(a - d))) < doorHalf * 0.8);
     const blocked = (x: number, z: number) => {
@@ -431,6 +439,64 @@ export function withFloors(kit: Kit, scene: InteriorScene, id: ModuleId, label: 
   // O que já ocupa o térreo (móveis, balcões, estantes) e o alto do salão, pelo desenho: os detalhes novos desviam.
   const occupied = [...scene.obstacles, ...footprint(scene.scene, () => 0, 0.05, 2.6, 0.5)];
   const overhead = footprint(scene.scene, () => 0, H - 2.4, H - 0.2, 0.5);
+  // Lounge dos elevadores no fundo do térreo: tapete, poltronas, plantas, quadro com os andares,
+  // botão de chamada aceso e uma faixa de luz no piso levando até ele (antes dos outros detalhes,
+  // para eles desviarem do lounge).
+  {
+    const lz = -(R - 3.4);
+    const free = (x: number, z: number, r: number) => !occupied.some((o) => Math.hypot(o.x - x, o.z - z) < o.r + r);
+    const rug = kit.mat(style.warm ? '#B9A27E' : '#8EA0B5', { rough: 1 });
+    b.add(rug, new THREE.BoxGeometry(6.4, 0.015, 3.6), [0, 0.012, lz]);
+    b.add(kit.mat(accent, { rough: 0.9 }), new THREE.BoxGeometry(6.6, 0.012, 3.8), [0, 0.008, lz]);
+    // Faixa de luz no piso, do meio do salão até o lounge.
+    for (let k = 0; k < 8; k++) {
+      const z = lz + 2.2 + k * 1.1;
+      if (free(0, z, 0.2)) b.add(kit.mat(accent, { glow: true }), new THREE.BoxGeometry(0.12, 0.01, 0.6), [0, 0.02, z]);
+    }
+    const fabric = kit.mat(style.warm ? '#9C6B4E' : '#5B6B80', { rough: 0.95 });
+    const legs = kit.mat('#2B3442', { rough: 0.5, metal: 0.3 });
+    for (const sx of [-1, 1]) {
+      const x = sx * 3.9;
+      if (!free(x, lz, 0.9)) continue;
+      // Poltrona virada para o centro do lounge.
+      b.add(fabric, new THREE.BoxGeometry(0.85, 0.4, 0.85), [x, 0.42, lz]);
+      b.add(fabric, new THREE.BoxGeometry(0.2, 0.55, 0.85), [x + sx * 0.33, 0.85, lz]);
+      for (const az of [-1, 1]) b.add(fabric, new THREE.BoxGeometry(0.85, 0.25, 0.15), [x, 0.72, lz + az * 0.38]);
+      for (const [ax, az] of [[-0.35, -0.35], [0.35, -0.35], [-0.35, 0.35], [0.35, 0.35]] as const) b.add(legs, new THREE.CylinderGeometry(0.025, 0.02, 0.22, 6), [x + ax, 0.11, lz + az]);
+      seats.push({ x, y: 0.62, z: lz, face: sx > 0 ? -Math.PI / 2 : Math.PI / 2 });
+      occupied.push({ x, z: lz, r: 0.7, h: 1 });
+    }
+    // Mesinha de centro com revistas.
+    if (free(0, lz + 0.4, 0.5)) {
+      b.add(kit.mat('#C9A27A', { rough: 0.6 }), new THREE.CylinderGeometry(0.45, 0.45, 0.04, 24), [-1.9, 0.45, lz + 0.6]);
+      b.add(legs, new THREE.CylinderGeometry(0.04, 0.06, 0.43, 8), [-1.9, 0.22, lz + 0.6]);
+      for (let k = 0; k < 3; k++) b.add(kit.mat(['#E07A5F', '#5B8DB8', '#F2CC8F'][k]!, { rough: 0.8 }), new THREE.BoxGeometry(0.22, 0.012, 0.3), [-1.95 + k * 0.05, 0.48 + k * 0.012, lz + 0.6], [0, k * 0.4, 0]);
+    }
+    for (const sx of [-1, 1]) {
+      const x = sx * 2.6;
+      const z = -(R - 1.6);
+      if (!free(x, z, 0.5)) continue;
+      b.add(kit.mat('#D9CBB6', { rough: 0.8 }), new THREE.CylinderGeometry(0.32, 0.25, 0.6, 16), [x, 0.3, z]);
+      b.add(kit.mat('#3E7F44', { rough: 0.9 }), new THREE.IcosahedronGeometry(0.5, 1), [x, 1.05, z], undefined, [1, 1.5, 1]);
+    }
+    // Portal dos elevadores no vidro do fundo: moldura, placa e botão de chamada.
+    const pz = -(R - 0.35);
+    b.add(legs, new THREE.BoxGeometry(2.8, 0.18, 0.2), [0, 2.75, pz]);
+    for (const sx of [-1, 1]) b.add(legs, new THREE.BoxGeometry(0.16, 2.75, 0.2), [sx * 1.4, 1.375, pz]);
+    b.add(kit.mat('#E5E7EB', { metal: 0.6, rough: 0.3 }), new THREE.BoxGeometry(0.16, 0.3, 0.05), [1.75, 1.2, pz + 0.1]);
+    for (const dy of [0.07, -0.07]) b.add(kit.mat(accent, { glow: true }), new THREE.CircleGeometry(0.035, 12), [1.75, 1.2 + dy, pz + 0.13]);
+    const sign = sectorSign(kit, elevators, accent, 2.4);
+    sign.position.set(0, 3.2, pz + 0.12);
+    scene.scene.add(sign);
+    // Quadro com os andares (do térreo ao último) ao lado do portal.
+    b.add(legs, new THREE.BoxGeometry(1.5, 0.5 + plan.length * 0.42, 0.06), [-2.4, 1.7, pz + 0.05]);
+    [0, ...plan.map((_, n) => n + 1)].forEach((n, k) => {
+      const s = sectorSign(kit, floorName(n), n === 0 ? accent : '#94A3B8', 1.3);
+      s.position.set(-2.4, 1.7 + (plan.length / 2 - k) * 0.42, pz + 0.1);
+      scene.scene.add(s);
+    });
+    occupied.push({ x: 0, z: lz, r: 2.2, h: 0.1 }, { x: 0, z: -(R - 1.2), r: 1.6, h: 3 });
+  }
   enrichGround(kit, b, seats, occupied, overhead, R, H, accent, style.warm, thingRoot, things);
   // Torre do elevador: vidro, estrutura e uma cabine em cada andar; placa com o nome de cada andar.
   const topY = H + plan.length * STOREY;
@@ -569,7 +635,7 @@ function lobbyOf(plan: Plan, apo: number, inner: number, slots: Slot[]): Lobby {
   }
   const z = plan === 'corridor' || plan === 'open' ? -apo * 0.8 : -(inner + apo) / 2;
   const sx = plan === 'corridor' || plan === 'open' ? 3.4 : 2.2;
-  return { sofa: { x: -2.2, z, face: Math.PI / 2 }, table: [-0.9, z], plant: [-2.4, z + 1.8], lamp: [-2.4, z - 1.8], sig: { x: sx, z, face: -Math.PI / 2 } };
+  return { sofa: { x: -2.2, z, face: Math.PI / 2 }, table: [-0.9, z], plant: [-2.4, z + 1.8], lamp: [-2.4, z - 1.8], sig: { x: sx, z, face: -Math.PI / 2 }, service: [1.5, -(apo - 0.65)] };
 }
 
 /** Núcleo maciço com a escada em caracol: parede de pedra, nichos com telas e porta da escada. */

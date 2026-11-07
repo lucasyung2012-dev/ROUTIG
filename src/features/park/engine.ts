@@ -6,7 +6,7 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import type { ModuleId } from '@/app/modules';
-import { LAKE, PARK_RADIUS, PONDS, heightAt, inWater } from '@/domain/park';
+import { LAKE, PARK_RADIUS, PATH_WIDTH, PONDS, heightAt, inWater, parkPaths, samplePath } from '@/domain/park';
 import { Kit } from './kit';
 import { createCameraRig, type CamMode, type MoveSettings, type Posture } from './camera';
 import { AVATAR_LOOK, createCrowd, type Figure } from './people';
@@ -151,6 +151,17 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
       return { t: Math.round(t), m };
     };
     const parts = world.root.children.map((c, i) => ({ i, k: String(c.userData.building ?? (c.name || c.type)), kids: c.children.length, ...tri(c) })).sort((a, b) => b.t - a.t);
+    // Obstáculos em cima dos caminhos (o que atrapalha andar), agrupados a cada 3 m.
+    const blockers = new Map<string, { x: number; z: number; w: number }>();
+    for (const p of parkPaths())
+      for (const s of samplePath(p.points, 1.5)) {
+        const half = PATH_WIDTH[p.kind] / 2 - 0.4;
+        for (const o of world.obstacles) {
+          if (o.h - heightAt(o.x, o.z) < 0.35) continue;
+          if (Math.hypot(o.x - s.x, o.z - s.z) < Math.max(0.2, half) + o.r * 0.5) blockers.set(`${Math.round(o.x / 3)},${Math.round(o.z / 3)}`, { x: Math.round(o.x), z: Math.round(o.z), w: PATH_WIDTH[p.kind] });
+        }
+      }
+    document.documentElement.dataset.blockers = JSON.stringify([...blockers.values()]);
     window.setInterval(() => {
       document.documentElement.dataset.park = JSON.stringify({ buildMs: Math.round(buildMs), calls: renderer.info.render.calls, frameTris: renderer.info.render.triangles, geos: renderer.info.memory.geometries, tex: renderer.info.memory.textures, total: tri(world.root), parts: parts.slice(0, 40) });
     }, 2000);
@@ -285,7 +296,7 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
     else rig.glideTo(new THREE.Vector3(lv.arrive.x, lv.y + 3.3, lv.arrive.z - 0.8), new THREE.Vector3(lv.arrive.x, lv.y + 0.6, lv.arrive.z + 9), 900);
   };
   /* ---------- Elevador: entrar, fechar portas, subir/descer, abrir, sair ---------- */
-  type Ride = { from: number; to: number; t0: number; start: THREE.Vector3; startLook: THREE.Vector3; mode: CamMode };
+  type Ride = { from: number; to: number; t0: number; start: THREE.Vector3; startLook: THREE.Vector3; mode: CamMode; dinged: boolean };
   let ride: Ride | null = null;
   const RIDE = { walkIn: 1800, close: 700, open: 700, walkOut: 900, perFloor: 1700 };
   const rideTo = (to: number) => {
@@ -293,7 +304,9 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
     if (!inside || !fl || ride || to === level || to < 0 || to >= fl.levels.length) return;
     const look = new THREE.Vector3();
     camera.getWorldDirection(look);
-    ride = { from: level, to, t0: performance.now(), start: camera.position.clone(), startLook: camera.position.clone().add(look.multiplyScalar(5)), mode: rig.mode() };
+    ride = { from: level, to, t0: performance.now(), start: camera.position.clone(), startLook: camera.position.clone().add(look.multiplyScalar(5)), mode: rig.mode(), dinged: false };
+    // "Ding" da chegada da cabine.
+    audio?.note(76, 'bell');
     rig.setMove(0, 0);
     fl.cabin.position.y = fl.levels[level]!.y;
     opts.onRiding(true);
@@ -353,6 +366,12 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
     fl.cabin.position.y = y1;
     camera.position.set(inCab.x, y1 + 1.6, inCab.z);
     if (t < p1) {
+      if (!ride.dinged) {
+        // Chegou no andar: dois tons ("ding-dong") ao abrir.
+        ride.dinged = true;
+        audio?.note(79, 'bell');
+        audio?.note(74, 'bell', 0.25);
+      }
       camera.lookAt(outLook(y1));
       setDoors(ease2((t - p0) / RIDE.open));
       return true;

@@ -4792,6 +4792,7 @@ export const pt = {
     floorNames: { f0: 'Térreo', f1: '1º andar', f2: '2º andar', f3: '3º andar' },
     floorsNav: 'Andares',
     terrace: 'Terraço',
+    elevators: 'Elevadores',
     use: {
       piano: 'Tocar o piano',
       drums: 'Tocar a bateria',

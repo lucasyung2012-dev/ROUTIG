@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { NAV_MODULE_IDS } from '@/app/modules';
-import { PLAZA_RADIUS, inWater, entranceOf, heightAt, layoutProblems, parkPaths, PARK_BUILDINGS, PARK_REGIONS, treePositions } from '@/domain/park';
+import { PATH_WIDTH, PLAZA_RADIUS, inWater, entranceOf, heightAt, layoutProblems, parkPaths, PARK_BUILDINGS, PARK_REGIONS, samplePath, treePositions } from '@/domain/park';
 import { Vector3 } from 'three';
 import type { InboxItem } from '@/domain/inbox';
 import { receptionData } from '@/features/park/receptionData';
@@ -31,6 +31,22 @@ describe('parque 3D (V2, Etapa 0): planta', () => {
     }
     expect(heightAt(0, 0)).toBe(0);
     expect(heightAt(PLAZA_RADIUS, 0)).toBe(0);
+  });
+});
+
+describe('parque V2.1: caminhos em ordem', () => {
+  it('nenhum caminho passa pela água nem pelo lote de outro prédio', () => {
+    const problems: string[] = [];
+    for (const [i, p] of parkPaths().entries()) {
+      const w = PATH_WIDTH[p.kind];
+      const end = p.points[p.points.length - 1]!;
+      const own = PARK_BUILDINGS.find((b) => { const e = entranceOf(b); return Math.hypot(e.x - end.x, e.z - end.z) < 0.01; });
+      for (const q of samplePath(p.points, 2)) {
+        if (inWater(q.x, q.z, w / 2 + 0.3)) problems.push(`caminho ${i} na água em ${q.x.toFixed(0)},${q.z.toFixed(0)}`);
+        for (const b of PARK_BUILDINGS) if (b !== own && Math.hypot(q.x - b.x, q.z - b.z) < b.radius * 0.75) problems.push(`caminho ${i} no lote de ${b.id}`);
+      }
+    }
+    expect([...new Set(problems)]).toEqual([]);
   });
 });
 

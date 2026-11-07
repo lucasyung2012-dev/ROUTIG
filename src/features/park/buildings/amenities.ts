@@ -4,7 +4,7 @@
  * Bancos e mirantes viram pontos de intera√ß√£o (sentar, observar).
  */
 import * as THREE from 'three';
-import { POIS, heightAt, residences, seededRandom, type Poi } from '@/domain/park';
+import { PARK_BUILDINGS, PATH_WIDTH, PLAZA_RADIUS, POIS, heightAt, inWater, parkPaths, residences, samplePath, seededRandom, type Poi } from '@/domain/park';
 import { Builder, type Kit } from '../kit';
 
 export interface Seat {
@@ -69,24 +69,48 @@ export function amenities(kit: Kit): Amenities {
     }
   };
 
+  // Pontos dos caminhos (para virar caf√©s e quiosques de frente para quem passa e p√¥r bancos √† beira).
+  const lines = parkPaths().filter((l) => l.kind !== 'trail');
+  const pathPts = lines.flatMap((l) => samplePath(l.points, 3));
+  const nearestPath = (x: number, z: number) => pathPts.reduce((m, q) => (Math.hypot(q.x - x, q.z - z) < Math.hypot(m.x - x, m.z - z) ? q : m), pathPts[0]!);
   for (const p of POIS) {
     const y = heightAt(p.x, p.z);
+    const np = nearestPath(p.x, p.z);
+    const toPath = Math.atan2(np.x - p.x, np.z - p.z);
+    const fx = Math.sin(toPath);
+    const fz = Math.cos(toPath);
+    /** Ponto local (lx para o lado, lz para a frente = para o caminho) em coordenadas do mundo. */
+    const L = (lx: number, lz: number): [number, number] => [p.x + lx * fz + lz * fx, p.z - lx * fx + lz * fz];
     spots.push({ id: p.id, x: p.x, z: p.z, kind: p.kind });
     switch (p.kind) {
       case 'cafe': {
         // Quiosque do caf√© com toldo, balc√£o e mesas com guarda-sol.
         b.add(stone, new THREE.CylinderGeometry(9, 9, 0.12, 40), [p.x, y + 0.06, p.z]);
-        b.add(wood, new THREE.BoxGeometry(3.6, 2.6, 2.4), [p.x, y + 1.3, p.z - 3]);
-        b.add(kit.mat('#14B8A6', { rough: 0.6, side: THREE.DoubleSide }), new THREE.BoxGeometry(4.4, 0.08, 1.6), [p.x, y + 2.6, p.z - 1.3], [0.25, 0, 0]);
-        b.add(warm, new THREE.BoxGeometry(3, 0.6, 0.05), [p.x, y + 1.9, p.z - 1.78]);
-        for (let i = 0; i < 4; i++) table(p.x - 4.5 + i * 3, p.z + 2.5 + (i % 2) * 1.6, i * 0.4, true);
+        // Virado para o caminho: balc√£o atr√°s, mesas alinhadas na frente.
+        const [kx, kz] = L(0, -4);
+        b.add(wood, new THREE.BoxGeometry(4.2, 2.8, 2.6), [kx, y + 1.4, kz], [0, toPath, 0]);
+        b.add(kit.mat('#F4EFE6', { rough: 0.8 }), new THREE.BoxGeometry(4.4, 0.25, 2.8), [kx, y + 2.9, kz], [0, toPath, 0]);
+        const [ax, az] = L(0, -2.4);
+        b.add(kit.mat('#14B8A6', { rough: 0.6, side: THREE.DoubleSide }), new THREE.BoxGeometry(4.6, 0.06, 1.6), [ax, y + 2.55, az], [0, toPath, 0]);
+        const [cx2, cz2] = L(0, -2.65);
+        b.add(warm, new THREE.BoxGeometry(3.2, 0.6, 0.05), [cx2, y + 1.85, cz2], [0, toPath, 0]);
+        for (let i = 0; i < 4; i++) {
+          const [tx, tz] = L(-4.5 + i * 3, 1.5 + (i % 2) * 1.8);
+          table(tx, tz, toPath + Math.PI / 2, true);
+        }
+
         break;
       }
       case 'kiosk': {
-        b.add(wood, new THREE.CylinderGeometry(1.6, 1.6, 2.4, 6), [p.x, y + 1.2, p.z]);
-        b.add(kit.mat('#F97316', { rough: 0.5 }), new THREE.ConeGeometry(2.2, 1, 6), [p.x, y + 2.9, p.z]);
-        b.add(warm, new THREE.BoxGeometry(1.4, 0.5, 0.05), [p.x, y + 1.6, p.z + 1.4]);
-        for (let i = 0; i < 2; i++) table(p.x - 2.5 + i * 5, p.z + 4, 0, false);
+        b.add(wood, new THREE.CylinderGeometry(1.6, 1.6, 2.4, 6), [p.x, y + 1.2, p.z], [0, toPath, 0]);
+        b.add(kit.mat('#F97316', { rough: 0.5 }), new THREE.ConeGeometry(2.2, 1, 6), [p.x, y + 2.9, p.z], [0, toPath, 0]);
+        const [wx, wz] = L(0, 1.45);
+        b.add(warm, new THREE.BoxGeometry(1.4, 0.5, 0.05), [wx, y + 1.6, wz], [0, toPath, 0]);
+        for (let i = 0; i < 2; i++) {
+          const [tx, tz] = L(-2.6 + i * 5.2, 3.6);
+          table(tx, tz, toPath + Math.PI / 2, false);
+        }
+
         break;
       }
       case 'pergola':
@@ -124,17 +148,44 @@ export function amenities(kit: Kit): Amenities {
       case 'stage': {
         // Palco ao ar livre do anfiteatro do Pavilh√£o Musical.
         b.add(wood, new THREE.CylinderGeometry(5, 5.2, 0.8, 32, 1, false, -Math.PI / 2, Math.PI), [p.x, y + 0.4, p.z], [0, p.view, 0]);
+        // Arquibancada em degraus (an√©is de assento de 0,45 m), n√£o blocos maci√ßos.
         for (let k = 0; k < 4; k++) {
-          const r = 8 + k * 1.4;
-          b.add(stone, new THREE.CylinderGeometry(r + 1.2, r + 1.2, 0.4 + k * 0.4, 32, 1, false, Math.PI / 2 - 0.9, 1.8), [p.x, y + (0.4 + k * 0.4) / 2, p.z], [0, p.view, 0]);
+          const r0 = 8 + k * 1.2;
+          const sh = new THREE.Shape();
+          sh.absarc(0, 0, r0 + 1.2, Math.PI / 2 - 0.9, Math.PI / 2 + 0.9, false);
+          sh.absarc(0, 0, r0, Math.PI / 2 + 0.9, Math.PI / 2 - 0.9, true);
+          const g = new THREE.ExtrudeGeometry(sh, { depth: 0.45 + k * 0.45, bevelEnabled: false, curveSegments: 24 });
+          g.rotateX(Math.PI / 2);
+          g.translate(0, 0.45 + k * 0.45, 0);
+          b.add(stone, g, [p.x, y, p.z], [0, p.view, 0]);
         }
+
         break;
       }
     }
   }
 
-  // Bancos ao longo dos caminhos centrais e perto do lago.
-  for (const [x, z, f] of [[-30, -40, 0.6], [30, -40, -0.6], [-80, 60, 2.4], [-60, 75, 2.6], [-150, 60, -2.4], [0, -100, 0], [80, 0, Math.PI / 2], [-20, 130, Math.PI]] as const) bench(x, z, f);
+  // Bancos √† beira dos caminhos, de frente para eles, a cada ~40 m (longe de pr√©dios, √°gua e cruzamentos).
+  const placed: Array<{ x: number; z: number }> = [];
+  for (const l of lines) {
+    const w = PATH_WIDTH[l.kind];
+    const pts = samplePath(l.points, 40);
+    pts.forEach((q, k) => {
+      if (k === 0 || k === pts.length - 1) return;
+      const nx = pts[k + 1]!;
+      const dx = nx.x - q.x;
+      const dz = nx.z - q.z;
+      const len = Math.hypot(dx, dz) || 1;
+      const side = k % 2 ? 1 : -1;
+      const x = q.x + (-dz / len) * (w / 2 + 1.6) * side;
+      const z = q.z + (dx / len) * (w / 2 + 1.6) * side;
+      if (Math.hypot(x, z) < PLAZA_RADIUS + 4 || inWater(x, z, 2) || PARK_BUILDINGS.some((bd) => Math.hypot(x - bd.x, z - bd.z) < bd.radius * 0.95)) return;
+      if (placed.some((o) => Math.hypot(o.x - x, o.z - z) < 25) || POIS.some((o) => Math.hypot(o.x - x, o.z - z) < 12)) return;
+      if (pathPts.some((o) => Math.hypot(o.x - x, o.z - z) < w / 2 + 0.9)) return;
+      placed.push({ x, z });
+      bench(x, z, Math.atan2(q.x - x, q.z - z));
+    });
+  }
 
   return { group: b.build(), seats, viewpoints, spots };
 }
@@ -166,7 +217,7 @@ export function houses(kit: Kit): THREE.Group {
     const cz = h.z;
     const cs = Math.cos(h.rot);
     const sn = Math.sin(h.rot);
-    // Casa assentada numa base nivelada (o terreno de fora È ondulado).
+    // Casa assentada numa base nivelada (o terreno de fora \xE9 ondulado).
     let y = Infinity;
     for (const [px, pz] of [[-8, -7], [8, -7], [-8, 9], [8, 9]] as const) y = Math.min(y, heightAt(cx + px * cs + pz * sn, cz - px * sn + pz * cs));
     const put = (m: THREE.Material, g: THREE.BufferGeometry, lx: number, ly: number, lz: number, ry = 0, sc?: [number, number, number]) => b.add(m, g, [cx + lx * cs + lz * sn, y + ly, cz - lx * sn + lz * cs], [0, h.rot + ry, 0], sc);
@@ -181,7 +232,7 @@ export function houses(kit: Kit): THREE.Group {
     put(drive, new THREE.BoxGeometry(3, 0.06, 5.5), w / 2 - 1, 0.05, d / 2 + 3);
     for (const s of [-1, 1]) put(hedge, new THREE.BoxGeometry(0.7, 0.9, d + 8), s * (w / 2 + 2.6), 0.45, 1.5);
     put(hedge, new THREE.BoxGeometry(w + 2, 0.9, 0.7), -1.6, 0.45, d / 2 + 5.6);
-    // Caixa de correio e poste de luz do port„o.
+    // Caixa de correio e poste de luz do port\xE3o.
     put(frame, new THREE.CylinderGeometry(0.04, 0.04, 1.1, 6), w / 2 + 1.8, 0.55, d / 2 + 5.4);
     put(doorMat, new THREE.BoxGeometry(0.3, 0.22, 0.45), w / 2 + 1.8, 1.15, d / 2 + 5.4);
     put(frame, new THREE.CylinderGeometry(0.05, 0.06, 2.4, 6), -w / 2 - 1.8, 1.2, d / 2 + 5.4);
@@ -203,7 +254,7 @@ export function houses(kit: Kit): THREE.Group {
       put(doorMat, new THREE.BoxGeometry(1.1, 2.3, 0.08), w * 0.3, 1.15, d * 0.43);
     } else {
       put(wall, new THREE.BoxGeometry(w, H, d), 0, H / 2, 0);
-      // RodapÈ de pedra e friso entre andares.
+      // Rodap\xE9 de pedra e friso entre andares.
       put(stone, new THREE.BoxGeometry(w + 0.1, 0.5, d + 0.1), 0, 0.25, 0);
       if (floors === 2) put(whiteTrim, new THREE.BoxGeometry(w + 0.12, 0.14, d + 0.12), 0, fh, 0);
       // Janelas com moldura (frente e laterais) e porta com batente.
@@ -221,7 +272,7 @@ export function houses(kit: Kit): THREE.Group {
       put(lamp, new THREE.BoxGeometry(0.15, 0.25, 0.1), 0.9, 2.2, d / 2 + 0.1);
       const roofM = tile[style % tile.length]!;
       if (style === 0) {
-        // Colonial: telhado de duas ·guas, chaminÈ e varanda com colunas.
+        // Colonial: telhado de duas \xE1guas, chamin\xE9 e varanda com colunas.
         const sh = new THREE.Shape([new THREE.Vector2(-(w / 2 + 0.6), 0), new THREE.Vector2(w / 2 + 0.6, 0), new THREE.Vector2(0, 2.6)]);
         const g = new THREE.ExtrudeGeometry(sh, { depth: d + 1, bevelEnabled: false });
         g.translate(0, 0, -(d + 1) / 2);
@@ -231,7 +282,7 @@ export function houses(kit: Kit): THREE.Group {
         for (const s of [-1, -0.33, 0.33, 1]) put(whiteTrim, new THREE.CylinderGeometry(0.12, 0.14, 2.7, 10), s * w * 0.33, 1.45, d / 2 + 2);
         put(roofM, new THREE.BoxGeometry(w * 0.74, 0.18, 2.6), 0, 2.85, d / 2 + 1.2);
       } else if (style === 2) {
-        // BangalÙ: quatro ·guas, varanda de madeira e garagem.
+        // Bangal\xF4: quatro \xE1guas, varanda de madeira e garagem.
         put(roofM, new THREE.CylinderGeometry(0.4, Math.max(w, d) * 0.72, 2.2, 4, 1), 0, H + 1.1, 0, Math.PI / 4, [w / Math.max(w, d), 1, d / Math.max(w, d)]);
         put(deck, new THREE.BoxGeometry(w + 1, 0.2, 2.6), 0, 0.1, d / 2 + 1.3);
         for (const s of [-1, 0, 1]) put(deck, new THREE.BoxGeometry(0.16, 2.6, 0.16), s * (w / 2), 1.4, d / 2 + 2.5);
@@ -240,7 +291,7 @@ export function houses(kit: Kit): THREE.Group {
         put(frame, new THREE.BoxGeometry(2.8, 2.3, 0.08), w / 2 + 1.8, 1.15, 3.52);
         put(slate, new THREE.BoxGeometry(4, 0.2, 6.4), w / 2 + 1.8, 2.9, 0.5);
       } else {
-        // Sobrado tropical: telhado de uma ·gua, pÈrgola e piscina.
+        // Sobrado tropical: telhado de uma \xE1gua, p\xE9rgola e piscina.
         const g = new THREE.BoxGeometry(w + 1.2, 0.25, d + 1.2);
         g.rotateX(0.12);
         put(roofM, g, 0, H + 0.6, 0);
@@ -250,7 +301,7 @@ export function houses(kit: Kit): THREE.Group {
         put(pool, new THREE.BoxGeometry(4.6, 0.04, 2.6), w / 2 - 2.8, 0.14, d / 2 + 3.6);
       }
     }
-    // ¡rvore e arbustos do jardim.
+    // \xC1rvore e arbustos do jardim.
     const tx = (rnd() > 0.5 ? 1 : -1) * (w / 2 + 1);
     put(doorMat, new THREE.CylinderGeometry(0.15, 0.22, 2.8, 8), tx, 1.4, d / 2 + 4);
     put(leaf, new THREE.IcosahedronGeometry(1.7, 1), tx, 3.6, d / 2 + 4, 0, [1, 0.85, 1]);

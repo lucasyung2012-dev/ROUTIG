@@ -325,7 +325,7 @@ function paths(kit: Kit): { group: THREE.Group; lamps: Point[] } {
     // Postes a cada ~22 m, alternando os lados.
     const s = samplePath(line.points, 22);
     s.forEach((p, k) => {
-      if (k === 0 || Math.hypot(p.x, p.z) < PLAZA_RADIUS + 3) return;
+      if (k === 0 || k === s.length - 1 || Math.hypot(p.x, p.z) < PLAZA_RADIUS + 3) return;
       const q = s[Math.min(k + 1, s.length - 1)]!;
       const dx = q.x - p.x;
       const dz = q.z - p.z;
@@ -334,7 +334,16 @@ function paths(kit: Kit): { group: THREE.Group; lamps: Point[] } {
       lamps.push({ x: p.x + (-dz / l) * (w / 2 + 1.2) * side, z: p.z + (dx / l) * (w / 2 + 1.2) * side });
     });
   }
-  return { group: b.build(false), lamps };
+  // Postes em ordem: nunca na água, dentro de lote, em cima de outro caminho ou colados em outro poste.
+  const all = parkPaths().flatMap((l) => samplePath(l.points, 2).map((q) => ({ ...q, w: PATH_WIDTH[l.kind] })));
+  const kept: Point[] = [];
+  for (const l of lamps) {
+    if (inWater(l.x, l.z, 1.5) || PARK_BUILDINGS.some((bd) => Math.hypot(l.x - bd.x, l.z - bd.z) < bd.radius * 0.9)) continue;
+    if (all.some((q) => Math.hypot(q.x - l.x, q.z - l.z) < q.w / 2 + 0.6)) continue;
+    if (kept.some((o) => Math.hypot(o.x - l.x, o.z - l.z) < 9)) continue;
+    kept.push(l);
+  }
+  return { group: b.build(false), lamps: kept };
 }
 
 /* ---------- Praça central ---------- */

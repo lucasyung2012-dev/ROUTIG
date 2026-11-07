@@ -88,7 +88,7 @@ export const PARK_BUILDINGS: ParkBuilding[] = [
   // Norte: aprendizagem na mata tropical (Academy e Library dividem o pátio de estudos).
   b('academy', 'north', -45, -150, 33, 'campus', '#6366F1', COURTS.learning!),
   b('library', 'north', 30, -150, 30, 'library', '#3B82F6', COURTS.learning!),
-  b('notes', 'north', 95, -125, 28, 'stack', '#F59E0B', COURTS.learning!),
+  b('notes', 'north', 95, -125, 28, 'stack', '#F59E0B', { x: 60, z: -100 }),
   b('focus', 'north', -115, -115, 28, 'pavilion', '#10B981', { x: -80, z: -95 }),
   // Leste: criação e comunicação em gramados abertos.
   b('languages', 'east', 140, -45, 28, 'pagoda', '#14B8A6', COURTS.east!),
@@ -200,12 +200,14 @@ const mid = (a: Point, c: Point, bend: number): Point => ({ x: (a.x + c.x) / 2 +
 /** Rede de caminhos: avenidas (principais), ligações entre prédios (secundários) e trilhas contemplativas. */
 export function parkPaths(): ParkPath[] {
   const out: ParkPath[] = [];
-  // Avenidas: praça → núcleo de cada região.
-  for (const r of ['north', 'east', 'south', 'west'] as const) {
-    const hub = REGION_HUB[r];
-    const s = edgeOfPlaza(hub);
-    out.push({ kind: 'main', points: [s, mid(s, hub, 0.08), hub] });
-  }
+  // Avenidas: praça → núcleo de cada região. A do Norte contorna o Observatório Central pelo
+  // oeste e a do Sul passa entre a Estufa de Hábitos e o Observatório Temporal (nada cruza lote).
+  const P = (x: number, z: number): Point => ({ x, z });
+  out.push({ kind: 'main', points: [edgeOfPlaza(P(-0.55, -1)), P(-36, -62), P(-28, -95), REGION_HUB.north] });
+  out.push({ kind: 'main', points: [edgeOfPlaza(REGION_HUB.east), mid(edgeOfPlaza(REGION_HUB.east), REGION_HUB.east, 0.08), REGION_HUB.east] });
+  out.push({ kind: 'main', points: [edgeOfPlaza(P(0, 1)), P(-12, 70), P(-18, 100), P(-12, 140), REGION_HUB.south] });
+  out.push({ kind: 'main', points: [edgeOfPlaza(REGION_HUB.west), mid(edgeOfPlaza(REGION_HUB.west), REGION_HUB.west, 0.08), REGION_HUB.west] });
+
   // Prédios centrais: praça → entrada.
   for (const p of PARK_BUILDINGS.filter((x) => x.region === 'central')) {
     const e = entranceOf(p);
@@ -221,17 +223,19 @@ export function parkPaths(): ParkPath[] {
     if (!seen.has(key)) {
       seen.add(key);
       const hub = REGION_HUB[p.region];
-      if (dist(hub, court) > 8) out.push({ kind: 'secondary', points: [hub, mid(hub, court, 0.1), court] });
+      // Ao pátio do crescimento, contornando o lago ornamental.
+      if (court === COURTS.growth) out.push({ kind: 'secondary', points: [hub, { x: -20, z: 142 }, { x: -55, z: 140 }, court] });
+      else if (dist(hub, court) > 8) out.push({ kind: 'secondary', points: [hub, mid(hub, court, 0.1), court] });
     }
     out.push({ kind: 'secondary', points: [court, mid(court, e, 0.12), e] });
   }
-  // Circuitos de exploração entre regiões vizinhas (sem voltar à praça).
-  const ring = ['north', 'east', 'south', 'west'] as const;
-  ring.forEach((r, i) => {
-    const a = REGION_HUB[r];
-    const c = REGION_HUB[ring[(i + 1) % 4]!];
-    out.push({ kind: 'secondary', points: [a, { x: (a.x + c.x) * 0.72, z: (a.z + c.z) * 0.72 }, c] });
-  });
+  // Circuitos de exploração entre regiões vizinhas (sem voltar à praça), desviando dos lotes e da água.
+  const H = REGION_HUB;
+  out.push({ kind: 'secondary', points: [H.north, { x: (H.north.x + H.east.x) * 0.72, z: (H.north.z + H.east.z) * 0.72 }, H.east] });
+  out.push({ kind: 'secondary', points: [H.east, P(95, 110), P(95, 175), P(40, 185), H.south] });
+  out.push({ kind: 'secondary', points: [H.south, P(-20, 142), P(-15, 95), P(-65, 70), P(-105, 30), H.west] });
+  out.push({ kind: 'secondary', points: [H.west, { x: (H.west.x + H.north.x) * 0.72, z: (H.west.z + H.north.z) * 0.72 }, H.north] });
+
   // Trilha contemplativa em volta do lago (acompanha a margem, com folga).
   const loop: Point[] = [];
   for (let i = 0; i <= 28; i++) {
@@ -242,9 +246,9 @@ export function parkPaths(): ParkPath[] {
   out.push({ kind: 'trail', points: loop });
   // Trilhas das colinas do Oeste e da mata do Norte.
   out.push({ kind: 'trail', points: [{ x: -120, z: -10 }, { x: -170, z: -60 }, { x: -205, z: -40 }, { x: -200, z: 40 }, { x: -150, z: 60 }] });
-  out.push({ kind: 'trail', points: [{ x: -80, z: -95 }, { x: -60, z: -195 }, { x: 10, z: -210 }, { x: 70, z: -185 }, { x: 95, z: -125 }] });
+  out.push({ kind: 'trail', points: [P(-80, -95), P(-88, -150), P(-60, -200), P(10, -215), P(55, -170), P(60, -100)] });
   // Trilha dos lagos ornamentais.
-  out.push({ kind: 'trail', points: [{ x: -75, z: 150 }, { x: -92, z: 165 }, { x: -35, z: 150 }, { x: -15, z: 176 }, { x: 20, z: 160 }] });
+  out.push({ kind: 'trail', points: [P(-75, 150), P(-92, 165), P(-35, 150), P(-30, 176), P(-15, 180), P(5, 172), P(20, 160)] });
   return out;
 }
 

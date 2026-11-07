@@ -434,14 +434,19 @@ function joints(f: Figure): Joints {
   const breathe = Math.sin(p * 0.5) * 0.02;
   switch (f.pose) {
     case 'walk': {
-      // Passo com joelho dobrando na volta da perna e braços opostos.
+      // Marcha natural: a coxa vai mais para a frente do que para trás, o joelho só dobra bem na
+      // fase de balanço (perna passando) e quase estica ao pisar; o quadril sobe no meio do apoio e
+      // desce com as pernas abertas; braços opostos às pernas, discretos, cotovelo dobrando mais na frente.
       const a = Math.sin(p);
-      j.hf = [a * 0.45 * s, -a * 0.45 * s];
-      j.kf = [(0.1 + Math.max(0, Math.sin(p - 1.3)) * 0.75) * s, (0.1 + Math.max(0, Math.sin(p + Math.PI - 1.3)) * 0.75) * s];
-      j.sf = [-a * 0.38 * s, a * 0.38 * s];
-      j.ef = [0.25 + 0.15 * s, 0.25 + 0.15 * s];
-      j.hip = HIP - 0.015 + Math.abs(Math.cos(p)) * 0.03 * s;
-      j.lean = 0.05 * s;
+      const knee = (ph: number) => (0.06 + 0.78 * Math.max(0, Math.cos(ph - 0.35)) ** 2) * s;
+      j.hf = [(0.08 + a * 0.32) * s, (0.08 - a * 0.32) * s];
+      j.kf = [knee(p), knee(p + Math.PI)];
+      j.sf = [-a * 0.26 * s, a * 0.26 * s];
+      j.ef = [0.18 + Math.max(0, -a) * 0.3 * s, 0.18 + Math.max(0, a) * 0.3 * s];
+      j.abd = [0.06, 0.06];
+      j.hip = HIP - 0.014 * s + (1 - Math.abs(a)) * 0.02 * s;
+      j.lean = 0.03 * s;
+      j.headPitch = Math.sin(p * 2) * 0.012 * s;
       break;
     }
     case 'sit':
@@ -490,14 +495,17 @@ function joints(f: Figure): Joints {
       break;
     }
     case 'run': {
-      // Corrida: passada larga, joelho alto, braços dobrados balançando forte.
+      // Corrida: passada mais longa, joelho subindo na volta da perna, braços dobrados a uns 80°
+      // balançando junto ao corpo, tronco um pouco inclinado; pequena fase de voo.
       const a = Math.sin(p);
-      j.hf = [a * 0.8, -a * 0.8];
-      j.kf = [0.35 + Math.max(0, Math.sin(p - 1.1)) * 1.3, 0.35 + Math.max(0, Math.sin(p + Math.PI - 1.1)) * 1.3];
-      j.sf = [-a * 0.75, a * 0.75];
-      j.ef = [1.3, 1.3];
-      j.hip = HIP - 0.03 + Math.abs(Math.cos(p)) * 0.06;
-      j.lean = 0.2;
+      const knee = (ph: number) => 0.25 + 1.15 * Math.max(0, Math.cos(ph - 0.3)) ** 2;
+      j.hf = [0.18 + a * 0.55, 0.18 - a * 0.55];
+      j.kf = [knee(p), knee(p + Math.PI)];
+      j.sf = [-a * 0.5, a * 0.5];
+      j.ef = [1.35, 1.35];
+      j.abd = [0.12, 0.12];
+      j.hip = HIP - 0.035 + (1 - Math.abs(a)) * 0.045;
+      j.lean = 0.12;
       break;
     }
     case 'kick': {
@@ -542,10 +550,12 @@ function joints(f: Figure): Joints {
       j.prop = 'camera';
       break;
     case 'wave':
-      j.sf = [0.05, 0.2];
-      j.abd = [0.08, 2.5];
-      j.ef = [0.15, 0.35 + Math.sin(p * 5) * 0.35];
-      j.headPitch = -0.05;
+      // Aceno: braço levantado ao lado da cabeça, só o antebraço balança, de leve.
+      j.sf = [0.04, 0.3];
+      j.abd = [0.08, 2.3];
+      j.ef = [0.15, 0.6 + Math.sin(p * 6) * 0.2];
+      j.headPitch = -0.04;
+      j.lean = -0.02;
       break;
     case 'exercise': {
       const k = Math.abs(Math.sin(p));

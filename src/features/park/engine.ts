@@ -752,7 +752,8 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
       opts.onMode(mode);
     }
     const body = rig.body();
-    walkPhase += dt * body.speed * 2.6;
+    // Um ciclo de passos por 1,4 m andando e 2,4 m correndo (pé não escorrega no chão).
+    walkPhase += dt * body.speed * (body.speed > 4.2 ? 2.6 : 4.5);
     avatar.group.visible = mode === 'third' && !rig.gliding() && !riding;
     if (avatar.group.visible) bodyFigure();
     const t = opts.reduceMotion ? 0 : (now - t0) / 1000;

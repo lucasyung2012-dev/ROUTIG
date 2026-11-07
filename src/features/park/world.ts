@@ -381,6 +381,7 @@ function plaza(kit: Kit): THREE.Group {
     const a = (i / 8) * Math.PI * 2 + Math.PI / 8;
     const x = Math.sin(a) * 21.5;
     const z = Math.cos(a) * 21.5;
+    if (onPath(x, z, 1.2)) continue; // o canteiro não fecha a saída de um caminho
     b.add(kit.mat('#D9D2C3', { rough: 0.6 }), new THREE.CylinderGeometry(2.4, 2.5, 0.55, 32), [x, 0.3, z]);
     b.add(kit.mat('#5C8F48', { rough: 1 }), new THREE.CylinderGeometry(2.2, 2.2, 0.05, 32), [x, 0.6, z]);
   }
@@ -659,7 +660,7 @@ export function createWorld(kit: Kit): World {
   for (const l of p.lamps) obstacles.push({ x: l.x, z: l.z, r: 0.25, h: heightAt(l.x, l.z) + 4.2 });
 
   // Árvores do parque e as da calçada do bairro (copas redondas e esguias alternadas).
-  const plantList = [...plants(), ...streetTrees().map((p, i) => ({ x: p.x, y: heightAt(p.x, p.z), z: p.z, s: p.s, species: (i % 3 ? 'round' : 'slender') as Plant['species'] }))];
+  const plantList = [...plants().filter((p) => !onPath(p.x, p.z, 0.9 * p.s)), ...streetTrees().map((p, i) => ({ x: p.x, y: heightAt(p.x, p.z), z: p.z, s: p.s, species: (i % 3 ? 'round' : 'slender') as Plant['species'] }))];
   const trees = forest(kit, plantList);
   for (const t of plantList) if (Math.hypot(t.x, t.z) < PARK_RADIUS + 30) obstacles.push({ x: t.x, z: t.z, r: 0.3 * t.s, h: (t.y ?? 0) + 3 });
   const meadow = meadows(kit);

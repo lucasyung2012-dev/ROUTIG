@@ -4,6 +4,12 @@ Leia este arquivo no começo de toda conversa nova sobre o ROUTIG. A especifica�
 
 **Atualizado:** 2026-11-08 (arquitetura própria de cada prédio e objetos funcionais; login e sincronização prontos, aguardando o ID do cliente Google)
 
+## Estado da conversa (2026-11-08, riqueza de detalhes, pessoas e leveza)
+
+- **Feito e publicado (CI verde):** grama em tons, mato e flores do campo; árvores com copa e tom próprios e versão leve de longe; bairro com prédios detalhados, lojas, carros parados e rodando, faixas e árvores de calçada; moradores e avatar com roupa e acessórios próprios (camisa, jaqueta, moletom, vestido, esportiva, boné, gorro, óculos, mochila), expressões (espanto, riso, bochechas) e vozes; marcha, corrida e aceno mais naturais; futebol com passes, chutes, gol, goleiros, coletes e comemoração; tênis com quique e golpe na hora; sons de bola e apito; lounge dos elevadores no térreo (por dentro) e pavilhão de vidro com piso, passagem coberta e bancos na base da torre (por fora); placa do andar, saída de emergência, ding da cabine; apoio em cada andar e detalhes nas salas; nada de bancos, mesas, quiosques, canteiros, árvores ou pilares em cima dos caminhos.
+- **Medido (?debug):** ~1,37 mi triângulos no total, ~1,0 mi por quadro, 214 desenhos; 21 pontos de borda de prédio/palco encostando na margem de caminhos (não no meio).
+- **Não verificado:** sons (não dá para ouvir no teste), pavilhão do elevador visto de perto, jogos ao vivo, iPad/iPhone.
+
 ## Estado da conversa (2026-11-08, arquitetura de cada prédio e objetos funcionais)
 
 - **Feito e publicado (CI verde):**

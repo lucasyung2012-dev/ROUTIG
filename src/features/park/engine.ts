@@ -258,7 +258,7 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
   /* ---------- Elevador: entrar, fechar portas, subir/descer, abrir, sair ---------- */
   type Ride = { from: number; to: number; t0: number; start: THREE.Vector3; startLook: THREE.Vector3; mode: CamMode };
   let ride: Ride | null = null;
-  const RIDE = { walkIn: 1100, close: 700, open: 700, walkOut: 900, perFloor: 1700 };
+  const RIDE = { walkIn: 1800, close: 700, open: 700, walkOut: 900, perFloor: 1700 };
   const rideTo = (to: number) => {
     const fl = inside?.scene.floors;
     if (!inside || !fl || ride || to === level || to < 0 || to >= fl.levels.length) return;
@@ -288,9 +288,18 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
     let p1 = RIDE.walkIn;
     if (t < p1) {
       // Entra na cabine, vira de frente para as portas.
-      const k = ease2(t / p1);
-      camera.position.lerpVectors(ride.start, inCab.clone().setY(y0 + 1.6), k);
-      camera.lookAt(new THREE.Vector3().lerpVectors(ride.startLook, outLook(y0), k));
+      // Primeiro até a frente da porta, depois para dentro, virando de frente para a saída.
+      const k = t / p1;
+      const door = new THREE.Vector3(e.x, y0 + 1.6, e.z + 2.6);
+      if (k < 0.6) camera.position.lerpVectors(ride.start, door, ease2(k / 0.6));
+      else camera.position.lerpVectors(door, inCab.clone().setY(y0 + 1.6), ease2((k - 0.6) / 0.4));
+      if (k < 0.6) camera.lookAt(new THREE.Vector3().lerpVectors(ride.startLook, new THREE.Vector3(e.x, y0 + 1.4, e.z - 2), ease2(k / 0.6)));
+      else {
+        // Vira de frente para as portas passando pelo lado (sem girar no próprio eixo de uma vez).
+        const q2 = (k - 0.6) / 0.4;
+        const side = new THREE.Vector3(e.x + 4, y0 + 1.4, e.z);
+        camera.lookAt(q2 < 0.5 ? new THREE.Vector3().lerpVectors(new THREE.Vector3(e.x, y0 + 1.4, e.z - 2), side, ease2(q2 * 2)) : new THREE.Vector3().lerpVectors(side, outLook(y0), ease2(q2 * 2 - 1)));
+      }
       setDoors(1);
       return true;
     }

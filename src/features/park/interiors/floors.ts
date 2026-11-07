@@ -299,7 +299,7 @@ export function withFloors(kit: Kit, scene: InteriorScene, id: ModuleId, label: 
   const topY = H + plan.length * STOREY;
   b.add(glass, new THREE.CylinderGeometry(1.4, 1.4, topY, 24, 1, true), [tower.x, topY / 2, tower.z]);
   for (let k = 0; k < 6; k++) {
-    const a = (k / 6) * Math.PI * 2;
+    const a = (k / 6) * Math.PI * 2 + Math.PI / 6;
     b.add(metal, new THREE.BoxGeometry(0.12, topY, 0.12), [tower.x + Math.sin(a) * 1.4, topY / 2, tower.z + Math.cos(a) * 1.4]);
   }
   b.add(slab, new THREE.CylinderGeometry(1.6, 1.6, 0.3, 24), [tower.x, topY, tower.z]);

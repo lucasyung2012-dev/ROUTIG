@@ -467,6 +467,7 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
 
   const disposeInterior = () => {
     if (!inside) return;
+    hideSky();
     if (instrument) opts.onInstrument(null);
     instrument = null;
     // Pessoas e avatar são do parque: saem da cena antes de liberar o interior.
@@ -702,6 +703,73 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
     }
   };
   if (/[?&]debug/.test(location.search)) document.addEventListener('park-debug', onDebug);
+  /**
+   * O que a luneta mostra: a Lua com crateras no meio da vista, Saturno com os anéis ao lado e um
+   * campo de estrelas em volta. Some quando se para de observar (e vai embora com o interior).
+   */
+  let skyShow: THREE.Group | null = null;
+  const hideSky = () => {
+    if (!skyShow) return;
+    skyShow.parent?.remove(skyShow);
+    skyShow = null;
+  };
+  const showSky = (eye: THREE.Vector3, target: THREE.Vector3) => {
+    if (!inside) return;
+    hideSky();
+    const k = inside.kit;
+    const g = new THREE.Group();
+    const dir = target.clone().sub(eye).normalize();
+    const side = new THREE.Vector3().crossVectors(dir, new THREE.Vector3(0, 1, 0)).normalize();
+    const up = new THREE.Vector3().crossVectors(side, dir).normalize();
+    const at = (d: number, sx: number, sy: number) => eye.clone().addScaledVector(dir, d).addScaledVector(side, sx).addScaledVector(up, sy);
+    const lit = (color: string, glow: string, i: number) => k.own(new THREE.MeshStandardMaterial({ color, emissive: glow, emissiveIntensity: i, roughness: 1 }));
+    // Lua: esfera com mares escuros e crateras com borda clara.
+    const moon = new THREE.Mesh(k.own(new THREE.SphereGeometry(4, 40, 28)), lit('#D8D4CA', '#8C887C', 0.55));
+    moon.position.copy(at(70, -1, 0.5));
+    const maria = lit('#9A968B', '#55524A', 0.5);
+    const rim = lit('#ECE8DE', '#A39F93', 0.5);
+    [[0.3, 0.4, 1.3], [-0.5, 0.1, 1.0], [0.1, -0.5, 0.8], [0.6, -0.2, 0.55], [-0.2, 0.7, 0.45], [-0.7, -0.4, 0.5], [0.45, 0.65, 0.35]].forEach(([u, v, r], i) => {
+      const n = new THREE.Vector3(u!, v!, 1).normalize();
+      const c = new THREE.Mesh(k.own(new THREE.CircleGeometry(r!, 20)), i < 3 ? maria : lit('#B4B0A5', '#6D6A61', 0.5));
+      c.position.copy(n.clone().multiplyScalar(4.01));
+      c.lookAt(n.clone().multiplyScalar(10));
+      moon.add(c);
+      if (i >= 3) {
+        const ring = new THREE.Mesh(k.own(new THREE.RingGeometry(r! * 0.92, r! * 1.12, 20)), rim);
+        ring.position.copy(n.clone().multiplyScalar(4.02));
+        ring.lookAt(n.clone().multiplyScalar(10));
+        moon.add(ring);
+      }
+    });
+    // O lado da Lua que olha para quem observa.
+    moon.lookAt(eye);
+    g.add(moon);
+    // Saturno com os anéis inclinados.
+    const saturn = new THREE.Mesh(k.own(new THREE.SphereGeometry(2.2, 32, 20)), lit('#E3C68A', '#8A6F3A', 0.5));
+    saturn.position.copy(at(95, 16, 7));
+    const rings = new THREE.Mesh(k.own(new THREE.RingGeometry(3, 5.2, 48)), k.own(new THREE.MeshStandardMaterial({ color: '#CDB57E', emissive: '#7A6638', emissiveIntensity: 0.5, side: THREE.DoubleSide, transparent: true, opacity: 0.85 })));
+    rings.rotation.set(Math.PI / 2 - 0.45, 0.3, 0);
+    saturn.add(rings);
+    g.add(saturn);
+    // Campo de estrelas em volta da vista (algumas mais fortes).
+    const n = 420;
+    const pos = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) {
+      const p = at(110, (Math.random() - 0.5) * 120, (Math.random() - 0.5) * 80);
+      pos.set([p.x, p.y, p.z], i * 3);
+    }
+    const sg = k.own(new THREE.BufferGeometry());
+    sg.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    g.add(new THREE.Points(sg, k.own(new THREE.PointsMaterial({ color: '#F8FAFC', size: 1.6, sizeAttenuation: false }))));
+    // Uma estrela dupla mais brilhante, para ter o que procurar.
+    for (const [sx, sy] of [[-14, -8], [-13.2, -7.6]] as const) {
+      const st = new THREE.Mesh(k.own(new THREE.SphereGeometry(0.35, 10, 8)), k.own(new THREE.MeshBasicMaterial({ color: sx < -13.5 ? '#BFDBFE' : '#FDE68A' })));
+      st.position.copy(at(100, sx, sy));
+      g.add(st);
+    }
+    inside.scene.scene.add(g);
+    skyShow = g;
+  };
   /** Usar um objeto funcional dos interiores. */
   const useThing = (th: Thing) => {
     const fl = inside?.scene.floors;
@@ -726,7 +794,9 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
     if (th.kind === 'telescope') {
       const lv = fl.levels[level]!;
       rig.place(th.x, th.z, th.face + Math.PI);
-      return rig.observe(new THREE.Vector3(th.x + Math.sin(th.face) * 60, lv.y + 45, th.z + Math.cos(th.face) * 60));
+      const target = new THREE.Vector3(th.x + Math.sin(th.face) * 60, lv.y + 45, th.z + Math.cos(th.face) * 60);
+      showSky(new THREE.Vector3(th.x, lv.y + 1.7, th.z), target);
+      return rig.observe(target);
     }
     th.act?.(thingCtx);
   };
@@ -890,6 +960,8 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
     stepEnv(dt);
     const riding = stepRide(now) || stepClimb(now);
     if (!riding) rig.update(dt, now);
+    // Parou de olhar pela luneta: o céu da luneta some.
+    if (skyShow && rig.posture() !== 'observe') hideSky();
     const mode = rig.mode();
     if (mode !== lastMode) {
       lastMode = mode;
@@ -926,7 +998,7 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
         }
         const viewer = mode === 'orbit' ? rig.controls.target : body.pos;
         town.step(opts.reduceMotion ? dt * 0.5 : dt, conditions(), mode === 'orbit' ? { x: 1e5, z: 1e5 } : viewer, now);
-        extras.step(opts.reduceMotion ? dt * 0.5 : dt, shownHour, weather.rain, mode === 'orbit' ? { x: 1e5, z: 1e5 } : viewer, now);
+        extras.step(opts.reduceMotion ? dt * 0.5 : dt, shownHour, weather.rain, mode === 'orbit' ? { x: 1e5, z: 1e5 } : viewer, now, world.bus());
         world.play(extras.play());
         // Moradores e gente de passagem juntos, os mais perto primeiro.
         const range = mode === 'orbit' ? 260 : 140;

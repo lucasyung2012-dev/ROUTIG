@@ -107,6 +107,8 @@ export interface City {
   tick: (t: number) => void;
   /** Sons da rua deste passo (ônibus freando no ponto). */
   events: () => Array<{ x: number; z: number; kind: 'brake' | 'horn' }>;
+  /** Onde está o ônibus (ângulo na rua do parque) e quanto falta para sair do ponto (s; 0 = andando). */
+  bus: () => { a: number; wait: number };
 }
 
 export function city(kit: Kit): City {
@@ -422,5 +424,5 @@ export function city(kit: Kit): City {
       events.push({ x: p.x, z: p.z, kind: 'horn' });
     }
   };
-  return { group: g, tick, events: () => events };
+  return { group: g, tick, events: () => events, bus: () => ({ a: busS.a, wait: busS.wait }) };
 }

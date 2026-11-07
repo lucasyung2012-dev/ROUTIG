@@ -199,6 +199,9 @@ export function inField(x: number, z: number, pad = 0): boolean {
   return Object.values(SPORT_FIELDS).some((f) => Math.abs(x - f.x) < f.w / 2 + pad && Math.abs(z - f.z) < f.d / 2 + pad);
 }
 
+/** Centro do palco ao ar livre (o mesmo do ponto "palco-musica" em POIS). */
+const STAGE_AT = { x: 147.2, z: 92.8 };
+
 export function heightAt(x: number, z: number): number {
   let h = rawHeight(x, z);
   // Lago e lagos ornamentais em terreno baixo: o relevo em volta desce até a margem
@@ -228,6 +231,13 @@ export function heightAt(x: number, z: number): number {
       const k = 1 - smooth(p.radius * 0.95, p.radius + 18, d);
       h = h * (1 - k) + lotHeight(p) * k;
     }
+  }
+  // Anfiteatro do palco da música: chão plano num raio de 15 m, voltando ao relevo até 30 m
+  // (o palco e a arquibancada ficam no chão, sem afundar, e dá para andar entre eles).
+  const dS = Math.hypot(x - STAGE_AT.x, z - STAGE_AT.z);
+  if (dS < 30) {
+    const k = 1 - smooth(15, 30, dS);
+    h = h * (1 - k) + rawHeight(STAGE_AT.x, STAGE_AT.z) * k;
   }
   return h;
 }

@@ -6,8 +6,8 @@
 import * as THREE from 'three';
 import { navGraph } from '@/domain/parkPeople';
 import { crossStreets, onPath, onStreet, PARK_BUILDINGS, PATH_WIDTH, PLAZA_RADIUS, POIS, ROAD_RADIUS, SPORT_FIELDS, heightAt, inWater, parkPaths, residences, samplePath, seededRandom, type Poi } from '@/domain/park';
-import { Builder, type Kit } from '../kit';
-import { parkBin } from '../props';
+import { Builder, signTexture, type Kit } from '../kit';
+import { frame, parkBin, roundBox, signBoard } from '../props';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
 export interface Seat {
@@ -106,6 +106,8 @@ export function amenities(kit: Kit): Amenities {
   const lines = parkPaths().filter((l) => l.kind !== 'trail');
   const pathPts = lines.flatMap((l) => samplePath(l.points, 3));
   const nearestPath = (x: number, z: number) => pathPts.reduce((m, q) => (Math.hypot(q.x - x, q.z - z) < Math.hypot(m.x - x, m.z - z) ? q : m), pathPts[0]!);
+  // Altura do piso do anfiteatro (a arquibancada e os assentos usam a mesma).
+  let stageY = 0;
   for (const p of POIS) {
     const y = heightAt(p.x, p.z);
     const np = nearestPath(p.x, p.z);
@@ -179,8 +181,12 @@ export function amenities(kit: Kit): Amenities {
         break;
       }
       case 'stage': {
-        // Palco ao ar livre do anfiteatro do Pavilhão Musical.
-        b.add(wood, new THREE.CylinderGeometry(5, 5.2, 0.8, 32, 1, false, -Math.PI / 2, Math.PI), [p.x, y + 0.4, p.z], [0, p.view, 0]);
+        // Anfiteatro do Pavilhão Musical, no chão nivelado em volta do palco (heightAt): palco e
+        // arquibancada não afundam mais no terreno inclinado, e dá para andar por ele.
+        const Y = y;
+        stageY = Y;
+        b.add(kit.mat('#E2DCCD', { rough: 0.85 }), new THREE.CylinderGeometry(13.8, 13.8, 0.08, 48), [p.x, Y + 0.02, p.z]);
+        stage(kit, b, p.x, Y, p.z, p.view);
         // Arquibancada em degraus (anéis de assento de 0,45 m), não blocos maciços.
         for (let k = 0; k < 4; k++) {
           const r0 = 8 + k * 1.2;
@@ -190,7 +196,7 @@ export function amenities(kit: Kit): Amenities {
           const g = new THREE.ExtrudeGeometry(sh, { depth: 0.45 + k * 0.45, bevelEnabled: false, curveSegments: 24 });
           g.rotateX(Math.PI / 2);
           g.translate(0, 0.45 + k * 0.45, 0);
-          b.add(stone, g, [p.x, y, p.z], [0, p.view, 0]);
+          b.add(stone, g, [p.x, Y, p.z], [0, p.view, 0]);
         }
         // Dá para sentar nos degraus da arquibancada, de frente para o palco.
         for (let k = 0; k < 4; k++)
@@ -203,7 +209,7 @@ export function amenities(kit: Kit): Amenities {
             const sn = Math.sin(p.view);
             const wx = p.x + lx * cs + lz * sn;
             const wz = p.z - lx * sn + lz * cs;
-            seats.push({ x: wx, y: y + 0.45 * (k + 1), z: wz, face: Math.atan2(p.x - wx, p.z - wz) });
+            seats.push({ x: wx, y: stageY + 0.45 * (k + 1), z: wz, face: Math.atan2(p.x - wx, p.z - wz) });
           }
 
         break;
@@ -699,4 +705,102 @@ export function streetTrees(): Array<{ x: number; z: number; s: number }> {
     }
   }
   return out;
+}
+
+/**
+ * Palco do anfiteatro (público do lado +z): tablado com degraus e luzinhas na borda, parede de
+ * fundo com telão aceso e letreiro, cobertura em arco com treliças, barra de refletores coloridos,
+ * caixas de som e monitores de retorno, bateria, teclado, microfones e amplificadores.
+ */
+function stage(kit: Kit, b: Builder, x: number, y: number, z: number, rot: number) {
+  const put = frame(b, x, y, z, rot);
+  const deck = kit.mat('#8B6545', { rough: 0.7 });
+  const black = kit.mat('#16181C', { rough: 0.6 });
+  const steel = kit.mat('#9CA3AF', { metal: 0.85, rough: 0.3 });
+  const chrome = kit.mat('#D1D5DB', { metal: 0.95, rough: 0.15 });
+  const gold = kit.mat('#C9A227', { metal: 0.9, rough: 0.25 });
+  const fabric = kit.mat('#F3F4F6', { rough: 0.8, side: THREE.DoubleSide });
+  const accent = kit.mat('#EC4899', { glow: true });
+  const H = 1.0;
+  // Tablado em meia-lua: saia preta, piso de madeira e uma fileira de luzinhas na borda.
+  put(black, new THREE.CylinderGeometry(5.6, 5.6, H - 0.06, 40, 1, false, -Math.PI / 2, Math.PI), 0, (H - 0.06) / 2, 0);
+  put(deck, new THREE.CylinderGeometry(5.65, 5.65, 0.08, 40, 1, false, -Math.PI / 2, Math.PI), 0, H - 0.04, 0);
+  put(black, new THREE.BoxGeometry(11.3, H, 1.2), 0, H / 2, -0.6);
+  put(deck, new THREE.BoxGeometry(11.3, 0.08, 1.2), 0, H - 0.04, -0.6);
+  for (let k = 0; k <= 14; k++) {
+    const a = -Math.PI / 2 + (k / 14) * Math.PI;
+    put(kit.mat('#FFE7B0', { glow: true }), new THREE.CylinderGeometry(0.05, 0.05, 0.04, 8), Math.sin(a) * 5.58, H - 0.25, Math.cos(a) * 5.58, Math.PI / 2, a);
+  }
+  // Degraus dos dois lados.
+  for (const s of [-1, 1])
+    for (let k = 0; k < 4; k++) put(deck, new THREE.BoxGeometry(1.2, (H * (k + 1)) / 4, 0.4), s * 6.2, (H * (k + 1)) / 8, 1.6 - k * 0.4);
+  // Parede de fundo com telão e letreiro.
+  put(black, new THREE.BoxGeometry(11.6, 4.8, 0.3), 0, H + 2.4, -1.25);
+  put(kit.mat('#1E1B4B', { rough: 0.3 }), new THREE.BoxGeometry(6.4, 3.0, 0.05), 0, H + 2.3, -1.08);
+  put(kit.mat('#7C3AED', { glow: true }), new THREE.BoxGeometry(6.0, 2.6, 0.02), 0, H + 2.3, -1.05);
+  put(accent, new THREE.BoxGeometry(5.2, 0.12, 0.02), 0, H + 1.4, -1.03);
+  put(kit.mat('#60A5FA', { glow: true }), new THREE.BoxGeometry(3.6, 0.1, 0.02), 0, H + 3.2, -1.03);
+  const tex = signTexture(kit, ['PALCO DA MÚSICA', 'roda de violão · 17h às 23h'], { bg: '#111827', fg: '#F9FAFB', accent: '#EC4899', w: 512, h: 128 });
+  const sc = Math.cos(rot);
+  const sn = Math.sin(rot);
+  signBoard(b, kit, tex, x + 0 * sc + -1.05 * sn, y + H + 4.45, z - 0 * sn + -1.05 * sc, rot, 4.2, 0.7);
+  // Cobertura em arco: casca de lona sobre 5 treliças metálicas.
+  // Meio cilindro deitado (eixo para a frente), só a metade de cima.
+  const shell = new THREE.CylinderGeometry(6.2, 6.2, 5.6, 32, 1, true, Math.PI / 2, Math.PI);
+  shell.rotateX(Math.PI / 2);
+  put(fabric, shell, 0, H + 0.3, 1.5);
+  for (let k = 0; k < 5; k++) {
+    const t = new THREE.TorusGeometry(6.25, 0.07, 6, 32, Math.PI);
+    put(steel, t, 0, H + 0.3, -1.2 + k * 1.35);
+  }
+  for (const s of [-1, 1]) put(steel, new THREE.BoxGeometry(0.25, H + 0.4, 0.25), s * 6.25, (H + 0.4) / 2, 1.5);
+  // Barra de refletores na frente, cada um com uma cor.
+  put(black, new THREE.CylinderGeometry(0.06, 0.06, 10, 8), 0, H + 5.2, 3.8, 0, 0, Math.PI / 2);
+  const cols = ['#EF4444', '#3B82F6', '#F59E0B', '#22C55E', '#EC4899', '#A855F7', '#FBBF24', '#06B6D4'];
+  cols.forEach((c, k) => {
+    const lx = -4.2 + k * 1.2;
+    put(black, new THREE.CylinderGeometry(0.16, 0.2, 0.42, 12), lx, H + 4.9, 3.8, 0.6);
+    put(kit.mat(c, { glow: true }), new THREE.CircleGeometry(0.15, 14), lx, H + 4.74, 3.94, -Math.PI / 2 + 0.6);
+  });
+  // Caixas de som empilhadas dos lados, com os cones.
+  for (const s of [-1, 1]) {
+    for (let k = 0; k < 2; k++) {
+      put(black, roundBox(1.0, 1.1, 0.8, 0.05), s * 6.9, k * 1.12, 2.4, 0, -s * 0.25);
+      for (const cy of [0.35, 0.8]) put(kit.mat('#374151', { rough: 0.4 }), new THREE.CircleGeometry(cy > 0.5 ? 0.15 : 0.32, 18), s * 6.9 + Math.sin(-s * 0.25) * 0.41, k * 1.12 + cy, 2.4 + Math.cos(-s * 0.25) * 0.41, 0, -s * 0.25);
+    }
+    // Retorno (monitor de chão inclinado) na beira do tablado.
+    put(black, new THREE.BoxGeometry(0.8, 0.35, 0.45), s * 1.6, H + 0.17, 4.5, -0.5);
+  }
+  // Bateria no fundo: bumbo, caixa, tons, chimbal e pratos dourados.
+  const dx = 0;
+  const dz = 0.3;
+  put(kit.mat('#B91C1C', { rough: 0.35, metal: 0.2 }), new THREE.CylinderGeometry(0.33, 0.33, 0.45, 20), dx, H + 0.35, dz, Math.PI / 2);
+  put(chrome, new THREE.CircleGeometry(0.3, 20), dx, H + 0.35, dz + 0.23);
+  for (const [tx, ty, r] of [[-0.35, 0.8, 0.16], [0.35, 0.8, 0.16], [0.75, 0.55, 0.22], [-0.7, 0.6, 0.17]] as const) {
+    put(kit.mat('#B91C1C', { rough: 0.35, metal: 0.2 }), new THREE.CylinderGeometry(r, r, 0.22, 16), dx + tx, H + ty, dz + 0.35);
+    put(chrome, new THREE.CircleGeometry(r * 0.95, 16), dx + tx, H + ty + 0.112, dz + 0.35, -Math.PI / 2);
+  }
+  for (const [cx, cy] of [[-1.0, 1.15], [1.0, 1.25], [-0.8, 0.95]] as const) {
+    put(steel, new THREE.CylinderGeometry(0.012, 0.012, cy, 6), dx + cx, H + cy / 2, dz + 0.4);
+    put(gold, new THREE.CylinderGeometry(0.24, 0.24, 0.01, 20), dx + cx, H + cy, dz + 0.4, 0.15);
+  }
+  put(black, new THREE.CylinderGeometry(0.2, 0.18, 0.45, 12), dx, H + 0.22, dz - 0.6);
+  // Teclado num suporte em X.
+  for (const s of [-1, 1]) put(steel, new THREE.BoxGeometry(0.03, 0.9, 0.03), -2.8 + s * 0.3, H + 0.42, 1.5, 0, 0, s * 0.6);
+  put(black, new THREE.BoxGeometry(1.3, 0.1, 0.36), -2.8, H + 0.85, 1.5);
+  put(kit.mat('#F9FAFB', { rough: 0.4 }), new THREE.BoxGeometry(1.15, 0.02, 0.15), -2.8, H + 0.91, 1.58);
+  for (let k = 0; k < 10; k++) put(black, new THREE.BoxGeometry(0.035, 0.02, 0.09), -3.3 + k * 0.11, H + 0.925, 1.54);
+  // Microfones nos pedestais e amplificadores.
+  for (const [mx, mz] of [[0, 3.6], [1.8, 3.2], [-1.6, 3.3]] as const) {
+    put(steel, new THREE.CylinderGeometry(0.15, 0.15, 0.02, 12), mx, H + 0.01, mz);
+    put(steel, new THREE.CylinderGeometry(0.012, 0.012, 1.5, 6), mx, H + 0.75, mz);
+    put(black, new THREE.CapsuleGeometry(0.03, 0.12, 4, 8), mx, H + 1.55, mz + 0.06, 0.6);
+  }
+  for (const [ax, az] of [[2.6, -0.2], [3.5, -0.1]] as const) {
+    put(black, roundBox(0.7, 0.55, 0.35, 0.03), ax, H, az);
+    put(kit.mat('#4B5563', { rough: 0.8 }), new THREE.BoxGeometry(0.6, 0.35, 0.01), ax, H + 0.25, az + 0.18);
+    put(gold, new THREE.BoxGeometry(0.5, 0.04, 0.01), ax, H + 0.48, az + 0.18);
+  }
+  // Cabos no chão do palco.
+  put(black, new THREE.TorusGeometry(0.5, 0.015, 4, 20, Math.PI * 1.2), 1.0, H + 0.01, 2.0, Math.PI / 2);
 }

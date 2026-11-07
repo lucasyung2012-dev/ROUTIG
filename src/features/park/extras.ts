@@ -5,8 +5,8 @@
  * pais no banco, pombos na praça (voam quando alguém chega perto), patos no lago e um gato de rua.
  * Tudo por hora do dia e clima: de noite e com chuva o parque esvazia.
  */
-import { LAKE, PARK_SCALE, PLAY, PLAYGROUNDS, POIS, heightAt, lakeRadiusAt, onPath, playAt, plazaCarts, type Point } from '@/domain/park';
-import { routeBetween } from '@/domain/parkPeople';
+import { LAKE, ROAD_RADIUS, PARK_SCALE, PLAY, PLAYGROUNDS, POIS, heightAt, lakeRadiusAt, onPath, playAt, plazaCarts, type Point } from '@/domain/park';
+import { navGraph, routeBetween } from '@/domain/parkPeople';
 import type { Figure } from './people';
 
 export type ExtraSound = 'bikebell' | 'kid' | 'coo' | 'quack' | 'meow';
@@ -44,7 +44,7 @@ export interface Quad {
 }
 
 export interface Extras {
-  step: (dt: number, hour: number, rain: number, viewer: Point, now: number) => void;
+  step: (dt: number, hour: number, rain: number, viewer: Point, now: number, bus?: { a: number; wait: number } | null) => void;
   visible: (from: Point, max: number, range: number) => Figure[];
   pigeons: () => Bird[];
   ducks: () => Duck[];
@@ -166,9 +166,89 @@ export function createExtras(): Extras {
   const cafe = POIS.find((p) => p.id === 'cafe-praca') ?? { x: 30, z: 30 };
   const catS: Quad & { tx: number; tz: number; until: number; meowCool: number } = { kind: 'cat', x: cafe.x + 4, y: 0, z: cafe.z + 3, yaw: 0, phase: 0, gait: 0, sit: true, color: '#E8A35C', size: 1, tx: cafe.x, tz: cafe.z, until: 0, meowCool: 0 };
 
+  // Pontos de ônibus (os mesmos do bairro: logo depois de cada portão, do lado de fora da rua).
+  // Gente chega a pé, espera em pé ou no banco, embarca quando o ônibus para; quem desce sai andando.
+  const stopAt = (a: number, r: number) => ({ x: Math.cos(a) * r, z: Math.sin(a) * r });
+  const BUS_R = ROAD_RADIUS + 1.6;
+  interface Passenger {
+    id: number;
+    x: number;
+    z: number;
+    tx: number;
+    tz: number;
+    yaw: number;
+    phase: number;
+    state: 'coming' | 'waiting' | 'boarding' | 'leaving';
+    seat: boolean;
+  }
+  const busStops = navGraph().gates.map((gi, si) => {
+    const n = navGraph().nodes[gi]!;
+    return { si, a: Math.atan2(n.z, n.x) + 0.05, people: [] as Passenger[], next: 0, served: false };
+  });
+  let passengerId = 700;
+  const slotOf = (st: (typeof busStops)[number], k: number, seat: boolean) => {
+    // No banco (encostado no fundo do abrigo) ou em pé na frente, lado a lado ao longo da calçada.
+    const off = (k - 1) * 0.9;
+    return stopAt(st.a + off / (ROAD_RADIUS + 6), ROAD_RADIUS + (seat ? 6.4 : 5.2));
+  };
+  const stepStops = (dt: number, hour: number, rain: number, now: number, bus?: { a: number; wait: number } | null) => {
+    const service = hour > 5.5 && hour < 23.5;
+    for (const st of busStops) {
+      // Chega alguém de vez em quando (mais de manhã e no fim da tarde), até 4 esperando.
+      const rush = (hour > 6.5 && hour < 9.5) || (hour > 16.5 && hour < 19.5) ? 2 : 1;
+      const waiting = st.people.filter((p) => p.state === 'coming' || p.state === 'waiting');
+      if (service && now > st.next && waiting.length < 4) {
+        st.next = now + (18000 + Math.random() * 30000) / rush / (rain > 0.2 ? 0.6 : 1);
+        const k = waiting.length;
+        const seat = k < 2 && Math.random() < 0.6;
+        const slot = slotOf(st, k, seat);
+        const from = stopAt(st.a + (Math.random() < 0.5 ? -1 : 1) * (18 / ROAD_RADIUS), ROAD_RADIUS + 5);
+        st.people.push({ id: passengerId++, x: from.x, z: from.z, tx: slot.x, tz: slot.z, yaw: 0, phase: Math.random() * 6, state: 'coming', seat });
+      }
+      // O ônibus parado neste ponto: quem espera vai até a porta e embarca; um ou dois descem.
+      const here = bus && bus.wait > 0 && Math.abs(angDiff(bus.a, st.a)) * BUS_R < 3;
+      if (here && !st.served) {
+        st.served = true;
+        const door = stopAt(bus!.a + 4.3 / BUS_R, ROAD_RADIUS + 3);
+        for (const p of st.people)
+          if (p.state === 'waiting' || p.state === 'coming') {
+            p.state = 'boarding';
+            p.tx = door.x;
+            p.tz = door.z;
+          }
+        const off = Math.floor(Math.random() * 3);
+        for (let k = 0; k < off; k++) {
+          const away = stopAt(st.a + (k % 2 ? 1 : -1) * (25 / ROAD_RADIUS), ROAD_RADIUS + 5);
+          st.people.push({ id: passengerId++, x: door.x, z: door.z, tx: away.x, tz: away.z, yaw: 0, phase: k, state: 'leaving', seat: false });
+        }
+      }
+      if (!here) st.served = false;
+      for (const p of st.people) {
+        const dx = p.tx - p.x;
+        const dz = p.tz - p.z;
+        const d = Math.hypot(dx, dz);
+        if (d > 0.15) {
+          const sp = p.state === 'boarding' ? 1.6 : 1.3;
+          p.x += (dx / d) * Math.min(d, sp * dt);
+          p.z += (dz / d) * Math.min(d, sp * dt);
+          p.yaw = turn(p.yaw, Math.atan2(dx, dz), dt * 6);
+          p.phase += dt * sp * 4.2;
+        } else if (p.state === 'coming') {
+          p.state = 'waiting';
+          // De frente para a rua, de onde vem o ônibus.
+          p.yaw = Math.atan2(-Math.cos(st.a), -Math.sin(st.a));
+        }
+      }
+      // Embarcou ou foi embora: sai da cena.
+      st.people = st.people.filter((p) => !((p.state === 'boarding' || p.state === 'leaving') && Math.hypot(p.tx - p.x, p.tz - p.z) <= 0.15));
+      if (!service) st.people = st.people.filter((p) => p.state === 'leaving');
+    }
+  };
+
   let hourNow = 12;
   let rainNow = 0;
-  const step: Extras['step'] = (dt, hour, rain, viewer, now) => {
+  const step: Extras['step'] = (dt, hour, rain, viewer, now, bus) => {
+    stepStops(dt, hour, rain, now, bus);
     hourNow = hour;
     rainNow = rain;
     sounds.length = 0;
@@ -519,6 +599,11 @@ export function createExtras(): Extras {
         const z = Math.cos(c.face) * r;
         add({ ...look(360 + i), outfit: 'shirt', shirt: i ? '#F8FAFC' : '#DC2626', accent: '#FFFFFF', hat: 1, hatColor: i ? '#16A34A' : '#F8FAFC', x, y: heightAt(x, z), z, yaw: c.face, pose: 'stand', phase: performance.now() / 600 + i, stride: 0, scale: 1, expr: Math.floor(performance.now() / 5000 + i) % 3 === 0 ? 'smile' : 'neutral' });
       });
+    for (const st of busStops)
+      for (const p of st.people) {
+        const sitting = p.state === 'waiting' && p.seat;
+        add({ ...look(p.id), bag: p.id % 3 === 0, x: p.x, y: heightAt(p.x, p.z) + (sitting ? 0.17 : 0.2), z: p.z, yaw: p.yaw, pose: p.state === 'waiting' ? (sitting ? 'sit' : p.id % 4 === 0 ? 'photo' : 'stand') : 'walk', phase: p.phase, stride: 1, scale: 0.94 + hash(p.id) * 0.1, expr: 'neutral' });
+      }
     const playOn = hourNow > 8 && hourNow < 18.5 && rainNow < 0.15;
     if (playOn) {
       for (const Y of yards) Y.kids.forEach((k) => add({ ...look(k.id, true), x: k.x, y: k.y, z: k.z, yaw: k.yaw, pose: k.pose, phase: k.phase, stride: 1, scale: k.scale, expr: k.pose === 'run' || k.pose === 'swing' ? 'laugh' : 'smile' }));

@@ -181,6 +181,8 @@ export interface World {
   play: (s: Array<{ swings: number[]; seesaw: number }>) => void;
   /** Sons da rua deste quadro (ônibus freando, buzina). */
   cityEvents: () => Array<{ x: number; z: number; kind: 'brake' | 'horn' }>;
+  /** Ônibus da linha do parque (null enquanto o bairro não montou). */
+  bus: () => { a: number; wait: number } | null;
   /** Cancela o que ainda ia ser montado (ao fechar o parque). */
   stop: () => void;
   /** Centro do lounge do elevador de cada prédio (diagnóstico). */
@@ -901,6 +903,7 @@ export function createWorld(kit: Kit): World {
     seats: [...am.seats, ...plazaSeats(), ...pgs.flatMap((p) => p.seats)],
     play: (st) => st.forEach((s, i) => pgs[i]?.tick(s)),
     cityEvents: () => streets?.events() ?? [],
+    bus: () => streets?.bus() ?? null,
     stop: () => window.clearTimeout(edgeTimer),
     lifts,
     treeSpots: plantList,

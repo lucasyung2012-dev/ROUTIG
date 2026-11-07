@@ -456,26 +456,30 @@ export function withFloors(kit: Kit, scene: InteriorScene, id: ModuleId, label: 
     const fabric = kit.mat(style.warm ? '#9C6B4E' : '#5B6B80', { rough: 0.95 });
     const legs = kit.mat('#2B3442', { rough: 0.5, metal: 0.3 });
     for (const sx of [-1, 1]) {
-      const x = sx * 3.9;
-      if (!free(x, lz, 0.9)) continue;
+      // A poltrona procura um lugar livre perto do lounge (cada térreo é diferente); antes, sem
+      // lugar no ponto exato, ela simplesmente não aparecia.
+      const spot = ([[3.9, 0], [3.3, 0.9], [4.5, -0.7], [2.8, 1.7], [3.6, 2.4]] as const).map(([dx, dz]) => [sx * dx, lz + dz] as const).find(([px, pz]) => free(px, pz, 0.9));
+      if (!spot) continue;
+      const [x, az0] = spot;
       // Poltrona virada para o centro do lounge.
-      b.add(fabric, new THREE.BoxGeometry(0.85, 0.4, 0.85), [x, 0.42, lz]);
-      b.add(fabric, new THREE.BoxGeometry(0.2, 0.55, 0.85), [x + sx * 0.33, 0.85, lz]);
-      for (const az of [-1, 1]) b.add(fabric, new THREE.BoxGeometry(0.85, 0.25, 0.15), [x, 0.72, lz + az * 0.38]);
-      for (const [ax, az] of [[-0.35, -0.35], [0.35, -0.35], [-0.35, 0.35], [0.35, 0.35]] as const) b.add(legs, new THREE.CylinderGeometry(0.025, 0.02, 0.22, 6), [x + ax, 0.11, lz + az]);
-      seats.push({ x, y: 0.62, z: lz, face: sx > 0 ? -Math.PI / 2 : Math.PI / 2 });
-      occupied.push({ x, z: lz, r: 0.7, h: 1 });
+      b.add(fabric, new THREE.BoxGeometry(0.85, 0.4, 0.85), [x, 0.42, az0]);
+      b.add(fabric, new THREE.BoxGeometry(0.2, 0.55, 0.85), [x + sx * 0.33, 0.85, az0]);
+      for (const az of [-1, 1]) b.add(fabric, new THREE.BoxGeometry(0.85, 0.25, 0.15), [x, 0.72, az0 + az * 0.38]);
+      for (const [ax, az] of [[-0.35, -0.35], [0.35, -0.35], [-0.35, 0.35], [0.35, 0.35]] as const) b.add(legs, new THREE.CylinderGeometry(0.025, 0.02, 0.22, 6), [x + ax, 0.11, az0 + az]);
+      seats.push({ x, y: 0.62, z: az0, face: sx > 0 ? -Math.PI / 2 : Math.PI / 2 });
+      occupied.push({ x, z: az0, r: 0.7, h: 1 });
     }
     // Mesinha de centro com revistas.
-    if (free(0, lz + 0.4, 0.5)) {
+    if (free(-1.9, lz + 0.6, 0.5)) {
       b.add(kit.mat('#C9A27A', { rough: 0.6 }), new THREE.CylinderGeometry(0.45, 0.45, 0.04, 24), [-1.9, 0.45, lz + 0.6]);
       b.add(legs, new THREE.CylinderGeometry(0.04, 0.06, 0.43, 8), [-1.9, 0.22, lz + 0.6]);
       for (let k = 0; k < 3; k++) b.add(kit.mat(['#E07A5F', '#5B8DB8', '#F2CC8F'][k]!, { rough: 0.8 }), new THREE.BoxGeometry(0.22, 0.012, 0.3), [-1.95 + k * 0.05, 0.48 + k * 0.012, lz + 0.6], [0, k * 0.4, 0]);
     }
     for (const sx of [-1, 1]) {
-      const x = sx * 2.6;
+      const spot = ([2.6, 3.4, 1.9] as const).map((dx) => sx * dx).find((px) => free(px, -(R - 1.6), 0.5));
+      if (spot === undefined) continue;
+      const x = spot;
       const z = -(R - 1.6);
-      if (!free(x, z, 0.5)) continue;
       b.add(kit.mat('#D9CBB6', { rough: 0.8 }), new THREE.CylinderGeometry(0.32, 0.25, 0.6, 16), [x, 0.3, z]);
       b.add(kit.mat('#3E7F44', { rough: 0.9 }), new THREE.IcosahedronGeometry(0.5, 1), [x, 1.05, z], undefined, [1, 1.5, 1]);
     }

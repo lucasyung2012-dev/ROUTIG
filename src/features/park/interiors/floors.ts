@@ -98,6 +98,9 @@ export interface FloorLevel {
   inner: number;
   ceiling: number;
   obstacles: Obstacle[];
+  /** Portas para o terraço (ângulos) e meia abertura em radianos. */
+  doors: number[];
+  doorHalf: number;
 }
 
 export interface Floors {
@@ -131,7 +134,7 @@ export function withFloors(kit: Kit, scene: InteriorScene, id: ModuleId, label: 
   const inner = R * 0.4;
   const tower = { x: 0, z: -(R + 2.2) };
   const levels: FloorLevel[] = [
-    { y: 0, outer: R, walk: R - 1.2, inner: 0, ceiling: H, obstacles: scene.obstacles },
+    { y: 0, outer: R, walk: R - 1.2, inner: 0, ceiling: H, obstacles: scene.obstacles, doors: [], doorHalf: 0 },
   ];
   const zones: FloorZone[] = [];
   const seats: Seat[] = [];
@@ -151,10 +154,21 @@ export function withFloors(kit: Kit, scene: InteriorScene, id: ModuleId, label: 
     b.add(metal, new THREE.TorusGeometry(inner, 0.05, 6, 64), [0, y + 1.1, 0], [Math.PI / 2, 0, 0]);
     b.add(glass, new THREE.CylinderGeometry(below + 0.1, below + 0.1, 1.1, 64, 1, true), [0, y + 0.55, 0]);
     b.add(metal, new THREE.TorusGeometry(below + 0.1, 0.05, 6, 64), [0, y + 1.1, 0], [Math.PI / 2, 0, 0]);
-    // Fachada de vidro do andar, com montantes; cobertura no último andar (com claraboia).
-    b.add(glass, new THREE.CylinderGeometry(outer, outer, STOREY - 0.3, 48, 1, true), [0, y + (STOREY - 0.3) / 2, 0]);
+    // Fachada de vidro do andar, com montantes e quatro portas para o terraço; cobertura no último andar.
+    const doors = [1, 3, 5, 7].map((k) => (k * Math.PI) / 4);
+    const doorHalf = 0.8 / outer;
+    const fh = STOREY - 0.3;
+    doors.forEach((d) => {
+      b.add(glass, new THREE.CylinderGeometry(outer, outer, fh, 12, 1, true, d + doorHalf, Math.PI / 2 - doorHalf * 2), [0, y + fh / 2, 0]);
+      for (const side of [-1, 1]) {
+        const a = d + side * doorHalf;
+        b.add(metal, new THREE.BoxGeometry(0.14, 2.4, 0.26), [Math.sin(a) * outer, y + 1.2, Math.cos(a) * outer], [0, a, 0]);
+      }
+      b.add(kit.mat(accent, { glow: true }), new THREE.BoxGeometry(1.8, 0.14, 0.3), [Math.sin(d) * outer, y + 2.45, Math.cos(d) * outer], [0, d, 0]);
+    });
     for (let k = 0; k < 24; k++) {
       const a = (k / 24) * Math.PI * 2;
+      if (k % 6 === 3) continue;
       b.add(metal, new THREE.BoxGeometry(0.1, STOREY - 0.3, 0.22), [Math.sin(a) * outer, y + (STOREY - 0.3) / 2, Math.cos(a) * outer], [0, a, 0]);
     }
     if (top) {
@@ -239,7 +253,7 @@ export function withFloors(kit: Kit, scene: InteriorScene, id: ModuleId, label: 
       scene.pickables.push(g);
       obstacles.push({ x, z, r: 1.2, h: 2 });
     });
-    levels.push({ y, outer, walk: below - 0.5, inner, ceiling: y + STOREY - 0.35, obstacles });
+    levels.push({ y, outer, walk: below - 0.5, inner, ceiling: y + STOREY - 0.35, obstacles, doors, doorHalf });
   });
 
   // Torre do elevador: vidro, estrutura e uma cabine em cada andar; placa com o nome de cada andar.

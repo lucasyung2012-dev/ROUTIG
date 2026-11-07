@@ -31,6 +31,8 @@ export interface CameraWorld {
   maxDistance: number;
   /** Pontos onde não se pisa (água); quem anda não entra. */
   blocked?: (x: number, z: number) => boolean;
+  /** Fachada de vidro circular (raio): a câmera da 3ª pessoa não a atravessa. */
+  wall?: number;
 }
 
 export interface MoveSettings {
@@ -380,7 +382,10 @@ export function createCameraRig(camera: THREE.PerspectiveCamera, canvas: HTMLCan
         const x = head.x + back.x * s;
         const z = head.z + back.z * s;
         const y = head.y + back.y * s;
-        if (solidAt(x, z, y) || Math.hypot(x - world.limit.x, z - world.limit.z) > world.limit.r + 0.4 || (Number.isFinite(world.ceiling) && y > world.ceiling - 0.3)) {
+        const wr = Math.hypot(x, z);
+        const fr = Math.hypot(feet.x, feet.z);
+        const throughWall = world.wall !== undefined && (fr < world.wall ? wr > world.wall - 0.35 : wr < world.wall + 0.35);
+        if (throughWall || solidAt(x, z, y) || Math.hypot(x - world.limit.x, z - world.limit.z) > world.limit.r + 0.4 || (Number.isFinite(world.ceiling) && y > world.ceiling - 0.3)) {
           d = Math.max(0.6, s - 0.3);
           break;
         }

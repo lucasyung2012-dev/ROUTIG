@@ -220,7 +220,14 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
     const sc = inside!.scene;
     const lv = sc.floors?.levels[L];
     if (!lv || L === 0) return { ground: () => 0, obstacles: sc.obstacles, limit: { x: 0, z: 0, r: sc.room.radius - 1.2 }, ceiling: lv?.ceiling ?? sc.room.height, minDistance: 1.5, maxDistance: sc.room.radius * 1.7 };
-    return { ground: () => lv.y, obstacles: lv.obstacles, limit: { x: 0, z: 0, r: lv.walk }, ceiling: lv.ceiling, minDistance: 1.5, maxDistance: sc.room.radius * 1.7, blocked: (x: number, z: number) => Math.hypot(x, z) < lv.inner + 0.5 };
+    // Átrio aberto e fachada de vidro: só se passa pelas portas do terraço.
+    const atDoor = (x: number, z: number) => lv.doors.some((d) => Math.abs(Math.atan2(Math.sin(Math.atan2(x, z) - d), Math.cos(Math.atan2(x, z) - d))) < lv.doorHalf * 0.8);
+    const blocked = (x: number, z: number) => {
+      const r = Math.hypot(x, z);
+      return r < lv.inner + 0.5 || (Math.abs(r - lv.outer) < 0.3 && !atDoor(x, z));
+    };
+    return { ground: () => lv.y, obstacles: lv.obstacles, limit: { x: 0, z: 0, r: lv.walk }, ceiling: lv.ceiling, minDistance: 1.5, maxDistance: sc.room.radius * 1.7, blocked, wall: lv.outer };
+
   };
   const setFloor = (L: number, move = true) => {
     const levels = inside?.scene.floors?.levels;

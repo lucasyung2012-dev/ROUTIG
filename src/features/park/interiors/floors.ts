@@ -13,6 +13,7 @@ import { Builder, type Kit } from '../kit';
 import type { Obstacle, Seat } from '../camera';
 import { sectorSign, type InteriorScene } from './common';
 import { footprint } from '../collision';
+import { furnish, roomType, type RoomType } from './furnish';
 
 /** Sala de um andar: chave do nome, setor real que ela abre (null = sem tela própria), tipo de mobília. */
 export type RoomKind = 'desk' | 'shelf' | 'screen' | 'lounge' | 'studio';
@@ -80,6 +81,35 @@ export const FLOOR_PLANS: Record<ModuleId, FloorRoom[][]> = {
 
 const STOREY = 4.4;
 
+/** Estilo de cada prédio: piso dos corredores por andar, paredes e luz (cada prédio com sua cara). */
+const STYLES: Record<ModuleId, { floors: string[]; wall: string; glass: boolean; warm: boolean }> = {
+  dashboard: { floors: ['#E6EBF2', '#D9E0EA'], wall: '#EEF2F7', glass: true, warm: false },
+  profile: { floors: ['#D8C3A5'], wall: '#F3EBDD', glass: false, warm: true },
+  notes: { floors: ['#E3D5C1'], wall: '#F5EFE4', glass: false, warm: true },
+  library: { floors: ['#C9A27A', '#B98E66'], wall: '#EFE6D6', glass: false, warm: true },
+  calendar: { floors: ['#E2E8F0', '#CBD5E1'], wall: '#F1F5F9', glass: true, warm: false },
+  tasks: { floors: ['#E5E7EB', '#D1D5DB'], wall: '#F3F4F6', glass: true, warm: false },
+  focus: { floors: ['#E7DCC8'], wall: '#F4EFE6', glass: false, warm: true },
+  habits: { floors: ['#DDE8D5'], wall: '#EEF5EA', glass: true, warm: true },
+  academy: { floors: ['#E9DFCF', '#E2D6C1', '#D9CCB3'], wall: '#F6F1E7', glass: false, warm: true },
+  languages: { floors: ['#EADBC8', '#E3D2BA'], wall: '#F7EFE3', glass: false, warm: true },
+  projects: { floors: ['#D9D4CC', '#CFC8BD'], wall: '#E7E3DC', glass: true, warm: false },
+  music: { floors: ['#C7A27C', '#B48D68'], wall: '#EADFD0', glass: false, warm: true },
+  sports: { floors: ['#D9DEE5', '#CDD3DB'], wall: '#EEF1F4', glass: true, warm: false },
+  goals: { floors: ['#EDE3C8'], wall: '#F8F2E2', glass: false, warm: true },
+  insights: { floors: ['#E3E8F0', '#D5DCE8', '#C8D1E0'], wall: '#EEF2F8', glass: true, warm: false },
+  finance: { floors: ['#E8E2D6', '#DCD4C4'], wall: '#F2EEE6', glass: false, warm: true },
+  settings: { floors: ['#E9EDF2', '#DDE3EA'], wall: '#F1F4F7', glass: true, warm: false },
+  inbox: { floors: ['#E8EEF5'], wall: '#F2F6FA', glass: true, warm: false },
+};
+
+/** Piso de cada tipo de sala. */
+const ROOM_FLOOR: Record<RoomType, string> = {
+  classroom: '#C9A27A', lab: '#E5E7EB', booth: '#4B5563', gym: '#3F4A5A', archive: '#B98E66', gallery: '#EDE9E3', office: '#D6CFC4',
+  dataviz: '#2E3646', lounge: '#B08968', studio: '#E7DCCB', stage: '#8B6B4E', observatory: '#2B3442', music: '#A47551',
+};
+
+
 export interface FloorZone {
   level: number;
   key: string;
@@ -127,13 +157,11 @@ export function withFloors(kit: Kit, scene: InteriorScene, id: ModuleId, label: 
   const accent = buildingById(id)?.color ?? '#22D3EE';
   const b = new Builder();
   const slab = kit.mat('#F1F3F6', { rough: 0.6 });
-  const floorMat = kit.mat('#E4E8EE', { rough: 0.3, metal: 0.05 });
+  const style = STYLES[id];
   const glass = kit.mat('#CFE7F5', { glass: true, side: THREE.DoubleSide });
   const metal = kit.mat('#9AA6B5', { metal: 0.85, rough: 0.3 });
   const wood = kit.mat('#A0714F', { rough: 0.75 });
   const dark = kit.mat('#2B3442', { rough: 0.5 });
-  const rug = kit.mat(accent, { rough: 0.9 });
-  const screen = kit.mat('#7DD3FC', { glow: true, rough: 0.3 });
   const leaf = kit.mat('#4C9A4F', { rough: 0.9 });
   const inner = R * 0.4;
   const tower = { x: 0, z: -(R + 2.2) };
@@ -153,7 +181,6 @@ export function withFloors(kit: Kit, scene: InteriorScene, id: ModuleId, label: 
     const top = L === plan.length;
     // Laje (forma o piso do andar e o terraço do recuo), átrio aberto no meio com guarda-corpo de vidro.
     b.add(slab, thick(inner, below + 0.2, y - 0.3, 0.3));
-    b.add(floorMat, new THREE.RingGeometry(inner, below, 64, 1), [0, y + 0.01, 0], [-Math.PI / 2, 0, 0]);
     b.add(glass, new THREE.CylinderGeometry(inner, inner, 1.1, 48, 1, true), [0, y + 0.55, 0]);
     b.add(metal, new THREE.TorusGeometry(inner, 0.05, 6, 64), [0, y + 1.1, 0], [Math.PI / 2, 0, 0]);
     b.add(glass, new THREE.CylinderGeometry(below + 0.1, below + 0.1, 1.1, 64, 1, true), [0, y + 0.55, 0]);
@@ -205,57 +232,65 @@ export function withFloors(kit: Kit, scene: InteriorScene, id: ModuleId, label: 
     }
     // Ponte do terraço até a torre do elevador.
     b.add(slab, new THREE.BoxGeometry(2.4, 0.3, R + 2.2 - outer + 0.4), [0, y - 0.15, -(outer + R + 2.2) / 2]);
-    // Salas do andar, em volta do átrio (os fundos ficam livres para o elevador).
-    const mid = (inner + outer) / 2;
-    rooms.forEach(([key, sector, kind], k) => {
-      const a = Math.PI + ((k + 1) / (rooms.length + 1)) * Math.PI * 2;
+    // Salas do andar: cada uma com paredes laterais, frente com porta (vidro nos prédios de
+    // tecnologia, alvenaria nos de clima mais quente), piso, luz e mobília do seu tipo.
+    // Os fundos (perto do elevador) ficam como saguão.
+    const ri = inner + 1.5;
+    const ro = outer - 0.15;
+    const lobby = 0.9;
+    const span = (Math.PI * 2 - lobby) / rooms.length;
+    const start = Math.PI + lobby / 2;
+    const wallH = STOREY - 0.35;
+    const corridor = kit.mat(style.floors[(L - 1) % style.floors.length]!, { rough: 0.35, metal: 0.05 });
+    b.add(corridor, new THREE.RingGeometry(inner, below, 64, 1), [0, y + 0.012, 0], [-Math.PI / 2, 0, 0]);
+    const partMat = style.glass ? glass : kit.mat(style.wall, { rough: 0.8 });
+    const lamp = kit.mat(style.warm ? '#FFE8C2' : '#E8F4FF', { glow: true });
+    for (let k = 0; k <= rooms.length; k++) {
+      const ang = start + k * span;
+      b.add(kit.mat(style.wall, { rough: 0.8 }), new THREE.BoxGeometry(0.15, wallH, ro - ri), [Math.sin(ang) * (ri + ro) / 2, y + wallH / 2, Math.cos(ang) * (ri + ro) / 2], [0, ang, 0]);
+    }
+    rooms.forEach(([key, sector], k) => {
+      const b0 = start + k * span;
+      const a = b0 + span / 2;
+      const mid = (ri + ro) / 2;
       const x = Math.sin(a) * mid;
       const z = Math.cos(a) * mid;
       const face = a + Math.PI;
+      const type = roomType(key, id);
+      // Frente com porta de 2,4 m no meio, verga e placa com o nome.
+      const dh = 1.2 / ri;
+      b.add(partMat, new THREE.CylinderGeometry(ri, ri, wallH, 10, 1, true, b0, span / 2 - dh), [0, y + wallH / 2, 0]);
+      b.add(partMat, new THREE.CylinderGeometry(ri, ri, wallH, 10, 1, true, a + dh, span / 2 - dh), [0, y + wallH / 2, 0]);
+      b.add(kit.mat(style.wall, { rough: 0.8 }), new THREE.CylinderGeometry(ri, ri, wallH - 2.4, 6, 1, true, a - dh, dh * 2), [0, y + 2.4 + (wallH - 2.4) / 2, 0]);
+      if (style.glass) b.add(metal, new THREE.TorusGeometry(ri, 0.03, 4, 48, span), [0, y + 1.0, 0], [-Math.PI / 2, 0, b0 - Math.PI / 2]);
+      // Piso da sala.
+      b.add(kit.mat(ROOM_FLOOR[type], { rough: type === 'lab' || type === 'booth' ? 0.4 : 0.7 }), new THREE.RingGeometry(ri, ro, 16, 1, b0 - Math.PI / 2, span), [0, y + 0.02, 0], [-Math.PI / 2, 0, 0]);
+      // Luzes do teto.
+      for (const f of [0.35, 0.65]) {
+        const la = b0 + span * f;
+        b.add(lamp, new THREE.BoxGeometry(1.2, 0.04, 0.5), [Math.sin(la) * mid, y + wallH - 0.05, Math.cos(la) * mid], [0, la, 0]);
+      }
       zones.push({ level: L, key, sector, x, z, face });
       const g = new THREE.Group();
       g.position.set(x, y, z);
       g.rotation.y = face;
-      g.userData.zone = zones.length - 1;
-      g.userData.sector = sector;
       const fb = new Builder();
-      fb.add(rug, new THREE.CircleGeometry(1.9, 32), [0, 0.02, 0], [-Math.PI / 2, 0, 0]);
-      if (kind === 'desk' || kind === 'studio') {
-        fb.add(wood, new THREE.BoxGeometry(2.2, 0.06, 0.9), [0, 0.75, 0]);
-        for (const sx of [-1, 1]) fb.add(dark, new THREE.BoxGeometry(0.06, 0.72, 0.8), [sx * 1.0, 0.37, 0]);
-        for (const sx of [-0.6, 0.6]) {
-          fb.add(dark, new THREE.BoxGeometry(0.45, 0.06, 0.45), [sx, 0.46, 0.75]);
-          fb.add(dark, new THREE.BoxGeometry(0.45, 0.5, 0.06), [sx, 0.72, 0.98]);
-          fb.add(metal, new THREE.CylinderGeometry(0.03, 0.03, 0.44, 6), [sx, 0.22, 0.75]);
-        }
-        if (kind === 'studio') fb.add(metal, new THREE.BoxGeometry(0.9, 1.4, 0.05), [0, 1.5, -0.6], [-0.2, 0, 0]);
-      } else if (kind === 'shelf') {
-        for (const sx of [-0.9, 0.9]) {
-          fb.add(wood, new THREE.BoxGeometry(1.6, 2.1, 0.4), [sx, 1.05, -0.9]);
-          for (let r = 0; r < 4; r++) fb.add(kit.mat(['#E07A5F', '#3D9970', '#5B8DB8', '#F2CC8F'][r]!, { rough: 0.8 }), new THREE.BoxGeometry(1.4, 0.3, 0.25), [sx, 0.35 + r * 0.5, -0.78]);
-        }
-      } else if (kind === 'screen') {
-        fb.add(dark, new THREE.BoxGeometry(2.6, 1.5, 0.08), [0, 1.6, -0.9]);
-        fb.add(screen, new THREE.BoxGeometry(2.4, 1.3, 0.02), [0, 1.6, -0.85]);
-        fb.add(metal, new THREE.CylinderGeometry(0.05, 0.05, 0.9, 8), [0, 0.45, -0.9]);
-        fb.add(wood, new THREE.BoxGeometry(1.2, 0.45, 0.5), [0, 0.22, 0.6]);
-      } else {
-        fb.add(kit.mat('#8FA3B8', { rough: 0.9 }), new THREE.BoxGeometry(2.0, 0.42, 0.8), [0, 0.22, -0.5]);
-        fb.add(kit.mat('#8FA3B8', { rough: 0.9 }), new THREE.BoxGeometry(2.0, 0.5, 0.2), [0, 0.6, -0.85]);
-        fb.add(wood, new THREE.CylinderGeometry(0.45, 0.45, 0.4, 20), [0, 0.2, 0.6]);
-        seats.push({ x: x + Math.sin(face) * -0.5, y: y + 0.45, z: z + Math.cos(face) * -0.5, face });
-      }
+      const w = mid * span * 0.9;
+      const d = ro - ri - 0.3;
+      const local = furnish(kit, fb, type, w, d, accent, k + L * 7);
       g.add(fb.build());
-      const sign = sectorSign(kit, label(key), sector ? accent : '#94A3B8', 2.4);
-      sign.position.set(0, 2.7, -1.2);
+      const sign = sectorSign(kit, label(key), sector ? accent : '#94A3B8', 2.2);
+      sign.position.set(0, 2.62, d / 2 + 0.25);
       g.add(sign);
+      const cf = Math.cos(face);
+      const sf = Math.sin(face);
+      for (const st of local) seats.push({ x: x + st.x * cf + st.z * sf, y: y + st.y, z: z - st.x * sf + st.z * cf, face: st.face + face });
       g.traverse((o) => {
         o.userData.zone = zones.length - 1;
         o.userData.sector = sector;
       });
       scene.scene.add(g);
       scene.pickables.push(g);
-      obstacles.push({ x, z, r: 1.2, h: 2 });
     });
     levels.push({ y, outer, walk: below - 0.5, inner, ceiling: y + STOREY - 0.35, obstacles, doors, doorHalf });
   });

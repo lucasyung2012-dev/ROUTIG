@@ -363,7 +363,8 @@ function plaza(kit: Kit): THREE.Group {
     const a = (i / 36) * Math.PI * 2;
     b.add(kit.mat('#CFC6B2', { rough: 0.8 }), new THREE.BoxGeometry(0.22, 0.02, 5.4), [Math.sin(a) * 10.85, 0.08, Math.cos(a) * 10.85], [0, a, 0]);
   }
-  b.add(kit.mat('#D6D0C2'), new THREE.TorusGeometry(R + 0.1, 0.22, 6, 128), [0, 0.1, 0], [-Math.PI / 2, 0, 0]);
+  // Meio-fio rente ao chão (14 cm): dá para passar por cima em qualquer ponto da borda.
+  b.add(kit.mat('#D6D0C2'), new THREE.TorusGeometry(R + 0.1, 0.22, 6, 128), [0, 0.05, 0], [-Math.PI / 2, 0, 0], [1, 1, 0.4]);
   // Bancos entre as saídas e canteiros circulares com borda de pedra.
   const wood = kit.mat('#A0714F', { rough: 0.8 });
   const metal = kit.mat('#475569', { metal: 0.7, rough: 0.35 });
@@ -374,7 +375,10 @@ function plaza(kit: Kit): THREE.Group {
     const x = Math.sin(a) * 17.2;
     const z = Math.cos(a) * 17.2;
     b.add(wood, new THREE.BoxGeometry(2.6, 0.12, 0.62), [x, 0.5, z], [0, a, 0]);
-    b.add(wood, new THREE.BoxGeometry(2.6, 0.5, 0.1), [x + Math.sin(a) * 0.33, 0.8, z + Math.cos(a) * 0.33], [-0.15, a, 0]);
+    // Encosto inclinado para trás (para fora da praça) no eixo do próprio banco.
+    const backrest = new THREE.BoxGeometry(2.6, 0.5, 0.1);
+    backrest.rotateX(0.15);
+    b.add(wood, backrest, [x + Math.sin(a) * 0.33, 0.8, z + Math.cos(a) * 0.33], [0, a, 0]);
     for (const s of [-1, 1]) b.add(metal, new THREE.BoxGeometry(0.1, 0.5, 0.55), [x + Math.cos(a) * s * 1.1, 0.25, z - Math.sin(a) * s * 1.1], [0, a, 0]);
   }
   for (let i = 0; i < 8; i++) {
@@ -680,13 +684,27 @@ export function createWorld(kit: Kit): World {
   festive.visible = false;
   root.add(festive);
 
-  const clouds = Array.from({ length: 12 }, (_, i) => {
-    const c = cloud(kit, i + 1);
-    c.position.set(-480 + i * 80, 80 + (i % 3) * 14, -320 + ((i * 97) % 640));
-    c.scale.setScalar(2.2 + (i % 3) * 0.7);
-    root.add(c);
-    return c;
+  // Nuvens: seis formas em instâncias (uma chamada de desenho por forma) e 42 nuvens espalhadas
+  // pelo céu, em alturas, tamanhos e velocidades diferentes.
+  const crnd = seededRandom(31);
+  const cloudSpots = Array.from({ length: 42 }, () => ({ x: -620 + crnd() * 1240, y: 85 + crnd() * 65, z: -540 + crnd() * 1080, s: 1.5 + crnd() * 2.3, sy: 0.7 + crnd() * 0.5, r: crnd() * 6, v: 1.3 + crnd() * 1.5 }));
+  const clouds = Array.from({ length: 6 }, (_, k) => {
+    const src = cloud(kit, k + 1);
+    const im = new THREE.InstancedMesh(src.geometry, src.material, 7);
+    im.frustumCulled = false;
+    root.add(im);
+    return im;
   });
+  const cM = new THREE.Matrix4();
+  const cQ = new THREE.Quaternion();
+  const cV = new THREE.Vector3();
+  const cS = new THREE.Vector3();
+  const cUp = new THREE.Vector3(0, 1, 0);
+  const placeClouds = () => {
+    cloudSpots.forEach((c, i) => clouds[i % 6]!.setMatrixAt(Math.floor(i / 6), cM.compose(cV.set(c.x, c.y, c.z), cQ.setFromAxisAngle(cUp, c.r), cS.set(c.s, c.s * c.sy, c.s))));
+    clouds.forEach((m) => (m.instanceMatrix.needsUpdate = true));
+  };
+  placeClouds();
   const bd = birds(kit, 12);
   const inbox = buildings.get('inbox')!.def;
   const dr = drone(kit, inbox);
@@ -742,10 +760,11 @@ export function createWorld(kit: Kit): World {
       trees.tick(t, weather.wind, cam);
       bd.tick(t);
       dr.tick(t);
-      clouds.forEach((c, i) => {
-        c.position.x += dt * (1.6 + (i % 3) * 0.5 + weather.wind * 9);
-        if (c.position.x > 600) c.position.x = -600;
-      });
+      for (const c of cloudSpots) {
+        c.x += dt * (c.v + weather.wind * 9);
+        if (c.x > 640) c.x = -640;
+      }
+      if (dt > 0) placeClouds();
       if (weather.rain > 0.02) rn.tick(dt, focus, weather.wind);
       ms.tick(focus, weather.fog, t);
       gr.tick(cam, t, weather.wind);

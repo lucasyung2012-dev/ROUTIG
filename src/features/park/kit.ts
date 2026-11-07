@@ -637,16 +637,22 @@ export function stars(kit: Kit, count = 500): THREE.Points {
 
 export function cloud(kit: Kit, seed: number): THREE.Mesh {
   const parts: THREE.BufferGeometry[] = [];
-  for (let i = 0; i < 6; i++) {
-    const s = 2.5 + ((seed * 7 + i * 13) % 5) * 0.6;
+  // Cúmulo: bolhas maiores no meio, menores nas pontas, e a base achatada.
+  const n = 7 + (seed % 3);
+  for (let i = 0; i < n; i++) {
+    const mid = 1 - Math.abs(i - (n - 1) / 2) / n;
+    const s = 1.8 + mid * 2.2 + ((seed * 7 + i * 13) % 5) * 0.35;
     const g = new THREE.IcosahedronGeometry(s, 1);
-    g.translate((i - 2.5) * 2.6, Math.sin(i + seed) * 0.8, Math.cos(i * 2 + seed) * 1.5);
+    g.translate((i - (n - 1) / 2) * 2.3, mid * 1.4 + Math.sin(i + seed) * 0.5, Math.cos(i * 2 + seed) * 1.8);
     parts.push(g.toNonIndexed());
     g.dispose();
   }
   const merged = kit.own(mergeGeometries(parts)!);
   parts.forEach((p) => p.dispose());
+  const cp = merged.attributes.position!;
+  for (let i = 0; i < cp.count; i++) if (cp.getY(i) < -0.6) cp.setY(i, -0.6 + (cp.getY(i) + 0.6) * 0.2);
   merged.scale(1, 0.55, 1);
+  merged.computeVertexNormals();
   const m = new THREE.Mesh(merged, kit.mat('#FFFFFF', { rough: 1 }));
   m.castShadow = false;
   return m;

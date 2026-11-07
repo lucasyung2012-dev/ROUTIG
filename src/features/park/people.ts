@@ -424,26 +424,32 @@ interface Joints {
   abd: [number, number];
   headPitch: number;
   headYaw: number;
+  /** Giro do peito contra o quadril (o ombro do braço que vai à frente avança junto). */
+  twist: number;
   prop: 'book' | 'guitar' | 'sketch' | 'camera' | 'racket' | null;
 }
 
 function joints(f: Figure): Joints {
   const s = f.stride;
   const p = f.phase;
-  const j: Joints = { hip: HIP, lean: 0, hf: [0, 0], kf: [0.04, 0.04], legOut: 0, sf: [0, 0], ef: [0.15, 0.15], abd: [0.08, 0.08], headPitch: 0, headYaw: f.look ?? 0, prop: null };
+  const j: Joints = { hip: HIP, lean: 0, hf: [0, 0], kf: [0.04, 0.04], legOut: 0, sf: [0, 0], ef: [0.15, 0.15], abd: [0.08, 0.08], headPitch: 0, headYaw: f.look ?? 0, twist: 0, prop: null };
   const breathe = Math.sin(p * 0.5) * 0.02;
   switch (f.pose) {
     case 'walk': {
       // Marcha natural: a coxa vai mais para a frente do que para trás, o joelho só dobra bem na
       // fase de balanço (perna passando) e quase estica ao pisar; o quadril sobe no meio do apoio e
-      // desce com as pernas abertas; braços opostos às pernas, discretos, cotovelo dobrando mais na frente.
+      // desce com as pernas abertas. Braços opostos às pernas, um pouco atrasados: na volta o braço
+      // fica quase esticado e a mão passa atrás do quadril; na ida o cotovelo dobra. O peito gira de
+      // leve contra o quadril.
       const a = Math.sin(p);
       const knee = (ph: number) => (0.06 + 0.78 * Math.max(0, Math.cos(ph - 0.35)) ** 2) * s;
       j.hf = [(0.08 + a * 0.32) * s, (0.08 - a * 0.32) * s];
       j.kf = [knee(p), knee(p + Math.PI)];
-      j.sf = [-a * 0.26 * s, a * 0.26 * s];
-      j.ef = [0.18 + Math.max(0, -a) * 0.3 * s, 0.18 + Math.max(0, a) * 0.3 * s];
-      j.abd = [0.06, 0.06];
+      const arm = Math.sin(p - 0.25);
+      j.sf = [(-0.08 - arm * 0.36) * s, (-0.08 + arm * 0.36) * s];
+      j.ef = [0.08 + Math.max(0, -arm) * 0.32 * s, 0.08 + Math.max(0, arm) * 0.32 * s];
+      j.abd = [0.07, 0.07];
+      j.twist = -a * 0.07 * s;
       j.hip = HIP - 0.014 * s + (1 - Math.abs(a)) * 0.02 * s;
       j.lean = 0.03 * s;
       j.headPitch = Math.sin(p * 2) * 0.012 * s;
@@ -495,15 +501,19 @@ function joints(f: Figure): Joints {
       break;
     }
     case 'run': {
-      // Corrida: passada mais longa, joelho subindo na volta da perna, braços dobrados a uns 80°
-      // balançando junto ao corpo, tronco um pouco inclinado; pequena fase de voo.
+      // Corrida: passada mais longa, joelho subindo na volta da perna, tronco inclinado e girando com
+      // os braços. Braço dobrado que vai bem para trás (mão junto ao quadril, cotovelo mais aberto) e
+      // volta à frente do peito (cotovelo fechado); pequena fase de voo.
       const a = Math.sin(p);
       const knee = (ph: number) => 0.25 + 1.15 * Math.max(0, Math.cos(ph - 0.3)) ** 2;
       j.hf = [0.18 + a * 0.55, 0.18 - a * 0.55];
       j.kf = [knee(p), knee(p + Math.PI)];
-      j.sf = [-a * 0.5, a * 0.5];
-      j.ef = [1.35, 1.35];
-      j.abd = [0.12, 0.12];
+      const arm = Math.sin(p - 0.2);
+      const elbow = (fw: number) => 1.2 + Math.max(0, fw) * 0.3 - Math.max(0, -fw) * 0.25;
+      j.sf = [-0.25 - arm * 0.6, -0.25 + arm * 0.6];
+      j.ef = [elbow(-arm), elbow(arm)];
+      j.abd = [0.14, 0.14];
+      j.twist = -a * 0.13;
       j.hip = HIP - 0.035 + (1 - Math.abs(a)) * 0.045;
       j.lean = 0.12;
       break;
@@ -665,7 +675,7 @@ export function createCrowd(kit: Kit, capacity: number, shadows = true): Crowd {
       // Tronco e cabeça.
       step(m1, base, 0, j.hip, 0);
       pelvis.setMatrixAt(i, m1);
-      step(m2, m1, 0, 0.03, 0, -j.lean);
+      step(m2, m1, 0, 0.03, 0, -j.lean, j.twist);
       torso.setMatrixAt(i, m2);
       const outfit = f.outfit ?? 'tee';
       const acc = f.accent ?? '#F4F4F5';

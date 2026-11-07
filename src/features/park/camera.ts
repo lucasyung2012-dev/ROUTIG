@@ -69,7 +69,7 @@ export interface CameraRig {
   observe: (p: THREE.Vector3 | null) => void;
   posture: () => Posture;
   /** Pés do corpo, direção e velocidade atual (avatar, NPCs, minimapa). */
-  body: () => { pos: THREE.Vector3; yaw: number; speed: number; airborne: boolean };
+  body: () => { pos: THREE.Vector3; yaw: number; speed: number; airborne: boolean; running: boolean };
   glideTo: (cam: THREE.Vector3 | THREE.Curve<THREE.Vector3>, target: THREE.Vector3, ms: number, done?: () => void) => void;
   gliding: () => boolean;
   update: (dt: number, now: number) => void;
@@ -112,6 +112,7 @@ export function createCameraRig(camera: THREE.PerspectiveCamera, canvas: HTMLCan
   let vy = 0;
   let airborne = false;
   const vel = new THREE.Vector2();
+  let running = false;
   const move = new THREE.Vector2();
   const keys = new Set<string>();
   const focusPt = new THREE.Vector3();
@@ -306,7 +307,8 @@ export function createCameraRig(camera: THREE.PerspectiveCamera, canvas: HTMLCan
     }
     if (posture === 'sit') return;
     const run = runSrc.btn || runSrc.stick || keys.has('ShiftLeft') || keys.has('ShiftRight');
-    const top = (run ? 7.5 : 3.6) * settings.speed;
+    running = run;
+    const top = (run ? 7.5 : 2.5) * settings.speed;
     const fwd = new THREE.Vector2(-Math.sin(yaw), -Math.cos(yaw));
     const right = new THREE.Vector2(-fwd.y, fwd.x);
     const want = fwd.multiplyScalar(fy * top).add(right.multiplyScalar(fx * top));
@@ -445,7 +447,7 @@ export function createCameraRig(camera: THREE.PerspectiveCamera, canvas: HTMLCan
     sit,
     observe,
     posture: () => posture,
-    body: () => ({ pos: feet, yaw, speed: vel.length(), airborne }),
+    body: () => ({ pos: feet, yaw, speed: vel.length(), airborne, running }),
     glideTo: (cam, target, ms, done) => {
       if (mode !== 'orbit') {
         // Desliza na câmera livre e volta ao modo de antes ao chegar.

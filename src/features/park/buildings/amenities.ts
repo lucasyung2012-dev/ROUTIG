@@ -50,7 +50,10 @@ export function amenities(kit: Kit): Amenities {
     const y = heightAt(x, z);
     const back = face + Math.PI;
     b.add(wood, new THREE.BoxGeometry(1.8, 0.08, 0.5), [x, y + 0.45, z], [0, face, 0]);
-    b.add(wood, new THREE.BoxGeometry(1.8, 0.45, 0.07), [x + Math.sin(back) * 0.26, y + 0.72, z + Math.cos(back) * 0.26], [-0.12, face, 0]);
+    // Encosto inclinado para trás no eixo do próprio banco (antes inclinava num eixo fixo e entortava).
+    const backrest = new THREE.BoxGeometry(1.8, 0.45, 0.07);
+    backrest.rotateX(-0.12);
+    b.add(wood, backrest, [x + Math.sin(back) * 0.26, y + 0.72, z + Math.cos(back) * 0.26], [0, face, 0]);
     for (const s of [-1, 1]) b.add(dark, new THREE.BoxGeometry(0.07, 0.45, 0.45), [x + Math.cos(face) * s * 0.8, y + 0.22, z - Math.sin(face) * s * 0.8], [0, face, 0]);
     seats.push({ x, y: y + 0.45, z, face });
   };

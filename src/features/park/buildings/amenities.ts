@@ -142,24 +142,119 @@ export function amenities(kit: Kit): Amenities {
 /** ResidÃªncias: casas variadas de 1 ou 2 pavimentos, com jardim e luz nas janelas Ã  noite. */
 export function houses(kit: Kit): THREE.Group {
   const b = new Builder();
-  const walls = [kit.mat('#F1ECE2', { rough: 0.8 }), kit.mat('#E5D3B8', { rough: 0.8 }), kit.mat('#DCE6EE', { rough: 0.8 }), kit.mat('#EBDDD2', { rough: 0.8 })];
-  const roofs = [kit.mat('#7C4A32', { rough: 0.7 }), kit.mat('#4B5563', { rough: 0.6 }), kit.mat('#9A5B3B', { rough: 0.7 }), kit.mat('#374151', { rough: 0.6 })];
-  const glass = kit.mat('#FFE2A8', { glow: true, rough: 0.6 });
+  const plaster = [kit.mat('#F1ECE2', { rough: 0.85 }), kit.mat('#E9D9BF', { rough: 0.85 }), kit.mat('#DCE6EE', { rough: 0.85 }), kit.mat('#EFE3D7', { rough: 0.85 }), kit.mat('#E3E8DD', { rough: 0.85 })];
+  const tile = [kit.mat('#8A4B32', { rough: 0.7 }), kit.mat('#9C5A3C', { rough: 0.7 }), kit.mat('#5B4B44', { rough: 0.65 })];
+  const slate = kit.mat('#3F4650', { rough: 0.6 });
+  const cladding = kit.mat('#9B6B47', { rough: 0.7 });
+  const frame = kit.mat('#2F3338', { rough: 0.5, metal: 0.3 });
+  const whiteTrim = kit.mat('#FAFAF7', { rough: 0.6 });
+  const win = kit.mat('#FFE2A8', { glow: true, rough: 0.4 });
+  const doorMat = kit.mat('#6B4A33', { rough: 0.6 });
+  const stone = kit.mat('#B9B3A8', { rough: 0.95 });
+  const drive = kit.mat('#A7A39B', { rough: 0.95 });
+  const lawn = kit.mat('#79B35E', { rough: 1 });
+  const hedge = kit.mat('#3F7F44', { rough: 0.95 });
   const leaf = kit.mat('#4C9A4F', { rough: 0.9 });
+  const pool = kit.mat('#4FB3E0', { rough: 0.15, metal: 0.1 });
+  const deck = kit.mat('#A47551', { rough: 0.75 });
+  const lamp = kit.mat('#FFE7B0', { glow: true });
+  const glassRail = kit.mat('#CFE7F5', { glass: true });
   const rnd = seededRandom(77);
   for (const h of residences()) {
-    const y = heightAt(h.x, h.z);
-    const w = 7 + rnd() * 3;
-    const d = 6 + rnd() * 2;
-    const hh = h.floors === 2 ? 6 : 3.2;
-    b.add(walls[h.style]!, new THREE.BoxGeometry(w, hh, d), [h.x, y + hh / 2, h.z], [0, h.rot, 0]);
-    if (h.style % 2) b.add(roofs[h.style]!, new THREE.BoxGeometry(w + 0.6, 0.3, d + 0.6), [h.x, y + hh + 0.15, h.z], [0, h.rot, 0]);
-    else b.add(roofs[h.style]!, new THREE.CylinderGeometry(0, d * 0.62, 2, 4, 1), [h.x, y + hh + 1, h.z], [0, h.rot + Math.PI / 4, 0], [w / d, 1, 1]);
-    // Janelas (acendem Ã  noite) e porta.
-    for (let f = 0; f < h.floors; f++) for (const s of [-1, 1]) b.add(glass, new THREE.BoxGeometry(1.1, 1, 0.1), [h.x + Math.cos(h.rot) * s * w * 0.25 + Math.sin(h.rot) * (d / 2 + 0.02), y + 1.6 + f * 2.8, h.z - Math.sin(h.rot) * s * w * 0.25 + Math.cos(h.rot) * (d / 2 + 0.02)], [0, h.rot, 0]);
-    b.add(kit.mat('#5B4636', { rough: 0.7 }), new THREE.BoxGeometry(1, 2.1, 0.1), [h.x + Math.sin(h.rot) * (d / 2 + 0.03), y + 1.05, h.z + Math.cos(h.rot) * (d / 2 + 0.03)], [0, h.rot, 0]);
-    // Jardim da frente.
-    for (let k = 0; k < 3; k++) b.add(leaf, new THREE.IcosahedronGeometry(0.7 + rnd() * 0.4, 1), [h.x + Math.sin(h.rot) * (d / 2 + 2) + Math.cos(h.rot) * (k - 1) * 2.4, y + 0.6, h.z + Math.cos(h.rot) * (d / 2 + 2) - Math.sin(h.rot) * (k - 1) * 2.4]);
+    const style = h.style;
+    const cx = h.x;
+    const cz = h.z;
+    const cs = Math.cos(h.rot);
+    const sn = Math.sin(h.rot);
+    // Casa assentada numa base nivelada (o terreno de fora é ondulado).
+    let y = Infinity;
+    for (const [px, pz] of [[-8, -7], [8, -7], [-8, 9], [8, 9]] as const) y = Math.min(y, heightAt(cx + px * cs + pz * sn, cz - px * sn + pz * cs));
+    const put = (m: THREE.Material, g: THREE.BufferGeometry, lx: number, ly: number, lz: number, ry = 0, sc?: [number, number, number]) => b.add(m, g, [cx + lx * cs + lz * sn, y + ly, cz - lx * sn + lz * cs], [0, h.rot + ry, 0], sc);
+    const w = style === 1 ? 12 + rnd() * 2 : 10 + rnd() * 2.5;
+    const d = 8.5 + rnd() * 2;
+    const floors = style === 2 ? 1 : h.floors === 2 || style === 3 ? 2 : 1;
+    const fh = 3;
+    const wall = plaster[Math.floor(rnd() * plaster.length)]!;
+    // Lote: base, gramado, entrada de carro e cerca viva.
+    put(stone, new THREE.BoxGeometry(w + 6, 1.6, d + 9), 0, -0.8, 1.5);
+    put(lawn, new THREE.BoxGeometry(w + 5.6, 0.05, d + 8.6), 0, 0.02, 1.5);
+    put(drive, new THREE.BoxGeometry(3, 0.06, 5.5), w / 2 - 1, 0.05, d / 2 + 3);
+    for (const s of [-1, 1]) put(hedge, new THREE.BoxGeometry(0.7, 0.9, d + 8), s * (w / 2 + 2.6), 0.45, 1.5);
+    put(hedge, new THREE.BoxGeometry(w + 2, 0.9, 0.7), -1.6, 0.45, d / 2 + 5.6);
+    // Caixa de correio e poste de luz do portão.
+    put(frame, new THREE.CylinderGeometry(0.04, 0.04, 1.1, 6), w / 2 + 1.8, 0.55, d / 2 + 5.4);
+    put(doorMat, new THREE.BoxGeometry(0.3, 0.22, 0.45), w / 2 + 1.8, 1.15, d / 2 + 5.4);
+    put(frame, new THREE.CylinderGeometry(0.05, 0.06, 2.4, 6), -w / 2 - 1.8, 1.2, d / 2 + 5.4);
+    put(lamp, new THREE.SphereGeometry(0.16, 10, 8), -w / 2 - 1.8, 2.5, d / 2 + 5.4);
+    const H = floors * fh;
+    if (style === 1) {
+      // Moderna: dois volumes deslocados, laje plana, revestimento de madeira e grandes vidros.
+      put(wall, new THREE.BoxGeometry(w * 0.6, fh, d), -w * 0.2, fh / 2, 0);
+      put(cladding, new THREE.BoxGeometry(w * 0.45, fh, d * 0.85), w * 0.28, fh / 2, -d * 0.05);
+      if (floors === 2) put(wall, new THREE.BoxGeometry(w * 0.7, fh, d * 0.9), w * 0.1, fh * 1.5, -0.4);
+      put(slate, new THREE.BoxGeometry(w * 0.75, 0.25, d + 0.6), w * 0.1, H + 0.12, -0.2);
+      put(frame, new THREE.BoxGeometry(w * 0.5, 2.3, 0.08), -w * 0.18, 1.3, d / 2 + 0.02);
+      put(win, new THREE.BoxGeometry(w * 0.48, 2.2, 0.04), -w * 0.18, 1.3, d / 2 + 0.05);
+      if (floors === 2) {
+        put(win, new THREE.BoxGeometry(w * 0.5, 1.4, 0.04), w * 0.1, fh + 1.6, d * 0.45 - 0.35);
+        put(whiteTrim, new THREE.BoxGeometry(w * 0.55, 0.12, 1.6), w * 0.1, fh + 0.05, d / 2 + 0.4);
+        put(glassRail, new THREE.BoxGeometry(w * 0.55, 1.0, 0.04), w * 0.1, fh + 0.6, d / 2 + 1.2);
+      }
+      put(doorMat, new THREE.BoxGeometry(1.1, 2.3, 0.08), w * 0.3, 1.15, d * 0.43);
+    } else {
+      put(wall, new THREE.BoxGeometry(w, H, d), 0, H / 2, 0);
+      // Rodapé de pedra e friso entre andares.
+      put(stone, new THREE.BoxGeometry(w + 0.1, 0.5, d + 0.1), 0, 0.25, 0);
+      if (floors === 2) put(whiteTrim, new THREE.BoxGeometry(w + 0.12, 0.14, d + 0.12), 0, fh, 0);
+      // Janelas com moldura (frente e laterais) e porta com batente.
+      for (let f = 0; f < floors; f++)
+        for (const s of [-1, 1]) {
+          const lx = s * w * 0.3;
+          put(whiteTrim, new THREE.BoxGeometry(1.5, 1.5, 0.12), lx, f * fh + 1.6, d / 2 + 0.02);
+          put(win, new THREE.BoxGeometry(1.3, 1.3, 0.06), lx, f * fh + 1.6, d / 2 + 0.06);
+          put(frame, new THREE.BoxGeometry(0.05, 1.3, 0.08), lx, f * fh + 1.6, d / 2 + 0.08);
+          put(whiteTrim, new THREE.BoxGeometry(0.12, 1.3, 1.3), s * (w / 2 + 0.02), f * fh + 1.6, 0);
+          put(win, new THREE.BoxGeometry(0.06, 1.1, 1.1), s * (w / 2 + 0.05), f * fh + 1.6, 0);
+        }
+      put(whiteTrim, new THREE.BoxGeometry(1.4, 2.5, 0.14), 0, 1.25, d / 2 + 0.02);
+      put(doorMat, new THREE.BoxGeometry(1.1, 2.25, 0.08), 0, 1.12, d / 2 + 0.07);
+      put(lamp, new THREE.BoxGeometry(0.15, 0.25, 0.1), 0.9, 2.2, d / 2 + 0.1);
+      const roofM = tile[style % tile.length]!;
+      if (style === 0) {
+        // Colonial: telhado de duas águas, chaminé e varanda com colunas.
+        const sh = new THREE.Shape([new THREE.Vector2(-(w / 2 + 0.6), 0), new THREE.Vector2(w / 2 + 0.6, 0), new THREE.Vector2(0, 2.6)]);
+        const g = new THREE.ExtrudeGeometry(sh, { depth: d + 1, bevelEnabled: false });
+        g.translate(0, 0, -(d + 1) / 2);
+        put(roofM, g, 0, H, 0);
+        put(stone, new THREE.BoxGeometry(0.8, 2.6, 0.8), w * 0.3, H + 1.3, -d * 0.2);
+        put(deck, new THREE.BoxGeometry(w * 0.7, 0.2, 2.2), 0, 0.1, d / 2 + 1.1);
+        for (const s of [-1, -0.33, 0.33, 1]) put(whiteTrim, new THREE.CylinderGeometry(0.12, 0.14, 2.7, 10), s * w * 0.33, 1.45, d / 2 + 2);
+        put(roofM, new THREE.BoxGeometry(w * 0.74, 0.18, 2.6), 0, 2.85, d / 2 + 1.2);
+      } else if (style === 2) {
+        // Bangalô: quatro águas, varanda de madeira e garagem.
+        put(roofM, new THREE.CylinderGeometry(0.4, Math.max(w, d) * 0.72, 2.2, 4, 1), 0, H + 1.1, 0, Math.PI / 4, [w / Math.max(w, d), 1, d / Math.max(w, d)]);
+        put(deck, new THREE.BoxGeometry(w + 1, 0.2, 2.6), 0, 0.1, d / 2 + 1.3);
+        for (const s of [-1, 0, 1]) put(deck, new THREE.BoxGeometry(0.16, 2.6, 0.16), s * (w / 2), 1.4, d / 2 + 2.5);
+        put(roofM, new THREE.BoxGeometry(w + 1.2, 0.15, 2.8), 0, 2.75, d / 2 + 1.3);
+        put(wall, new THREE.BoxGeometry(3.6, 2.8, 6), w / 2 + 1.8, 1.4, 0.5);
+        put(frame, new THREE.BoxGeometry(2.8, 2.3, 0.08), w / 2 + 1.8, 1.15, 3.52);
+        put(slate, new THREE.BoxGeometry(4, 0.2, 6.4), w / 2 + 1.8, 2.9, 0.5);
+      } else {
+        // Sobrado tropical: telhado de uma água, pérgola e piscina.
+        const g = new THREE.BoxGeometry(w + 1.2, 0.25, d + 1.2);
+        g.rotateX(0.12);
+        put(roofM, g, 0, H + 0.6, 0);
+        for (let k = 0; k < 7; k++) put(deck, new THREE.BoxGeometry(0.12, 0.18, 3.4), -w / 2 + 1 + k * 0.7, 2.9, d / 2 + 1.7);
+        for (const s of [0, 1]) put(deck, new THREE.BoxGeometry(0.15, 2.9, 0.15), -w / 2 + 1 + s * 4.2, 1.45, d / 2 + 3.3);
+        put(stone, new THREE.BoxGeometry(5.2, 0.12, 3.2), w / 2 - 2.8, 0.06, d / 2 + 3.6);
+        put(pool, new THREE.BoxGeometry(4.6, 0.04, 2.6), w / 2 - 2.8, 0.14, d / 2 + 3.6);
+      }
+    }
+    // Árvore e arbustos do jardim.
+    const tx = (rnd() > 0.5 ? 1 : -1) * (w / 2 + 1);
+    put(doorMat, new THREE.CylinderGeometry(0.15, 0.22, 2.8, 8), tx, 1.4, d / 2 + 4);
+    put(leaf, new THREE.IcosahedronGeometry(1.7, 1), tx, 3.6, d / 2 + 4, 0, [1, 0.85, 1]);
+    for (let k = 0; k < 4; k++) put(hedge, new THREE.IcosahedronGeometry(0.5 + rnd() * 0.3, 1), -w / 2 + 1 + k * (w / 3.2), 0.45, d / 2 + 0.8);
   }
   return b.build();
 }

@@ -110,6 +110,9 @@ export interface Floors {
   /** Torre do elevador (fora do salão do térreo, nos fundos). */
   elevator: { x: number; z: number };
   seats: Seat[];
+  /** Cabine (sobe e desce) e as duas portas de correr (abrem para os lados). */
+  cabin: THREE.Group;
+  doors: [THREE.Object3D, THREE.Object3D];
 }
 
 /**
@@ -265,15 +268,40 @@ export function withFloors(kit: Kit, scene: InteriorScene, id: ModuleId, label: 
     b.add(metal, new THREE.BoxGeometry(0.12, topY, 0.12), [tower.x + Math.sin(a) * 1.4, topY / 2, tower.z + Math.cos(a) * 1.4]);
   }
   b.add(slab, new THREE.CylinderGeometry(1.6, 1.6, 0.3, 24), [tower.x, topY, tower.z]);
-  b.add(kit.mat(accent, { glow: true }), new THREE.CylinderGeometry(1.2, 1.2, 0.15, 24), [tower.x, H - 0.1, tower.z]);
   levels.forEach((lv, n) => {
     const s = sectorSign(kit, floorName(n), accent, 1.6);
     s.position.set(tower.x, lv.y + 2.9, tower.z + 1.5);
     scene.scene.add(s);
   });
   scene.scene.add(b.build());
+  // Cabine: piso, parede curva ao fundo, corrimão, teto com luz, painel de andares e portas de vidro.
+  const cabin = new THREE.Group();
+  const cb = new Builder();
+  cb.add(slab, new THREE.CylinderGeometry(1.25, 1.25, 0.12, 24), [0, -0.06, 0]);
+  cb.add(kit.mat('#E9EDF2', { rough: 0.4, metal: 0.2 }), new THREE.CylinderGeometry(1.25, 1.25, 2.4, 24, 1, true, Math.PI * 0.6, Math.PI * 0.8), [0, 1.2, 0]);
+  cb.add(slab, new THREE.CylinderGeometry(1.25, 1.25, 0.1, 24), [0, 2.45, 0]);
+  cb.add(kit.mat('#FFF1D6', { glow: true }), new THREE.CylinderGeometry(0.6, 0.6, 0.03, 24), [0, 2.39, 0]);
+  cb.add(metal, new THREE.TorusGeometry(1.12, 0.025, 6, 32, Math.PI * 0.8), [0, 0.95, 0], [Math.PI / 2, 0, Math.PI * 0.1]);
+  cb.add(dark, new THREE.BoxGeometry(0.22, 0.4, 0.04), [0.95, 1.3, -0.55], [0, -0.9, 0]);
+  cb.add(kit.mat(accent, { glow: true }), new THREE.BoxGeometry(0.14, 0.04, 0.05), [0.95, 1.45, -0.54], [0, -0.9, 0]);
+  cabin.add(cb.build());
+  const door = (side: number) => {
+    const d = new THREE.Group();
+    const db = new Builder();
+    db.add(glass, new THREE.BoxGeometry(0.78, 2.3, 0.04), [0, 1.15, 0]);
+    db.add(metal, new THREE.BoxGeometry(0.06, 2.3, 0.06), [side * 0.37, 1.15, 0]);
+    db.add(metal, new THREE.BoxGeometry(0.78, 0.06, 0.06), [0, 2.3, 0]);
+    d.add(db.build(false));
+    d.position.set(side * 0.39, 0, 1.18);
+    cabin.add(d);
+    return d;
+  };
+  const doors: [THREE.Object3D, THREE.Object3D] = [door(-1), door(1)];
+  cabin.position.set(tower.x, 0, tower.z);
+  cabin.traverse((o) => (o.userData.noCollide = true));
+  scene.scene.add(cabin);
   // Colisão de cada andar pelo desenho (móveis, floreiras, guarda-corpos).
   levels.forEach((lv, n) => n > 0 && lv.obstacles.push(...footprint(scene.scene, () => lv.y)));
-  scene.floors = { levels, zones, elevator: tower, seats };
+  scene.floors = { levels, zones, elevator: tower, seats, cabin, doors };
   return scene;
 }

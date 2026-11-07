@@ -52,6 +52,7 @@ export function createRoom(kit: Kit, o: RoomOpts): Room {
   const sk = sky(kit);
   sk.set(new THREE.Color('#5AA9E6'), new THREE.Color('#E3F2F9'));
   scene.add(sk.mesh);
+  sk.mesh.userData.outdoorOnly = true;
   scene.add(new THREE.HemisphereLight('#FFFFFF', '#9FB0C4', 0.85));
   const key = new THREE.DirectionalLight('#FFF6E8', 1.2);
   key.position.set(o.radius * 0.4, 30, o.radius * 0.3);
@@ -63,6 +64,7 @@ export function createRoom(kit: Kit, o: RoomOpts): Room {
   const lawn = new THREE.Mesh(kit.own(new THREE.CircleGeometry(220, 48)), kit.mat('#6FAE5C', { rough: 1 }));
   lawn.rotation.x = -Math.PI / 2;
   lawn.position.y = -0.05;
+  lawn.userData.outdoorOnly = true;
   scene.add(lawn);
   const rnd = seededRandom(Math.round(o.radius * 13));
   const ring: Plant[] = [];
@@ -73,6 +75,7 @@ export function createRoom(kit: Kit, o: RoomOpts): Room {
     ring.push({ x: Math.sin(a) * r, z: Math.cos(a) * r, s: 1 + rnd() * 0.6, species: species[i % 4]! });
   }
   const trees = forest(kit, ring);
+  trees.group.userData.outdoorOnly = true;
   scene.add(trees.group);
 
   const b = new Builder();

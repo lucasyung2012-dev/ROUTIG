@@ -42,6 +42,10 @@ export interface EngineOpts {
   /** O que dá para fazer aqui (sentar, observar) e a postura atual. */
   onHint: (h: Hint | null) => void;
   onPosture: (p: Posture) => void;
+  /** Perto do elevador e a pessoa pediu para chamar: mostrar a escolha de andar. */
+  onElevator: () => void;
+  /** Elevador em movimento (true) ou parado (false). */
+  onRiding: (riding: boolean) => void;
   /** Alguém respondeu ao cumprimento (nome, atividade e qual fala). */
   onTalk: (t: { name: string; activity: string; line: number }) => void;
   /** Interior: quantos andares tem o prédio e em qual a pessoa está. */
@@ -90,6 +94,8 @@ export interface Engine {
   /** Salas dos andares do prédio aberto (índice = posição na lista). */
   zones: () => Array<{ level: number; key: string; sector: string | null }>;
   focusZone: (i: number) => void;
+  /** Andar de elevador até o andar `n` (com cabine e portas). */
+  rideTo: (n: number) => void;
   setData: (id: ModuleId, data: unknown) => void;
   project: () => Array<{ id: ModuleId; x: number; y: number; visible: boolean }>;
   dispose: () => void;
@@ -249,6 +255,81 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
     if (rig.mode() !== 'orbit') rig.place(0, z, Math.PI);
     else rig.glideTo(new THREE.Vector3(0, lv.y + 3.4, lv.walk - 1), new THREE.Vector3(0, lv.y + 1, -lv.inner), 900);
   };
+  /* ---------- Elevador: entrar, fechar portas, subir/descer, abrir, sair ---------- */
+  type Ride = { from: number; to: number; t0: number; start: THREE.Vector3; startLook: THREE.Vector3; mode: CamMode };
+  let ride: Ride | null = null;
+  const RIDE = { walkIn: 1100, close: 700, open: 700, walkOut: 900, perFloor: 1700 };
+  const rideTo = (to: number) => {
+    const fl = inside?.scene.floors;
+    if (!inside || !fl || ride || to === level || to < 0 || to >= fl.levels.length) return;
+    const look = new THREE.Vector3();
+    camera.getWorldDirection(look);
+    ride = { from: level, to, t0: performance.now(), start: camera.position.clone(), startLook: camera.position.clone().add(look.multiplyScalar(5)), mode: rig.mode() };
+    rig.setMove(0, 0);
+    fl.cabin.position.y = fl.levels[level]!.y;
+    opts.onRiding(true);
+  };
+  const ease2 = (k: number) => (k < 0.5 ? 2 * k * k : 1 - (-2 * k + 2) ** 2 / 2);
+  /** Um quadro da viagem; devolve true enquanto a câmera é do elevador. */
+  const stepRide = (now: number) => {
+    const fl = inside?.scene.floors;
+    if (!ride || !fl) return false;
+    const e = fl.elevator;
+    const y0 = fl.levels[ride.from]!.y;
+    const y1 = fl.levels[ride.to]!.y;
+    const move = RIDE.perFloor * Math.abs(ride.to - ride.from);
+    const t = now - ride.t0;
+    const inCab = new THREE.Vector3(e.x, 0, e.z - 0.2);
+    const outLook = (y: number) => new THREE.Vector3(e.x, y + 1.5, e.z + 8);
+    const setDoors = (open: number) => {
+      fl.doors[0].position.x = -0.39 - open * 0.72;
+      fl.doors[1].position.x = 0.39 + open * 0.72;
+    };
+    let p1 = RIDE.walkIn;
+    if (t < p1) {
+      // Entra na cabine, vira de frente para as portas.
+      const k = ease2(t / p1);
+      camera.position.lerpVectors(ride.start, inCab.clone().setY(y0 + 1.6), k);
+      camera.lookAt(new THREE.Vector3().lerpVectors(ride.startLook, outLook(y0), k));
+      setDoors(1);
+      return true;
+    }
+    let p0 = p1;
+    p1 += RIDE.close;
+    if (t < p1) {
+      setDoors(1 - ease2((t - p0) / RIDE.close));
+      return true;
+    }
+    p0 = p1;
+    p1 += move;
+    if (t < p1) {
+      const y = y0 + (y1 - y0) * ease2((t - p0) / move);
+      fl.cabin.position.y = y;
+      camera.position.set(inCab.x, y + 1.6, inCab.z);
+      camera.lookAt(outLook(y));
+      setDoors(0);
+      return true;
+    }
+    p0 = p1;
+    p1 += RIDE.open;
+    fl.cabin.position.y = y1;
+    camera.position.set(inCab.x, y1 + 1.6, inCab.z);
+    if (t < p1) {
+      camera.lookAt(outLook(y1));
+      setDoors(ease2((t - p0) / RIDE.open));
+      return true;
+    }
+    // Chegou: sai da cabine para o andar, no modo de câmera de antes.
+    setDoors(1);
+    const to = ride.to;
+    const mode = ride.mode;
+    ride = null;
+    setFloor(to);
+    if (mode !== 'orbit') rig.setMode(mode);
+    opts.onRiding(false);
+    return false;
+  };
+
   const focusZone = (i: number) => {
     const z = inside?.scene.floors?.zones[i];
     if (!z) return;
@@ -295,6 +376,7 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
       const cached = dataCache.get(id);
       if (cached !== undefined) scene.setData(cached);
       inside = { id, kit: ikit, scene };
+      scene.scene.traverse((o) => o.userData.outdoorOnly && (o.visible = false));
       level = 0;
       rig.setWorld(levelWorld(0));
       opts.onFloors(scene.floors?.levels.length ?? 1, 0);
@@ -394,7 +476,7 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
     const p = rig.body().pos;
     if (inside) {
       const levels = inside.scene.floors?.levels.length ?? 1;
-      if (elevatorNear() && levels > 1) return setFloor((level + 1) % levels);
+      if (elevatorNear() && levels > 1) return opts.onElevator();
       const s = floorSeat(p);
       if (s) rig.sit({ ...s, face: s.face + Math.PI });
       return;
@@ -519,6 +601,11 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
   let frames = 0;
   let statsAt = performance.now();
   let near: ModuleId | null = null;
+  const wcam = new THREE.PerspectiveCamera(55, 1, 0.3, 1400);
+  const toWorld = new THREE.Matrix4();
+  const wq = new THREE.Quaternion();
+  const up = new THREE.Vector3(0, 1, 0);
+  const one = new THREE.Vector3(1, 1, 1);
   let lastMode: CamMode = rig.mode();
   let hintFrame = 0;
   let hint: string | null = null;
@@ -530,7 +617,8 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
     last = now;
     frames++;
     stepEnv(dt);
-    rig.update(dt, now);
+    const riding = stepRide(now);
+    if (!riding) rig.update(dt, now);
     const mode = rig.mode();
     if (mode !== lastMode) {
       lastMode = mode;
@@ -538,7 +626,7 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
     }
     const body = rig.body();
     walkPhase += dt * body.speed * 2.6;
-    avatar.group.visible = mode === 'third' && !rig.gliding();
+    avatar.group.visible = mode === 'third' && !rig.gliding() && !riding;
     if (avatar.group.visible) bodyFigure();
     const t = opts.reduceMotion ? 0 : (now - t0) / 1000;
     if (!inside) {
@@ -585,7 +673,30 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
       renderer.render(outside, camera);
     } else {
       inside.scene.tick(t, camera);
+      // Primeiro o parque (visto da posição real dentro do prédio), depois o interior por cima:
+      // pelas janelas aparecem o parque, os outros prédios, as pessoas e o céu de verdade.
+      const bd = world.buildings.get(inside.id)!;
+      toWorld.compose(v.set(bd.def.x, heightAt(bd.def.x, bd.def.z), bd.def.z), wq.setFromAxisAngle(up, bd.facing), one);
+      camera.updateMatrixWorld();
+      wcam.matrixWorld.multiplyMatrices(toWorld, camera.matrixWorld);
+      wcam.matrixWorld.decompose(wcam.position, wcam.quaternion, wcam.scale);
+      wcam.fov = camera.fov;
+      wcam.aspect = camera.aspect;
+      wcam.updateProjectionMatrix();
+      wcam.updateMatrixWorld();
+      world.tick(t, opts.reduceMotion ? 0 : dt, wcam.position, wcam.position);
+      if (crowdMax > 0) {
+        town.step(opts.reduceMotion ? dt * 0.5 : dt, conditions(), { x: 1e5, z: 1e5 }, now);
+        crowd.set(town.visible(wcam.position, crowdMax, 160));
+      }
+      bd.group.visible = false;
+      renderer.autoClear = false;
+      renderer.clear();
+      renderer.render(outside, wcam);
+      renderer.clearDepth();
+      bd.group.visible = true;
       if (mode !== 'orbit' && ++hintFrame % 8 === 0) {
+
         const h = findHint();
         const key = h ? JSON.stringify(h) : null;
         if (key !== hint) {
@@ -594,6 +705,7 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
         }
       }
       renderer.render(inside.scene.scene, camera);
+      renderer.autoClear = true;
     }
     audio?.update({ listener: camera, inside: !!inside, hour: shownHour, sky: weather, steps: mode === 'orbit' || rig.gliding() ? 0 : body.airborne ? 0 : body.speed }, dt);
     if (now - statsAt >= 1000) {
@@ -667,6 +779,7 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
     setFloor: (n) => setFloor(n),
     zones: () => (inside?.scene.floors?.zones ?? []).map((z) => ({ level: z.level, key: z.key, sector: z.sector })),
     focusZone: (i) => focusZone(i),
+    rideTo,
     setData: (id, data) => {
       dataCache.set(id, data);
       if (inside?.id === id) inside.scene.setData(data);

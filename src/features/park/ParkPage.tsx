@@ -194,6 +194,8 @@ export default function ParkPage() {
   const [center, setCenter] = useState(false);
   const [floors, setFloors] = useState({ count: 1, current: 0 });
   const [zoneKey, setZoneKey] = useState<string | null>(null);
+  const [elevator, setElevator] = useState(false);
+  const [riding, setRiding] = useState(false);
   const [talk, setTalk] = useState<{ name: string; activity: string; line: number; at: number } | null>(null);
   const reopened = useRef(false);
   const navigate = useNavigate();
@@ -281,6 +283,8 @@ export default function ParkPage() {
           setZoneKey(null);
         },
         onFloors: (count, current) => setFloors({ count, current }),
+        onElevator: () => setElevator(true),
+        onRiding: setRiding,
         onTalk: (x) => setTalk({ ...x, at: Date.now() }),
         onZone: (z) => {
           if (z?.sector === '@options') {
@@ -530,7 +534,7 @@ export default function ParkPage() {
               floors={Array.from({ length: floors.count }, (_, n) => ({
                 name: t(`park.floorNames.f${n}` as MessageKey),
                 current: floors.current === n,
-                onGo: () => engine.current?.setFloor(n),
+                onGo: () => (camMode === 'orbit' ? engine.current?.setFloor(n) : engine.current?.rideTo(n)),
                 rooms:
                   n === 0
                     ? sectors.map((s) => ({ id: s, label: sectorName(inside, s), active: !zoneKey && sector === s, onPick: () => (floors.current !== 0 && engine.current?.setFloor(0), chooseSector(s)) }))
@@ -680,9 +684,9 @@ export default function ParkPage() {
       )}
 
       {/* Andando (primeira e terceira pessoa): controle, botões de correr, pular e interagir, e dica */}
-      {camMode !== 'orbit' && !stick.hidden && <Joystick onMove={(x, y) => engine.current?.setMove(x, y)} onRun={(on) => engine.current?.setRun(on, 'stick')} label={t('park.joystick')} size={stick.size} side={stick.side} />}
-      {camMode !== 'orbit' && !stick.hidden && <ActionButtons side={stick.side === 'left' ? 'right' : 'left'} engine={engine} canInteract={!!hint || posture !== 'stand' || (!!near && !inside)} />}
-      {camMode !== 'orbit' && (hint || posture !== 'stand') && (!near || !!inside) && (
+      {camMode !== 'orbit' && !riding && !stick.hidden && <Joystick onMove={(x, y) => engine.current?.setMove(x, y)} onRun={(on) => engine.current?.setRun(on, 'stick')} label={t('park.joystick')} size={stick.size} side={stick.side} />}
+      {camMode !== 'orbit' && !riding && !stick.hidden && <ActionButtons side={stick.side === 'left' ? 'right' : 'left'} engine={engine} canInteract={!!hint || posture !== 'stand' || (!!near && !inside)} />}
+      {camMode !== 'orbit' && !riding && !elevator && (hint || posture !== 'stand') && (!near || !!inside) && (
         <InteractPrompt
           kind={posture !== 'stand' ? 'stand' : (hint?.kind ?? 'sit')}
           title={posture !== 'stand' ? t('park.standUp') : hint?.kind === 'person' ? t('park.hints.greet', { name: hint.name }) : hint ? t(`park.hints.${hint.kind}`) : ''}
@@ -777,6 +781,20 @@ export default function ParkPage() {
         </div>
       )}
 
+      {elevator && inside && (
+        <ElevatorPanel
+          floors={Array.from({ length: floors.count }, (_, n) => ({
+            name: t(`park.floorNames.f${n}` as MessageKey),
+            rooms: n === 0 ? sectors.map((s) => sectorName(inside, s)) : (engine.current?.zones() ?? []).filter((z) => z.level === n).map((z) => t(`park.floorRooms.${inside}.${z.key}` as MessageKey)),
+          }))}
+          current={floors.current}
+          onPick={(n) => {
+            setElevator(false);
+            engine.current?.rideTo(n);
+          }}
+          onClose={() => setElevator(false)}
+        />
+      )}
       {talk && <TalkBubble key={talk.at} name={talk.name} text={`${t(`park.talk.hi${talk.line}` as MessageKey)} ${t(`park.talk.${talk.activity}` as MessageKey)}`} onDone={() => setTalk(null)} />}
       {/* Central de Módulos: botão flutuante (arraste para mudar de lugar) */}
       <FloatingCenterButton place={fab} onMove={setFab} onOpen={() => setCenter(true)} label={t('park.center.open')} />
@@ -875,6 +893,47 @@ function ActionButtons({ side, engine, canInteract }: { side: 'left' | 'right'; 
       <button type="button" aria-label={t('park.interact')} disabled={!canInteract} className={cn(btn, 'h-16 w-16', canInteract ? 'bg-accent/80 ring-white' : 'opacity-40')} onPointerDown={() => canInteract && engine.current?.interact()}>
         <Hand className="h-7 w-7" />
       </button>
+    </div>
+  );
+}
+
+/** Painel do elevador: os andares (com as salas de cada um) como botões de um painel de cabine. */
+function ElevatorPanel({ floors, current, onPick, onClose }: { floors: Array<{ name: string; rooms: string[] }>; current: number; onPick: (n: number) => void; onClose: () => void }) {
+  const { t } = useSettings();
+  return (
+    <div className="absolute inset-0 z-30 flex items-end justify-center bg-black/30 p-3 sm:items-center" onClick={onClose}>
+      <div role="dialog" aria-label={t('park.elevatorTitle')} onClick={(e) => e.stopPropagation()} className="w-full max-w-sm animate-fade-up overflow-hidden rounded-3xl bg-[#1C2230] text-white shadow-lift ring-1 ring-white/15">
+        <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+          <span className="flex items-center gap-2 text-sm font-semibold">
+            <ArrowUpDown className="h-4 w-4 text-accent" aria-hidden />
+            {t('park.elevatorTitle')}
+          </span>
+          <button type="button" aria-label={t('common.close')} onClick={onClose} className="rounded-lg p-1 text-white/70 hover:bg-white/10">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <ul className="flex max-h-[55vh] flex-col-reverse gap-2 overflow-y-auto p-3">
+          {floors.map((f, n) => (
+            <li key={n}>
+              <button
+                type="button"
+                disabled={n === current}
+                onClick={() => onPick(n)}
+                className={cn('flex w-full items-start gap-3 rounded-2xl p-3 text-left ring-1 transition', n === current ? 'bg-white/5 ring-white/10' : 'bg-white/10 ring-white/20 hover:bg-white/15 active:scale-[0.99]')}
+              >
+                <span className={cn('flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold ring-2', n === current ? 'bg-accent text-accent-fg ring-accent' : 'ring-white/40')}>{n === 0 ? t('park.floorNames.f0').slice(0, 1) : n}</span>
+                <span className="min-w-0">
+                  <span className="block text-sm font-semibold">
+                    {f.name}
+                    {n === current && <span className="ml-2 text-xs font-normal text-white/60">{t('park.youAreHere')}</span>}
+                  </span>
+                  <span className="block text-xs leading-snug text-white/65">{f.rooms.join(' · ')}</span>
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </div>
     </div>
   );
 }

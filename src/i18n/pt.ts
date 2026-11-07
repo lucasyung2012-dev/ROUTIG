@@ -4573,6 +4573,8 @@ export const pt = {
       photo: 'Fotografando os prédios.',
     },
     places: 'Andares e salas',
+    elevatorTitle: 'Elevador',
+    youAreHere: 'você está aqui',
     settings3d: {
       intro: 'Ajustes do parque que ficam neste aparelho. Hora, clima, câmera, som e controles estão nas opções dentro do parque.',
       stats: 'Mostrar desempenho no parque',
@@ -4789,7 +4791,7 @@ export const pt = {
     interact: 'Interagir',
     standUp: 'Voltar a andar',
     hints: {
-      elevator: 'Elevador: próximo andar',
+      elevator: 'Chamar o elevador',
       greet: 'Cumprimentar {name}',
       sit: 'Sentar no banco',
       view: 'Apreciar a vista',

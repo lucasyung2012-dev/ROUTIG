@@ -4575,6 +4575,8 @@ export const en: Messages = {
       photo: 'Photographing the buildings.',
     },
     places: 'Floors and rooms',
+    elevatorTitle: 'Elevator',
+    youAreHere: 'you are here',
     settings3d: {
       intro: 'Park settings kept on this device. Time, weather, camera, sound and controls are in the options inside the park.',
       stats: 'Show performance in the park',
@@ -4791,7 +4793,7 @@ export const en: Messages = {
     interact: 'Interact',
     standUp: 'Walk again',
     hints: {
-      elevator: 'Elevator: next floor',
+      elevator: 'Call the elevator',
       greet: 'Greet {name}',
       sit: 'Sit on the bench',
       view: 'Enjoy the view',

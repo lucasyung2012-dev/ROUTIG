@@ -320,6 +320,12 @@ export function withFloors(kit: Kit, scene: InteriorScene, id: ModuleId, label: 
         b.add(partMat, new THREE.CylinderGeometry(ri, ri, wallH, 10, 1, true, b0, span / 2 - dh), [0, y + wallH / 2, 0]);
         b.add(partMat, new THREE.CylinderGeometry(ri, ri, wallH, 10, 1, true, a + dh, span / 2 - dh), [0, y + wallH / 2, 0]);
         b.add(wallMat, new THREE.CylinderGeometry(ri, ri, wallH - 2.4, 6, 1, true, a - dh, dh * 2), [0, y + 2.4 + (wallH - 2.4) / 2, 0]);
+        // Batentes e soleira da porta.
+        for (const sd of [-1, 1]) {
+          const e = a + sd * dh;
+          b.add(metal, new THREE.BoxGeometry(0.1, 2.4, 0.22), [Math.sin(e) * ri, y + 1.2, Math.cos(e) * ri], [0, e, 0]);
+        }
+        b.add(metal, new THREE.BoxGeometry(2.0, 0.03, 0.3), [Math.sin(a) * ri, y + 0.015, Math.cos(a) * ri], [0, a, 0]);
         if (style.glass) b.add(metal, new THREE.TorusGeometry(ri, 0.03, 4, 48, span), [0, y + 1.0, 0], [-Math.PI / 2, 0, b0 - Math.PI / 2]);
         for (const e of k === slots.length - 1 ? [b0, b0 + span] : [b0]) b.add(wallMat, new THREE.BoxGeometry(0.15, wallH, ro - ri), [Math.sin(e) * (ri + ro) / 2, y + wallH / 2, Math.cos(e) * (ri + ro) / 2], [0, e, 0]);
         b.add(kit.mat(ROOM_FLOOR[type], { rough: type === 'lab' || type === 'booth' ? 0.4 : 0.7 }), new THREE.RingGeometry(ri, ro, 16, 1, b0 - Math.PI / 2, span), [0, y + 0.02, 0], [-Math.PI / 2, 0, 0]);

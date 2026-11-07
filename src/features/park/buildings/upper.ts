@@ -14,7 +14,7 @@ import { FORMS, apothem, circle, facade, facadeMats, levelRot, levelScale, outli
 
 const STOREY = 4.4;
 
-export function upperFloors(kit: Kit, id: ModuleId, levels: number, base: number, core: number, accent: string): { group: THREE.Group; top: number; near: THREE.Object3D | null; far: THREE.Object3D | null } {
+export function upperFloors(kit: Kit, id: ModuleId, levels: number, base: number, core: number, accent: string, body = Infinity): { group: THREE.Group; top: number; near: THREE.Object3D | null; far: THREE.Object3D | null } {
   const g = new THREE.Group();
   const b = new Builder();
   // Detalhe de perto (fachada peça a peça, guarda-corpos, floreiras, frisos) e versão de longe.
@@ -30,7 +30,8 @@ export function upperFloors(kit: Kit, id: ModuleId, levels: number, base: number
   const glow = kit.mat(accent, { glow: true });
   const warm = kit.mat('#FFE7B0', { glow: true });
   const fm = facadeMats(kit, form);
-  const r0 = Math.max(6, core * 0.82);
+  // Do tamanho do corpo do prédio de baixo (nunca maior que o lote).
+  const r0 = Math.max(6, Math.min(core * 0.82, body));
   const segs = form.sides >= 3 ? form.sides : 48;
   const ownRot = (L: number) => (form.sides >= 3 ? levelRot(form, L) : 0);
   // Cilindro com a forma do andar (o CylinderGeometry começa no ângulo `thetaStart` do eixo +z).
@@ -97,6 +98,21 @@ export function upperFloors(kit: Kit, id: ModuleId, levels: number, base: number
   const roofHole = form.plan === 'garden' ? [circle(Math.max(3.2, apothem(form.sides, r) * 0.36))] : [];
   b.add(slab, slabGeo(outline(form.sides, ownRot(levels), r * 1.05), roofHole, y + 0.4, 0.4));
   const top = y + 0.4;
+  // Casa de máquinas na cobertura (ar-condicionado com ventilador, dutos e antena), só de perto.
+  if (['tasks', 'finance', 'notes', 'inbox', 'profile', 'sports', 'settings', 'calendar', 'projects'].includes(id)) {
+    const unit = kit.mat('#C9CED6', { metal: 0.5, rough: 0.4 });
+    const grille = kit.mat('#4B5563', { metal: 0.6, rough: 0.5 });
+    for (const a of [(3 * Math.PI) / 4, -(3 * Math.PI) / 4]) {
+      const rr = apothem(form.sides, r) * 0.68;
+      const x = Math.sin(a) * rr;
+      const z = Math.cos(a) * rr;
+      bd.add(unit, new THREE.BoxGeometry(1.8, 1.1, 1.2), [x, y + 0.4 + 0.55, z], [0, a, 0]);
+      bd.add(grille, new THREE.CylinderGeometry(0.42, 0.42, 0.06, 20), [x, y + 0.4 + 1.13, z]);
+      bd.add(grille, new THREE.BoxGeometry(0.06, 0.04, 0.8), [x, y + 0.4 + 1.17, z], [0, a, 0]);
+      bd.add(unit, new THREE.CylinderGeometry(0.15, 0.15, 2.2, 10), [x * 0.75, y + 0.4 + 0.3, z * 0.75], [0, 0, Math.PI / 2]);
+    }
+    bd.add(metal, new THREE.CylinderGeometry(0.04, 0.04, 3.2, 6), [apothem(form.sides, r) * 0.5, y + 0.4 + 1.6, -apothem(form.sides, r) * 0.2]);
+  }
   // O que a planta mostra por fora.
   const inner = Math.max(3.2, apothem(form.sides, r) * 0.36);
   if (form.plan === 'atrium' && id !== 'dashboard') {

@@ -616,7 +616,7 @@ export function createWorld(kit: Kit): World {
       group = d.group;
       top = d.top;
       // Os andares de cima por fora, iguais aos de dentro (seção 10).
-      const up = upperFloors(kit, def.id, FLOOR_PLANS[def.id]?.length ?? 0, d.top - 2, d.core, def.color);
+      const up = upperFloors(kit, def.id, FLOOR_PLANS[def.id]?.length ?? 0, d.top - 2, d.core, def.color, bodyRadius(d.group));
       d.group.add(up.group);
       // Fachada peça a peça de perto; de longe, o mesmo volume e as mesmas cores, mais leve.
       if (up.near && up.far) lodItems.push({ obj: up.near, x: def.x, z: def.z, far: 240, base: 240 }, { obj: up.far, x: def.x, z: def.z, far: 240, base: 240, invert: true });
@@ -866,4 +866,28 @@ function plazaSeats(): Seat[] {
     out.push({ x: Math.sin(a) * 17.2, y: 0.56, z: Math.cos(a) * 17.2, face: a + Math.PI });
   }
   return out;
+}
+
+/**
+ * Raio do corpo do prédio do térreo (paredes e volumes acima de 4,5 m, sem postes, plantas nem o
+ * piso do lote): os andares de cima apoiam sobre ele em vez de virar uma marquise solta.
+ */
+function bodyRadius(g: THREE.Object3D): number {
+  g.updateMatrixWorld(true);
+  const rs: number[] = [];
+  const v = new THREE.Vector3();
+  g.traverse((o) => {
+    const m = o as THREE.Mesh;
+    if (!m.isMesh || (o as THREE.InstancedMesh).isInstancedMesh) return;
+    const pos = m.geometry.attributes.position;
+    if (!pos) return;
+    const step = Math.max(1, Math.floor(pos.count / 600));
+    for (let i = 0; i < pos.count; i += step) {
+      v.fromBufferAttribute(pos, i).applyMatrix4(m.matrixWorld);
+      if (v.y > 4.5) rs.push(Math.hypot(v.x, v.z));
+    }
+  });
+  if (!rs.length) return Infinity;
+  rs.sort((a, b) => a - b);
+  return rs[Math.floor(rs.length * 0.95)]!;
 }

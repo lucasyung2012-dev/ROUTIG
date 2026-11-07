@@ -6,7 +6,7 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import type { ModuleId } from '@/app/modules';
-import { LAKE, PARK_RADIUS, PATH_WIDTH, PONDS, heightAt, inWater, parkPaths, samplePath } from '@/domain/park';
+import { LAKE, PARK_RADIUS, PONDS, heightAt, inWater, onPath } from '@/domain/park';
 import { Kit } from './kit';
 import { createCameraRig, type CamMode, type MoveSettings, type Posture } from './camera';
 import { AVATAR_LOOK, createCrowd, type Figure } from './people';
@@ -152,15 +152,11 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
     };
     const parts = world.root.children.map((c, i) => ({ i, k: String(c.userData.building ?? (c.name || c.type)), kids: c.children.length, ...tri(c) })).sort((a, b) => b.t - a.t);
     // Obstáculos em cima dos caminhos (o que atrapalha andar), agrupados a cada 3 m.
-    const blockers = new Map<string, { x: number; z: number; w: number }>();
-    for (const p of parkPaths())
-      for (const s of samplePath(p.points, 1.5)) {
-        const half = PATH_WIDTH[p.kind] / 2 - 0.4;
-        for (const o of world.obstacles) {
-          if (o.h - heightAt(o.x, o.z) < 0.35) continue;
-          if (Math.hypot(o.x - s.x, o.z - s.z) < Math.max(0.2, half) + o.r * 0.5) blockers.set(`${Math.round(o.x / 3)},${Math.round(o.z / 3)}`, { x: Math.round(o.x), z: Math.round(o.z), w: PATH_WIDTH[p.kind] });
-        }
-      }
+    const blockers = new Map<string, { x: number; z: number }>();
+    for (const o of world.obstacles) {
+      if (o.h - heightAt(o.x, o.z) < 0.35) continue;
+      if (onPath(o.x, o.z, o.r * 0.5 - 0.4)) blockers.set(`${Math.round(o.x / 3)},${Math.round(o.z / 3)}`, { x: Math.round(o.x), z: Math.round(o.z) });
+    }
     document.documentElement.dataset.blockers = JSON.stringify([...blockers.values()]);
     window.setInterval(() => {
       document.documentElement.dataset.park = JSON.stringify({ buildMs: Math.round(buildMs), calls: renderer.info.render.calls, frameTris: renderer.info.render.triangles, geos: renderer.info.memory.geometries, tex: renderer.info.memory.textures, total: tri(world.root), parts: parts.slice(0, 40) });

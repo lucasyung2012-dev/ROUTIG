@@ -17,7 +17,10 @@ Leia este arquivo no começo de toda conversa nova sobre o ROUTIG. A especifica�
   - Chão: poças depois da chuva, grama gasta nos atalhos e na frente dos bancos, folhas secas no outono; janelas do bairro só acendem à noite; lixeiras ao lado dos bancos; bebedouro, estação de reciclagem e extintor detalhados nos andares.
 - **Testado no navegador:** avatar de frente (rosto, mãos, tênis), praça com carrinhos, vendedores e jardineiro, pombo no chão, nenhum obstáculo novo nos caminhos.
 - **Não verificado:** sons; entrar pela porta andando e subir a escada (o painel do navegador parou de desenhar quadros com a janela fora de foco); parquinho, bairro e elevadores novos vistos de perto; peso por quadro em terceira pessoa (a última medida, na vista de cima de todo o parque, deu ~1,5 mi triângulos e ~1.000 chamadas de desenho).
+- **Teste no navegador (2026-11-07, depois):** abertura em ~1,0 s (borda do mapa monta depois e só aparece perto da borda); entrar andando pela porta de vidro (abre, entra, aparece dentro olhando o saguão) e sair andando; subir e descer a escada em caracol (Calendar); parquinho com crianças; lounges de elevador de Music, Library e Goals do lado de fora; bairro com rua do parque, transversal, semáforo, ônibus e carros. Corrigido no teste: "Ir para" em 1ª/3ª pessoa agora deixa na frente da porta; lounge que ficava dentro do térreo; parede de dentro da escada; rua do parque e transversais que não apareciam de cima (carros pareciam andar na grama); árvores de calçada nas transversais.
+- **Diagnóstico (só com ?debug):** evento `park-debug` com `stairs`, `look:playground`, `look:<prédio>`, `look:x,z`, `cam:x,y,z,tx,ty,tz` e `probe:x,z`.
 - **Próximo:** revisão do 2D (dashboard, interface, módulos); ID do cliente Google (docs/GOOGLE-CLOUD.md).
+- **V2.2:** o Lucas vai mandar um prompt (feito com o ChatGPT); analisar contra o que já existe e só implementar depois do OK.
 
 ## Estado da conversa (2026-11-08, riqueza de detalhes, pessoas e leveza)
 

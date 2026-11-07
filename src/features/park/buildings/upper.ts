@@ -32,6 +32,16 @@ export function upperFloors(kit: Kit, id: ModuleId, levels: number, base: number
   const ownRot = (L: number) => (form.sides >= 3 ? levelRot(form, L) : 0);
   // Cilindro com a forma do andar (o CylinderGeometry começa no ângulo `thetaStart` do eixo +z).
   const prism = (R: number, h: number, L: number) => new THREE.CylinderGeometry(R, R, h, segs, 1, true, ownRot(L));
+  // Pilares (pilotis) do chão até a laje do 1º andar, na borda: a laje não fica solta sobre o térreo.
+  {
+    const n = form.sides >= 6 ? form.sides : form.sides >= 3 ? form.sides * 2 : 12;
+    const col = kit.mat(form.facade === 'stone' || form.facade === 'brick' ? form.frame : '#D5DBE2', { rough: 0.6 });
+    for (let k = 0; k < n; k++) {
+      const a = (k / n) * Math.PI * 2 + Math.PI / n;
+      if (Math.abs(Math.sin(a)) < 0.2 && Math.cos(a) > 0) continue; // livre na frente (entrada)
+      b.add(col, new THREE.CylinderGeometry(0.35, 0.42, base + 0.4, 12), [Math.sin(a) * r0 * 0.93, (base + 0.4) / 2, Math.cos(a) * r0 * 0.93]);
+    }
+  }
   let y = base;
   let r = r0;
   for (let L = 1; L <= levels; L++) {

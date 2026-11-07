@@ -469,7 +469,7 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
     const p = rig.body().pos;
     if (level === 0) return Math.hypot(p.x, p.z + lv.walk) < 5.5;
     const e = inside!.scene.floors!.elevator;
-    return Math.hypot(p.x - e.x, p.z - (e.z + 2.6)) < 4.6;
+    return Math.hypot(p.x - e.x, p.z - (e.z + 2.6)) < 3.4;
   };
   /** Objeto funcional mais perto, neste andar. */
   const thingNear = (p: { x: number; z: number }): Thing | null => {
@@ -496,8 +496,8 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
     if (rig.posture() !== 'stand') return null;
     const p = rig.body().pos;
     if (inside) {
-      if (elevatorNear() && (inside.scene.floors?.levels.length ?? 1) > 1) return { kind: 'elevator' };
       const th = thingNear(p);
+      if (!th && elevatorNear() && (inside.scene.floors?.levels.length ?? 1) > 1) return { kind: 'elevator' };
       if (th) {
         const fl = inside.scene.floors!;
         if (th.kind === 'room') return { kind: 'use', what: 'room', key: fl.zones[th.zone!]?.key };
@@ -556,9 +556,9 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
     const p = rig.body().pos;
     if (inside) {
       const levels = inside.scene.floors?.levels.length ?? 1;
-      if (elevatorNear() && levels > 1) return opts.onElevator();
       const th = thingNear(p);
       if (th) return useThing(th);
+      if (elevatorNear() && levels > 1) return opts.onElevator();
       const s = floorSeat(p);
       if (s) rig.sit({ ...s, face: s.face + Math.PI });
       return;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { NAV_MODULE_IDS } from '@/app/modules';
-import { PATH_WIDTH, PLAZA_RADIUS, inWater, entranceOf, heightAt, layoutProblems, parkPaths, PARK_BUILDINGS, PARK_REGIONS, samplePath, treePositions } from '@/domain/park';
+import { PATH_WIDTH, PLAZA_RADIUS, inField, inWater, entranceOf, heightAt, layoutProblems, parkPaths, PARK_BUILDINGS, PARK_REGIONS, samplePath, treePositions } from '@/domain/park';
 import { Vector3 } from 'three';
 import type { InboxItem } from '@/domain/inbox';
 import { receptionData } from '@/features/park/receptionData';
@@ -40,7 +40,11 @@ describe('parque V2.1: caminhos em ordem', () => {
     const entrances = PARK_BUILDINGS.map(entranceOf);
     const loose: string[] = [];
     paths.forEach((p, i) => {
-      for (const end of [p.points[0]!, p.points[p.points.length - 1]!]) {
+      const a0 = p.points[0]!;
+      const a1 = p.points[p.points.length - 1]!;
+      if (Math.hypot(a0.x - a1.x, a0.z - a1.z) < 1) return; // circuito fechado
+      for (const end of [a0, a1]) {
+        if (inField(end.x, end.z, 5)) continue; // chega à quadra ou ao campo
         if (Math.abs(Math.hypot(end.x, end.z) - PLAZA_RADIUS) < 1) continue;
         if (entrances.some((e) => Math.hypot(e.x - end.x, e.z - end.z) < 1)) continue;
         const joined = paths.some((o, j) => j !== i && samplePath(o.points, 1).some((q) => Math.hypot(q.x - end.x, q.z - end.z) < 3));

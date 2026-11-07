@@ -302,6 +302,10 @@ export function parkPaths(): ParkPath[] {
     loop.push({ x: LAKE.x + Math.cos(a) * r, z: LAKE.z + Math.sin(a) * r });
   }
   out.push({ kind: 'trail', points: loop });
+  // A trilha do lago se liga à rede: ao circuito Sul–Oeste e ao fim da trilha das colinas.
+  const nearLoop = (p: Point) => samplePath(loop, 2).reduce((m, q) => (dist(q, p) < dist(m, p) ? q : m), loop[0]!);
+  out.push({ kind: 'trail', points: [P(-65, 70), nearLoop(P(-65, 70))] });
+  out.push({ kind: 'trail', points: [P(-150, 60), nearLoop(P(-150, 60))] });
   // Acesso às quadras externas do Complexo Esportivo.
   out.push({ kind: 'secondary', points: [REGION_HUB.west, { x: -205, z: -60 }, { x: SPORT_FIELDS.tennis.x, z: SPORT_FIELDS.tennis.z + SPORT_FIELDS.tennis.d / 2 + 3 }] });
   out.push({ kind: 'secondary', points: [{ x: -205, z: -60 }, { x: -240, z: -80 }, { x: -245, z: -110 }, { x: SPORT_FIELDS.football.x + SPORT_FIELDS.football.w / 2 + 3, z: SPORT_FIELDS.football.z + 10 }] });

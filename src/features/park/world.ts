@@ -363,8 +363,15 @@ function plaza(kit: Kit): THREE.Group {
     const a = (i / 36) * Math.PI * 2;
     b.add(kit.mat('#CFC6B2', { rough: 0.8 }), new THREE.BoxGeometry(0.22, 0.02, 5.4), [Math.sin(a) * 10.85, 0.08, Math.cos(a) * 10.85], [0, a, 0]);
   }
-  // Meio-fio rente ao chão (14 cm): dá para passar por cima em qualquer ponto da borda.
-  b.add(kit.mat('#D6D0C2'), new THREE.TorusGeometry(R + 0.1, 0.22, 6, 128), [0, 0.05, 0], [-Math.PI / 2, 0, 0], [1, 1, 0.4]);
+  // Meio-fio rente ao chão (14 cm), fora da colisão: onde o gramado em volta fica mais baixo ele
+  // contava como degrau alto e prendia quem andava; agora dá para passar em qualquer ponto da borda.
+  const curbGeo = kit.own(new THREE.TorusGeometry(R + 0.1, 0.22, 6, 128));
+  curbGeo.rotateX(-Math.PI / 2);
+  curbGeo.scale(1, 0.4, 1);
+  const curb = new THREE.Mesh(curbGeo, kit.mat('#D6D0C2'));
+  curb.position.y = 0.05;
+  curb.receiveShadow = true;
+  curb.userData.noCollide = true;
   // Bancos entre as saídas e canteiros circulares com borda de pedra.
   const wood = kit.mat('#A0714F', { rough: 0.8 });
   const metal = kit.mat('#475569', { metal: 0.7, rough: 0.35 });
@@ -389,7 +396,9 @@ function plaza(kit: Kit): THREE.Group {
     b.add(kit.mat('#D9D2C3', { rough: 0.6 }), new THREE.CylinderGeometry(2.4, 2.5, 0.55, 32), [x, 0.3, z]);
     b.add(kit.mat('#5C8F48', { rough: 1 }), new THREE.CylinderGeometry(2.2, 2.2, 0.05, 32), [x, 0.6, z]);
   }
-  return b.build();
+  const g = b.build();
+  g.add(curb);
+  return g;
 }
 
 /* ---------- Postes em instâncias ---------- */

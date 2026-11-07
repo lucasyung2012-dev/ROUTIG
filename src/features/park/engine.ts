@@ -138,6 +138,10 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
   const crowd = createCrowd(kit, 40);
   outside.add(crowd.group);
   const town = createTown(world.seats);
+  // Bolas dos jogos (tênis amarela, futebol branca).
+  const ballMeshes = { tennis: new THREE.InstancedMesh(kit.own(new THREE.SphereGeometry(0.07, 10, 8)), kit.mat('#D9F23A', { rough: 0.7 }), 2), football: new THREE.InstancedMesh(kit.own(new THREE.SphereGeometry(0.11, 14, 10)), kit.mat('#F8FAFC', { rough: 0.5 }), 2) };
+  outside.add(ballMeshes.tennis, ballMeshes.football);
+  const ballM = new THREE.Matrix4();
   let avatarWaveUntil = 0;
   let crowdMax = 16;
   let season: Conditions['season'] = 'summer';
@@ -651,6 +655,14 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
         const viewer = mode === 'orbit' ? rig.controls.target : body.pos;
         town.step(opts.reduceMotion ? dt * 0.5 : dt, conditions(), mode === 'orbit' ? { x: 1e5, z: 1e5 } : viewer, now);
         crowd.set(town.visible(viewer, crowdMax, mode === 'orbit' ? 260 : 140));
+        ballMeshes.tennis.count = 0;
+        ballMeshes.football.count = 0;
+        for (const bl of town.balls()) {
+          const m = ballMeshes[bl.kind];
+          ballM.makeTranslation(bl.x, bl.y, bl.z);
+          m.setMatrixAt(m.count++, ballM);
+          m.instanceMatrix.needsUpdate = true;
+        }
       }
       // Andando: avisa quando a entrada de um prédio está a poucos passos e o que dá para fazer aqui.
       if (mode !== 'orbit') {

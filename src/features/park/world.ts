@@ -6,7 +6,7 @@
 import * as THREE from 'three';
 import type { ModuleId } from '@/app/modules';
 import { LAKE, PARK_BUILDINGS, PARK_RADIUS, PARK_SCALE, PATH_WIDTH, PLAZA_RADIUS, POIS, PONDS, entranceOf, facingOf, heightAt, inWater, lakeRadiusAt, parkPaths, samplePath, seededRandom, treePositions, type ParkBuilding, type Point } from '@/domain/park';
-import { amenities, houses, type Seat, type Viewpoint } from './buildings/amenities';
+import { amenities, houses, sportsFields, type Seat, type Viewpoint } from './buildings/amenities';
 import { Builder, Kit, cloud, forest, setWaterNight, setWaterSky, setWaterWeather, shrubs, sky, stars, water, type Plant, type TreeSpecies } from './kit';
 import { birds, butterflies, drone, fountain, leaves, rain } from './life';
 import { dashboardBuilding, inboxBuilding, profileBuilding, settingsBuilding, type DetailedBuilding } from './buildings/central';
@@ -621,7 +621,9 @@ export function createWorld(kit: Kit): World {
   }
   const am = amenities(kit);
   const ww = walkway(kit, buildings.get('tasks')?.def, buildings.get('calendar')?.def);
-  root.add(am.group, houses(kit), ww);
+  const fields = sportsFields(kit);
+  root.add(am.group, houses(kit), ww, fields);
+  obstacles.push(...footprint(fields, heightAt));
   // Barracas, quiosques, mesas, bancos, pérgolas, passarela, praça; postes e troncos das árvores.
   obstacles.push(...footprint(am.group, heightAt), ...footprint(ww, heightAt), ...footprint(plazaGroup, heightAt));
   for (const l of p.lamps) obstacles.push({ x: l.x, z: l.z, r: 0.25, h: heightAt(l.x, l.z) + 4.2 });

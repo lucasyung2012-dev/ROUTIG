@@ -182,8 +182,32 @@ function rawHeight(xm: number, zm: number): number {
  * Altura do terreno: o relevo bruto, com cada lote nivelado numa plataforma (o prédio assenta
  * no chão) e a praça plana. Margens do lago descem até a água (no desenho do terreno).
  */
+/**
+ * Instalações esportivas externas do Complexo Esportivo (V2.1, 10.13 e 11.13): quadra de tênis
+ * e campo de futebol, em terreno nivelado. `w` na direção x, `d` na direção z (metros).
+ */
+export const SPORT_FIELDS = {
+  tennis: { x: -215, z: -92, w: 36, d: 18 },
+  football: { x: -262, z: -152, w: 70, d: 46 },
+} as const;
+
+/** Dentro de um campo/quadra (com folga). */
+export function inField(x: number, z: number, pad = 0): boolean {
+  return Object.values(SPORT_FIELDS).some((f) => Math.abs(x - f.x) < f.w / 2 + pad && Math.abs(z - f.z) < f.d / 2 + pad);
+}
+
 export function heightAt(x: number, z: number): number {
   let h = rawHeight(x, z);
+  // Campo e quadra nivelados, com taludes suaves em volta.
+  for (const f of Object.values(SPORT_FIELDS)) {
+    const dx = Math.max(0, Math.abs(x - f.x) - f.w / 2);
+    const dz = Math.max(0, Math.abs(z - f.z) - f.d / 2);
+    const d = Math.hypot(dx, dz);
+    if (d < 14) {
+      const k = 1 - smooth(0, 14, d);
+      h = h * (1 - k) + rawHeight(f.x, f.z) * k;
+    }
+  }
   for (const p of PARK_BUILDINGS) {
     const d = Math.hypot(x - p.x, z - p.z);
     if (d < p.radius + 18) {
@@ -267,6 +291,9 @@ export function parkPaths(): ParkPath[] {
     loop.push({ x: LAKE.x + Math.cos(a) * r, z: LAKE.z + Math.sin(a) * r });
   }
   out.push({ kind: 'trail', points: loop });
+  // Acesso às quadras externas do Complexo Esportivo.
+  out.push({ kind: 'secondary', points: [REGION_HUB.west, { x: -205, z: -60 }, { x: SPORT_FIELDS.tennis.x, z: SPORT_FIELDS.tennis.z + SPORT_FIELDS.tennis.d / 2 + 3 }] });
+  out.push({ kind: 'secondary', points: [{ x: -205, z: -60 }, { x: -240, z: -80 }, { x: -245, z: -110 }, { x: SPORT_FIELDS.football.x + SPORT_FIELDS.football.w / 2 + 3, z: SPORT_FIELDS.football.z + 10 }] });
   // Trilhas das colinas do Oeste e da mata do Norte.
   out.push({ kind: 'trail', points: [P(-120, -10), P(-170, -60), P(-205, -40), P(-200, 40), P(-150, 60)] });
   out.push({ kind: 'trail', points: [P(-80, -95), P(-88, -150), P(-60, -200), P(10, -215), P(55, -170), P(60, -100)] });
@@ -383,6 +410,7 @@ export function treePositions(count: number, seed = 7): Array<{ x: number; z: nu
     if (PARK_BUILDINGS.some((q) => dist(p, q) < q.radius * 0.85)) continue;
     if (POIS.some((q) => dist(p, q) < 9)) continue;
     if (Object.values(COURTS).some((q) => dist(p, q) < 10)) continue;
+    if (inField(p.x, p.z, 6)) continue;
     const edge = parkEdgeAt(a);
     if (r > edge + 18 && r < edge + 56) continue; // faixa das residências
     if (near(pathGrid, p, 4.5) || near(grid, p, 4.2)) continue;

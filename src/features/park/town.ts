@@ -4,7 +4,7 @@
  * câmera são desenhados (limite por aparelho e modo gráfico).
  */
 import { activityAt, campusPeople, poseFor, routeBetween, routeHome, spotFor, type Activity, type Conditions, type Person, type PersonPose } from '@/domain/parkPeople';
-import { PARK_SCALE, heightAt, type Point } from '@/domain/park';
+import { PARK_SCALE, SPORT_FIELDS, heightAt, type Point } from '@/domain/park';
 import type { Figure } from './people';
 import type { Seat } from './camera';
 
@@ -43,6 +43,8 @@ export interface Town {
   /** Quantos estão no campus agora e o que fazem (painel de opções). */
   census: () => { outside: number; total: number; byActivity: Partial<Record<Activity, number>> };
   nearest: (p: { x: number; z: number }, r: number) => { name: string; activity: Activity; x: number; z: number } | null;
+  /** Bolas dos jogos em andamento (tênis e futebol). */
+  balls: () => Array<{ x: number; y: number; z: number; kind: 'tennis' | 'football' }>;
   /** Cumprimentar quem está perto: a pessoa olha, acena e responde. */
   greet: (p: { x: number; z: number }, r: number, now: number) => { name: string; activity: Activity; x: number; z: number; line: number } | null;
 }
@@ -134,6 +136,8 @@ export function createTown(seats: Seat[] = []): Town {
     for (const a of agents) {
       if (Math.floor(c.hour) !== a.block && (c.hour * 60) % 60 >= (a.p.id % 12) * 2) plan(a, c, false);
       if (a.away && a.activity === 'home') continue;
+      // Jogando nas quadras: quem comanda a posição é o jogo (abaixo), não a rota.
+      if (a.activity === 'sport' && a.ri >= a.route.length - 1 && (near(a, SPORT_FIELDS.tennis, 8) || near(a, SPORT_FIELDS.football, 10)) && now >= a.talkUntil) continue;
       // Cumprimentada: para o que estava fazendo, vira para o visitante, acena e fala.
       if (now < a.talkUntil) {
         if (a.seat < 0) a.yaw = Math.atan2(viewer.x - a.x, viewer.z - a.z);
@@ -203,10 +207,79 @@ export function createTown(seats: Seat[] = []): Town {
     }
   };
 
+  /* ---------- Jogos nas quadras externas (tênis e futebol, V2.1 11.13) ---------- */
+  let ballList: ReturnType<Town['balls']> = [];
+  const moveTo = (a: Agent, tx: number, tz: number, sp: number, dt: number) => {
+    const dx = tx - a.x;
+    const dz = tz - a.z;
+    const d = Math.hypot(dx, dz);
+    const st = Math.min(d, sp * dt);
+    if (d > 0.01) {
+      a.x += (dx / d) * st;
+      a.z += (dz / d) * st;
+    }
+    return dt > 0 ? st / dt : 0;
+  };
+  const near = (a: Agent, f: { x: number; z: number; w: number; d: number }, pad: number) => Math.abs(a.x - f.x) < f.w / 2 + pad && Math.abs(a.z - f.z) < f.d / 2 + pad;
+  const games = (dt: number, now: number) => {
+    const t = now / 1000;
+    ballList = [];
+    const ready = agents.filter((a) => a.activity === 'sport' && !a.away && a.ri >= a.route.length - 1 && now >= a.talkUntil).sort((u, v) => u.p.id - v.p.id);
+    const T = SPORT_FIELDS.tennis;
+    const tennis = ready.filter((a) => near(a, T, 8)).slice(0, 4);
+    if (tennis.length >= 2) {
+      // Bola indo e voltando por cima da rede, em arco; jogadores acompanham a bola de lado.
+      const u = (t / 1.3) % 2;
+      const k = u < 1 ? u : 2 - u;
+      const bx = T.x - 10.5 + 21 * k;
+      const bz = T.z + Math.sin(t * 0.9) * 3.2;
+      const arc = Math.sin(Math.PI * (u % 1));
+      ballList.push({ x: bx, y: heightAt(T.x, T.z) + 0.35 + arc * 2.1, z: bz, kind: 'tennis' });
+      tennis.forEach((a, i) => {
+        const side = i % 2 ? 1 : -1;
+        const tx = T.x + side * (i >= 2 ? 6.5 : 11.6);
+        const tz = T.z + (bz - T.z) * 0.8 + (i >= 2 ? 1.8 : 0) * side;
+        moveTo(a, tx, tz, 5, dt);
+        a.yaw = side > 0 ? -Math.PI / 2 : Math.PI / 2;
+        a.pose = 'tennis' as PersonPose;
+        a.phase += dt * 4.8;
+        a.look = 0;
+      });
+    }
+    const F = SPORT_FIELDS.football;
+    const foot = ready.filter((a) => near(a, F, 10)).slice(0, 12);
+    if (foot.length >= 2) {
+      // Bola rolando pelo campo; dois goleiros, o resto disputa e se espalha em volta.
+      const bx = F.x + Math.sin(t * 0.31) * 25 + Math.sin(t * 0.83) * 5;
+      const bz = F.z + Math.sin(t * 0.47 + 1) * 14;
+      ballList.push({ x: bx, y: heightAt(F.x, F.z) + 0.22, z: bz, kind: 'football' });
+      foot.forEach((a, i) => {
+        let tx: number;
+        let tz: number;
+        if (i < 2) {
+          const side = i === 0 ? -1 : 1;
+          tx = F.x + side * 30.5;
+          tz = F.z + Math.max(-3.5, Math.min(3.5, (bz - F.z) * 0.4));
+        } else {
+          const ang = i * 2.4 + t * 0.25;
+          const rr = i < 4 ? 1.2 : 4 + (i % 4) * 3.2;
+          tx = bx + Math.cos(ang) * rr;
+          tz = bz + Math.sin(ang) * rr * 0.7;
+        }
+        const sp = moveTo(a, tx, tz, i < 2 ? 3 : 5.5, dt);
+        a.yaw = Math.atan2(bx - a.x, bz - a.z);
+        a.pose = sp > 0.4 ? 'walk' : 'stand';
+        a.phase += dt * Math.max(2, sp * 2.2);
+        a.look = 0;
+      });
+    }
+  };
+
   let conditionsRef: Conditions = { hour: 12, day: 0, rain: 0, fog: 0, wind: 0, season: 'summer' };
   const wrappedStep: Town['step'] = (dt, c, viewer, now) => {
     conditionsRef = c;
     step(dt, c, viewer, now);
+    games(dt, now);
   };
 
   const visible = (from: { x: number; z: number }, max: number, range: number): Figure[] =>
@@ -256,6 +329,7 @@ export function createTown(seats: Seat[] = []): Town {
       }
       return { outside, total: agents.length, byActivity: by };
     },
+    balls: () => ballList,
     greet: (p, r, now) => {
       let best: Agent | null = null;
       let bd = r;

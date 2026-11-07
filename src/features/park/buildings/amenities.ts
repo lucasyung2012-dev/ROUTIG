@@ -4,7 +4,7 @@
  * Bancos e mirantes viram pontos de interação (sentar, observar).
  */
 import * as THREE from 'three';
-import { PARK_BUILDINGS, PATH_WIDTH, PLAZA_RADIUS, POIS, heightAt, inWater, parkPaths, residences, samplePath, seededRandom, type Poi } from '@/domain/park';
+import { PARK_BUILDINGS, PATH_WIDTH, PLAZA_RADIUS, POIS, SPORT_FIELDS, heightAt, inWater, parkPaths, residences, samplePath, seededRandom, type Poi } from '@/domain/park';
 import { Builder, type Kit } from '../kit';
 
 export interface Seat {
@@ -306,6 +306,74 @@ export function houses(kit: Kit): THREE.Group {
     put(doorMat, new THREE.CylinderGeometry(0.15, 0.22, 2.8, 8), tx, 1.4, d / 2 + 4);
     put(leaf, new THREE.IcosahedronGeometry(1.7, 1), tx, 3.6, d / 2 + 4, 0, [1, 0.85, 1]);
     for (let k = 0; k < 4; k++) put(hedge, new THREE.IcosahedronGeometry(0.5 + rnd() * 0.3, 1), -w / 2 + 1 + k * (w / 3.2), 0.45, d / 2 + 0.8);
+  }
+  return b.build();
+}
+
+/**
+ * Instalações externas do Complexo Esportivo (V2.1, 11.13): quadra de tênis com linhas oficiais,
+ * rede e bancos; campo de futebol com gramado listrado, linhas, círculo central, áreas, gols com
+ * rede e uma pequena arquibancada.
+ */
+export function sportsFields(kit: Kit): THREE.Group {
+  const b = new Builder();
+  const line = kit.mat('#F8FAFC', { rough: 0.6 });
+  const post = kit.mat('#D1D5DB', { metal: 0.7, rough: 0.3 });
+  const netM = kit.mat('#E5E7EB', { glass: true, side: THREE.DoubleSide });
+  const wood = kit.mat('#A0714F', { rough: 0.75 });
+  const dark = kit.mat('#334155', { metal: 0.6, rough: 0.35 });
+  const L = (w: number, d: number, x: number, z: number, y: number) => b.add(line, new THREE.BoxGeometry(w, 0.02, d), [x, y + 0.075, z]);
+
+  // Tênis (23,77 × 10,97 m, ao longo de x).
+  {
+    const f = SPORT_FIELDS.tennis;
+    const y = heightAt(f.x, f.z);
+    b.add(kit.mat('#3E7D6B', { rough: 0.85 }), new THREE.BoxGeometry(f.w, 0.1, f.d), [f.x, y + 0.02, f.z]);
+    b.add(kit.mat('#2F6CA8', { rough: 0.8 }), new THREE.BoxGeometry(23.77, 0.02, 10.97), [f.x, y + 0.075, f.z]);
+    for (const s of [-1, 1]) {
+      L(0.08, 10.97, f.x + s * 11.885, f.z, y);
+      L(23.77, 0.06, f.x, f.z + s * 5.485, y);
+      L(23.77, 0.06, f.x, f.z + s * 4.115, y);
+      L(0.06, 8.23, f.x + s * 6.4, f.z, y);
+      L(0.15, 0.06, f.x + s * 11.8, f.z, y);
+      // Bancos e cadeira do juiz.
+      b.add(wood, new THREE.BoxGeometry(2.4, 0.08, 0.5), [f.x + s * 4, y + 0.45, f.z + 7.6]);
+      b.add(dark, new THREE.BoxGeometry(2.2, 0.45, 0.4), [f.x + s * 4, y + 0.22, f.z + 7.6]);
+    }
+    L(12.8, 0.06, f.x, f.z, y);
+    for (const s of [-1, 1]) b.add(post, new THREE.CylinderGeometry(0.05, 0.05, 1.07, 8), [f.x, y + 0.6, f.z + s * 6.4]);
+    b.add(netM, new THREE.BoxGeometry(0.02, 0.9, 12.8), [f.x, y + 0.53, f.z]);
+    b.add(line, new THREE.BoxGeometry(0.04, 0.06, 12.8), [f.x, y + 1.0, f.z]);
+    b.add(post, new THREE.BoxGeometry(0.6, 1.8, 0.6), [f.x, y + 0.9, f.z - 7.4]);
+  }
+  // Futebol (64 × 40 m).
+  {
+    const f = SPORT_FIELDS.football;
+    const y = heightAt(f.x, f.z);
+    for (let k = 0; k < 10; k++) b.add(kit.mat(k % 2 ? '#4F9A45' : '#5BA94F', { rough: 0.95 }), new THREE.BoxGeometry(f.w / 10, 0.1, f.d), [f.x - f.w / 2 + (k + 0.5) * (f.w / 10), y + 0.02, f.z]);
+    const W = 64;
+    const D = 40;
+    for (const s of [-1, 1]) {
+      L(W, 0.12, f.x, f.z + s * (D / 2), y);
+      L(0.12, D, f.x + s * (W / 2), f.z, y);
+      // Grande área e pequena área.
+      L(0.12, 22, f.x + s * (W / 2 - 13), f.z, y);
+      L(13, 0.12, f.x + s * (W / 2 - 6.5), f.z + 11, y);
+      L(13, 0.12, f.x + s * (W / 2 - 6.5), f.z - 11, y);
+      L(0.12, 10, f.x + s * (W / 2 - 4.5), f.z, y);
+      L(4.5, 0.12, f.x + s * (W / 2 - 2.25), f.z + 5, y);
+      L(4.5, 0.12, f.x + s * (W / 2 - 2.25), f.z - 5, y);
+      // Gol com rede.
+      const gx = f.x + s * (W / 2 + 0.05);
+      for (const z of [-2.5, 2.5]) b.add(line, new THREE.CylinderGeometry(0.06, 0.06, 2.2, 8), [gx, y + 1.15, f.z + z]);
+      b.add(line, new THREE.CylinderGeometry(0.06, 0.06, 5.1, 8), [gx, y + 2.25, f.z], [Math.PI / 2, 0, 0]);
+      b.add(netM, new THREE.BoxGeometry(0.02, 2.2, 5), [gx + s * 1.4, y + 1.1, f.z]);
+      for (const z of [-2.5, 2.5]) b.add(netM, new THREE.BoxGeometry(1.4, 2.2, 0.02), [gx + s * 0.7, y + 1.1, f.z + z]);
+    }
+    L(0.12, D, f.x, f.z, y);
+    b.add(line, new THREE.TorusGeometry(6, 0.06, 4, 48), [f.x, y + 0.075, f.z], [Math.PI / 2, 0, 0]);
+    // Arquibancada pequena ao lado.
+    for (let k = 0; k < 3; k++) b.add(kit.mat('#CBD5E1', { rough: 0.7 }), new THREE.BoxGeometry(30, 0.45 * (k + 1), 1), [f.x, y + 0.225 * (k + 1), f.z - f.d / 2 - 1.5 - k]);
   }
   return b.build();
 }

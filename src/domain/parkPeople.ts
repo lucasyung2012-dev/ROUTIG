@@ -4,10 +4,10 @@
  * dos caminhos), param nos espaços de convivência e voltam para casa (fora da área explorável).
  * Tudo determinístico por dia e hora: a mesma hora mostra o mesmo campus. Sem missões.
  */
-import { COURTS, PARK_BUILDINGS, PARK_SCALE, PLAZA_RADIUS, POIS, dist, inWater, parkPaths, residences, seededRandom, type Point } from './park';
+import { COURTS, PARK_BUILDINGS, PARK_SCALE, SPORT_FIELDS, PLAZA_RADIUS, POIS, dist, inWater, parkPaths, residences, seededRandom, type Point } from './park';
 
 export type Activity = 'home' | 'cafe' | 'read' | 'study' | 'sport' | 'music' | 'view' | 'chat' | 'stroll' | 'picnic' | 'draw' | 'photo';
-export type PersonPose = 'stand' | 'walk' | 'sit' | 'read' | 'play' | 'wave' | 'exercise' | 'draw' | 'photo';
+export type PersonPose = 'stand' | 'walk' | 'sit' | 'read' | 'play' | 'wave' | 'exercise' | 'draw' | 'photo' | 'tennis';
 
 export interface Person {
   id: number;
@@ -87,7 +87,8 @@ export const ACTIVITY_SPOTS: Record<Exclude<Activity, 'home' | 'stroll'>, Point[
   cafe: [poi('cafe-praca'), poi('cafe-sul'), poi('quiosque-leste')],
   read: [poi('leitura-norte'), poi('pergola-sul')],
   study: [COURTS.learning!, COURTS.east!],
-  sport: [{ x: sports.x + 52, z: sports.z - 22 }, { x: sports.x + 50, z: sports.z + 26 }],
+  // Tênis e futebol nas instalações externas (de dia); exercício no gramado do complexo.
+  sport: [{ x: SPORT_FIELDS.tennis.x, z: SPORT_FIELDS.tennis.z }, { x: SPORT_FIELDS.football.x, z: SPORT_FIELDS.football.z }, { x: sports.x + 52, z: sports.z - 22 }],
   music: [poi('palco-musica')],
   view: [poi('mirante-colina'), poi('mirante-lago')],
   chat: [{ x: 14, z: 12 }, { x: -14, z: -12 }, poi('praca-leste')],
@@ -258,6 +259,8 @@ export function activityAt(p: Person, c: Conditions): Activity {
   const evt = spontaneousEvent(c.day, block);
   if (evt && r > 0.86 && c.rain < 0.15) return evt;
   let pick: Activity;
+  // De dia, com tempo bom, sempre há quem jogue tênis ou futebol.
+  if (block >= 8 && block <= 17 && c.rain < 0.15 && r > 0.32 && r < 0.45 && p.rhythm !== 'night') return 'sport';
   if (block >= 11 && block <= 13 && r < 0.55) pick = 'cafe';
   else if (block >= 18 && p.rhythm !== 'early' && r < 0.6) pick = 'music';
   else if (block <= 9 && p.rhythm === 'early' && r < 0.7) pick = r < 0.5 ? 'sport' : 'stroll';

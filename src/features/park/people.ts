@@ -9,7 +9,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { Kit } from './kit';
 
-export type Pose = 'stand' | 'walk' | 'sit' | 'read' | 'play' | 'wave' | 'exercise' | 'draw' | 'photo';
+export type Pose = 'stand' | 'walk' | 'sit' | 'read' | 'play' | 'wave' | 'exercise' | 'draw' | 'photo' | 'tennis';
 
 export interface Figure {
   x: number;
@@ -251,6 +251,20 @@ function sketchGeo(): THREE.BufferGeometry {
   return mergeGeometries([pad.toNonIndexed(), pencil.toNonIndexed()])!;
 }
 
+function racketGeo(): THREE.BufferGeometry {
+  const handle = new THREE.CylinderGeometry(0.014, 0.016, 0.28, 8);
+  handle.translate(0, -0.14, 0);
+  const head = new THREE.TorusGeometry(0.11, 0.008, 6, 20);
+  head.scale(0.8, 1.15, 1);
+  head.rotateY(Math.PI / 2);
+  head.translate(0, -0.4, 0);
+  const strings = new THREE.CircleGeometry(0.1, 16);
+  strings.scale(0.8, 1.15, 1);
+  strings.rotateY(Math.PI / 2);
+  strings.translate(0, -0.4, 0);
+  return mergeGeometries([handle.toNonIndexed(), head.toNonIndexed(), strings.toNonIndexed()])!;
+}
+
 function cameraGeo(): THREE.BufferGeometry {
   const box = new THREE.BoxGeometry(0.13, 0.08, 0.06);
   const lens = new THREE.CylinderGeometry(0.028, 0.03, 0.06, 14);
@@ -270,7 +284,7 @@ interface Joints {
   abd: [number, number];
   headPitch: number;
   headYaw: number;
-  prop: 'book' | 'guitar' | 'sketch' | 'camera' | null;
+  prop: 'book' | 'guitar' | 'sketch' | 'camera' | 'racket' | null;
 }
 
 function joints(f: Figure): Joints {
@@ -319,6 +333,20 @@ function joints(f: Figure): Joints {
         j.headPitch = 0.45;
         j.prop = 'sketch';
       }
+      break;
+    }
+    case 'tennis': {
+      // Raquete na mão direita; o braço vai e volta na batida, pernas abertas e joelhos dobrados.
+      const sw = Math.sin(p * 1.3);
+      j.hf = [0.25, -0.15];
+      j.kf = [0.35, 0.3];
+      j.legOut = 0.12;
+      j.hip = HIP - 0.06;
+      j.sf = [0.5, 0.6 + sw * 0.7];
+      j.abd = [0.2, 0.5 + sw * 0.4];
+      j.ef = [0.9, 0.4];
+      j.lean = 0.12;
+      j.prop = 'racket';
       break;
     }
     case 'photo':
@@ -386,7 +414,8 @@ export function createCrowd(kit: Kit, capacity: number, shadows = true): Crowd {
   const camera = mk(cameraGeo(), kit.mat('#1F2328', { rough: 0.35, metal: 0.4 }), 1, false);
   const parts = [pelvis, torso, head, sclera, iris, brows, upper, fore, hand, thigh, shin, shoe];
   const variants = [...hairs, ...Object.values(mouths)];
-  const props = { book, guitar, sketch, camera };
+  const racket = mk(racketGeo(), kit.mat('#1F6FB2', { rough: 0.4, side: THREE.DoubleSide }), 1, false);
+  const props = { book, guitar, sketch, camera, racket };
 
   const base = new THREE.Matrix4();
   const tmp = new THREE.Matrix4();
@@ -404,13 +433,14 @@ export function createCrowd(kit: Kit, capacity: number, shadows = true): Crowd {
     tmp.compose(v.set(x, y, z), q.setFromEuler(e.set(rx, ry, rz)), sc.set(1, 1, 1));
     return out.multiplyMatrices(parent, tmp);
   };
-  const counts = { book: 0, guitar: 0, sketch: 0, camera: 0 };
+  const counts = { book: 0, guitar: 0, sketch: 0, camera: 0, racket: 0 };
+  const handR = new THREE.Matrix4();
   const vCount = new Map<THREE.InstancedMesh, number>();
   const blinkM = new THREE.Matrix4().makeScale(1, 0.12, 1);
 
   const set = (list: Figure[]) => {
     const n = Math.min(capacity, list.length);
-    counts.book = counts.guitar = counts.sketch = counts.camera = 0;
+    counts.book = counts.guitar = counts.sketch = counts.camera = counts.racket = 0;
     vCount.clear();
     const now = performance.now() / 1000;
     for (let i = 0; i < n; i++) {
@@ -449,6 +479,7 @@ export function createCrowd(kit: Kit, capacity: number, shadows = true): Crowd {
         fore.setMatrixAt(i * 2 + k, m1);
         step(m1, m1, 0, -FORE, 0);
         hand.setMatrixAt(i * 2 + k, m1);
+        if (k === 1) handR.copy(m1);
       }
       // Pernas: quadril → joelho → tornozelo (sapato sempre reto no chão).
       step(m3, base, 0, j.hip, 0);
@@ -468,6 +499,7 @@ export function createCrowd(kit: Kit, capacity: number, shadows = true): Crowd {
         if (j.prop === 'book') step(m1, m2, 0, 0.16, 0.3, -0.75);
         else if (j.prop === 'guitar') step(m1, m2, 0.04, 0.1, 0.19, 0, 0.15, 1.2);
         else if (j.prop === 'sketch') step(m1, base, 0, SIT_HIP + 0.1, 0.4, -0.35);
+        else if (j.prop === 'racket') step(m1, handR, 0, -0.08, 0.01);
         else step(m1, m2, 0, TORSO + 0.2, 0.17);
         im.setMatrixAt(idx, m1);
       }

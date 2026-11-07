@@ -42,6 +42,8 @@ export interface Figure {
   /** Mochila nas costas. */
   bag?: boolean;
   shoes?: string;
+  /** Cor do solado e do cadarço. */
+  sole?: string;
   /** 0 curto, 1 comprido, 2 coque, 3 cacheado. */
   hairStyle?: number;
   /** Cor dos olhos (íris). */
@@ -69,7 +71,8 @@ const HIP = THIGH + SHIN + ANKLE;
 const TORSO = 0.48;
 const UPPER = 0.29;
 const FORE = 0.26;
-const SIT_HIP = 0.47;
+// Sentado: a pelve apoia no assento (0,45 m) sem afundar nele.
+const SIT_HIP = 0.53;
 
 /** Peça de membro: cápsula afinando, com a origem no topo (a articulação). */
 function limb(r0: number, r1: number, len: number): THREE.BufferGeometry {
@@ -138,7 +141,8 @@ function hairGeo(style = 0): THREE.BufferGeometry {
   const cap = new THREE.SphereGeometry(0.107, 18, 10, 0, Math.PI * 2, 0, Math.PI * 0.52);
   cap.scale(0.93, 1.12, 1.04);
   cap.translate(0, 0.012, -0.008);
-  const back = new THREE.SphereGeometry(0.1, 14, 8, Math.PI * 0.6, Math.PI * 0.8, Math.PI * 0.35, Math.PI * 0.35);
+  // Nuca: centrada atrás da cabeça (na esfera do three, phi = 1,5π aponta para -z).
+  const back = new THREE.SphereGeometry(0.1, 14, 8, Math.PI * 1.1, Math.PI * 0.8, Math.PI * 0.35, Math.PI * 0.35);
   back.scale(0.95, 1.1, 1.05);
   back.translate(0, -0.005, -0.012);
   const parts = [cap.toNonIndexed(), back.toNonIndexed()];
@@ -250,7 +254,7 @@ function stripeGeo(): THREE.BufferGeometry {
 }
 /** Capuz caído nas costas e os cordões. */
 function hoodGeo(): THREE.BufferGeometry {
-  const hood = new THREE.SphereGeometry(0.11, 14, 10, Math.PI * 0.55, Math.PI * 0.9, 0, Math.PI * 0.6);
+  const hood = new THREE.SphereGeometry(0.11, 14, 10, Math.PI * 1.05, Math.PI * 0.9, 0, Math.PI * 0.6);
   hood.scale(1.1, 0.7, 1);
   hood.translate(0, 0.5, -0.03);
   const parts = [hood.toNonIndexed()];
@@ -331,28 +335,84 @@ function cheekGeo(): THREE.BufferGeometry {
 }
 
 function handGeo(): THREE.BufferGeometry {
-  // Palma e dedos arredondados (nada de bloco), polegar à parte.
-  const palm = new THREE.CapsuleGeometry(0.03, 0.04, 4, 10);
-  palm.scale(1.15, 1, 0.5);
-  palm.translate(0, -0.045, 0);
-  const fingers = new THREE.CapsuleGeometry(0.027, 0.035, 4, 10);
-  fingers.scale(1.2, 1, 0.45);
-  fingers.translate(0, -0.1, 0.004);
-  const thumb = new THREE.CapsuleGeometry(0.01, 0.03, 3, 6);
-  thumb.rotateZ(0.5);
-  thumb.translate(0.036, -0.05, 0.012);
-  const parts = [palm, fingers, thumb].map((g) => g.toNonIndexed());
-  const m = mergeGeometries(parts)!;
+  // Mão relaxada ao lado do corpo: punho, palma achatada de lado (virada para a coxa), quatro
+  // dedos de comprimentos diferentes levemente dobrados e o polegar à frente.
+  const wrist = new THREE.CylinderGeometry(0.03, 0.032, 0.03, 10);
+  wrist.scale(0.75, 1, 1);
+  wrist.translate(0, -0.012, 0);
+  const palm = new THREE.CapsuleGeometry(0.034, 0.036, 4, 12);
+  palm.scale(0.5, 1, 1.2);
+  palm.translate(0, -0.06, 0);
+  const parts = [wrist, palm];
+  [0.048, 0.056, 0.052, 0.042].forEach((len, k) => {
+    const f = new THREE.CapsuleGeometry(0.0088, len, 3, 8);
+    f.translate(0, -len / 2, 0);
+    f.rotateX(-0.22 - k * 0.04);
+    f.translate(-0.004, -0.098, 0.03 - k * 0.0195);
+    parts.push(f);
+  });
+  const thumb = new THREE.CapsuleGeometry(0.0105, 0.036, 3, 8);
+  thumb.translate(0, -0.018, 0);
+  thumb.rotateX(-0.75);
+  thumb.translate(-0.006, -0.05, 0.038);
+  parts.push(thumb);
+  const m = mergeGeometries(parts.map((g) => g.toNonIndexed()))!;
+  parts.forEach((g) => g.dispose());
   m.computeVertexNormals();
   return m;
 }
 
 function shoeGeo(): THREE.BufferGeometry {
-  const s = new THREE.CapsuleGeometry(0.048, 0.16, 4, 10);
-  s.rotateX(Math.PI / 2);
-  s.scale(1, 0.75, 1);
-  s.translate(0, -0.03, 0.05);
-  return s;
+  const upper = new THREE.CapsuleGeometry(0.044, 0.15, 4, 14);
+  upper.rotateX(Math.PI / 2);
+  upper.scale(1, 0.78, 1);
+  upper.translate(0, -0.018, 0.048);
+  // Cano em volta do tornozelo e biqueira um pouco mais alta.
+  const collar = new THREE.CylinderGeometry(0.045, 0.05, 0.05, 12);
+  collar.scale(0.95, 1, 1.1);
+  collar.translate(0, 0.006, -0.01);
+  const tongue = new THREE.BoxGeometry(0.045, 0.012, 0.075);
+  tongue.rotateX(-0.45);
+  tongue.translate(0, 0.022, 0.05);
+  const parts = [upper, collar, tongue].map((g) => g.toNonIndexed());
+  const m = mergeGeometries(parts)!;
+  m.computeVertexNormals();
+  return m;
+}
+function soleGeo(): THREE.BufferGeometry {
+  const sole = new THREE.CapsuleGeometry(0.048, 0.165, 4, 14);
+  sole.rotateX(Math.PI / 2);
+  sole.scale(1.04, 0.24, 1);
+  sole.translate(0, -0.048, 0.048);
+  const parts = [sole.toNonIndexed()];
+  // Cadarço: quatro passadas cruzando o peito do pé.
+  for (let k = 0; k < 4; k++) {
+    const l = new THREE.BoxGeometry(0.05, 0.005, 0.008);
+    l.rotateX(-0.4);
+    l.translate(0, 0.018 - k * 0.008, 0.03 + k * 0.022);
+    parts.push(l.toNonIndexed());
+  }
+  return mergeGeometries(parts)!;
+}
+/** Barra da camiseta (por cima do cós), gola careca, punho da manga, cinto e meia. */
+function ringGeo(r: number, h: number, sx = 1, sz = 1, y = 0): THREE.BufferGeometry {
+  const g = new THREE.CylinderGeometry(r, r * 1.03, h, 18, 1, true);
+  g.scale(sx, 1, sz);
+  g.translate(0, y, 0);
+  return g;
+}
+function beltGeo(): THREE.BufferGeometry {
+  const belt = ringGeo(0.158, 0.035, 1.07, 0.7, 0.045);
+  const buckle = new THREE.BoxGeometry(0.04, 0.03, 0.012);
+  buckle.translate(0, 0.045, 0.112);
+  return mergeGeometries([belt.toNonIndexed(), buckle.toNonIndexed()])!;
+}
+function crewGeo(): THREE.BufferGeometry {
+  const g = new THREE.TorusGeometry(0.066, 0.009, 6, 18);
+  g.rotateX(Math.PI / 2);
+  g.scale(1.12, 1, 0.82);
+  g.translate(0, 0.488, 0.005);
+  return g;
 }
 
 function bookGeo(): THREE.BufferGeometry {
@@ -460,11 +520,31 @@ function joints(f: Figure): Joints {
     case 'play':
     case 'draw': {
       j.hip = SIT_HIP;
-      j.hf = [1.5, 1.5];
-      j.kf = [1.45, 1.45];
-      j.sf = [0.45, 0.45];
-      j.ef = [0.7, 0.7];
-      j.lean = -0.05 + breathe;
+      j.hf = [1.5, 1.42];
+      j.kf = [1.32, 1.22];
+      j.legOut = 0.07;
+      // Mãos apoiadas nas coxas, encostado de leve no encosto.
+      j.sf = [0.42, 0.4];
+      j.ef = [0.95, 1.0];
+      j.abd = [0.1, 0.1];
+      j.lean = -0.1 + breathe;
+      const way = (f.seed ?? 0) % 3;
+      if (f.pose === 'sit' && way === 1) {
+        // Inclinado para a frente, cotovelos nos joelhos.
+        j.lean = 0.32 + breathe;
+        j.sf = [0.75, 0.75];
+        j.ef = [1.55, 1.55];
+        j.abd = [0.18, 0.18];
+        j.headPitch = -0.2;
+      } else if (f.pose === 'sit' && way === 2) {
+        // Bem encostado, um braço sobre o encosto e o outro no colo.
+        j.lean = -0.2 + breathe;
+        j.sf = [0.35, -0.35];
+        j.abd = [0.1, 1.25];
+        j.ef = [1.0, 0.5];
+        j.hf = [1.38, 1.5];
+        j.kf = [1.0, 1.36];
+      }
       if (f.pose === 'read') {
         j.sf = [0.75, 0.75];
         j.ef = [1.15, 1.15];
@@ -613,6 +693,14 @@ export function createCrowd(kit: Kit, capacity: number, shadows = true): Crowd {
   const thigh = mk(limb(0.078, 0.06, THIGH), cloth, 2);
   const shin = mk(limb(0.058, 0.044, SHIN), cloth, 2);
   const shoe = mk(shoeGeo(), kit.mat('#2B2B2B', { rough: 0.6 }), 2);
+  // Solado com cadarço, meias, punhos das mangas: dois por pessoa (contagem variável).
+  const sole = mk(soleGeo(), kit.mat('#ffffff', { rough: 0.7 }), 2, false);
+  const sock = mk(ringGeo(0.047, 0.06, 1, 1, -SHIN + 0.035), kit.mat('#ffffff', { rough: 0.9 }), 2, false);
+  const sleeve = mk(ringGeo(0.064, 0.05, 1, 1, -UPPER + 0.045), kit.mat('#ffffff', { rough: 0.85, side: THREE.DoubleSide }), 2, false);
+  const cuff = mk(ringGeo(0.041, 0.03, 1, 1, -FORE + 0.02), kit.mat('#ffffff', { rough: 0.85 }), 2, false);
+  const hem = mk(ringGeo(0.155, 0.075, 1.12, 0.68, 0.01), kit.mat('#ffffff', { rough: 0.85, side: THREE.DoubleSide }), 1, false);
+  const belt = mk(beltGeo(), kit.mat('#ffffff', { rough: 0.45, metal: 0.2 }), 1, false);
+  const crew = mk(crewGeo(), cloth, 1, false);
   const book = mk(bookGeo(), kit.mat('#F5F0E6', { rough: 0.9, side: THREE.DoubleSide }), 1, false);
   const guitar = mk(guitarGeo(), kit.mat('#B5713A', { rough: 0.45 }), 1, false);
   const sketch = mk(sketchGeo(), kit.mat('#FAFAF7', { rough: 0.9 }), 1, false);
@@ -630,16 +718,18 @@ export function createCrowd(kit: Kit, capacity: number, shadows = true): Crowd {
   const specs = mk(glassesGeo(), kit.mat('#1F1F22', { rough: 0.3, metal: 0.4 }), 1, false);
   const backpack = mk(bagGeo(), kit.mat('#ffffff', { rough: 0.7 }));
   const cheeks = mk(cheekGeo(), kit.own(new THREE.MeshStandardMaterial({ color: '#F2A2A0', roughness: 0.8, transparent: true, opacity: 0.5, depthWrite: false })), 1, false);
-  const extra = [jacket, collar, stripe, hood, skirt, ...caps, specs, backpack, cheeks];
+  const extra = [jacket, collar, stripe, hood, skirt, ...caps, specs, backpack, cheeks, sole, sock, sleeve, cuff, hem, belt, crew];
   const mouthOpen = mk(mouthGeo('open'), kit.mat('#5A2A26', { rough: 0.6 }), 1, false);
   const mouthLaugh = mk(mouthGeo('laugh'), kit.mat('#7A2E2A', { rough: 0.6, side: THREE.DoubleSide }), 1, false);
   const squintM = new THREE.Matrix4().makeScale(1, 0.45, 1);
-  const pushV = (im: THREE.InstancedMesh, m: THREE.Matrix4, color?: string) => {
+  const pushV = (im: THREE.InstancedMesh, m: THREE.Matrix4, color?: string | THREE.Color) => {
     const k = vCount.get(im) ?? 0;
     vCount.set(im, k + 1);
     im.setMatrixAt(k, m);
-    if (color) im.setColorAt(k, c.set(color));
+    if (color) im.setColorAt(k, typeof color === 'string' ? c.set(color) : color);
   };
+  const shade = new THREE.Color();
+  const dim = (hex: string, k: number) => shade.set(hex).multiplyScalar(k);
   const props = { book, guitar, sketch, camera, racket };
 
   const base = new THREE.Matrix4();
@@ -685,6 +775,10 @@ export function createCrowd(kit: Kit, capacity: number, shadows = true): Crowd {
       if (outfit === 'hoodie') pushV(hood, m2, f.shirt);
       if (outfit === 'dress') pushV(skirt, m1, f.shirt);
       if (f.bag) pushV(backpack, m2, acc === '#F4F4F5' ? '#475569' : acc);
+      // Camiseta e moletom por fora da calça (barra), camisa por dentro com cinto; gola careca.
+      if (outfit === 'tee' || outfit === 'hoodie' || outfit === 'sport' || outfit === 'jacket') pushV(hem, m2, dim(f.shirt, 0.94));
+      if (outfit === 'shirt') pushV(belt, m1, '#3B2A20');
+      if (outfit === 'tee' || outfit === 'sport' || outfit === 'jacket') pushV(crew, m2, dim(f.shirt, 0.82));
       step(m3, m2, 0, TORSO + 0.2, 0.01, j.headPitch, j.headYaw);
       head.setMatrixAt(i, m3);
       // Rosto: olhos (piscam de vez em quando), sobrancelhas (sobem ao sorrir), boca da expressão.
@@ -715,8 +809,11 @@ export function createCrowd(kit: Kit, capacity: number, shadows = true): Crowd {
         const side = k === 0 ? -1 : 1;
         step(m1, m2, side * 0.19, TORSO - 0.06, 0, -j.sf[k]!, 0, side * j.abd[k]!);
         upper.setMatrixAt(i * 2 + k, m1);
+        const sleeveCol = f.outfit === 'jacket' ? (f.accent ?? '#F4F4F5') : f.shirt;
+        if (f.shortSleeves && f.outfit !== 'jacket') pushV(sleeve, m1, dim(sleeveCol, 0.95));
         step(m1, m1, 0, -UPPER, 0, -j.ef[k]!);
         fore.setMatrixAt(i * 2 + k, m1);
+        if (!f.shortSleeves || f.outfit === 'jacket') pushV(cuff, m1, dim(sleeveCol, 0.88));
         step(m1, m1, 0, -FORE, 0);
         hand.setMatrixAt(i * 2 + k, m1);
         if (k === 1) handR.copy(m1);
@@ -729,8 +826,10 @@ export function createCrowd(kit: Kit, capacity: number, shadows = true): Crowd {
         thigh.setMatrixAt(i * 2 + k, m1);
         step(m1, m1, 0, -THIGH, 0, j.kf[k]!);
         shin.setMatrixAt(i * 2 + k, m1);
+        if (f.shorts || f.outfit === 'dress') pushV(sock, m1, f.outfit === 'dress' ? f.skin : '#F4F4F5');
         step(m1, m1, 0, -SHIN, 0, j.hf[k]! - j.kf[k]!, 0, -side * j.legOut);
         shoe.setMatrixAt(i * 2 + k, m1);
+        pushV(sole, m1, f.sole ?? (f.shoes === '#7C4A2D' ? '#3B2A1E' : '#F4F4F2'));
       }
       // Objeto da atividade.
       if (j.prop) {
@@ -786,7 +885,7 @@ export function createCrowd(kit: Kit, capacity: number, shadows = true): Crowd {
 }
 
 /** Avatar universal do visitante: cores neutras, sem gênero nem idade definidos. */
-export const AVATAR_LOOK = { shirt: '#F4F1EA', pants: '#2F3A4F', skin: '#C9A27E', hair: '#2F2A26', hairStyle: 0, eyes: '#4A3426', outfit: 'jacket', accent: '#3E6E9E', bag: true, shoes: '#F5F5F4' } as const;
+export const AVATAR_LOOK = { shirt: '#F4F1EA', pants: '#2F3A4F', skin: '#C9A27E', hair: '#2F2A26', hairStyle: 0, eyes: '#4A3426', outfit: 'jacket', accent: '#3E6E9E', bag: true, shoes: '#3A4150', sole: '#F4F4F2' } as const;
 
 /** Estilo próprio de cada morador, sempre o mesmo para a mesma pessoa (roupa, acessórios, sapatos). */
 export function styleOf(id: number): Pick<Figure, 'outfit' | 'accent' | 'hat' | 'hatColor' | 'glasses' | 'bag' | 'shoes' | 'shortSleeves' | 'shorts'> {

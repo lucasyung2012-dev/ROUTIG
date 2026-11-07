@@ -69,7 +69,7 @@ export interface CameraRig {
   observe: (p: THREE.Vector3 | null) => void;
   posture: () => Posture;
   /** Pés do corpo, direção e velocidade atual (avatar, NPCs, minimapa). */
-  body: () => { pos: THREE.Vector3; yaw: number; speed: number; airborne: boolean; running: boolean };
+  body: () => { pos: THREE.Vector3; yaw: number; speed: number; airborne: boolean; running: boolean; heading: number };
   glideTo: (cam: THREE.Vector3 | THREE.Curve<THREE.Vector3>, target: THREE.Vector3, ms: number, done?: () => void) => void;
   gliding: () => boolean;
   update: (dt: number, now: number) => void;
@@ -113,6 +113,8 @@ export function createCameraRig(camera: THREE.PerspectiveCamera, canvas: HTMLCan
   let airborne = false;
   const vel = new THREE.Vector2();
   let running = false;
+  /** Para onde o corpo olha (segue a direção do movimento; parado, fica como estava). */
+  let heading = Math.PI;
   const move = new THREE.Vector2();
   const keys = new Set<string>();
   const focusPt = new THREE.Vector3();
@@ -206,6 +208,7 @@ export function createCameraRig(camera: THREE.PerspectiveCamera, canvas: HTMLCan
     collide(feet, Number.isFinite(world.ceiling) ? 0.3 : 0.45, true);
     feet.y = world.ground(feet.x, feet.z);
     yaw = y;
+    heading = y + Math.PI;
     pitch = 0;
     vel.set(0, 0);
     vy = 0;
@@ -266,6 +269,7 @@ export function createCameraRig(camera: THREE.PerspectiveCamera, canvas: HTMLCan
     feet.set(seat.x, seat.y - 0.45, seat.z);
     seatEye = seat.y + SEATED_EYE;
     yaw = seat.face;
+    heading = seat.face + Math.PI;
     pitch = -0.05;
     vel.set(0, 0);
     setPosture('sit');
@@ -320,6 +324,11 @@ export function createCameraRig(camera: THREE.PerspectiveCamera, canvas: HTMLCan
     const prevZ = feet.z;
     feet.x += vel.x * dt;
     feet.z += vel.y * dt;
+    if (vel.lengthSq() > 0.09) {
+      const want = Math.atan2(vel.x, vel.y);
+      const d = Math.atan2(Math.sin(want - heading), Math.cos(want - heading));
+      heading += d * Math.min(1, dt * 10);
+    }
     collide(feet, Number.isFinite(world.ceiling) ? 0.3 : 0.45, true);
     if (world.blocked?.(feet.x, feet.z)) {
       feet.x = prevX;
@@ -447,7 +456,7 @@ export function createCameraRig(camera: THREE.PerspectiveCamera, canvas: HTMLCan
     sit,
     observe,
     posture: () => posture,
-    body: () => ({ pos: feet, yaw, speed: vel.length(), airborne, running }),
+    body: () => ({ pos: feet, yaw, speed: vel.length(), airborne, running, heading }),
     glideTo: (cam, target, ms, done) => {
       if (mode !== 'orbit') {
         // Desliza na câmera livre e volta ao modo de antes ao chegar.

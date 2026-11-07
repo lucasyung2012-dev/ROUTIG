@@ -186,7 +186,7 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
   const bodyFigure = () => {
     const b = rig.body();
     const sitting = rig.posture() === 'sit';
-    avatar.set([{ x: b.pos.x, y: b.pos.y, z: b.pos.z, yaw: b.yaw + Math.PI, pose: sitting ? 'sit' : b.running && b.speed > 3 ? 'run' : b.speed > 0.2 ? 'walk' : performance.now() < avatarWaveUntil ? 'wave' : 'stand', expr: performance.now() < avatarWaveUntil - 1300 ? 'talk' : performance.now() < avatarWaveUntil ? 'smile' : Math.floor(performance.now() / 7000) % 5 === 0 ? 'smile' : 'neutral', phase: b.speed > 0.2 ? walkPhase : performance.now() / 500, stride: Math.min(1, b.speed / 2.5), ...AVATAR_LOOK, scale: 1 }]);
+    avatar.set([{ x: b.pos.x, y: b.pos.y, z: b.pos.z, yaw: sitting ? b.yaw + Math.PI : b.heading, pose: sitting ? 'sit' : b.running && b.speed > 3 ? 'run' : b.speed > 0.2 ? 'walk' : performance.now() < avatarWaveUntil ? 'wave' : 'stand', expr: performance.now() < avatarWaveUntil - 1300 ? 'talk' : performance.now() < avatarWaveUntil ? 'smile' : Math.floor(performance.now() / 7000) % 5 === 0 ? 'smile' : 'neutral', phase: b.speed > 0.2 ? walkPhase : performance.now() / 500, stride: Math.min(1, b.speed / 2.5), ...AVATAR_LOOK, scale: 1 }]);
   };
   let walkPhase = 0;
 

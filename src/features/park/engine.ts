@@ -511,13 +511,13 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
       rig.controls.target.copy(v.target);
       scene.scene.add(avatar.group, indoorCrowd.group);
       if (rig.mode() !== 'orbit') {
-        rig.place(v.cam.x, v.cam.z, Math.atan2(-(v.target.x - v.cam.x), -(v.target.z - v.cam.z)));
-        // Acabou de passar pela porta: dá alguns passos para dentro do saguão.
-        if (!instant) {
-          const dx = v.target.x - v.cam.x;
-          const dz = v.target.z - v.cam.z;
-          const r = Math.hypot(dx, dz) || 1;
-          rig.autoWalk(v.cam.x + (dx / r) * 2.6, v.cam.z + (dz / r) * 2.6, 1.9, () => undefined);
+        if (instant) rig.place(v.cam.x, v.cam.z, Math.atan2(-(v.target.x - v.cam.x), -(v.target.z - v.cam.z)));
+        else {
+          // Acabou de passar pela porta (a entrada fica na frente, +z): aparece logo dentro dela,
+          // de costas para a porta, e dá alguns passos para dentro do saguão.
+          const edge = scene.room.radius - 1.2;
+          rig.place(0, edge - 0.4, 0);
+          rig.autoWalk(0, edge - 3.4, 1.9, () => undefined);
         }
       }
       recompile(scene.scene);

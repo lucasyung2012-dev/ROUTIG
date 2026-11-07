@@ -243,7 +243,6 @@ function tintedCrown(g: THREE.BufferGeometry, base: string, seed: number): THREE
     arr[i * 3 + 2] = col.b * k;
   }
   geo.setAttribute('color', new THREE.BufferAttribute(arr, 3));
-  geo.computeVertexNormals();
   return geo;
 }
 
@@ -255,19 +254,99 @@ export interface Forest {
   setSeason: (crownColors: Partial<Record<TreeSpecies, string>>) => void;
 }
 
-/** Copa irregular: vários volumes deslocados e achatados (nada de esfera ou cone perfeito). */
+/** Textura de folhagem (gerada na hora): dezenas de folhas com tons variados e fundo transparente. */
+function leafTexture(): THREE.CanvasTexture {
+  const c = document.createElement('canvas');
+  c.width = c.height = 256;
+  const g = c.getContext('2d');
+  if (g) {
+    let s = 11;
+    const r = () => ((s = (s * 9301 + 49297) % 233280) / 233280);
+    for (let i = 0; i < 230; i++) {
+      const a = r() * Math.PI * 2;
+      const d = Math.sqrt(r()) * 118;
+      const x = 128 + Math.cos(a) * d;
+      const y = 128 + Math.sin(a) * d;
+      g.save();
+      g.translate(x, y);
+      g.rotate(r() * Math.PI * 2);
+      const l = 26 + r() * 22;
+      g.fillStyle = `hsl(${95 + r() * 35}, ${38 + r() * 25}%, ${24 + r() * 26 + (d < 60 ? -6 : 4)}%)`;
+      g.beginPath();
+      g.ellipse(0, 0, 5 + r() * 6, 2.2 + r() * 2.6, 0, 0, Math.PI * 2);
+      g.fill();
+      // Nervura central, quase imperceptível.
+      g.strokeStyle = 'rgba(255,255,255,0.12)';
+      g.lineWidth = 0.6;
+      g.beginPath();
+      g.moveTo(-l * 0.18, 0);
+      g.lineTo(l * 0.18, 0);
+      g.stroke();
+      g.restore();
+    }
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 4;
+  return t;
+}
+
+/**
+ * Copa irregular feita de cachos de folhas: vários volumes deslocados e achatados, cada um com
+ * cartões de folhagem (textura com transparência) virados para fora. Mais natural que esferas,
+ * e mais leve (poucos triângulos por árvore).
+ */
 function blobCrown(seed: number, blobs: number, spread: number, size: number, flat: number): THREE.BufferGeometry {
   let s = seed;
   const r = () => ((s = (s * 9301 + 49297) % 233280) / 233280);
   const parts: THREE.BufferGeometry[] = [];
+  const n = new THREE.Vector3();
   for (let i = 0; i < blobs; i++) {
     const a = (i / blobs) * Math.PI * 2 + r();
     const d = i === 0 ? 0 : spread * (0.55 + r() * 0.45);
-    const g = new THREE.IcosahedronGeometry(size * (0.7 + r() * 0.45), 1);
-    g.scale(1, flat * (0.8 + r() * 0.3), 1);
-    g.translate(Math.cos(a) * d, (r() - 0.4) * size * 0.6, Math.sin(a) * d);
+    const bs = size * (0.75 + r() * 0.4);
+    const cx = Math.cos(a) * d;
+    const cy = (r() - 0.4) * size * 0.6;
+    const cz = Math.sin(a) * d;
+    const cards = 9 + Math.floor(r() * 5);
+    for (let k = 0; k < cards; k++) {
+      // Ponto na superfície do volume (mais em cima e dos lados que embaixo).
+      const u = r() * Math.PI * 2;
+      const v = Math.acos(1 - r() * 1.7);
+      n.set(Math.sin(v) * Math.cos(u), Math.cos(v) * flat, Math.sin(v) * Math.sin(u)).normalize();
+      const cs = bs * (0.9 + r() * 0.5);
+      const g = new THREE.PlaneGeometry(cs, cs);
+      g.rotateZ(r() * Math.PI);
+      g.lookAt(n);
+      g.translate(cx + n.x * bs * 0.75, cy + n.y * bs * 0.75 * flat, cz + n.z * bs * 0.75);
+      // Normais apontando para fora do volume: luz suave como numa copa de verdade.
+      const nor = g.attributes.normal!;
+      for (let j = 0; j < nor.count; j++) nor.setXYZ(j, n.x, n.y, n.z);
+      parts.push(g.toNonIndexed());
+      g.dispose();
+    }
+  }
+  const m = mergeGeometries(parts)!;
+  parts.forEach((p) => p.dispose());
+  return m;
+}
+
+/** Tronco com galhos subindo para dentro da copa (altura real: escala só uniforme). */
+function trunkWithBranches(h: number, spread: number, seed: number): THREE.BufferGeometry {
+  let s = seed;
+  const r = () => ((s = (s * 9301 + 49297) % 233280) / 233280);
+  const parts: THREE.BufferGeometry[] = [];
+  const main = new THREE.CylinderGeometry(0.13, 0.26, h, 7);
+  main.translate(0, h / 2, 0);
+  parts.push(main.toNonIndexed());
+  for (let k = 0; k < 4; k++) {
+    const len = spread * (0.7 + r() * 0.5) + 0.6;
+    const g = new THREE.CylinderGeometry(0.04, 0.09, len, 5);
+    g.translate(0, len / 2, 0);
+    g.rotateZ(0.65 + r() * 0.35);
+    g.rotateY((k / 4) * Math.PI * 2 + r());
+    g.translate(0, h * (0.7 + r() * 0.25), 0);
     parts.push(g.toNonIndexed());
-    g.dispose();
   }
   const m = mergeGeometries(parts)!;
   parts.forEach((p) => p.dispose());
@@ -311,9 +390,8 @@ const SPECIES: Record<TreeSpecies, { trunkH: number; crown: () => THREE.BufferGe
 
 export function forest(kit: Kit, plants: Plant[]): Forest {
   const group = new THREE.Group();
-  const trunkGeo = kit.own(new THREE.CylinderGeometry(0.18, 0.3, 1, 6));
-  trunkGeo.translate(0, 0.5, 0);
-  const trunkMat = kit.mat('#6B4A33');
+  const trunkMat = kit.mat('#6B4A33', { rough: 0.95 });
+  const leaves = kit.own(leafTexture());
   const bySpecies = new Map<TreeSpecies, Plant[]>();
   plants.forEach((p) => bySpecies.set(p.species, [...(bySpecies.get(p.species) ?? []), p]));
   const crowns: Array<{ mesh: THREE.InstancedMesh; list: Plant[]; crownY: number; species: TreeSpecies }> = [];
@@ -321,12 +399,13 @@ export function forest(kit: Kit, plants: Plant[]): Forest {
   const m4 = new THREE.Matrix4();
   bySpecies.forEach((list, sp) => {
     const def = SPECIES[sp];
+    const trunkGeo = kit.own(sp === 'palm' ? (() => { const g = new THREE.CylinderGeometry(0.14, 0.24, def.trunkH, 8); g.translate(0, def.trunkH / 2, 0); return g; })() : trunkWithBranches(def.trunkH, sp === 'slender' ? 2.4 : 1.2, sp.length * 31));
     const trunk = new THREE.InstancedMesh(trunkGeo, trunkMat, list.length);
     const crownGeo = kit.own(tintedCrown(def.crown(), '#ffffff', sp.length));
-    const crownMat = kit.own(new THREE.MeshStandardMaterial({ color: def.color, vertexColors: true, roughness: 0.9 }));
+    const crownMat = kit.own(new THREE.MeshStandardMaterial({ color: def.color, vertexColors: true, roughness: 0.85, map: leaves, alphaTest: 0.42, side: THREE.DoubleSide }));
     const crown = new THREE.InstancedMesh(crownGeo, crownMat, list.length);
     list.forEach((p, i) => {
-      m4.compose(new THREE.Vector3(p.x, p.y ?? 0, p.z), new THREE.Quaternion(), new THREE.Vector3(p.s, def.trunkH * p.s, p.s));
+      m4.compose(new THREE.Vector3(p.x, p.y ?? 0, p.z), new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), p.x * 1.7 + p.z), new THREE.Vector3(p.s, p.s, p.s));
       trunk.setMatrixAt(i, m4);
     });
     trunk.castShadow = crown.castShadow = true;

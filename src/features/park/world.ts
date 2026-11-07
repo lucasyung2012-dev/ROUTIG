@@ -16,6 +16,8 @@ import { focusBuilding, goalsBuilding, habitsBuilding, musicBuilding, sportsBuil
 import { prototypeBuilding } from './buildings/prototype';
 import type { Obstacle } from './camera';
 import { footprint } from './collision';
+import { upperFloors } from './buildings/upper';
+import { FLOOR_PLANS } from './interiors/floors';
 import { createGrass } from './grass';
 
 export type Quality = 'low' | 'medium' | 'high';
@@ -613,6 +615,10 @@ export function createWorld(kit: Kit): World {
       const d = make(kit);
       group = d.group;
       top = d.top;
+      // Os andares de cima por fora, iguais aos de dentro (seção 10).
+      const up = upperFloors(kit, def.id, FLOOR_PLANS[def.id]?.length ?? 0, d.top - 2, d.core, def.color);
+      d.group.add(up.group);
+      top = up.top;
       core = d.core;
       if (d.tick) ticks.push(d.tick);
       // Arbustos, flores e letreiros só de perto.

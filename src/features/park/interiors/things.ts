@@ -15,7 +15,7 @@ import { Builder, type Kit } from '../kit';
 import type { Seat } from '../camera';
 
 export type ThingKind = 'piano' | 'drums' | 'record' | 'lamp' | 'globe' | 'clock' | 'telescope' | 'stairs' | 'room';
-export type Timbre = 'piano' | 'kick' | 'snare' | 'hat' | 'tom' | 'bell' | 'pluck';
+export type Timbre = 'piano' | 'kick' | 'snare' | 'hat' | 'tom' | 'bell' | 'pluck' | 'voice' | 'whistle' | 'ball';
 
 export interface ThingCtx {
   /** Toca uma nota (MIDI) com um timbre, daqui a `delay` segundos. */

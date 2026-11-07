@@ -179,7 +179,7 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
   const bodyFigure = () => {
     const b = rig.body();
     const sitting = rig.posture() === 'sit';
-    avatar.set([{ x: b.pos.x, y: b.pos.y, z: b.pos.z, yaw: b.yaw + Math.PI, pose: sitting ? 'sit' : b.speed > 0.2 ? 'walk' : performance.now() < avatarWaveUntil ? 'wave' : 'stand', expr: performance.now() < avatarWaveUntil ? 'smile' : 'neutral', phase: b.speed > 0.2 ? walkPhase : performance.now() / 500, stride: Math.min(1, b.speed / 3.6), ...AVATAR_LOOK, scale: 1 }]);
+    avatar.set([{ x: b.pos.x, y: b.pos.y, z: b.pos.z, yaw: b.yaw + Math.PI, pose: sitting ? 'sit' : b.speed > 4.2 ? 'run' : b.speed > 0.2 ? 'walk' : performance.now() < avatarWaveUntil ? 'wave' : 'stand', expr: performance.now() < avatarWaveUntil - 1300 ? 'talk' : performance.now() < avatarWaveUntil ? 'smile' : Math.floor(performance.now() / 7000) % 5 === 0 ? 'smile' : 'neutral', phase: b.speed > 0.2 ? walkPhase : performance.now() / 500, stride: Math.min(1, b.speed / 3.6), ...AVATAR_LOOK, scale: 1 }]);
   };
   let walkPhase = 0;
 
@@ -597,6 +597,10 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
       // Cumprimento (V2.1, 13.7): virar para a pessoa, acenar; ela olha, acena e responde.
       rig.place(p.x, p.z, Math.atan2(-(who.x - p.x), -(who.z - p.z)));
       avatarWaveUntil = performance.now() + 2200;
+      // Voz: o visitante diz "oi" e a pessoa responde no seu tom de voz.
+      [0, 0.13, 0.26].forEach((d, i) => audio?.note(60 + (i === 1 ? 3 : 0), 'voice', d));
+      const base = 52 + (who.seed % 14);
+      for (let i = 0; i < 6; i++) audio?.note(base + [0, 2, 4, 1, 3, -2][i]!, 'voice', 0.55 + i * 0.14);
       opts.onTalk({ name: who.name, activity: who.activity, line: who.line });
       return;
     }
@@ -744,6 +748,15 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
         const viewer = mode === 'orbit' ? rig.controls.target : body.pos;
         town.step(opts.reduceMotion ? dt * 0.5 : dt, conditions(), mode === 'orbit' ? { x: 1e5, z: 1e5 } : viewer, now);
         crowd.set(town.visible(viewer, crowdMax, mode === 'orbit' ? 260 : 140));
+        // Sons dos jogos perto de quem está olhando: chute, raquetada, apito, torcida.
+        for (const hit of town.hits()) {
+          const dd = Math.hypot(hit.x - viewer.x, hit.z - viewer.z);
+          if (dd > 60) continue;
+          if (hit.kind === 'kick') audio?.note(45, 'ball');
+          else if (hit.kind === 'racket') audio?.note(64, 'ball');
+          else if (hit.kind === 'whistle') audio?.note(100, 'whistle');
+          else for (let i = 0; i < 8; i++) audio?.note(58 + ((i * 5) % 9), 'voice', i * 0.09);
+        }
         ballMeshes.tennis.count = 0;
         ballMeshes.football.count = 0;
         for (const bl of town.balls()) {

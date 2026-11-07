@@ -6,7 +6,7 @@
 import { activityAt, campusPeople, indoorOf, poseFor, routeBetween, routeHome, spotFor, type Activity, type Conditions, type Person, type PersonPose } from '@/domain/parkPeople';
 import { PARK_SCALE, SPORT_FIELDS, heightAt, type Point } from '@/domain/park';
 import type { ModuleId } from '@/app/modules';
-import type { Figure } from './people';
+import { styleOf, type Expr, type Figure } from './people';
 import type { Seat } from './camera';
 
 interface Agent {
@@ -34,6 +34,10 @@ interface Agent {
   smileUntil: number;
   /** Dentro de qual prédio está (some do lado de fora). */
   inside: ModuleId | null;
+  /** Colete do time no jogo de futebol (cor). */
+  bib?: string;
+  /** Susto ao ser cumprimentado (sobrancelhas sobem, boca em "o"). */
+  surpriseUntil: number;
 }
 
 export interface Town {
@@ -51,7 +55,9 @@ export interface Town {
   /** Bolas dos jogos em andamento (tênis e futebol). */
   balls: () => Array<{ x: number; y: number; z: number; kind: 'tennis' | 'football' }>;
   /** Cumprimentar quem está perto: a pessoa olha, acena e responde. */
-  greet: (p: { x: number; z: number }, r: number, now: number) => { name: string; activity: Activity; x: number; z: number; line: number } | null;
+  greet: (p: { x: number; z: number }, r: number, now: number) => { name: string; activity: Activity; x: number; z: number; line: number; seed: number } | null;
+  /** Chutes, raquetadas, apito e comemoração deste passo (para o som). */
+  hits: () => Array<{ x: number; z: number; kind: 'kick' | 'racket' | 'whistle' | 'cheer' }>;
 }
 
 const WALK = 1.35;
@@ -86,7 +92,7 @@ export function createTown(seats: Seat[] = []): Town {
   const agents: Agent[] = people.map((p) => {
     const slot = groupSlot.get(p.group) ?? 0;
     groupSlot.set(p.group, slot + 1);
-    return { p, slot, x: p.home.x, z: p.home.z, yaw: 0, activity: 'home', route: [], ri: 0, pose: 'stand', phase: Math.random() * 6, away: true, block: -1, waveUntil: 0, waveCool: 0, seat: -1, look: 0, line: Math.floor(Math.random() * 3), talkUntil: 0, smileUntil: 0, inside: null };
+    return { p, slot, x: p.home.x, z: p.home.z, yaw: 0, activity: 'home', route: [], ri: 0, pose: 'stand', phase: Math.random() * 6, away: true, block: -1, waveUntil: 0, waveCool: 0, seat: -1, look: 0, line: Math.floor(Math.random() * 3), talkUntil: 0, smileUntil: 0, inside: null, surpriseUntil: 0 };
   });
 
   const strollRoute = (a: Agent): Point[] => {
@@ -231,55 +237,176 @@ export function createTown(seats: Seat[] = []): Town {
     return dt > 0 ? st / dt : 0;
   };
   const near = (a: Agent, f: { x: number; z: number; w: number; d: number }, pad: number) => Math.abs(a.x - f.x) < f.w / 2 + pad && Math.abs(a.z - f.z) < f.d / 2 + pad;
+  /** Batidas e chutes que soaram neste passo (o motor toca o som se estiver perto). */
+  let hits: Array<{ x: number; z: number; kind: 'kick' | 'racket' | 'whistle' | 'cheer' }> = [];
+  // Futebol: quem está com a bola, a bola no ar (de onde, para onde, quanto tempo), chute a gol e comemoração.
+  const fb = { owner: -1, holdUntil: 0, fx: 0, fz: 0, tx: 0, tz: 0, t0: 0, dur: 0, shot: false, target: -1, kicker: -1, kickUntil: 0, cheer: -1, cheerUntil: 0, resetAt: 0 };
+  const hash = (n: number) => {
+    const v = Math.sin(n * 91.345) * 43758.5453;
+    return v - Math.floor(v);
+  };
   const games = (dt: number, now: number) => {
     const t = now / 1000;
     ballList = [];
+    hits = [];
+    for (const a of agents) a.bib = undefined;
     const ready = agents.filter((a) => a.activity === 'sport' && !a.away && a.ri >= a.route.length - 1 && now >= a.talkUntil).sort((u, v) => u.p.id - v.p.id);
     const T = SPORT_FIELDS.tennis;
     const tennis = ready.filter((a) => near(a, T, 8)).slice(0, 4);
     if (tennis.length >= 2) {
-      // Bola indo e voltando por cima da rede, em arco; jogadores acompanham a bola de lado.
-      const u = (t / 1.3) % 2;
-      const k = u < 1 ? u : 2 - u;
-      const bx = T.x - 10.5 + 21 * k;
+      // Rally: a bola cruza a rede em arco, quica na quadra do outro lado e chega na raquete;
+      // quem recebe prepara o golpe e bate na hora certa.
+      const per = 1.4;
+      const u = (t / per) % 2;
+      const dir = u < 1 ? 1 : -1;
+      const k = u % 1;
+      const x0 = T.x - 10.5;
+      const bx = dir > 0 ? x0 + 21 * k : x0 + 21 * (1 - k);
       const bz = T.z + Math.sin(t * 0.9) * 3.2;
-      const arc = Math.sin(Math.PI * (u % 1));
-      ballList.push({ x: bx, y: heightAt(T.x, T.z) + 0.35 + arc * 2.1, z: bz, kind: 'tennis' });
+      const y = k < 0.68 ? Math.sin((Math.PI * k) / 0.68) * 2.2 : Math.sin((Math.PI * (k - 0.68)) / 0.32) * 0.9;
+      ballList.push({ x: bx, y: heightAt(T.x, T.z) + 0.3 + y, z: bz, kind: 'tennis' });
+      const prevK = ((t - dt) / per) % 1;
+      if (prevK > k) hits.push({ x: bx, z: bz, kind: 'racket' });
       tennis.forEach((a, i) => {
         const side = i % 2 ? 1 : -1;
         const tx = T.x + side * (i >= 2 ? 6.5 : 11.6);
         const tz = T.z + (bz - T.z) * 0.8 + (i >= 2 ? 1.8 : 0) * side;
-        moveTo(a, tx, tz, 5, dt);
+        const sp = moveTo(a, tx, tz, 5, dt);
         a.yaw = side > 0 ? -Math.PI / 2 : Math.PI / 2;
-        a.pose = 'tennis' as PersonPose;
-        a.phase += dt * 4.8;
+        // Golpe: quem recebe (a bola vem para o seu lado) leva a raquete atrás e bate no fim do quique.
+        const incoming = (dir > 0 && side > 0) || (dir < 0 && side < 0);
+        const mine = i < 2 || Math.abs(bz - a.z) < 2.5;
+        const v = incoming && mine ? (k > 0.75 ? -0.9 + ((k - 0.75) / 0.25) * 1.9 : -0.9) : k < 0.15 && mine ? 1 - k * 8 : -0.5;
+        a.pose = sp > 1.5 ? 'run' : ('tennis' as PersonPose);
+        a.phase = a.pose === 'run' ? a.phase + dt * 9 : Math.asin(Math.max(-1, Math.min(1, v))) / 1.3;
         a.look = 0;
+        a.bib = undefined;
       });
     }
     const F = SPORT_FIELDS.football;
     const foot = ready.filter((a) => near(a, F, 10)).slice(0, 12);
-    if (foot.length >= 2) {
-      // Bola rolando pelo campo; dois goleiros, o resto disputa e se espalha em volta.
-      const bx = F.x + Math.sin(t * 0.31) * 25 + Math.sin(t * 0.83) * 5;
-      const bz = F.z + Math.sin(t * 0.47 + 1) * 14;
-      ballList.push({ x: bx, y: heightAt(F.x, F.z) + 0.22, z: bz, kind: 'football' });
+    if (foot.length >= 3) {
+      const ground = heightAt(F.x, F.z);
+      const goalX = (team: number) => F.x + (team === 0 ? 31 : -31);
+      const team = (i: number) => (i < 2 ? i : i % 2);
+      foot.forEach((a, i) => (a.bib = i < 2 ? (i === 0 ? '#F59E0B' : '#22C55E') : team(i) === 0 ? '#E11D48' : '#2563EB'));
+      if (fb.owner >= foot.length || fb.target >= foot.length) fb.owner = fb.target = -1;
+      // Bola: no ar (passe ou chute), no pé de alguém ou parada no meio depois do gol.
+      let bx: number;
+      let bz: number;
+      let by = 0;
+      const flying = now < fb.t0 + fb.dur;
+      if (now < fb.resetAt) {
+        bx = F.x;
+        bz = F.z;
+      } else if (flying) {
+        const k = (now - fb.t0) / fb.dur;
+        bx = fb.fx + (fb.tx - fb.fx) * k;
+        bz = fb.fz + (fb.tz - fb.fz) * k;
+        const len = Math.hypot(fb.tx - fb.fx, fb.tz - fb.fz);
+        by = Math.sin(Math.PI * k) * (fb.shot ? 0.9 : len > 14 ? 2.2 : 0.25);
+      } else if (fb.dur > 0) {
+        // Chegou: gol, defesa do goleiro ou domínio de quem recebeu.
+        bx = fb.tx;
+        bz = fb.tz;
+        if (fb.shot) {
+          const keeper = foot[fb.tx > F.x ? 1 : 0];
+          const saved = keeper && Math.hypot(keeper.x - bx, keeper.z - bz) < 1.6;
+          if (!saved && Math.abs(bz - F.z) < 3.6) {
+            fb.cheer = fb.kicker;
+            fb.cheerUntil = now + 2600;
+            fb.resetAt = now + 2600;
+            fb.owner = -1;
+            hits.push({ x: bx, z: bz, kind: 'cheer' });
+          } else fb.owner = fb.tx > F.x ? 1 : 0;
+        } else fb.owner = fb.target;
+        fb.dur = 0;
+        fb.shot = false;
+        fb.holdUntil = now + 900 + hash(now) * 1600;
+      } else {
+        const o = foot[fb.owner];
+        if (!o) {
+          // Saída de bola: o mais perto do meio começa com ela.
+          fb.owner = foot.length > 2 ? 2 : 0;
+          fb.holdUntil = now + 1200;
+          if (now >= fb.resetAt && fb.resetAt > 0) {
+            hits.push({ x: F.x, z: F.z, kind: 'whistle' });
+            fb.resetAt = 0;
+          }
+        }
+        const own = foot[fb.owner]!;
+        bx = own.x + Math.sin(own.yaw) * 0.6;
+        bz = own.z + Math.cos(own.yaw) * 0.6;
+        // Decide: chute a gol perto da área, senão passe para um companheiro (de preferência à frente).
+        if (now > fb.holdUntil) {
+          const tm = team(fb.owner);
+          const gx = goalX(tm);
+          const mates = foot.map((p, i) => ({ p, i })).filter((m) => m.i !== fb.owner && team(m.i) === tm && m.i >= 2);
+          const shoot = fb.owner >= 2 && Math.abs(gx - own.x) < 20 && hash(now * 1.3) < 0.55;
+          fb.fx = bx;
+          fb.fz = bz;
+          fb.t0 = now;
+          fb.kicker = fb.owner;
+          fb.kickUntil = now + 380;
+          if (shoot || !mates.length) {
+            fb.shot = true;
+            fb.tx = gx;
+            fb.tz = F.z + (hash(now * 2.1) - 0.5) * 9;
+            fb.dur = 900;
+          } else {
+            const ahead = mates.sort((u, v) => (u.p.x - v.p.x) * (tm === 0 ? -1 : 1) + hash(u.i + now) * 6 - hash(v.i + now) * 6)[0]!;
+            fb.target = ahead.i;
+            fb.tx = ahead.p.x;
+            fb.tz = ahead.p.z;
+            fb.dur = Math.max(450, Math.hypot(fb.tx - bx, fb.tz - bz) * 75);
+          }
+          fb.owner = -1;
+          hits.push({ x: bx, z: bz, kind: 'kick' });
+        }
+      }
+      ballList.push({ x: bx, y: ground + 0.22 + by, z: bz, kind: 'football' });
+      // Jogadores: goleiros na linha acompanhando a bola; quem tem a bola conduz para o gol;
+      // o mais perto do outro time marca; os demais se espalham em formação acompanhando a jogada.
+      const chaser = [0, 1].map((tm) => foot.map((p, i) => ({ p, i })).filter((m) => m.i >= 2 && team(m.i) === tm && m.i !== fb.owner).sort((u, v) => Math.hypot(u.p.x - bx, u.p.z - bz) - Math.hypot(v.p.x - bx, v.p.z - bz))[0]?.i ?? -1);
       foot.forEach((a, i) => {
         let tx: number;
         let tz: number;
-        if (i < 2) {
-          const side = i === 0 ? -1 : 1;
-          tx = F.x + side * 30.5;
-          tz = F.z + Math.max(-3.5, Math.min(3.5, (bz - F.z) * 0.4));
-        } else {
-          const ang = i * 2.4 + t * 0.25;
-          const rr = i < 4 ? 1.2 : 4 + (i % 4) * 3.2;
-          tx = bx + Math.cos(ang) * rr;
-          tz = bz + Math.sin(ang) * rr * 0.7;
+        let speed = 5.5;
+        if (now < fb.cheerUntil && (i === fb.cheer || (i >= 2 && fb.cheer >= 0 && team(i) === team(fb.cheer)))) {
+          const c = foot[fb.cheer]!;
+          tx = i === fb.cheer ? c.x : c.x + Math.cos(i * 2.4) * 1.4;
+          tz = i === fb.cheer ? c.z : c.z + Math.sin(i * 2.4) * 1.4;
+          moveTo(a, tx, tz, 4, dt);
+          a.pose = 'cheer';
+          a.phase += dt * 5;
+          a.look = 0;
+          return;
         }
-        const sp = moveTo(a, tx, tz, i < 2 ? 3 : 5.5, dt);
-        a.yaw = Math.atan2(bx - a.x, bz - a.z);
-        a.pose = sp > 0.4 ? 'walk' : 'stand';
-        a.phase += dt * Math.max(2, sp * 2.2);
+        if (i < 2) {
+          tx = F.x + (i === 0 ? -30.5 : 30.5);
+          tz = F.z + Math.max(-3.5, Math.min(3.5, (bz - F.z) * 0.6));
+          speed = 4;
+        } else if (i === fb.owner) {
+          const gx = goalX(team(i));
+          tx = a.x + Math.sign(gx - a.x) * 3;
+          tz = a.z + (F.z - a.z) * 0.2 + Math.sin(t * 1.7 + i) * 1.5;
+          speed = 4.2;
+        } else if (chaser[team(i) === 0 ? 1 : 0] === i || (fb.target === i && fb.dur > 0)) {
+          tx = fb.target === i && fb.dur > 0 ? fb.tx : bx;
+          tz = fb.target === i && fb.dur > 0 ? fb.tz : bz;
+          speed = 6.5;
+        } else {
+          const tm = team(i);
+          const row = Math.floor((i - 2) / 2);
+          const lane = ((row % 3) - 1) * 9;
+          const depth = (row < 3 ? -8 : 8) * (tm === 0 ? 1 : -1);
+          tx = Math.max(F.x - 28, Math.min(F.x + 28, bx * 0.6 + F.x * 0.4 + depth));
+          tz = F.z + lane + Math.sin(t * 0.5 + i) * 2;
+        }
+        const sp = moveTo(a, tx, tz, speed, dt);
+        a.yaw = i === fb.owner ? Math.atan2(tx - a.x, tz - a.z) : Math.atan2(bx - a.x, bz - a.z);
+        a.pose = i === fb.kicker && now < fb.kickUntil ? 'kick' : i < 2 ? 'keeper' : sp > 3.2 ? 'run' : sp > 0.4 ? 'walk' : 'stand';
+        a.phase = a.pose === 'kick' ? ((now - (fb.kickUntil - 380)) / 380) * Math.PI : a.phase + dt * Math.max(2, sp * (a.pose === 'run' ? 2.6 : 2.2));
         a.look = 0;
       });
     }
@@ -292,6 +419,23 @@ export function createTown(seats: Seat[] = []): Town {
     games(dt, now);
   };
 
+  /**
+   * Rosto de cada um: espanto no instante do cumprimento, depois fala e sorri; na roda de conversa
+   * alterna falar, sorrir e rir; comemorando gol, ri; sozinho, de vez em quando um sorriso.
+   */
+  const exprOf = (a: Agent): Expr => {
+    const now = performance.now();
+    if (now < a.surpriseUntil) return 'surprised';
+    if (now < a.talkUntil) return 'talk';
+    if (now < a.smileUntil) return 'smile';
+    if (a.pose === 'cheer') return 'laugh';
+    if ((a.activity === 'chat' || a.activity === 'picnic' || a.activity === 'cafe') && a.pose !== 'walk') {
+      const k = Math.floor(now / 2300 + a.slot * 1.7) % 5;
+      return k === 0 || k === 3 ? 'talk' : k === 1 ? 'laugh' : 'smile';
+    }
+    if (a.pose === 'run' || a.pose === 'keeper' || a.pose === 'kick') return 'neutral';
+    return Math.floor(now / 6000 + a.p.id) % 4 === 0 ? 'smile' : 'neutral';
+  };
   const visible = (from: { x: number; z: number }, max: number, range: number): Figure[] =>
     agents
       .filter((a) => !(a.away && a.activity === 'home') && !a.inside)
@@ -310,17 +454,17 @@ export function createTown(seats: Seat[] = []): Town {
           pose: a.pose,
           phase: a.phase,
           stride: a.pose === 'walk' ? 1 : 0,
-          shirt: a.p.shirt,
-          pants: a.p.pants,
+          ...styleOf(a.p.id),
+          // No futebol, colete do time por cima da roupa (e roupa esportiva).
+          ...(a.bib ? { outfit: 'sport' as const, accent: '#FFFFFF', shortSleeves: true, shorts: true, hat: 0, bag: false } : {}),
+          shirt: a.bib ?? a.p.shirt,
+          pants: a.bib ? '#1F2937' : a.p.pants,
           skin: a.p.skin,
           hair: HAIRS[a.p.id % HAIRS.length],
           hairStyle: (a.p.id * 7) % 4,
           eyes: EYES[(a.p.id * 5) % EYES.length],
-          shortSleeves: a.p.id % 2 === 0,
-          shorts: a.p.id % 3 === 0,
           seed: a.p.id,
-          // Rosto: fala logo depois do cumprimento e sorri; na roda de conversa, fala e ri por vezes.
-          expr: performance.now() < a.talkUntil ? 'talk' : performance.now() < a.smileUntil ? 'smile' : a.activity === 'chat' && a.pose !== 'walk' ? (Math.floor(performance.now() / 2500 + a.slot) % 3 === 0 ? 'talk' : 'smile') : 'neutral',
+          expr: exprOf(a),
           scale: a.p.scale,
         };
       });
@@ -340,6 +484,7 @@ export function createTown(seats: Seat[] = []): Town {
       return { outside, total: agents.length, byActivity: by };
     },
     balls: () => ballList,
+    hits: () => hits,
     insideOf: (id) =>
       agents
         .filter((a) => a.inside === id)
@@ -354,15 +499,15 @@ export function createTown(seats: Seat[] = []): Town {
             pose: 'stand' as const,
             phase: (performance.now() / 1000) * 2 + a.p.id,
             stride: 0,
+            ...styleOf(a.p.id),
             shirt: a.p.shirt,
             pants: a.p.pants,
             skin: a.p.skin,
             hair: HAIRS[a.p.id % HAIRS.length],
             hairStyle: (a.p.id * 7) % 4,
             eyes: EYES[(a.p.id * 5) % EYES.length],
-            shortSleeves: a.p.id % 2 === 0,
-            shorts: a.p.id % 3 === 0,
             seed: a.p.id,
+            expr: (Math.floor(performance.now() / 4000 + a.p.id) % 5 === 0 ? 'smile' : 'neutral') as Expr,
             scale: a.p.scale,
           },
         })),
@@ -380,10 +525,11 @@ export function createTown(seats: Seat[] = []): Town {
       if (!best) return null;
       best.waveUntil = now + 3200;
       best.waveCool = now + 3200;
-      best.talkUntil = now + 1900;
-      best.smileUntil = now + 4500;
+      best.surpriseUntil = now + 450;
+      best.talkUntil = now + 2300;
+      best.smileUntil = now + 5200;
       best.line = (best.line + 1) % 3;
-      return { name: best.p.name, activity: best.activity, x: best.x, z: best.z, line: best.line };
+      return { name: best.p.name, activity: best.activity, x: best.x, z: best.z, line: best.line, seed: best.p.id };
     },
     nearest: (p, r) => {
       let best: Agent | null = null;

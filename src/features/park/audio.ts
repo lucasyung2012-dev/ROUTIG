@@ -246,6 +246,51 @@ export function createParkAudio(mix: AudioMix): ParkAudio | null {
         osc('sine', f * 2.76, 0.12, 0.002, 1.6);
         osc('sine', f * 5.4, 0.05, 0.002, 0.8);
         break;
+      case 'voice': {
+        // Sílaba de fala (estilo "balbucio" de jogo): vogal com formante e entonação que cai.
+        const o = ctx.createOscillator();
+        o.type = 'sawtooth';
+        o.frequency.setValueAtTime(f, at);
+        o.frequency.linearRampToValueAtTime(f * (0.88 + Math.random() * 0.2), at + 0.11);
+        const vowel = [700, 1100, 450, 900, 350][Math.floor(Math.random() * 5)]!;
+        const bp = ctx.createBiquadFilter();
+        bp.type = 'bandpass';
+        bp.frequency.value = vowel;
+        bp.Q.value = 3;
+        const lp = ctx.createBiquadFilter();
+        lp.type = 'lowpass';
+        lp.frequency.value = 2400;
+        const g = ctx.createGain();
+        env(g, 0.5, 0.012, 0.12);
+        o.connect(bp).connect(lp).connect(g).connect(out);
+        o.start(at);
+        o.stop(at + 0.16);
+        break;
+      }
+      case 'whistle': {
+        // Apito do juiz: tom agudo com trinado.
+        const o = ctx.createOscillator();
+        o.type = 'sine';
+        o.frequency.value = 2900;
+        const lfo = ctx.createOscillator();
+        lfo.frequency.value = 38;
+        const depth = ctx.createGain();
+        depth.gain.value = 140;
+        lfo.connect(depth).connect(o.frequency);
+        const g = ctx.createGain();
+        env(g, 0.12, 0.01, 0.55);
+        o.connect(g).connect(out);
+        o.start(at);
+        lfo.start(at);
+        o.stop(at + 0.6);
+        lfo.stop(at + 0.6);
+        break;
+      }
+      case 'ball':
+        // Batida na bola (couro) ou raquetada: "toc" curto.
+        osc('sine', f, 0.45, 0.002, 0.09, f * 0.6);
+        hiss(0.12, 0.04, 1800, 'bandpass');
+        break;
       case 'pluck':
         osc('triangle', f, 0.28, 0.006, 1.2);
         osc('sine', f / 2, 0.12, 0.01, 1.4);

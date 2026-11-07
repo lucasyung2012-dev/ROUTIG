@@ -9,7 +9,9 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { Kit } from './kit';
 
-export type Pose = 'stand' | 'walk' | 'sit' | 'read' | 'play' | 'wave' | 'exercise' | 'draw' | 'photo' | 'tennis';
+export type Pose = 'stand' | 'walk' | 'sit' | 'read' | 'play' | 'wave' | 'exercise' | 'draw' | 'photo' | 'tennis' | 'kick' | 'cheer' | 'keeper' | 'run';
+export type Outfit = 'tee' | 'shirt' | 'jacket' | 'hoodie' | 'dress' | 'sport';
+export type Expr = 'neutral' | 'smile' | 'talk' | 'surprised' | 'laugh';
 
 export interface Figure {
   x: number;
@@ -29,7 +31,17 @@ export interface Figure {
   /** Virar a cabeça (radianos), por exemplo para olhar quem chega. */
   look?: number;
   /** Expressão do rosto: sorrindo ao cumprimentar, boca mexendo ao falar. */
-  expr?: 'neutral' | 'smile' | 'talk';
+  expr?: Expr;
+  /** Estilo da roupa e segunda cor (jaqueta, gola, listra, capuz). */
+  outfit?: Outfit;
+  accent?: string;
+  /** 0 nada, 1 boné, 2 gorro. */
+  hat?: number;
+  hatColor?: string;
+  glasses?: boolean;
+  /** Mochila nas costas. */
+  bag?: boolean;
+  shoes?: string;
   /** 0 curto, 1 comprido, 2 coque, 3 cacheado. */
   hairStyle?: number;
   /** Cor dos olhos (íris). */
@@ -177,7 +189,20 @@ function browGeo(): THREE.BufferGeometry {
   }
   return mergeGeometries(parts)!;
 }
-function mouthGeo(kind: 'neutral' | 'smile' | 'talk'): THREE.BufferGeometry {
+function mouthGeo(kind: 'neutral' | 'smile' | 'talk' | 'open' | 'laugh'): THREE.BufferGeometry {
+  if (kind === 'open') {
+    // Espanto: boca em "o".
+    const m = new THREE.TorusGeometry(0.012, 0.005, 6, 14);
+    m.scale(1, 1.25, 1);
+    m.translate(0, -0.05, 0.087);
+    return m;
+  }
+  if (kind === 'laugh') {
+    // Riso: meia-lua aberta.
+    const m = new THREE.CircleGeometry(0.024, 14, Math.PI, Math.PI);
+    m.translate(0, -0.032, 0.089);
+    return m;
+  }
   if (kind === 'talk') {
     const m = new THREE.SphereGeometry(0.014, 10, 8);
     m.scale(1.2, 0.8, 0.35);
@@ -188,6 +213,121 @@ function mouthGeo(kind: 'neutral' | 'smile' | 'talk'): THREE.BufferGeometry {
   t.rotateZ(kind === 'smile' ? Math.PI + Math.PI * 0.1 : Math.PI + Math.PI * 0.375);
   t.translate(0, kind === 'smile' ? -0.036 : -0.022, 0.088);
   return t;
+}
+
+/** Jaqueta aberta na frente (por cima da camiseta), com lapelas. */
+function jacketGeo(): THREE.BufferGeometry {
+  const prof: Array<[number, number]> = [[0.15, -0.04], [0.16, 0.1], [0.165, 0.2], [0.19, 0.33], [0.195, 0.41], [0.172, 0.465], [0.11, 0.5], [0.07, 0.51]];
+  const g = new THREE.LatheGeometry(prof.map(([r, y]) => new THREE.Vector2(r, y)), 18, 0.42, Math.PI * 2 - 0.84);
+  g.scale(1.12, 1, 0.68);
+  const parts = [g.toNonIndexed()];
+  for (const s of [-1, 1]) {
+    const lapel = new THREE.BoxGeometry(0.05, 0.16, 0.012);
+    lapel.rotateZ(s * 0.35);
+    lapel.translate(s * 0.06, 0.42, 0.115);
+    parts.push(lapel.toNonIndexed());
+  }
+  const m = mergeGeometries(parts)!;
+  m.computeVertexNormals();
+  return m;
+}
+/** Gola e botões da camisa social; listra da camiseta esportiva (mesma malha, cor de destaque). */
+function collarGeo(): THREE.BufferGeometry {
+  const c = new THREE.TorusGeometry(0.06, 0.014, 6, 16, Math.PI * 1.4);
+  c.rotateX(Math.PI / 2);
+  c.rotateY(-Math.PI * 0.2 - Math.PI / 2);
+  c.scale(1.1, 1, 0.9);
+  c.translate(0, 0.49, 0);
+  const placket = new THREE.BoxGeometry(0.02, 0.36, 0.01);
+  placket.translate(0, 0.27, 0.118);
+  return mergeGeometries([c.toNonIndexed(), placket.toNonIndexed()])!;
+}
+function stripeGeo(): THREE.BufferGeometry {
+  const g = new THREE.CylinderGeometry(0.18, 0.18, 0.07, 18, 1, true);
+  g.scale(1.12, 1, 0.68);
+  g.translate(0, 0.3, 0);
+  return g;
+}
+/** Capuz caído nas costas e os cordões. */
+function hoodGeo(): THREE.BufferGeometry {
+  const hood = new THREE.SphereGeometry(0.11, 14, 10, Math.PI * 0.55, Math.PI * 0.9, 0, Math.PI * 0.6);
+  hood.scale(1.1, 0.7, 1);
+  hood.translate(0, 0.5, -0.03);
+  const parts = [hood.toNonIndexed()];
+  for (const s of [-1, 1]) {
+    const cord = new THREE.CylinderGeometry(0.004, 0.004, 0.12, 4);
+    cord.translate(s * 0.03, 0.42, 0.115);
+    parts.push(cord.toNonIndexed());
+  }
+  return mergeGeometries(parts)!;
+}
+/** Saia do vestido, do quadril ao joelho (abre um pouco embaixo). */
+function skirtGeo(): THREE.BufferGeometry {
+  const g = new THREE.CylinderGeometry(0.16, 0.27, 0.46, 18, 1, true);
+  g.scale(1.1, 1, 0.85);
+  g.translate(0, -0.2, 0);
+  return g;
+}
+/** Boné (copa e aba) ou gorro. */
+function hatGeo(kind: 1 | 2): THREE.BufferGeometry {
+  if (kind === 2) {
+    const beanie = new THREE.SphereGeometry(0.112, 16, 10, 0, Math.PI * 2, 0, Math.PI * 0.55);
+    beanie.scale(0.95, 1.2, 1.05);
+    beanie.translate(0, 0.02, -0.006);
+    const fold = new THREE.CylinderGeometry(0.106, 0.108, 0.035, 16, 1, true);
+    fold.translate(0, 0.03, -0.006);
+    return mergeGeometries([beanie.toNonIndexed(), fold.toNonIndexed()])!;
+  }
+  const crown = new THREE.SphereGeometry(0.11, 16, 8, 0, Math.PI * 2, 0, Math.PI * 0.5);
+  crown.scale(0.95, 0.85, 1.05);
+  crown.translate(0, 0.04, -0.005);
+  const brim = new THREE.CylinderGeometry(0.075, 0.075, 0.01, 14, 1, false, -Math.PI / 2, Math.PI);
+  brim.scale(1.1, 1, 1);
+  brim.translate(0, 0.045, 0.09);
+  return mergeGeometries([crown.toNonIndexed(), brim.toNonIndexed()])!;
+}
+/** Óculos: dois aros e a ponte. */
+function glassesGeo(): THREE.BufferGeometry {
+  const parts: THREE.BufferGeometry[] = [];
+  for (const s of [-1, 1]) {
+    const rim = new THREE.TorusGeometry(0.019, 0.0028, 4, 14);
+    rim.translate(s * 0.036, 0.016, 0.096);
+    parts.push(rim.toNonIndexed());
+    const arm = new THREE.BoxGeometry(0.003, 0.003, 0.09);
+    arm.translate(s * 0.07, 0.018, 0.05);
+    parts.push(arm.toNonIndexed());
+  }
+  const bridge = new THREE.BoxGeometry(0.016, 0.003, 0.003);
+  bridge.translate(0, 0.02, 0.097);
+  parts.push(bridge.toNonIndexed());
+  return mergeGeometries(parts)!;
+}
+/** Mochila com bolso e alças. */
+function bagGeo(): THREE.BufferGeometry {
+  const body = new THREE.CapsuleGeometry(0.11, 0.16, 4, 10);
+  body.scale(1.15, 1, 0.55);
+  body.translate(0, 0.27, -0.16);
+  const pocket = new THREE.BoxGeometry(0.16, 0.1, 0.04);
+  pocket.translate(0, 0.2, -0.22);
+  const parts = [body.toNonIndexed(), pocket.toNonIndexed()];
+  for (const s of [-1, 1]) {
+    const strap = new THREE.TorusGeometry(0.1, 0.012, 4, 10, Math.PI);
+    strap.rotateY(Math.PI / 2);
+    strap.translate(s * 0.1, 0.33, -0.02);
+    parts.push(strap.toNonIndexed());
+  }
+  return mergeGeometries(parts)!;
+}
+/** Bochechas rosadas (ao sorrir e rir). */
+function cheekGeo(): THREE.BufferGeometry {
+  const parts: THREE.BufferGeometry[] = [];
+  for (const s of [-1, 1]) {
+    const c = new THREE.CircleGeometry(0.014, 10);
+    c.rotateY(s * 0.55);
+    c.translate(s * 0.052, -0.012, 0.083);
+    parts.push(c.toNonIndexed());
+  }
+  return mergeGeometries(parts)!;
 }
 
 function handGeo(): THREE.BufferGeometry {
@@ -349,6 +489,51 @@ function joints(f: Figure): Joints {
       j.prop = 'racket';
       break;
     }
+    case 'run': {
+      // Corrida: passada larga, joelho alto, braços dobrados balançando forte.
+      const a = Math.sin(p);
+      j.hf = [a * 0.8, -a * 0.8];
+      j.kf = [0.35 + Math.max(0, Math.sin(p - 1.1)) * 1.3, 0.35 + Math.max(0, Math.sin(p + Math.PI - 1.1)) * 1.3];
+      j.sf = [-a * 0.75, a * 0.75];
+      j.ef = [1.3, 1.3];
+      j.hip = HIP - 0.03 + Math.abs(Math.cos(p)) * 0.06;
+      j.lean = 0.2;
+      break;
+    }
+    case 'kick': {
+      // Chute: perna direita vai para trás e volta com força; braços abrem para equilibrar.
+      const k = Math.sin(Math.min(1, (p % (Math.PI * 2)) / Math.PI) * Math.PI);
+      j.hf = [-0.1, -0.9 + k * 2.1];
+      j.kf = [0.15, 1.2 - k * 1.1];
+      j.abd = [0.6, 0.5];
+      j.sf = [0.4, -0.5];
+      j.lean = 0.1 - k * 0.15;
+      break;
+    }
+    case 'cheer': {
+      // Comemoração: braços para cima, pulinhos.
+      const k = Math.abs(Math.sin(p * 2));
+      j.abd = [2.7, 2.7];
+      j.ef = [0.3, 0.3];
+      j.hip = HIP + k * 0.06;
+      j.kf = [0.2 + k * 0.3, 0.2 + k * 0.3];
+      j.hf = [k * 0.2, k * 0.2];
+      j.headPitch = -0.25;
+      break;
+    }
+    case 'keeper': {
+      // Goleiro: base aberta, joelhos dobrados, braços abertos e prontos.
+      const sw = Math.sin(p * 0.7);
+      j.hf = [0.35, 0.35];
+      j.kf = [0.6, 0.6];
+      j.legOut = 0.2;
+      j.hip = HIP - 0.12;
+      j.abd = [0.9 + sw * 0.2, 0.9 - sw * 0.2];
+      j.ef = [0.6, 0.6];
+      j.sf = [0.5, 0.5];
+      j.lean = 0.25;
+      break;
+    }
     case 'photo':
       j.sf = [1.25, 1.25];
       j.ef = [1.75, 1.75];
@@ -415,6 +600,26 @@ export function createCrowd(kit: Kit, capacity: number, shadows = true): Crowd {
   const parts = [pelvis, torso, head, sclera, iris, brows, upper, fore, hand, thigh, shin, shoe];
   const variants = [...hairs, ...Object.values(mouths)];
   const racket = mk(racketGeo(), kit.mat('#1F6FB2', { rough: 0.4, side: THREE.DoubleSide }), 1, false);
+  // Roupas e acessórios (contagem variável: só quem usa).
+  const jacket = mk(jacketGeo(), kit.mat('#ffffff', { rough: 0.75, side: THREE.DoubleSide }));
+  const collar = mk(collarGeo(), cloth, 1, false);
+  const stripe = mk(stripeGeo(), cloth, 1, false);
+  const hood = mk(hoodGeo(), cloth);
+  const skirt = mk(skirtGeo(), kit.mat('#ffffff', { rough: 0.85, side: THREE.DoubleSide }));
+  const caps = [mk(hatGeo(1), cloth), mk(hatGeo(2), kit.mat('#ffffff', { rough: 0.95 }))];
+  const specs = mk(glassesGeo(), kit.mat('#1F1F22', { rough: 0.3, metal: 0.4 }), 1, false);
+  const backpack = mk(bagGeo(), kit.mat('#ffffff', { rough: 0.7 }));
+  const cheeks = mk(cheekGeo(), kit.own(new THREE.MeshStandardMaterial({ color: '#F2A2A0', roughness: 0.8, transparent: true, opacity: 0.5, depthWrite: false })), 1, false);
+  const extra = [jacket, collar, stripe, hood, skirt, ...caps, specs, backpack, cheeks];
+  const mouthOpen = mk(mouthGeo('open'), kit.mat('#5A2A26', { rough: 0.6 }), 1, false);
+  const mouthLaugh = mk(mouthGeo('laugh'), kit.mat('#7A2E2A', { rough: 0.6, side: THREE.DoubleSide }), 1, false);
+  const squintM = new THREE.Matrix4().makeScale(1, 0.45, 1);
+  const pushV = (im: THREE.InstancedMesh, m: THREE.Matrix4, color?: string) => {
+    const k = vCount.get(im) ?? 0;
+    vCount.set(im, k + 1);
+    im.setMatrixAt(k, m);
+    if (color) im.setColorAt(k, c.set(color));
+  };
   const props = { book, guitar, sketch, camera, racket };
 
   const base = new THREE.Matrix4();
@@ -452,24 +657,39 @@ export function createCrowd(kit: Kit, capacity: number, shadows = true): Crowd {
       pelvis.setMatrixAt(i, m1);
       step(m2, m1, 0, 0.03, 0, -j.lean);
       torso.setMatrixAt(i, m2);
+      const outfit = f.outfit ?? 'tee';
+      const acc = f.accent ?? '#F4F4F5';
+      if (outfit === 'jacket') pushV(jacket, m2, acc);
+      if (outfit === 'shirt') pushV(collar, m2, acc);
+      if (outfit === 'sport') pushV(stripe, m2, acc);
+      if (outfit === 'hoodie') pushV(hood, m2, f.shirt);
+      if (outfit === 'dress') pushV(skirt, m1, f.shirt);
+      if (f.bag) pushV(backpack, m2, acc === '#F4F4F5' ? '#475569' : acc);
       step(m3, m2, 0, TORSO + 0.2, 0.01, j.headPitch, j.headYaw);
       head.setMatrixAt(i, m3);
       // Rosto: olhos (piscam de vez em quando), sobrancelhas (sobem ao sorrir), boca da expressão.
       const blink = (now + (f.seed ?? i) * 1.37) % 4.3 < 0.13;
-      const eyeM = blink ? m1.multiplyMatrices(m3, blinkM) : m3;
+      // Rindo, os olhos apertam; espantado, as sobrancelhas sobem bem.
+      const eyeM = blink ? m1.multiplyMatrices(m3, blinkM) : f.expr === 'laugh' ? m1.multiplyMatrices(m3, squintM) : m3;
       sclera.setMatrixAt(i, eyeM);
       iris.setMatrixAt(i, eyeM);
-      brows.setMatrixAt(i, f.expr === 'smile' ? step(m2b, m3, 0, 0.006, 0) : m3);
+      brows.setMatrixAt(i, f.expr === 'surprised' ? step(m2b, m3, 0, 0.014, 0) : f.expr === 'smile' || f.expr === 'laugh' ? step(m2b, m3, 0, 0.006, 0) : m3);
+      if (f.expr === 'smile' || f.expr === 'laugh') pushV(cheeks, m3);
+      if (f.glasses) pushV(specs, m3);
+      if (f.hat) pushV(caps[(f.hat - 1) % 2]!, m3, f.hatColor ?? f.accent ?? '#334155');
       const hm = hairs[(f.hairStyle ?? 0) % 4]!;
       const hi = vCount.get(hm) ?? 0;
       vCount.set(hm, hi + 1);
-      hm.setMatrixAt(hi, m3);
+      // Debaixo do gorro, só o cabelo comprido aparece (o curto e o coque ficam escondidos).
+      hm.setMatrixAt(hi, f.hat === 2 && (f.hairStyle ?? 0) !== 1 ? step(m2b, m3, 0, -0.02, 0) : m3);
       hm.setColorAt(hi, c.set(f.hair ?? '#3B2A20'));
-      const expr = f.expr === 'talk' ? (Math.floor(now * 7 + i) % 2 ? 'talk' : 'neutral') : (f.expr ?? 'neutral');
-      const mm = mouths[expr];
-      const mi = vCount.get(mm) ?? 0;
-      vCount.set(mm, mi + 1);
-      mm.setMatrixAt(mi, m3);
+      const ex = f.expr ?? 'neutral';
+      if (ex === 'surprised') pushV(mouthOpen, m3);
+      else if (ex === 'laugh') pushV(Math.floor(now * 6 + i) % 3 ? mouthLaugh : mouths.smile, m3);
+      else {
+        const expr = ex === 'talk' ? (Math.floor(now * 7 + i) % 2 ? 'talk' : 'neutral') : ex;
+        pushV(mouths[expr], m3);
+      }
       // Braços: ombro → cotovelo → mão.
       for (let k = 0; k < 2; k++) {
         const side = k === 0 ? -1 : 1;
@@ -505,6 +725,8 @@ export function createCrowd(kit: Kit, capacity: number, shadows = true): Crowd {
       }
       pelvis.setColorAt(i, c.set(f.pants));
       torso.setColorAt(i, c.set(f.shirt));
+      // Jaqueta: mangas da cor da jaqueta.
+      if (f.outfit === 'jacket') c.set(f.accent ?? '#F4F4F5');
       upper.setColorAt(i * 2, c);
       upper.setColorAt(i * 2 + 1, c);
       head.setColorAt(i, c.set(f.skin));
@@ -515,11 +737,13 @@ export function createCrowd(kit: Kit, capacity: number, shadows = true): Crowd {
       brows.setColorAt(i, c.set(f.hair ?? '#3B2A20').multiplyScalar(0.8));
       iris.setColorAt(i, c.set(f.eyes ?? '#4A3426'));
       // Manga curta e bermuda mostram a pele; senão, a roupa.
-      if (!f.shortSleeves) for (let k = 0; k < 2; k++) fore.setColorAt(i * 2 + k, c.set(f.shirt));
+      if (!f.shortSleeves || f.outfit === 'jacket') for (let k = 0; k < 2; k++) fore.setColorAt(i * 2 + k, c.set(f.outfit === 'jacket' ? (f.accent ?? '#F4F4F5') : f.shirt));
+      if (f.outfit === 'dress') pelvis.setColorAt(i, c.set(f.shirt));
       for (let k = 0; k < 2; k++) {
-        thigh.setColorAt(i * 2 + k, c.set(f.pants));
-        shin.setColorAt(i * 2 + k, f.shorts ? c.set(f.skin) : c.set(f.pants));
-        shoe.setColorAt(i * 2 + k, c.set('#2B2B2B'));
+        // Vestido: pernas à mostra (meia-calça clara ou pele); bermuda: canela à mostra.
+        thigh.setColorAt(i * 2 + k, f.outfit === 'dress' ? c.set(f.skin) : c.set(f.pants));
+        shin.setColorAt(i * 2 + k, f.shorts || f.outfit === 'dress' ? c.set(f.skin) : c.set(f.pants));
+        shoe.setColorAt(i * 2 + k, c.set(f.shoes ?? '#2B2B2B'));
       }
     }
     for (const im of parts) {
@@ -527,7 +751,7 @@ export function createCrowd(kit: Kit, capacity: number, shadows = true): Crowd {
       im.instanceMatrix.needsUpdate = true;
       if (im.instanceColor) im.instanceColor.needsUpdate = true;
     }
-    for (const im of variants) {
+    for (const im of [...variants, ...extra, mouthOpen, mouthLaugh]) {
       im.count = vCount.get(im) ?? 0;
       im.instanceMatrix.needsUpdate = true;
       if (im.instanceColor) im.instanceColor.needsUpdate = true;
@@ -542,4 +766,27 @@ export function createCrowd(kit: Kit, capacity: number, shadows = true): Crowd {
 }
 
 /** Avatar universal do visitante: cores neutras, sem gênero nem idade definidos. */
-export const AVATAR_LOOK = { shirt: '#5B8DB8', pants: '#3F4756', skin: '#C9A27E', hair: '#2F2A26', hairStyle: 0, eyes: '#4A3426' } as const;
+export const AVATAR_LOOK = { shirt: '#F4F1EA', pants: '#2F3A4F', skin: '#C9A27E', hair: '#2F2A26', hairStyle: 0, eyes: '#4A3426', outfit: 'jacket', accent: '#3E6E9E', bag: true, shoes: '#F5F5F4' } as const;
+
+/** Estilo próprio de cada morador, sempre o mesmo para a mesma pessoa (roupa, acessórios, sapatos). */
+export function styleOf(id: number): Pick<Figure, 'outfit' | 'accent' | 'hat' | 'hatColor' | 'glasses' | 'bag' | 'shoes' | 'shortSleeves' | 'shorts'> {
+  const h = (k: number) => {
+    const v = Math.sin(id * 12.9898 + k * 78.233) * 43758.5453;
+    return v - Math.floor(v);
+  };
+  const outfits: Outfit[] = ['tee', 'shirt', 'jacket', 'hoodie', 'dress', 'sport', 'tee', 'shirt'];
+  const outfit = outfits[Math.floor(h(1) * outfits.length)]!;
+  const accents = ['#F4F4F5', '#1F2937', '#7C2D12', '#365314', '#1E3A8A', '#9D174D', '#CA8A04', '#0F766E', '#D6C7A1'];
+  const shoes = ['#2B2B2B', '#F5F5F4', '#7C4A2D', '#1E3A8A', '#B91C1C', '#E5E7EB'];
+  return {
+    outfit,
+    accent: accents[Math.floor(h(2) * accents.length)]!,
+    hat: h(3) < 0.18 ? 1 : h(3) < 0.26 ? 2 : 0,
+    hatColor: accents[Math.floor(h(4) * accents.length)]!,
+    glasses: h(5) < 0.25,
+    bag: h(6) < 0.22,
+    shoes: shoes[Math.floor(h(7) * shoes.length)]!,
+    shortSleeves: outfit === 'tee' || outfit === 'sport' || (outfit === 'dress' && h(8) < 0.6),
+    shorts: outfit === 'sport' || (outfit === 'tee' && h(9) < 0.4),
+  };
+}

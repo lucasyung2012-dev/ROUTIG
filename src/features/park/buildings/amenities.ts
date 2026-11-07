@@ -567,7 +567,7 @@ export function neighborhood(kit: Kit): { group: THREE.Group; tick: (t: number) 
     body.translate(0, 0.55, 0);
     const cab = new THREE.BoxGeometry(1.6, 0.55, 2.2);
     cab.translate(0, 1.1, -0.2);
-    const parts = [body, cab];
+    const parts: THREE.BufferGeometry[] = [body, cab];
     for (const [wx, wz] of [[-0.85, 1.35], [0.85, 1.35], [-0.85, -1.35], [0.85, -1.35]] as const) {
       const wh = new THREE.CylinderGeometry(0.34, 0.34, 0.25, 12);
       wh.rotateZ(Math.PI / 2);

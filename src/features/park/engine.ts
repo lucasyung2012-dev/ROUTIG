@@ -672,8 +672,13 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
       const p = what === 'playground' ? PLAYGROUND : world.lifts.find((l) => l.id === what) ?? (xz.length === 2 && xz.every(Number.isFinite) ? { x: xz[0]!, z: xz[1]! } : null);
       if (!p) return;
       const y = heightAt(p.x, p.z);
+      // Lounge: a câmera fica do lado de fora do prédio, olhando para ele.
+      const bd = world.buildings.get(what as ModuleId)?.def;
+      const ox = bd ? p.x - bd.x : 1;
+      const oz = bd ? p.z - bd.z : 1;
+      const ol = Math.hypot(ox, oz) || 1;
       rig.setMode('orbit');
-      rig.glideTo(new THREE.Vector3(p.x + 14, y + 10, p.z + 14), new THREE.Vector3(p.x, y + 1.5, p.z), 900);
+      rig.glideTo(new THREE.Vector3(p.x + (ox / ol) * 18, y + 9, p.z + (oz / ol) * 18), new THREE.Vector3(p.x, y + 2, p.z), 900);
     }
   };
   if (/[?&]debug/.test(location.search)) document.addEventListener('park-debug', onDebug);

@@ -119,34 +119,132 @@ export function sky(kit: Kit): { mesh: THREE.Mesh; set: (top: THREE.Color, botto
 
 /* ---------- Água animada ---------- */
 
-export function water(kit: Kit, radius: number, color = '#2E9BD6'): { mesh: THREE.Mesh; tick: (t: number) => void } {
+/**
+ * Malha de água em anéis (do centro até a margem), com o atributo `edge` (0 no centro, 1 na
+ * margem) para a cor rasa perto da borda. Plano XY (a malha é girada para ficar deitada).
+ */
+export function waterGeometry(radiusAt: (a: number) => number, rings = 14, segs = 96): THREE.BufferGeometry {
+  const pos: number[] = [0, 0, 0];
+  const edge: number[] = [0];
+  const uv: number[] = [0.5, 0.5];
+  const idx: number[] = [];
+  for (let r = 1; r <= rings; r++) {
+    const k = Math.pow(r / rings, 0.8);
+    for (let s = 0; s < segs; s++) {
+      const a = (s / segs) * Math.PI * 2;
+      const rr = (radiusAt(a) - 0.6) * k;
+      pos.push(Math.cos(a) * rr, -Math.sin(a) * rr, 0);
+      edge.push(r / rings);
+      uv.push(0.5 + Math.cos(a) * k * 0.5, 0.5 - Math.sin(a) * k * 0.5);
+    }
+  }
+  const at = (r: number, s: number) => (r === 0 ? 0 : 1 + (r - 1) * segs + (s % segs));
+  for (let s = 0; s < segs; s++) idx.push(0, at(1, s + 1), at(1, s));
+  for (let r = 1; r < rings; r++)
+    for (let s = 0; s < segs; s++) {
+      const a = at(r, s);
+      const b = at(r, s + 1);
+      const c = at(r + 1, s);
+      const d = at(r + 1, s + 1);
+      idx.push(a, d, c, a, b, d);
+    }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('edge', new THREE.Float32BufferAttribute(edge, 1));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  g.setIndex(idx);
+  g.computeVertexNormals();
+  return g;
+}
+
+/**
+ * Água (V2.1, seção 6.3): reflexo do céu (mais forte de lado, como na água de verdade), brilho
+ * do sol, ondulações que andam com o vento, transparência e cor rasa perto da margem e funda
+ * no meio, gotas de chuva e escurecimento à noite. Tudo num shader, sem segunda renderização.
+ */
+export function water(kit: Kit, radius: number | ((a: number) => number), color = '#2E9BD6'): { mesh: THREE.Mesh; tick: (t: number) => void } {
   const mat = kit.own(
     new THREE.ShaderMaterial({
       transparent: true,
-      uniforms: { t: { value: 0 }, deep: { value: new THREE.Color(color) }, light: { value: new THREE.Color('#BFEFFF') }, night: { value: 0 }, rain: { value: 0 }, wind: { value: 0 } },
-      vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
-      fragmentShader: `uniform float t; uniform vec3 deep; uniform vec3 light; uniform float night; uniform float rain; uniform float wind; varying vec2 vUv;
+      fog: true,
+      uniforms: THREE.UniformsUtils.merge([
+        THREE.UniformsLib.fog,
+        {
+          t: { value: 0 },
+          deep: { value: new THREE.Color(color).multiplyScalar(0.55) },
+          shallow: { value: new THREE.Color('#6FC3C9') },
+          skyTop: { value: new THREE.Color('#4F9FE0') },
+          skyBottom: { value: new THREE.Color('#D6ECF7') },
+          sunDir: { value: new THREE.Vector3(0.4, 0.8, 0.3) },
+          sunColor: { value: new THREE.Color('#FFF6E5') },
+          night: { value: 0 },
+          rain: { value: 0 },
+          wind: { value: 0 },
+        },
+      ]),
+      vertexShader: `attribute float edge; varying float vEdge; varying vec3 vWorld; varying vec2 vUv;
+        #include <fog_pars_vertex>
         void main(){
-          vec2 p = (vUv - 0.5) * 2.0; float d = length(p);
-          float w = sin(d * 28.0 - t * 2.2) * 0.5 + 0.5;
-          float w2 = sin((p.x + p.y) * (17.0 + wind * 14.0) + t * (1.3 + wind * 2.5)) * 0.5 + 0.5;
-          float spark = pow(w * w2, 6.0 - wind * 3.0);
-          vec3 c = mix(deep, light, 0.18 + spark * 0.55 + (1.0 - d) * 0.12);
+          vEdge = edge; vUv = uv;
+          vec4 w = modelMatrix * vec4(position, 1.0);
+          vWorld = w.xyz;
+          vec4 mvPosition = viewMatrix * w;
+          gl_Position = projectionMatrix * mvPosition;
+          #include <fog_vertex>
+        }`,
+      fragmentShader: `uniform float t; uniform vec3 deep; uniform vec3 shallow; uniform vec3 skyTop; uniform vec3 skyBottom; uniform vec3 sunDir; uniform vec3 sunColor;
+        uniform float night; uniform float rain; uniform float wind;
+        varying float vEdge; varying vec3 vWorld; varying vec2 vUv;
+        #include <fog_pars_fragment>
+        vec2 grad(vec2 p, vec2 d, float f, float s, float a){ return d * (a * f * cos(dot(p, d) * f + t * s)); }
+        void main(){
+          vec2 p = vWorld.xz;
+          float k = 0.6 + wind * 1.4;
+          vec2 g = grad(p, normalize(vec2(1.0, 0.3)), 1.2, 1.6 + wind, 0.05 * k)
+                 + grad(p, normalize(vec2(-0.4, 1.0)), 2.1, 2.2 + wind * 2.0, 0.03 * k)
+                 + grad(p, normalize(vec2(0.7, -0.8)), 3.7, 2.9, 0.018 * k)
+                 + grad(p, normalize(vec2(-1.0, -0.2)), 6.3, 3.8, 0.011 * k)
+                 + grad(p, normalize(vec2(0.2, 1.0)), 11.0, 5.1, 0.006 * k);
+          vec3 N = normalize(vec3(-g.x, 1.0, -g.y));
+          vec3 V = normalize(cameraPosition - vWorld);
+          float fres = 0.03 + 0.97 * pow(1.0 - max(dot(N, V), 0.0), 5.0);
+          vec3 R = reflect(-V, N);
+          vec3 sky = mix(skyBottom, skyTop, clamp(R.y * 1.6, 0.0, 1.0));
+          // Raso perto da margem (claro e transparente), fundo no meio (escuro).
+          float sh = smoothstep(0.55, 1.0, vEdge);
+          vec3 body = mix(deep, shallow, sh);
+          vec3 c = mix(body, sky, clamp(fres * 1.15, 0.0, 0.9));
+          float spec = pow(max(dot(R, normalize(sunDir)), 0.0), 220.0);
+          c += sunColor * spec * 2.2 * (1.0 - night * 0.85);
           // Chuva: anéis de gotas que nascem e se abrem pela superfície.
-          vec2 g = vUv * 70.0; vec2 id = floor(g); vec2 f = fract(g) - 0.5;
+          vec2 q = p * 0.9; vec2 id = floor(q); vec2 f = fract(q) - 0.5;
           float hsh = fract(sin(dot(id, vec2(12.9898, 78.233))) * 43758.5453);
           float ph = fract(t * 0.8 + hsh);
-          float ring = smoothstep(0.05, 0.0, abs(length(f) - ph * 0.45)) * (1.0 - ph) * step(hsh, rain);
-          c = mix(c, light, ring * 0.6);
-          c = mix(c, c * 0.82, rain * 0.4);
-          c *= mix(1.0, 0.35, night);
-          gl_FragColor = vec4(c, 0.88);
+          float ring = smoothstep(0.06, 0.0, abs(length(f) - ph * 0.45)) * (1.0 - ph) * step(hsh, rain);
+          c = mix(c, sky, ring * 0.7);
+          c *= mix(1.0, 0.4, night);
+          float alpha = mix(0.94, 0.55, smoothstep(0.8, 1.0, vEdge));
+          gl_FragColor = vec4(c, alpha);
+          #include <tonemapping_fragment>
+          #include <colorspace_fragment>
+          #include <fog_fragment>
         }`,
     }),
   );
-  const mesh = new THREE.Mesh(kit.own(new THREE.CircleGeometry(radius, 48)), mat);
+  const geo = waterGeometry(typeof radius === 'number' ? () => radius + 0.6 : radius, typeof radius === 'number' ? 6 : 14, typeof radius === 'number' ? 48 : 128);
+  const mesh = new THREE.Mesh(kit.own(geo), mat);
   mesh.rotation.x = -Math.PI / 2;
   return { mesh, tick: (t) => (mat.uniforms.t!.value = t) };
+}
+
+/** Céu e sol refletidos nas águas criadas por `water`. */
+export function setWaterSky(mesh: THREE.Mesh, top: THREE.Color, bottom: THREE.Color, sunDir: THREE.Vector3, sun: THREE.Color) {
+  const m = mesh.material as THREE.ShaderMaterial;
+  if (!m.uniforms?.skyTop) return;
+  m.uniforms.skyTop.value.copy(top);
+  m.uniforms.skyBottom!.value.copy(bottom);
+  m.uniforms.sunDir!.value.copy(sunDir);
+  m.uniforms.sunColor!.value.copy(sun);
 }
 
 /** Ajusta o escurecimento noturno de todas as águas criadas por `water`. */

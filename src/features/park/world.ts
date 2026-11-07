@@ -5,9 +5,9 @@
  */
 import * as THREE from 'three';
 import type { ModuleId } from '@/app/modules';
-import { LAKE, PARK_BUILDINGS, PARK_RADIUS, PARK_SCALE, PATH_WIDTH, PLAZA_RADIUS, PONDS, entranceOf, facingOf, heightAt, inWater, lakeRadiusAt, parkPaths, samplePath, seededRandom, treePositions, type ParkBuilding, type Point } from '@/domain/park';
+import { LAKE, PARK_BUILDINGS, PARK_RADIUS, PARK_SCALE, PATH_WIDTH, PLAZA_RADIUS, POIS, PONDS, entranceOf, facingOf, heightAt, inWater, lakeRadiusAt, parkPaths, samplePath, seededRandom, treePositions, type ParkBuilding, type Point } from '@/domain/park';
 import { amenities, houses, type Seat, type Viewpoint } from './buildings/amenities';
-import { Builder, Kit, cloud, forest, setWaterNight, setWaterWeather, shrubs, sky, stars, water, type Plant, type TreeSpecies } from './kit';
+import { Builder, Kit, cloud, forest, setWaterNight, setWaterSky, setWaterWeather, shrubs, sky, stars, water, type Plant, type TreeSpecies } from './kit';
 import { birds, butterflies, drone, fountain, leaves, rain } from './life';
 import { dashboardBuilding, inboxBuilding, profileBuilding, settingsBuilding, type DetailedBuilding } from './buildings/central';
 import { academyBuilding, insightsBuilding, languagesBuilding, libraryBuilding, notesBuilding } from './buildings/north';
@@ -16,6 +16,7 @@ import { focusBuilding, goalsBuilding, habitsBuilding, musicBuilding, sportsBuil
 import { prototypeBuilding } from './buildings/prototype';
 import type { Obstacle } from './camera';
 import { footprint } from './collision';
+import { createGrass } from './grass';
 
 export type Quality = 'low' | 'medium' | 'high';
 /** Clima combinável (V2.1, seção 15): cada componente de 0 a 1; chuva com vento e neblina, por exemplo. */
@@ -404,33 +405,13 @@ function lampPosts(kit: Kit, spots: Point[]): THREE.Group {
 /* ---------- Lago, orla, píer e ponte ---------- */
 
 /** Superfície d'água com a forma da margem (UV de 0 a 1 para o shader das ondas). */
-function shapeWater(kit: Kit, color: string, radiusAt: (a: number) => number, maxR: number): ReturnType<typeof water> {
-  const w = water(kit, maxR, color);
-  const shape = new THREE.Shape();
-  for (let i = 0; i <= 96; i++) {
-    const a = (i / 96) * Math.PI * 2;
-    const r = radiusAt(a) - 0.6;
-    const px = Math.cos(a) * r;
-    const py = -Math.sin(a) * r;
-    if (i === 0) shape.moveTo(px, py);
-    else shape.lineTo(px, py);
-  }
-  const g = new THREE.ShapeGeometry(shape, 1);
-  const p = g.attributes.position!;
-  const uv = new Float32Array(p.count * 2);
-  for (let i = 0; i < p.count; i++) {
-    uv[i * 2] = p.getX(i) / (maxR * 2) + 0.5;
-    uv[i * 2 + 1] = p.getY(i) / (maxR * 2) + 0.5;
-  }
-  g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
-  w.mesh.geometry.dispose();
-  w.mesh.geometry = kit.own(g);
-  return w;
+function shapeWater(kit: Kit, color: string, radiusAt: (a: number) => number): ReturnType<typeof water> {
+  return water(kit, radiusAt, color);
 }
 
 function lake(kit: Kit): { group: THREE.Group; water: ReturnType<typeof water>; ponds: Array<ReturnType<typeof water>> } {
   const group = new THREE.Group();
-  const w = shapeWater(kit, '#2A86C4', lakeRadiusAt, LAKE.radius + 14);
+  const w = shapeWater(kit, '#1F6E9E', lakeRadiusAt);
   w.mesh.position.set(LAKE.x, -0.4, LAKE.z);
   const b = new Builder();
   const wood = kit.mat('#8B6545', { rough: 0.8 });
@@ -443,13 +424,48 @@ function lake(kit: Kit): { group: THREE.Group; water: ReturnType<typeof water>; 
   const ry = Math.atan2(Math.cos(a), Math.sin(a));
   b.add(wood, new THREE.BoxGeometry(2.6, 0.25, 16), [sx, 0.15, sz], [0, ry, 0]);
   b.add(wood, new THREE.BoxGeometry(6, 0.25, 4), [LAKE.x + Math.cos(a) * (r0 - 14), 0.15, LAKE.z + Math.sin(a) * (r0 - 14)], [0, ry, 0]);
-  // Pedras e margens naturais.
+  // Pedras e margens naturais: pedras arredondadas e irregulares em grupos, juncos em trechos.
   const rnd = seededRandom(9);
-  for (let k = 0; k < 60; k++) {
+  const rockMat2 = kit.mat('#7D7468', { rough: 0.95 });
+  const rock = (size: number) => {
+    const g = new THREE.DodecahedronGeometry(size, 1);
+    const p = g.attributes.position!;
+    for (let i = 0; i < p.count; i++) {
+      const f = 0.78 + rnd() * 0.36;
+      p.setXYZ(i, p.getX(i) * f, p.getY(i) * f * 0.62, p.getZ(i) * f);
+    }
+    g.computeVertexNormals();
+    return g;
+  };
+  for (let k = 0; k < 46; k++) {
     const t = rnd() * Math.PI * 2;
-    const r = lakeRadiusAt(t) + 0.2 + rnd() * 2.2;
-    b.add(rockMat, new THREE.IcosahedronGeometry(0.4 + rnd() * 1.1, 0), [LAKE.x + Math.cos(t) * r, -0.2, LAKE.z + Math.sin(t) * r], [rnd(), rnd(), 0]);
+    for (let j = 0; j < 2 + Math.floor(rnd() * 3); j++) {
+      const tt = t + (rnd() - 0.5) * 0.06;
+      const r = lakeRadiusAt(tt) - 0.4 + rnd() * 2.6;
+      b.add(rnd() > 0.5 ? rockMat : rockMat2, rock(0.35 + rnd() * 0.9), [LAKE.x + Math.cos(tt) * r, -0.15 + rnd() * 0.2, LAKE.z + Math.sin(tt) * r], [0, rnd() * 6, 0]);
+    }
   }
+  // Juncos e capim alto em trechos da margem (vegetação próxima da água).
+  const reedSpots: Array<{ x: number; z: number; h: number }> = [];
+  for (let k = 0; k < 26; k++) {
+    const t = rnd() * Math.PI * 2;
+    if (Math.abs(Math.atan2(Math.sin(t - 0.9), Math.cos(t - 0.9))) < 0.25) continue;
+    for (let j = 0; j < 14; j++) {
+      const tt = t + (rnd() - 0.5) * 0.08;
+      const r = lakeRadiusAt(tt) - 1.5 + rnd() * 2.2;
+      reedSpots.push({ x: LAKE.x + Math.cos(tt) * r, z: LAKE.z + Math.sin(tt) * r, h: 0.9 + rnd() * 1.1 });
+    }
+  }
+  const reedGeo = kit.own(new THREE.ConeGeometry(0.03, 1, 4));
+  reedGeo.translate(0, 0.5, 0);
+  const reeds = new THREE.InstancedMesh(reedGeo, kit.mat('#6E8F46', { rough: 0.9 }), reedSpots.length);
+  const rm = new THREE.Matrix4();
+  reedSpots.forEach((p, i) => {
+    rm.compose(new THREE.Vector3(p.x, -0.5, p.z), new THREE.Quaternion().setFromEuler(new THREE.Euler((rnd() - 0.5) * 0.25, 0, (rnd() - 0.5) * 0.25)), new THREE.Vector3(1, p.h, 1));
+    reeds.setMatrixAt(i, rm);
+  });
+  group.add(reeds);
+
   // Lagos ornamentais com borda de pedra e uma pequena cascata.
   const ponds = PONDS.map((p, i) => {
     const pw = water(kit, p.radius - 0.3, '#3896CF');
@@ -648,6 +664,20 @@ export function createWorld(kit: Kit): World {
   const grey = () => Math.min(0.85, Math.max(weather.cloud * 0.55, weather.rain * 0.7, weather.fog * 0.6));
   const sunK = () => Math.max(0.3, 1 - weather.cloud * 0.4 - weather.rain * 0.25 - weather.fog * 0.3);
   const ms = mist(kit);
+  // Grama em volta de quem anda: fora de caminhos, praça, água, lotes, convivência e da borda.
+  const pathCells = new Set<string>();
+  for (const l of parkPaths()) {
+    const half = PATH_WIDTH[l.kind] / 2 + 0.6;
+    for (const q of samplePath(l.points, 1)) for (let i = -Math.ceil(half); i <= Math.ceil(half); i++) for (let j = -Math.ceil(half); j <= Math.ceil(half); j++) if (i * i + j * j <= half * half) pathCells.add(`${Math.round(q.x) + i},${Math.round(q.z) + j}`);
+  }
+  const gr = createGrass(kit, heightAt, (x, z) => {
+    if (pathCells.has(`${Math.round(x)},${Math.round(z)}`)) return false;
+    const r = Math.hypot(x, z);
+    if (r < PLAZA_RADIUS + 1.5 || r > PARK_RADIUS + 25 || inWater(x, z, 0.8)) return false;
+    if (PARK_BUILDINGS.some((bd) => Math.hypot(x - bd.x, z - bd.z) < bd.radius * 0.9)) return false;
+    return !POIS.some((p) => Math.hypot(x - p.x, z - p.z) < 10);
+  });
+  root.add(gr.mesh);
   root.add(ms.mesh);
   // Borboletas nos jardins (Sul, pérgola, praça, mirante do lago) e folhas caindo no outono ou com vento.
   const bf = butterflies(kit, [[-30, 150], [-15, 148], [40, 145], [-45, 135], [15, 20], [-18, -14], [-78, 70], [-8, -128], [5, 175]].map(([x, z]) => ({ x: x! * PARK_SCALE, y: heightAt(x! * PARK_SCALE, z! * PARK_SCALE), z: z! * PARK_SCALE })));
@@ -689,6 +719,7 @@ export function createWorld(kit: Kit): World {
       });
       if (weather.rain > 0.02) rn.tick(dt, focus, weather.wind);
       ms.tick(focus, weather.fog, t);
+      gr.tick(cam, t, weather.wind);
       bf.tick(t, glowNow < 0.3 && weather.rain < 0.2 && weather.wind < 0.6);
       lv.tick(dt, t, focus, (season === 'autumn' ? 0.7 : 0) + Math.max(0, weather.wind - 0.45) * 1.4, weather.wind);
       wet += ((weather.rain > 0.1 ? 1 : 0) - wet) * Math.min(1, dt * (weather.rain > 0.1 ? 0.25 : 0.05));
@@ -722,6 +753,11 @@ export function createWorld(kit: Kit): World {
       kit.glowing.forEach((m) => (m.emissiveIntensity = 0.15 + l.glow * 1.6));
       setWaterNight(lk.water.mesh, l.glow * 0.8);
       f.waters.forEach((w) => setWaterNight(w, l.glow * 0.8));
+      // Céu e sol refletidos em todas as águas.
+      for (const m of [lk.water.mesh, ...lk.ponds.map((p) => p.mesh), ...f.waters]) {
+        setWaterNight(m, l.glow * 0.8);
+        setWaterSky(m, skyTop, skyBottom, sunDir, sun.color);
+      }
       clouds.forEach((c) => (c.material as THREE.MeshStandardMaterial).color.set(g > 0 ? (l.glow > 0.5 ? '#2E3446' : '#AAB4C0') : l.glow > 0.5 ? '#3A4466' : '#FFFFFF'));
     },
     setWeather: (w) => {
@@ -756,6 +792,7 @@ export function createWorld(kit: Kit): World {
       festive.visible = on;
     },
     setDetail: (q) => {
+      gr.setDensity(q === 'low' ? 0.35 : q === 'medium' ? 0.7 : 1);
       trees.setCount(q === 'low' ? 0.35 : q === 'medium' ? 0.7 : 1);
       bd.mesh.visible = q !== 'low';
       dr.group.visible = q !== 'low';

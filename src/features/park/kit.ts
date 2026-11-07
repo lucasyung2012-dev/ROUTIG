@@ -347,7 +347,7 @@ function tintedCrown(g: THREE.BufferGeometry, base: string, seed: number): THREE
 export interface Forest {
   group: THREE.Group;
   /** Balanço do vento nas copas (barato: só matrizes); `wind` de 0 a 1. */
-  tick: (t: number, wind?: number) => void;
+  tick: (t: number, wind?: number, cam?: THREE.Vector3) => void;
   setCount: (fraction: number) => void;
   setSeason: (crownColors: Partial<Record<TreeSpecies, string>>) => void;
 }
@@ -394,7 +394,7 @@ function leafTexture(): THREE.CanvasTexture {
  * cartões de folhagem (textura com transparência) virados para fora. Mais natural que esferas,
  * e mais leve (poucos triângulos por árvore).
  */
-function blobCrown(seed: number, blobs: number, spread: number, size: number, flat: number): THREE.BufferGeometry {
+function blobCrown(seed: number, blobs: number, spread: number, size: number, flat: number, density = 1): THREE.BufferGeometry {
   let s = seed;
   const r = () => ((s = (s * 9301 + 49297) % 233280) / 233280);
   const parts: THREE.BufferGeometry[] = [];
@@ -406,13 +406,15 @@ function blobCrown(seed: number, blobs: number, spread: number, size: number, fl
     const cx = Math.cos(a) * d;
     const cy = (r() - 0.4) * size * 0.6;
     const cz = Math.sin(a) * d;
-    const cards = 9 + Math.floor(r() * 5);
+    // De longe (density < 1): menos folhas, um pouco maiores, cobrindo o mesmo volume.
+    const cards = Math.max(3, Math.round((9 + Math.floor(r() * 5)) * density));
+    const grow = density < 1 ? 1 / Math.sqrt(density) * 0.85 : 1;
     for (let k = 0; k < cards; k++) {
       // Ponto na superfície do volume (mais em cima e dos lados que embaixo).
       const u = r() * Math.PI * 2;
       const v = Math.acos(1 - r() * 1.7);
       n.set(Math.sin(v) * Math.cos(u), Math.cos(v) * flat, Math.sin(v) * Math.sin(u)).normalize();
-      const cs = bs * (0.9 + r() * 0.5);
+      const cs = bs * (0.9 + r() * 0.5) * grow;
       const g = new THREE.PlaneGeometry(cs, cs);
       g.rotateZ(r() * Math.PI);
       g.lookAt(n);
@@ -478,13 +480,16 @@ function palmCrown(): THREE.BufferGeometry {
  * Espécies (V2.1: vegetação tropical predominante): copa larga irregular, árvore emergente grande
  * (10–20 m), conífera em camadas para o alto do Norte, ipê florido (decídua) e palmeira.
  */
-const SPECIES: Record<TreeSpecies, { trunkH: number; crown: () => THREE.BufferGeometry; crownY: number; color: string }> = {
-  round: { trunkH: 3, crown: () => blobCrown(3, 5, 1.8, 1.9, 0.75), crownY: 4.6, color: '#4C9A4F' },
-  conifer: { trunkH: 2, crown: () => blobCrown(7, 4, 0.9, 1.6, 1.6), crownY: 4.4, color: '#2F7A4A' },
-  slender: { trunkH: 9, crown: () => blobCrown(11, 7, 3.2, 2.4, 0.5), crownY: 10.5, color: '#5E9E4C' },
-  blossom: { trunkH: 2.6, crown: () => blobCrown(17, 5, 1.5, 1.5, 0.8), crownY: 4, color: '#F2A7C5' },
-  palm: { trunkH: 7, crown: palmCrown, crownY: 7.2, color: '#5DAF55' },
+const SPECIES: Record<TreeSpecies, { trunkH: number; crown: (density?: number) => THREE.BufferGeometry; crownY: number; color: string }> = {
+  round: { trunkH: 3, crown: (d) => blobCrown(3, 5, 1.8, 1.9, 0.75, d), crownY: 4.6, color: '#4C9A4F' },
+  conifer: { trunkH: 2, crown: (d) => blobCrown(7, 4, 0.9, 1.6, 1.6, d), crownY: 4.4, color: '#2F7A4A' },
+  slender: { trunkH: 9, crown: (d) => blobCrown(11, 7, 3.2, 2.4, 0.5, d), crownY: 10.5, color: '#5E9E4C' },
+  blossom: { trunkH: 2.6, crown: (d) => blobCrown(17, 5, 1.5, 1.5, 0.8, d), crownY: 4, color: '#F2A7C5' },
+  palm: { trunkH: 7, crown: () => palmCrown(), crownY: 7.2, color: '#5DAF55' },
 };
+
+/** Até onde a árvore aparece com todas as folhas e sombra; além disso, a versão leve (mesma forma e cor). */
+const TREE_NEAR = 170;
 
 export function forest(kit: Kit, plants: Plant[]): Forest {
   const group = new THREE.Group();
@@ -492,57 +497,94 @@ export function forest(kit: Kit, plants: Plant[]): Forest {
   const leaves = kit.own(leafTexture());
   const bySpecies = new Map<TreeSpecies, Plant[]>();
   plants.forEach((p) => bySpecies.set(p.species, [...(bySpecies.get(p.species) ?? []), p]));
-  const crowns: Array<{ mesh: THREE.InstancedMesh; list: Plant[]; crownY: number; species: TreeSpecies }> = [];
-  const trunks: THREE.InstancedMesh[] = [];
-  const m4 = new THREE.Matrix4();
+  const sway = { uTime: { value: 0 }, uWind: { value: 0 } };
+  // Por espécie: perto (todas as folhas, galhos, sombra) e longe (menos folhas maiores, tronco simples, sem sombra).
+  type TreeSet = { list: Plant[]; trunkM: THREE.Matrix4[]; crownM: THREE.Matrix4[]; near: [THREE.InstancedMesh, THREE.InstancedMesh]; far: [THREE.InstancedMesh, THREE.InstancedMesh]; species: TreeSpecies; mat: THREE.MeshStandardMaterial };
+  const sets: TreeSet[] = [];
   bySpecies.forEach((list, sp) => {
     const def = SPECIES[sp];
     const trunkGeo = kit.own(sp === 'palm' ? (() => { const g = new THREE.CylinderGeometry(0.14, 0.24, def.trunkH, 8); g.translate(0, def.trunkH / 2, 0); return g; })() : trunkWithBranches(def.trunkH, sp === 'slender' ? 2.4 : 1.2, sp.length * 31));
-    const trunk = new THREE.InstancedMesh(trunkGeo, trunkMat, list.length);
+    const farTrunkGeo = kit.own((() => { const g = new THREE.CylinderGeometry(sp === 'palm' ? 0.14 : 0.13, sp === 'palm' ? 0.24 : 0.26, def.trunkH, 5, 1, true); g.translate(0, def.trunkH / 2, 0); return g; })());
     const crownGeo = kit.own(tintedCrown(def.crown(), '#ffffff', sp.length));
+    const farCrownGeo = kit.own(tintedCrown(def.crown(0.35), '#ffffff', sp.length));
     const crownMat = kit.own(new THREE.MeshStandardMaterial({ color: def.color, vertexColors: true, roughness: 0.85, map: leaves, alphaTest: 0.42, side: THREE.DoubleSide }));
-    const crown = new THREE.InstancedMesh(crownGeo, crownMat, list.length);
-    list.forEach((p, i) => {
-      m4.compose(new THREE.Vector3(p.x, p.y ?? 0, p.z), new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), p.x * 1.7 + p.z), new THREE.Vector3(p.s, p.s, p.s));
-      trunk.setMatrixAt(i, m4);
-    });
-    trunk.castShadow = crown.castShadow = true;
-    trunk.receiveShadow = true;
-    group.add(trunk, crown);
-    trunks.push(trunk);
-    crowns.push({ mesh: crown, list, crownY: def.crownY, species: sp });
+    // Balanço das copas no vento calculado na placa de vídeo (sem recalcular as árvores no processador).
+    crownMat.onBeforeCompile = (sh) => {
+      sh.uniforms.uTime = sway.uTime;
+      sh.uniforms.uWind = sway.uWind;
+      sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nuniform float uTime;\nuniform float uWind;').replace(
+        '#include <begin_vertex>',
+        `#include <begin_vertex>
+        vec4 ip = instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0);
+        float sw = sin(uTime * (1.1 + uWind * 1.8) + ip.x * 0.3 + ip.z * 0.2) * (0.04 + uWind * 0.13) + uWind * 0.05;
+        transformed.z += sw * position.y;
+        transformed.x -= sw * 0.7 * position.y;`,
+      );
+    };
+    const mk = (geo: THREE.BufferGeometry, mat: THREE.Material, shadow: boolean) => {
+      const m = new THREE.InstancedMesh(geo, mat, list.length);
+      m.count = 0;
+      m.castShadow = shadow;
+      m.receiveShadow = shadow;
+      m.frustumCulled = false;
+      group.add(m);
+      return m;
+    };
+    const yaw = new THREE.Vector3(0, 1, 0);
+    const trunkM = list.map((p) => new THREE.Matrix4().compose(new THREE.Vector3(p.x, p.y ?? 0, p.z), new THREE.Quaternion().setFromAxisAngle(yaw, p.x * 1.7 + p.z), new THREE.Vector3(p.s, p.s, p.s)));
+    const crownM = list.map((p) => new THREE.Matrix4().compose(new THREE.Vector3(p.x, (p.y ?? 0) + def.crownY * p.s, p.z), new THREE.Quaternion().setFromAxisAngle(yaw, p.x * 1.7 + p.z), new THREE.Vector3(p.s, p.s, p.s)));
+    sets.push({ list, trunkM, crownM, near: [mk(trunkGeo, trunkMat, true), mk(crownGeo, crownMat, true)], far: [mk(farTrunkGeo, trunkMat, false), mk(farCrownGeo, crownMat, false)], species: sp, mat: crownMat });
   });
-  const q = new THREE.Quaternion();
-  const e = new THREE.Euler();
-  const pos = new THREE.Vector3();
-  const sc = new THREE.Vector3();
-  const tick = (t: number, wind = 0) => {
-    for (const c of crowns) {
-      c.list.forEach((p, i) => {
-        if (i >= c.mesh.count) return;
-        const sway = Math.sin(t * (1.1 + wind * 1.8) + p.x * 0.3 + p.z * 0.2) * (0.04 + wind * 0.13) + wind * 0.05;
-        e.set(sway, 0, sway * 0.7);
-        q.setFromEuler(e);
-        pos.set(p.x, (p.y ?? 0) + c.crownY * p.s, p.z);
-        sc.setScalar(p.s);
-        m4.compose(pos, q, sc);
-        c.mesh.setMatrixAt(i, m4);
-      });
-      c.mesh.instanceMatrix.needsUpdate = true;
+  let fraction = 1;
+  let lastX = Infinity;
+  let lastZ = Infinity;
+  let dirty = true;
+  const place = (cx: number, cz: number) => {
+    for (const st of sets) {
+      const n = Math.max(1, Math.round(st.list.length * fraction));
+      let a = 0;
+      let b = 0;
+      for (let i = 0; i < n; i++) {
+        const p = st.list[i]!;
+        if (Math.hypot(p.x - cx, p.z - cz) < TREE_NEAR) {
+          st.near[0].setMatrixAt(a, st.trunkM[i]!);
+          st.near[1].setMatrixAt(a++, st.crownM[i]!);
+        } else {
+          st.far[0].setMatrixAt(b, st.trunkM[i]!);
+          st.far[1].setMatrixAt(b++, st.crownM[i]!);
+        }
+      }
+      for (const m of st.near) {
+        m.count = a;
+        m.instanceMatrix.needsUpdate = true;
+      }
+      for (const m of st.far) {
+        m.count = b;
+        m.instanceMatrix.needsUpdate = true;
+      }
     }
   };
-  tick(0);
+  place(0, 0);
+  const tick = (t: number, wind = 0, cam?: THREE.Vector3) => {
+    sway.uTime.value = t;
+    sway.uWind.value = wind;
+    // Troca perto/longe só quando a câmera anda (a cada 12 m), não a cada quadro.
+    if (cam && (dirty || Math.hypot(cam.x - lastX, cam.z - lastZ) > 12)) {
+      lastX = cam.x;
+      lastZ = cam.z;
+      dirty = false;
+      place(cam.x, cam.z);
+    }
+  };
   return {
     group,
     tick,
     setCount: (f) => {
-      crowns.forEach((c, i) => {
-        const n = Math.max(1, Math.round(c.list.length * f));
-        c.mesh.count = n;
-        trunks[i]!.count = n;
-      });
+      fraction = f;
+      dirty = true;
+      place(Number.isFinite(lastX) ? lastX : 0, Number.isFinite(lastZ) ? lastZ : 0);
     },
-    setSeason: (colors) => crowns.forEach((c) => colors[c.species] && (c.mesh.material as THREE.MeshStandardMaterial).color.set(colors[c.species]!)),
+    setSeason: (colors) => sets.forEach((c) => colors[c.species] && c.mat.color.set(colors[c.species]!)),
   };
 }
 

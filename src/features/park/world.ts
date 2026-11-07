@@ -605,7 +605,7 @@ export function createWorld(kit: Kit): World {
     { x: 0, z: 0, r: 1.2, h: 9 },
   ];
   const ticks: Array<(t: number) => void> = [];
-  const lodItems: Array<{ obj: THREE.Object3D; x: number; z: number; far: number }> = [];
+  const lodItems: Array<{ obj: THREE.Object3D; x: number; z: number; far: number; base?: number; invert?: boolean }> = [];
   for (const def of PARK_BUILDINGS) {
     const make = DETAILED[def.id];
     let group: THREE.Group;
@@ -618,6 +618,8 @@ export function createWorld(kit: Kit): World {
       // Os andares de cima por fora, iguais aos de dentro (seção 10).
       const up = upperFloors(kit, def.id, FLOOR_PLANS[def.id]?.length ?? 0, d.top - 2, d.core, def.color);
       d.group.add(up.group);
+      // Fachada peça a peça de perto; de longe, o mesmo volume e as mesmas cores, mais leve.
+      if (up.near && up.far) lodItems.push({ obj: up.near, x: def.x, z: def.z, far: 240, base: 240 }, { obj: up.far, x: def.x, z: def.z, far: 240, base: 240, invert: true });
       top = up.top;
       core = d.core;
       if (d.tick) ticks.push(d.tick);
@@ -732,7 +734,7 @@ export function createWorld(kit: Kit): World {
       lk.water.tick(t * 0.6);
       lk.ponds.forEach((p) => p.tick(t * 0.8));
       ticks.forEach((fn) => fn(t));
-      trees.tick(t, weather.wind);
+      trees.tick(t, weather.wind, cam);
       bd.tick(t);
       dr.tick(t);
       clouds.forEach((c, i) => {
@@ -755,7 +757,7 @@ export function createWorld(kit: Kit): World {
       // A sombra acompanha onde a câmera olha (um mapa de sombra pequeno e nítido).
       sun.target.position.copy(focus);
       sun.position.copy(focus).addScaledVector(sunDir, 200);
-      for (const l of lodItems) l.obj.visible = Math.hypot(cam.x - l.x, cam.z - l.z) < l.far;
+      for (const l of lodItems) l.obj.visible = Math.hypot(cam.x - l.x, cam.z - l.z) < l.far !== !!l.invert;
     },
     setLight: (l) => {
       glowNow = l.glow;
@@ -820,7 +822,7 @@ export function createWorld(kit: Kit): World {
       dr.group.visible = q !== 'low';
       clouds.forEach((c, i) => (c.visible = q === 'high' || i % 2 === 0));
       const far = q === 'low' ? 0.6 : 1;
-      lodItems.forEach((l) => (l.far = (l.obj instanceof THREE.InstancedMesh ? 150 : 190) * far));
+      lodItems.forEach((l) => (l.far = (l.base ?? (l.obj instanceof THREE.InstancedMesh ? 150 : 190)) * far));
     },
   };
 }

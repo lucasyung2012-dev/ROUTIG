@@ -14,10 +14,13 @@ import { FORMS, apothem, circle, facade, facadeMats, levelRot, levelScale, outli
 
 const STOREY = 4.4;
 
-export function upperFloors(kit: Kit, id: ModuleId, levels: number, base: number, core: number, accent: string): { group: THREE.Group; top: number } {
+export function upperFloors(kit: Kit, id: ModuleId, levels: number, base: number, core: number, accent: string): { group: THREE.Group; top: number; near: THREE.Object3D | null; far: THREE.Object3D | null } {
   const g = new THREE.Group();
   const b = new Builder();
-  if (levels <= 0) return { group: g, top: base };
+  // Detalhe de perto (fachada peça a peça, guarda-corpos, floreiras, frisos) e versão de longe.
+  const bd = new Builder();
+  const bf = new Builder();
+  if (levels <= 0) return { group: g, top: base, near: null, far: null };
   const form = FORMS[id];
   const glass = kit.mat('#B9DCEF', { glass: true, side: THREE.DoubleSide });
   const metal = kit.mat('#A8B3C0', { metal: 0.85, rough: 0.3 });
@@ -60,24 +63,33 @@ export function upperFloors(kit: Kit, id: ModuleId, levels: number, base: number
         const q = below[(i + 1) % below.length]!;
         const len = Math.hypot(q[0] - p[0], q[1] - p[1]);
         const ang = Math.atan2(q[0] - p[0], q[1] - p[1]);
-        b.add(kit.mat('#CFE7F5', { glass: true }), new THREE.BoxGeometry(0.04, 1.0, len), [(p[0] + q[0]) / 2, y + 0.85, (p[1] + q[1]) / 2], [0, ang, 0]);
-        b.add(metal, new THREE.BoxGeometry(0.07, 0.06, len), [(p[0] + q[0]) / 2, y + 1.37, (p[1] + q[1]) / 2], [0, ang, 0]);
+        bd.add(kit.mat('#CFE7F5', { glass: true }), new THREE.BoxGeometry(0.04, 1.0, len), [(p[0] + q[0]) / 2, y + 0.85, (p[1] + q[1]) / 2], [0, ang, 0]);
+        bd.add(metal, new THREE.BoxGeometry(0.07, 0.06, len), [(p[0] + q[0]) / 2, y + 1.37, (p[1] + q[1]) / 2], [0, ang, 0]);
       }
       for (let k = 0; k < 10; k++) {
         const a = (k / 10) * Math.PI * 2 + L;
         const tr = r + 0.9;
-        b.add(stone, new THREE.BoxGeometry(1.2, 0.5, 0.5), [Math.sin(a) * tr, y + 0.6, Math.cos(a) * tr], [0, a, 0]);
-        b.add(leaf, new THREE.IcosahedronGeometry(0.4, 1), [Math.sin(a) * tr, y + 1.0, Math.cos(a) * tr], [0, 0, 0], [1.4, 0.8, 0.7]);
+        bd.add(stone, new THREE.BoxGeometry(1.2, 0.5, 0.5), [Math.sin(a) * tr, y + 0.6, Math.cos(a) * tr], [0, a, 0]);
+        bd.add(leaf, new THREE.IcosahedronGeometry(0.4, 1), [Math.sin(a) * tr, y + 1.0, Math.cos(a) * tr], [0, 0, 0], [1.4, 0.8, 0.7]);
       }
     }
     // Fachada do andar no tipo do prédio; por trás, as salas acesas à noite.
-    facade(b, form, fm, r, rot, y + 0.35, STOREY - 0.35);
+    facade(bd, form, fm, r, rot, y + 0.35, STOREY - 0.35);
+    // De longe: o mesmo volume, nas mesmas cores (parapeito, faixa de vidro, verga), sem as peças miúdas.
+    {
+      const h = STOREY - 0.35;
+      const ar = apothem(form.sides, r) * (form.sides >= 3 ? 1 / Math.cos(Math.PI / form.sides) : 1);
+      const solid = form.facade === 'stone' || form.facade === 'brick' || form.facade === 'panel';
+      bf.add(solid ? fm.frame : fm.metal, prism(ar, 0.95, L), [0, y + 0.35 + 0.475, 0]);
+      bf.add(fm.glass, prism(ar - 0.05, 1.9, L), [0, y + 0.35 + 1.9, 0]);
+      bf.add(solid ? fm.frame : fm.metal, prism(ar, h - 2.85, L), [0, y + 0.35 + 2.85 + (h - 2.85) / 2, 0]);
+    }
     b.add(warm, prism(apothem(form.sides, r) - 0.7, (STOREY - 0.35) * 0.5, L), [0, y + 0.35 + (STOREY - 0.35) * 0.5, 0]);
     // Friso de luz da cor do prédio na borda da laje.
     for (let i = 0; i < own.length; i++) {
       const p = own[i]!;
       const q = own[(i + 1) % own.length]!;
-      b.add(glow, new THREE.BoxGeometry(0.06, 0.06, Math.hypot(q[0] - p[0], q[1] - p[1])), [(p[0] + q[0]) / 2, y + STOREY - 0.02, (p[1] + q[1]) / 2], [0, Math.atan2(q[0] - p[0], q[1] - p[1]), 0]);
+      bd.add(glow, new THREE.BoxGeometry(0.06, 0.06, Math.hypot(q[0] - p[0], q[1] - p[1])), [(p[0] + q[0]) / 2, y + STOREY - 0.02, (p[1] + q[1]) / 2], [0, Math.atan2(q[0] - p[0], q[1] - p[1]), 0]);
     }
     y += STOREY;
   }
@@ -233,6 +245,9 @@ export function upperFloors(kit: Kit, id: ModuleId, levels: number, base: number
       for (let k = 0; k < 6; k++) b.add(metal, new THREE.CylinderGeometry(0.08, 0.08, 2.6, 6), [Math.sin((k / 6) * Math.PI * 2) * (r + 1.6), top + 1.3, Math.cos((k / 6) * Math.PI * 2) * (r + 1.6)]);
     }
   }
-  g.add(b.build());
-  return { group: g, top: top + 6 };
+  const near = bd.build();
+  const far = bf.build(false);
+  far.visible = false;
+  g.add(b.build(), near, far);
+  return { group: g, top: top + 6, near, far };
 }

@@ -789,12 +789,19 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
         avatar.group.visible = false;
         world.setLight(lightAt(12));
         world.tick(0, 0, new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 60, 0));
+        // Sombra do parque inteiro (senão aparece a borda da área de sombra como uma faixa).
+        const sc = world.sun.shadow.camera;
+        const box = [sc.left, sc.right, sc.top, sc.bottom, sc.far];
+        Object.assign(sc, { left: -half, right: half, top: half, bottom: -half, far: 900 });
+        sc.updateProjectionMatrix();
         renderer.setRenderTarget(rt);
         renderer.render(outside, cam);
         const buf = new Uint8Array(px * px * 4);
         renderer.readRenderTargetPixels(rt, 0, 0, px, px, buf);
         renderer.setRenderTarget(null);
         rt.dispose();
+        Object.assign(sc, { left: box[0], right: box[1], top: box[2], bottom: box[3], far: box[4] });
+        sc.updateProjectionMatrix();
         outside.fog = fog;
         crowd.group.visible = crowdVis;
         avatar.group.visible = avatarVis;
@@ -807,6 +814,15 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
         // A leitura vem de baixo para cima: vira as linhas.
         for (let y = 0; y < px; y++) img.data.set(buf.subarray((px - 1 - y) * px * 4, (px - y) * px * 4), y * px * 4);
         g.putImageData(img, 0, 0);
+        // Mais contraste e cor (a foto sai sem o ajuste de tons da tela).
+        const out = document.createElement('canvas');
+        out.width = out.height = px;
+        const o = out.getContext('2d');
+        if (o) {
+          o.filter = 'contrast(1.3) saturate(1.35) brightness(0.88)';
+          o.drawImage(c, 0, 0);
+          return out.toDataURL('image/jpeg', 0.85);
+        }
         return c.toDataURL('image/jpeg', 0.85);
       } catch {
         return null;

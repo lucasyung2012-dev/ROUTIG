@@ -713,11 +713,25 @@ export function createWorld(kit: Kit): World {
       const body = bodyRadius(d.group);
       const levels = FLOOR_PLANS[def.id]?.length ?? 0;
       // Torre do elevador e lounge no lado livre e mais plano do prédio, com calçada até o caminho.
-      const spot = liftSpot(def, Math.max(6, Math.min(d.core * 0.82, body)), toWorld);
+      // Parede do térreo em cada direção (raios no próprio prédio, ainda no referencial dele).
+      d.group.updateMatrixWorld(true);
+      const ray = new THREE.Raycaster();
+      const wallAt = (a: number) => {
+        const far = def.radius * 1.6;
+        const rs = [-1, 0, 1].map((side) => {
+          ray.set(new THREE.Vector3(Math.sin(a) * far + Math.cos(a) * side, 1.3, Math.cos(a) * far - Math.sin(a) * side), new THREE.Vector3(-Math.sin(a), 0, -Math.cos(a)));
+          ray.far = far;
+          const hit = ray.intersectObject(d.group, true).find((h) => (h.object as THREE.Mesh).isMesh && !(h.object as THREE.InstancedMesh).isInstancedMesh);
+          return hit ? far - hit.distance : 0;
+        });
+        return rs.sort((u, v) => u - v)[1]!;
+      };
+      const spot = liftSpot(def, Math.max(6, Math.min(d.core * 0.82, body)), toWorld, wallAt);
       if (levels > 0) lifts.push({ id: def.id, x: spot.pad.x, z: spot.pad.z });
       if (levels > 0) liftAccess(spot, clearZones, liftWalk, kit.mat('#D8D1C3', { rough: 0.85 }));
       const up = upperFloors(kit, def.id, levels, d.top - 2, d.core, def.color, body, (lx, lz) => !onPath(toWorld(lx, lz).x, toWorld(lx, lz).z, 0.6), {
         angle: spot.angle,
+        dist: spot.dist,
         ground: (lx, lz) => {
           const p = toWorld(lx, lz);
           return heightAt(p.x, p.z) - gy;
@@ -1022,14 +1036,17 @@ function plazaSeats(): Seat[] {
  * chão mais plano; de preferência nos fundos. Devolve o ângulo (local do prédio, 0 = frente), o
  * centro do lounge e a porta do pavilhão (no mundo).
  */
-function liftSpot(def: ParkBuilding, r0: number, toWorld: (lx: number, lz: number) => Point): { angle: number; pad: Point; door: Point } {
+function liftSpot(def: ParkBuilding, r0: number, toWorld: (lx: number, lz: number) => Point, wallAt: (a: number) => number): { angle: number; pad: Point; door: Point; dist: number } {
   const at = (a: number, rr: number, side: number) => toWorld(Math.sin(a) * rr + Math.cos(a) * side, Math.cos(a) * rr - Math.sin(a) * side);
+  // A torre fica fora da parede do térreo daquele lado (o térreo pode ser maior que os andares).
+  const distAt = (a: number) => Math.max(r0, wallAt(a)) + 2.8;
   let best = { angle: Math.PI, score: Infinity };
   for (const da of [0, 0.35, -0.35, 0.7, -0.7, 1.05, -1.05, 1.4, -1.4, 1.75, -1.75]) {
     const a = Math.PI + da;
+    const D = distAt(a);
     let score = Math.abs(da) * 4;
     const hs: number[] = [];
-    for (const rr of [r0 + 6.4, r0 + 3.4, r0 + 1, r0 - 3.5])
+    for (const rr of [D + 4.2, D + 1.2, D - 1.2])
       for (const side of [-5, -2.5, 0, 2.5, 5]) {
         const p = at(a, rr, side);
         hs.push(heightAt(p.x, p.z));
@@ -1043,7 +1060,8 @@ function liftSpot(def: ParkBuilding, r0: number, toWorld: (lx: number, lz: numbe
     if (score < best.score) best = { angle: a, score };
   }
   const a = best.angle;
-  return { angle: a, pad: at(a, r0 + 1, 0), door: at(a, r0 + 2.2, -4.8) };
+  const D = distAt(a);
+  return { angle: a, pad: at(a, D - 1.2, 0), door: at(a, D, -4.8), dist: D };
 }
 
 /** Calçada de placas de pedra da porta do lounge até o caminho mais perto (sem passar por água). */

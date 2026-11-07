@@ -20,6 +20,8 @@ const STOREY = 4.4;
  */
 export interface LiftSpot {
   angle: number;
+  /** Distância do centro do prédio ao centro da torre (fora da parede do térreo). */
+  dist?: number;
   ground: (lx: number, lz: number) => number;
 }
 
@@ -155,7 +157,7 @@ export function upperFloors(kit: Kit, id: ModuleId, levels: number, base: number
     for (let k = -4; k <= 4; k++) b.add(fm.frame, new THREE.BoxGeometry(0.18, top - base, 0.9), [k * r * 0.12, base + (top - base) / 2, apothem(form.sides, r0 * levelScale(form, 1)) + 0.6]);
   }
   // Torre do elevador nos fundos, com as pontes de cada andar.
-  const tz = -(r0 + 2.2);
+  const tz = -(lift.dist ?? r0 + 2.2);
   // Chão do lounge: nivelado pelo ponto mais alto (com base de pedra até o mais baixo).
   const ry = lift.angle - Math.PI;
   const groundAt = (x: number, z: number) => lift.ground(x * Math.cos(ry) + z * Math.sin(ry), -x * Math.sin(ry) + z * Math.cos(ry));

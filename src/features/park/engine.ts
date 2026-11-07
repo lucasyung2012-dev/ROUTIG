@@ -124,7 +124,9 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
 
   const kit = new Kit();
   const outside = new THREE.Scene();
+  const built0 = performance.now();
   const world = createWorld(kit);
+  const buildMs = performance.now() - built0;
   outside.add(world.root);
   outside.fog = new THREE.Fog('#DCEFF8', 320, 950);
 
@@ -133,6 +135,8 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
   pmrem.dispose();
 
   const camera = new THREE.PerspectiveCamera(48, 1, 0.3, 2800);
+  // Diagnóstico (só com ?debug na URL): medir o peso da cena no navegador.
+  if (/[?&]debug/.test(location.search)) (window as unknown as Record<string, unknown>).__park = { outside, renderer, camera, buildMs, inside: () => inside };
   const rig = createCameraRig(camera, canvas, opts.reduceMotion, opts.onPosture);
   const outsideWorld = () => rig.setWorld({ ground: heightAt, obstacles: world.obstacles, limit: { x: 0, z: 0, r: PARK_RADIUS + 30 }, ceiling: Infinity, minDistance: 4, maxDistance: 520, blocked: (x, z) => inWater(x, z, 0.8) });
   outsideWorld();

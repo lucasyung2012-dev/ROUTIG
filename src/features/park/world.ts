@@ -5,7 +5,7 @@
  */
 import * as THREE from 'three';
 import type { ModuleId } from '@/app/modules';
-import { LAKE, PARK_BUILDINGS, PARK_RADIUS, PARK_SCALE, PATH_WIDTH, PLAZA_RADIUS, POIS, PONDS, entranceOf, facingOf, heightAt, inWater, lakeRadiusAt, parkPaths, samplePath, seededRandom, treePositions, type ParkBuilding, type Point } from '@/domain/park';
+import { LAKE, PARK_BUILDINGS, PARK_RADIUS, PARK_SCALE, PATH_WIDTH, PLAZA_RADIUS, POIS, PONDS, entranceOf, facingOf, heightAt, inWater, inField, isFreeGround, lakeRadiusAt, parkPaths, samplePath, seededRandom, treePositions, type ParkBuilding, type Point } from '@/domain/park';
 import { amenities, houses, sportsFields, type Seat, type Viewpoint } from './buildings/amenities';
 import { Builder, Kit, cloud, forest, setWaterNight, setWaterSky, setWaterWeather, shrubs, sky, stars, water, type Plant, type TreeSpecies } from './kit';
 import { birds, butterflies, drone, fountain, leaves, rain } from './life';
@@ -339,7 +339,7 @@ function paths(kit: Kit): { group: THREE.Group; lamps: Point[] } {
   const all = parkPaths().flatMap((l) => samplePath(l.points, 2).map((q) => ({ ...q, w: PATH_WIDTH[l.kind] })));
   const kept: Point[] = [];
   for (const l of lamps) {
-    if (inWater(l.x, l.z, 1.5) || PARK_BUILDINGS.some((bd) => Math.hypot(l.x - bd.x, l.z - bd.z) < bd.radius * 0.9)) continue;
+    if (inField(l.x, l.z, 2) || inWater(l.x, l.z, 1.5) || PARK_BUILDINGS.some((bd) => Math.hypot(l.x - bd.x, l.z - bd.z) < bd.radius * 0.9)) continue;
     if (all.some((q) => Math.hypot(q.x - l.x, q.z - l.z) < q.w / 2 + 0.6)) continue;
     if (kept.some((o) => Math.hypot(o.x - l.x, o.z - l.z) < 9)) continue;
     kept.push(l);
@@ -523,28 +523,47 @@ function meadows(kit: Kit): THREE.Object3D[] {
   const rnd = seededRandom(17);
   const flowers: Array<{ x: number; y?: number; z: number; s: number; color: string }> = [];
   const bushes: typeof flowers = [];
-  const pathPts = parkPaths().flatMap((p) => samplePath(p.points, 6));
-  const free = (x: number, z: number) =>
-    Math.hypot(x, z) > PLAZA_RADIUS + 3 && !inWater(x, z, 3) && !PARK_BUILDINGS.some((b) => Math.hypot(x - b.x, z - b.z) < b.radius) && !pathPts.some((q) => Math.abs(q.x - x) < 3 && Math.abs(q.z - z) < 3);
-  // Canteiros em manchas (mais no Oeste, o lado dos jardins).
-  for (let k = 0; k < 70; k++) {
+  const put = (list: typeof flowers, x: number, z: number, s: number, color: string, pad = 0.4) => {
+    if (isFreeGround(x, z, pad)) list.push({ x, y: heightAt(x, z), z, s, color });
+  };
+  // Jardins de frente de cada prédio (V2.1, 6.2): duas fileiras de flores e uma de arbustos
+  // acompanhando o lote, abrindo espaço para a entrada.
+  const palettes = [['#F472B6', '#FBBF24', '#FFFFFF'], ['#C084FC', '#FDE68A', '#FFFFFF'], ['#F87171', '#FBBF24', '#FDBA74'], ['#60A5FA', '#FFFFFF', '#F9A8D4']];
+  PARK_BUILDINGS.forEach((b, bi) => {
+    const face = facingOf(b);
+    const pal = palettes[bi % palettes.length]!;
+    for (let a = -1.25; a <= 1.25; a += 0.045) {
+      if (Math.abs(a) < 0.22) continue;
+      const ang = face + a;
+      for (let row = 0; row < 2; row++) {
+        const rr = b.radius * 0.94 + 0.6 + row * 0.9;
+        put(flowers, b.x + Math.sin(ang) * rr, b.z + Math.cos(ang) * rr, 1.1, pal[(row + Math.floor(a * 10)) % pal.length]!, 0.2);
+      }
+    }
+    for (let a = -1.3; a <= 1.3; a += 0.13) {
+      if (Math.abs(a) < 0.26) continue;
+      const ang = face + a;
+      const rr = b.radius * 0.94 + 3.2;
+      put(bushes, b.x + Math.sin(ang) * rr, b.z + Math.cos(ang) * rr, 0.75 + rnd() * 0.3, rnd() > 0.5 ? '#3E8E4A' : '#4F9F55', 0.3);
+    }
+  });
+  // Jardins ornamentais do Sul (canteiros quadrados com flores em linhas e arbustos nos cantos).
+  for (const c of [POIS.find((p) => p.id === 'pergola-sul')!, POIS.find((p) => p.id === 'cafe-sul')!]) {
+    for (const [dx, dz] of [[-16, -6], [16, -6], [-16, 10], [16, 10]] as const) {
+      const cx = c.x + dx;
+      const cz = c.z + dz;
+      const pal = palettes[Math.abs(dx + dz) % palettes.length]!;
+      for (let i = 0; i < 7; i++) for (let j = 0; j < 7; j++) put(flowers, cx - 3 + i, cz - 3 + j, 1.15, pal[(i + j) % pal.length]!, 0.2);
+      for (const [ex, ez] of [[-4, -4], [4, -4], [-4, 4], [4, 4]] as const) put(bushes, cx + ex, cz + ez, 0.9, '#3E8E4A', 0.2);
+    }
+  }
+  // Moitas soltas de vegetação nativa (só em chão livre, longe dos caminhos).
+  for (let k = 0; k < 260; k++) {
     const a = rnd() * Math.PI * 2;
-    const r = 30 + rnd() * (PARK_RADIUS - 40);
-    const cx = Math.sin(a) * r;
-    const cz = Math.cos(a) * r;
-    const west = cz > 60; // Sul: jardins ornamentais com mais flores
-    const palette = west ? ['#F472B6', '#FBBF24', '#FFFFFF', '#C084FC', '#F87171'] : ['#FBBF24', '#FFFFFF', '#60A5FA', '#F472B6'];
-    for (let i = 0; i < (west ? 60 : 32); i++) {
-      const x = cx + (rnd() - 0.5) * 9;
-      const z = cz + (rnd() - 0.5) * 9;
-      if (!free(x, z)) continue;
-      flowers.push({ x, y: heightAt(x, z), z, s: 1.1, color: palette[i % palette.length]! });
-    }
-    for (let i = 0; i < 5; i++) {
-      const x = cx + (rnd() - 0.5) * 12;
-      const z = cz + (rnd() - 0.5) * 12;
-      if (free(x, z)) bushes.push({ x, y: heightAt(x, z), z, s: 0.9 + rnd() * 0.9, color: rnd() > 0.5 ? '#3E8E4A' : '#4F9F55' });
-    }
+    const r = 40 + rnd() * (PARK_RADIUS - 50);
+    const x = Math.sin(a) * r;
+    const z = Math.cos(a) * r;
+    for (let i = 0; i < 3; i++) put(bushes, x + (rnd() - 0.5) * 3, z + (rnd() - 0.5) * 3, 0.7 + rnd() * 0.8, rnd() > 0.5 ? '#3E8E4A' : '#5A9A50', 1.5);
   }
   return [shrubs(kit, flowers, 'flower'), shrubs(kit, bushes, 'bush')];
 }
@@ -666,18 +685,12 @@ export function createWorld(kit: Kit): World {
   const grey = () => Math.min(0.85, Math.max(weather.cloud * 0.55, weather.rain * 0.7, weather.fog * 0.6));
   const sunK = () => Math.max(0.3, 1 - weather.cloud * 0.4 - weather.rain * 0.25 - weather.fog * 0.3);
   const ms = mist(kit);
-  // Grama em volta de quem anda: fora de caminhos, praça, água, lotes, convivência e da borda.
-  const pathCells = new Set<string>();
-  for (const l of parkPaths()) {
-    const half = PATH_WIDTH[l.kind] / 2 + 0.6;
-    for (const q of samplePath(l.points, 1)) for (let i = -Math.ceil(half); i <= Math.ceil(half); i++) for (let j = -Math.ceil(half); j <= Math.ceil(half); j++) if (i * i + j * j <= half * half) pathCells.add(`${Math.round(q.x) + i},${Math.round(q.z) + j}`);
-  }
+  // Grama em volta de quem anda: só em gramados, fora de caminhos, praça, água, lotes, quadras e convivência.
   const gr = createGrass(kit, heightAt, (x, z) => {
-    if (pathCells.has(`${Math.round(x)},${Math.round(z)}`)) return false;
-    const r = Math.hypot(x, z);
-    if (r < PLAZA_RADIUS + 1.5 || r > PARK_RADIUS + 25 || inWater(x, z, 0.8)) return false;
-    if (PARK_BUILDINGS.some((bd) => Math.hypot(x - bd.x, z - bd.z) < bd.radius * 0.9)) return false;
-    return !POIS.some((p) => Math.hypot(x - p.x, z - p.z) < 10);
+    if (!isFreeGround(x, z, 0.2)) return false;
+    // Gramados em manchas (como um gramado de verdade, não grama alta em todo lugar).
+    const n = Math.sin(x * 0.045) + Math.sin(z * 0.052 + 1.3) + Math.sin((x + z) * 0.027 + 0.4);
+    return n > -0.4;
   });
   root.add(gr.mesh);
   root.add(ms.mesh);
@@ -703,7 +716,8 @@ export function createWorld(kit: Kit): World {
     buildings,
     obstacles,
     pickables: [...buildings.values()].map((b) => b.group),
-    seats: am.seats,
+    // Todos os bancos do parque servem para sentar (inclusive os da praça).
+    seats: [...am.seats, ...plazaSeats()],
     treeSpots: plantList,
     viewpoints: am.viewpoints,
     spots: am.spots,
@@ -834,4 +848,14 @@ function walkway(kit: Kit, a?: ParkBuilding, c?: ParkBuilding): THREE.Group {
     }
   }
   return b.build();
+}
+
+/** Assentos dos bancos da praça (mesmas posições do desenho da praça). */
+function plazaSeats(): Seat[] {
+  const out: Seat[] = [];
+  for (let i = 0; i < 16; i += 2) {
+    const a = (i / 16) * Math.PI * 2 + Math.PI / 16;
+    out.push({ x: Math.sin(a) * 17.2, y: 0.56, z: Math.cos(a) * 17.2, face: a + Math.PI });
+  }
+  return out;
 }

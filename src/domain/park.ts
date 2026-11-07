@@ -198,6 +198,17 @@ export function inField(x: number, z: number, pad = 0): boolean {
 
 export function heightAt(x: number, z: number): number {
   let h = rawHeight(x, z);
+  // Lago e lagos ornamentais em terreno baixo: o relevo em volta desce até a margem
+  // (sem morro cobrindo metade da água).
+  {
+    const dl = Math.hypot(x - LAKE.x, z - LAKE.z);
+    const lr = lakeRadiusAt(Math.atan2(z - LAKE.z, x - LAKE.x));
+    if (dl < lr + 40) h *= smooth(lr + 4, lr + 40, dl);
+    for (const p of PONDS) {
+      const dp = Math.hypot(x - p.x, z - p.z);
+      if (dp < p.radius + 22) h *= smooth(p.radius + 2, p.radius + 22, dp);
+    }
+  }
   // Campo e quadra nivelados, com taludes suaves em volta.
   for (const f of Object.values(SPORT_FIELDS)) {
     const dx = Math.max(0, Math.abs(x - f.x) - f.w / 2);
@@ -370,6 +381,35 @@ export function samplePath(path: Point[], step = 4): Point[] {
   }
   out.push(path[path.length - 1]!);
   return out;
+}
+
+let pathCache: Array<{ x: number; z: number; half: number }> | null = null;
+let pathGrid: Map<string, Array<{ x: number; z: number; half: number }>> | null = null;
+/**
+ * Chão livre para plantar flores, arbustos e grama ou pôr bancos: fora de caminhos, praça,
+ * água, lotes dos prédios, quadras, espaços de convivência e além da borda do campus.
+ */
+export function isFreeGround(x: number, z: number, pad = 0.5): boolean {
+  if (!pathCache) {
+    pathCache = parkPaths().flatMap((p) => samplePath(p.points, 1.5).map((q) => ({ ...q, half: PATH_WIDTH[p.kind] / 2 })));
+    pathGrid = new Map();
+    for (const q of pathCache) {
+      const k = `${Math.floor(q.x / 6)},${Math.floor(q.z / 6)}`;
+      const arr = pathGrid.get(k);
+      if (arr) arr.push(q);
+      else pathGrid.set(k, [q]);
+    }
+  }
+  const r = Math.hypot(x, z);
+  if (r < PLAZA_RADIUS + 2 + pad || r > PARK_RADIUS + 20) return false;
+  if (inWater(x, z, 1 + pad) || inField(x, z, 2 + pad)) return false;
+  if (PARK_BUILDINGS.some((b) => Math.hypot(x - b.x, z - b.z) < b.radius * 0.92 + pad)) return false;
+  if (POIS.some((p) => Math.hypot(x - p.x, z - p.z) < 10 + pad)) return false;
+  const gx = Math.floor(x / 6);
+  const gz = Math.floor(z / 6);
+  for (let i = -1; i <= 1; i++)
+    for (let j = -1; j <= 1; j++) for (const q of pathGrid!.get(`${gx + i},${gz + j}`) ?? []) if (Math.hypot(q.x - x, q.z - z) < q.half + 0.4 + pad) return false;
+  return true;
 }
 
 /** Densidade de árvores por região: Norte e Oeste densos, Leste espaçado, Sul ornamental. */

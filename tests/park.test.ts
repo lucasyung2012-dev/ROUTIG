@@ -35,6 +35,21 @@ describe('parque 3D (V2, Etapa 0): planta', () => {
 });
 
 describe('parque V2.1: caminhos em ordem', () => {
+  it('toda ponta de caminho chega a algum lugar: outro caminho, a praça ou a entrada de um prédio', () => {
+    const paths = parkPaths();
+    const entrances = PARK_BUILDINGS.map(entranceOf);
+    const loose: string[] = [];
+    paths.forEach((p, i) => {
+      for (const end of [p.points[0]!, p.points[p.points.length - 1]!]) {
+        if (Math.abs(Math.hypot(end.x, end.z) - PLAZA_RADIUS) < 1) continue;
+        if (entrances.some((e) => Math.hypot(e.x - end.x, e.z - end.z) < 1)) continue;
+        const joined = paths.some((o, j) => j !== i && samplePath(o.points, 1).some((q) => Math.hypot(q.x - end.x, q.z - end.z) < 3));
+        if (!joined) loose.push(`caminho ${i} solto em ${end.x.toFixed(0)},${end.z.toFixed(0)}`);
+      }
+    });
+    expect(loose).toEqual([]);
+  });
+
   it('nenhum caminho passa pela água nem pelo lote de outro prédio', () => {
     const problems: string[] = [];
     for (const [i, p] of parkPaths().entries()) {

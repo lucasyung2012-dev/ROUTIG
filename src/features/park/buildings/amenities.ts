@@ -159,6 +159,19 @@ export function amenities(kit: Kit): Amenities {
           g.translate(0, 0.45 + k * 0.45, 0);
           b.add(stone, g, [p.x, y, p.z], [0, p.view, 0]);
         }
+        // Dá para sentar nos degraus da arquibancada, de frente para o palco.
+        for (let k = 0; k < 4; k++)
+          for (let i = 0; i < 9; i++) {
+            const ang = Math.PI / 2 - 0.8 + (i / 8) * 1.6;
+            const rr = 8 + k * 1.2 + 0.6;
+            const lx = Math.cos(ang) * rr;
+            const lz = Math.sin(ang) * rr;
+            const cs = Math.cos(p.view);
+            const sn = Math.sin(p.view);
+            const wx = p.x + lx * cs + lz * sn;
+            const wz = p.z - lx * sn + lz * cs;
+            seats.push({ x: wx, y: y + 0.45 * (k + 1), z: wz, face: Math.atan2(p.x - wx, p.z - wz) });
+          }
 
         break;
       }

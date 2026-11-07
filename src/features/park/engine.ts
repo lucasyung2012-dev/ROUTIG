@@ -9,7 +9,7 @@ import type { ModuleId } from '@/app/modules';
 import { LAKE, PARK_RADIUS, PONDS, heightAt, inWater } from '@/domain/park';
 import { Kit } from './kit';
 import { createCameraRig, type CamMode, type MoveSettings, type Posture } from './camera';
-import { AVATAR_LOOK, createCrowd } from './people';
+import { AVATAR_LOOK, createCrowd, type Figure } from './people';
 import { createTown } from './town';
 import type { Conditions } from '@/domain/parkPeople';
 import { CLEAR_SKY, createWorld, lightAt, type Quality, type Season, type Sky } from './world';
@@ -138,6 +138,8 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
   const crowd = createCrowd(kit, 40);
   outside.add(crowd.group);
   const town = createTown(world.seats);
+  // Moradores dentro do prédio aberto (estudando, trabalhando, treinando...).
+  const indoorCrowd = createCrowd(kit, 40);
   // Bolas dos jogos (tênis amarela, futebol branca).
   const ballMeshes = { tennis: new THREE.InstancedMesh(kit.own(new THREE.SphereGeometry(0.07, 10, 8)), kit.mat('#D9F23A', { rough: 0.7 }), 2), football: new THREE.InstancedMesh(kit.own(new THREE.SphereGeometry(0.11, 14, 10)), kit.mat('#F8FAFC', { rough: 0.5 }), 2) };
   outside.add(ballMeshes.tennis, ballMeshes.football);
@@ -360,6 +362,8 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
 
   const disposeInterior = () => {
     if (!inside) return;
+    // Pessoas e avatar são do parque: saem da cena antes de liberar o interior.
+    inside.scene.scene.remove(avatar.group, indoorCrowd.group);
     const seen = new Set<THREE.BufferGeometry>();
     inside.scene.scene.traverse((o) => {
       const g = (o as THREE.Mesh).geometry as THREE.BufferGeometry | undefined;
@@ -398,7 +402,7 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
       const v = fit(scene.view('entry'));
       camera.position.copy(v.cam);
       rig.controls.target.copy(v.target);
-      scene.scene.add(avatar.group);
+      scene.scene.add(avatar.group, indoorCrowd.group);
       if (rig.mode() !== 'orbit') rig.place(v.cam.x, v.cam.z, Math.atan2(-(v.target.x - v.cam.x), -(v.target.z - v.cam.z)));
       recompile(scene.scene);
       opts.onInside(id);
@@ -696,6 +700,29 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
       renderer.render(outside, camera);
     } else {
       inside.scene.tick(t, camera);
+      // Quem está neste prédio: sentados nas cadeiras das salas (estudando, trabalhando, lendo),
+      // treinando ou tocando perto das salas do seu tipo. Lugares fixos por pessoa.
+      {
+        const fl = inside.scene.floors;
+        const here = town.insideOf(inside.id).sort((u, v) => u.key - v.key);
+        const seats = fl?.seats ?? [];
+        const zones = fl?.zones ?? [];
+        const figs: Figure[] = [];
+        here.forEach((h, i) => {
+          const f = h.figure;
+          const standing = h.activity === 'gym';
+          if (!standing && seats.length) {
+            const st = seats[(i * 7 + inside!.id.length) % seats.length]!;
+            figs.push({ ...f, x: st.x, y: st.y - 0.44, z: st.z, yaw: st.face, pose: h.activity === 'music' ? 'play' : h.activity === 'work' ? 'sit' : 'read' });
+          } else if (zones.length) {
+            const z = zones[i % zones.length]!;
+            const lv = fl!.levels[z.level]!;
+            const a = i * 2.3;
+            figs.push({ ...f, x: z.x + Math.cos(a) * 1.4, y: lv.y, z: z.z + Math.sin(a) * 1.4, yaw: z.face, pose: standing ? 'exercise' : 'stand' });
+          }
+        });
+        indoorCrowd.set(figs);
+      }
       // Primeiro o parque (visto da posição real dentro do prédio), depois o interior por cima:
       // pelas janelas aparecem o parque, os outros prédios, as pessoas e o céu de verdade.
       const bd = world.buildings.get(inside.id)!;

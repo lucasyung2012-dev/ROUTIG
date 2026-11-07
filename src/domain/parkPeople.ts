@@ -4,9 +4,10 @@
  * dos caminhos), param nos espaços de convivência e voltam para casa (fora da área explorável).
  * Tudo determinístico por dia e hora: a mesma hora mostra o mesmo campus. Sem missões.
  */
-import { COURTS, PARK_BUILDINGS, PARK_SCALE, SPORT_FIELDS, PLAZA_RADIUS, POIS, dist, inWater, parkPaths, residences, seededRandom, type Point } from './park';
+import type { ModuleId } from '@/app/modules';
+import { COURTS, PARK_BUILDINGS, PARK_SCALE, SPORT_FIELDS, entranceOf, PLAZA_RADIUS, POIS, dist, inWater, parkPaths, residences, seededRandom, type Point } from './park';
 
-export type Activity = 'home' | 'cafe' | 'read' | 'study' | 'sport' | 'music' | 'view' | 'chat' | 'stroll' | 'picnic' | 'draw' | 'photo';
+export type Activity = 'home' | 'cafe' | 'read' | 'study' | 'sport' | 'music' | 'view' | 'chat' | 'stroll' | 'picnic' | 'draw' | 'photo' | 'work' | 'gym';
 export type PersonPose = 'stand' | 'walk' | 'sit' | 'read' | 'play' | 'wave' | 'exercise' | 'draw' | 'photo' | 'tennis';
 
 export interface Person {
@@ -38,7 +39,7 @@ const NAMES = ['Ana', 'Bruno', 'Carla', 'Diego', 'Elisa', 'Fábio', 'Gabi', 'Hei
 const SHIRTS = ['#E07A5F', '#3D9970', '#F2CC8F', '#81B29A', '#5B8DB8', '#C06C84', '#F4A259', '#6C5B7B', '#EEEEEE', '#2E4057', '#D1495B', '#66A182', '#EDAE49', '#8E7DBE'];
 const PANTS = ['#2F3542', '#4A5568', '#6B4F3A', '#1F3A5F', '#7A7A7A', '#A68A64', '#334155'];
 const SKINS = ['#F1C9A5', '#E0AC86', '#C68863', '#A86F4C', '#8D5A3B', '#6B4229', '#F5D5B8'];
-const ALL: Activity[] = ['cafe', 'read', 'study', 'sport', 'music', 'view', 'chat', 'stroll', 'draw', 'photo'];
+const ALL: Activity[] = ['cafe', 'read', 'study', 'sport', 'music', 'view', 'chat', 'stroll', 'draw', 'photo', 'work', 'gym', 'study', 'work'];
 
 export const PEOPLE_COUNT = 64;
 
@@ -81,12 +82,13 @@ const poi = (id: string): Point => {
 };
 /** Ponto da planta original na escala atual do campus. */
 const sp = (x: number, z: number): Point => ({ x: x * PARK_SCALE, z: z * PARK_SCALE });
+
 const sports = PARK_BUILDINGS.find((b) => b.id === 'sports')!;
+const byId = (id: ModuleId) => PARK_BUILDINGS.find((b) => b.id === id)!;
 
 export const ACTIVITY_SPOTS: Record<Exclude<Activity, 'home' | 'stroll'>, Point[]> = {
   cafe: [poi('cafe-praca'), poi('cafe-sul'), poi('quiosque-leste')],
   read: [poi('leitura-norte'), poi('pergola-sul')],
-  study: [COURTS.learning!, COURTS.east!],
   // Tênis e futebol nas instalações externas (de dia); exercício no gramado do complexo.
   sport: [{ x: SPORT_FIELDS.tennis.x, z: SPORT_FIELDS.tennis.z }, { x: SPORT_FIELDS.football.x, z: SPORT_FIELDS.football.z }, { x: sports.x + 52, z: sports.z - 22 }],
   music: [poi('palco-musica')],
@@ -96,10 +98,14 @@ export const ACTIVITY_SPOTS: Record<Exclude<Activity, 'home' | 'stroll'>, Point[
   // Desenhar nos jardins (pérgola, gramado do Sul, beira do lago) e fotografar a arquitetura.
   draw: [poi('pergola-sul'), sp(-45, 140), poi('mirante-lago')],
   photo: [sp(0, -34), sp(30, 20), sp(10, -120)],
+  // Atividades dentro dos prédios: o ponto é a entrada (ver indoorOf).
+  study: [entranceOf(byId('academy')), entranceOf(byId('library'))],
+  work: [entranceOf(byId('projects'))],
+  gym: [entranceOf(byId('sports'))],
 };
 
 /** Atividades com teto (café, pérgola, leitura): a chuva leva as pessoas para elas. */
-const COVERED: Activity[] = ['cafe', 'read'];
+const COVERED: Activity[] = ['cafe', 'read', 'study', 'work', 'gym'];
 
 /* ---------- Rede de caminhos como grafo ---------- */
 
@@ -281,8 +287,35 @@ export function spontaneousEvent(day: number, block: number): Activity | null {
 }
 
 /** Lugar da atividade (cada grupo escolhe um; cada pessoa fica num ponto da roda do grupo). */
+/**
+ * Prédio onde a atividade acontece (V2.1, 13.3): estudar na Academy ou na Library, trabalhar
+ * nos prédios de organização, treinar no Complexo Esportivo, ensaiar no Pavilhão Musical à tarde,
+ * ler na Library quando chove. null = ao ar livre.
+ */
+export function indoorOf(p: Person, a: Activity, c: Conditions): ModuleId | null {
+  const WORK: ModuleId[] = ['projects', 'tasks', 'notes', 'calendar', 'insights', 'finance', 'languages', 'inbox'];
+  switch (a) {
+    case 'study':
+      return p.id % 2 ? 'academy' : 'library';
+    case 'work':
+      return WORK[p.id % WORK.length]!;
+    case 'gym':
+      return 'sports';
+    case 'read':
+      return c.rain > 0.15 || p.id % 3 === 0 ? 'library' : null;
+    case 'music':
+      return Math.floor(c.hour) < 17 ? 'music' : null;
+    case 'cafe':
+      return c.rain > 0.15 && p.id % 2 ? 'dashboard' : null;
+    default:
+      return null;
+  }
+}
+
 export function spotFor(p: Person, a: Activity, c: Conditions, slot: number): Point {
   if (a === 'home' || a === 'stroll') return p.home;
+  const indoor = indoorOf(p, a, c);
+  if (indoor) return entranceOf(byId(indoor));
   const list = ACTIVITY_SPOTS[a];
   const r = hourHash(p, c.day, Math.floor(c.hour) + 50);
   const base = list[Math.floor(r * list.length)]!;
@@ -299,6 +332,10 @@ export function poseFor(a: Activity, slot: number): PersonPose {
     case 'read':
     case 'study':
       return slot % 2 ? 'read' : 'sit';
+    case 'work':
+      return 'sit';
+    case 'gym':
+      return 'exercise';
     case 'sport':
       return 'exercise';
     case 'music':
@@ -327,4 +364,6 @@ export const ACTIVITY_LABEL: Record<Activity, string> = {
   picnic: 'no piquenique',
   draw: 'desenhando',
   photo: 'fotografando',
+  work: 'trabalhando',
+  gym: 'treinando na academia',
 };

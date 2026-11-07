@@ -3,8 +3,9 @@
  * reagindo a quem chega perto (olham e acenam) e voltando para casa. Só os mais próximos da
  * câmera são desenhados (limite por aparelho e modo gráfico).
  */
-import { activityAt, campusPeople, poseFor, routeBetween, routeHome, spotFor, type Activity, type Conditions, type Person, type PersonPose } from '@/domain/parkPeople';
+import { activityAt, campusPeople, indoorOf, poseFor, routeBetween, routeHome, spotFor, type Activity, type Conditions, type Person, type PersonPose } from '@/domain/parkPeople';
 import { PARK_SCALE, SPORT_FIELDS, heightAt, type Point } from '@/domain/park';
+import type { ModuleId } from '@/app/modules';
 import type { Figure } from './people';
 import type { Seat } from './camera';
 
@@ -31,6 +32,8 @@ interface Agent {
   line: number;
   talkUntil: number;
   smileUntil: number;
+  /** Dentro de qual prédio está (some do lado de fora). */
+  inside: ModuleId | null;
 }
 
 export interface Town {
@@ -43,6 +46,8 @@ export interface Town {
   /** Quantos estão no campus agora e o que fazem (painel de opções). */
   census: () => { outside: number; total: number; byActivity: Partial<Record<Activity, number>> };
   nearest: (p: { x: number; z: number }, r: number) => { name: string; activity: Activity; x: number; z: number } | null;
+  /** Quem está dentro de um prédio, com o que faz lá (estudar, trabalhar, treinar...). */
+  insideOf: (id: ModuleId) => Array<{ figure: Figure; activity: Activity; key: number }>;
   /** Bolas dos jogos em andamento (tênis e futebol). */
   balls: () => Array<{ x: number; y: number; z: number; kind: 'tennis' | 'football' }>;
   /** Cumprimentar quem está perto: a pessoa olha, acena e responde. */
@@ -81,7 +86,7 @@ export function createTown(seats: Seat[] = []): Town {
   const agents: Agent[] = people.map((p) => {
     const slot = groupSlot.get(p.group) ?? 0;
     groupSlot.set(p.group, slot + 1);
-    return { p, slot, x: p.home.x, z: p.home.z, yaw: 0, activity: 'home', route: [], ri: 0, pose: 'stand', phase: Math.random() * 6, away: true, block: -1, waveUntil: 0, waveCool: 0, seat: -1, look: 0, line: Math.floor(Math.random() * 3), talkUntil: 0, smileUntil: 0 };
+    return { p, slot, x: p.home.x, z: p.home.z, yaw: 0, activity: 'home', route: [], ri: 0, pose: 'stand', phase: Math.random() * 6, away: true, block: -1, waveUntil: 0, waveCool: 0, seat: -1, look: 0, line: Math.floor(Math.random() * 3), talkUntil: 0, smileUntil: 0, inside: null };
   });
 
   const strollRoute = (a: Agent): Point[] => {
@@ -98,6 +103,7 @@ export function createTown(seats: Seat[] = []): Town {
     const prev = a.activity;
     a.activity = next;
     a.ri = 0;
+    a.inside = null;
     if (instant) {
       if (next === 'home') {
         a.away = true;
@@ -110,6 +116,7 @@ export function createTown(seats: Seat[] = []): Town {
       a.x = s.x;
       a.z = s.z;
       a.away = false;
+      a.inside = indoorOf(a.p, next, c);
       a.route = next === 'stroll' ? strollRoute(a) : [s];
       a.ri = a.route.length - 1;
       return;
@@ -136,6 +143,8 @@ export function createTown(seats: Seat[] = []): Town {
     for (const a of agents) {
       if (Math.floor(c.hour) !== a.block && (c.hour * 60) % 60 >= (a.p.id % 12) * 2) plan(a, c, false);
       if (a.away && a.activity === 'home') continue;
+      // Dentro de um prédio: aparece lá dentro (quando o visitante entra), não do lado de fora.
+      if (a.inside) continue;
       // Jogando nas quadras: quem comanda a posição é o jogo (abaixo), não a rota.
       if (a.activity === 'sport' && a.ri >= a.route.length - 1 && (near(a, SPORT_FIELDS.tennis, 8) || near(a, SPORT_FIELDS.football, 10)) && now >= a.talkUntil) continue;
       // Cumprimentada: para o que estava fazendo, vira para o visitante, acena e fala.
@@ -162,6 +171,7 @@ export function createTown(seats: Seat[] = []): Town {
             a.route = strollRoute(a);
             a.ri = 0;
           } else if (a.activity === 'home') a.away = true;
+          else a.inside = indoorOf(a.p, a.activity, conditionsRef);
         } else {
           a.x += (dx / d) * sp * dt;
           a.z += (dz / d) * sp * dt;
@@ -284,7 +294,7 @@ export function createTown(seats: Seat[] = []): Town {
 
   const visible = (from: { x: number; z: number }, max: number, range: number): Figure[] =>
     agents
-      .filter((a) => !(a.away && a.activity === 'home'))
+      .filter((a) => !(a.away && a.activity === 'home') && !a.inside)
       .map((a) => ({ a, d: Math.hypot(a.x - from.x, a.z - from.z) }))
       .filter((o) => o.d < range)
       .sort((u, v) => u.d - v.d)
@@ -330,6 +340,32 @@ export function createTown(seats: Seat[] = []): Town {
       return { outside, total: agents.length, byActivity: by };
     },
     balls: () => ballList,
+    insideOf: (id) =>
+      agents
+        .filter((a) => a.inside === id)
+        .map((a) => ({
+          key: a.p.id,
+          activity: a.activity,
+          figure: {
+            x: 0,
+            y: 0,
+            z: 0,
+            yaw: 0,
+            pose: 'stand' as const,
+            phase: (performance.now() / 1000) * 2 + a.p.id,
+            stride: 0,
+            shirt: a.p.shirt,
+            pants: a.p.pants,
+            skin: a.p.skin,
+            hair: HAIRS[a.p.id % HAIRS.length],
+            hairStyle: (a.p.id * 7) % 4,
+            eyes: EYES[(a.p.id * 5) % EYES.length],
+            shortSleeves: a.p.id % 2 === 0,
+            shorts: a.p.id % 3 === 0,
+            seed: a.p.id,
+            scale: a.p.scale,
+          },
+        })),
     greet: (p, r, now) => {
       let best: Agent | null = null;
       let bd = r;

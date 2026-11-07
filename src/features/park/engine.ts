@@ -136,7 +136,25 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
 
   const camera = new THREE.PerspectiveCamera(48, 1, 0.3, 2800);
   // Diagnóstico (só com ?debug na URL): medir o peso da cena no navegador.
-  if (/[?&]debug/.test(location.search)) (window as unknown as Record<string, unknown>).__park = { outside, renderer, camera, buildMs, inside: () => inside };
+  if (/[?&]debug/.test(location.search)) {
+    const tri = (o: THREE.Object3D) => {
+      let t = 0;
+      let m = 0;
+      o.traverse((x) => {
+        const mesh = x as THREE.Mesh;
+        if (!mesh.isMesh) return;
+        m++;
+        const g = mesh.geometry;
+        const n = (g.index ? g.index.count : g.attributes.position!.count) / 3;
+        t += n * ((x as THREE.InstancedMesh).isInstancedMesh ? (x as THREE.InstancedMesh).count : 1);
+      });
+      return { t: Math.round(t), m };
+    };
+    const parts = world.root.children.map((c, i) => ({ i, k: String(c.userData.building ?? (c.name || c.type)), kids: c.children.length, ...tri(c) })).sort((a, b) => b.t - a.t);
+    window.setInterval(() => {
+      document.documentElement.dataset.park = JSON.stringify({ buildMs: Math.round(buildMs), calls: renderer.info.render.calls, frameTris: renderer.info.render.triangles, geos: renderer.info.memory.geometries, tex: renderer.info.memory.textures, total: tri(world.root), parts: parts.slice(0, 40) });
+    }, 2000);
+  }
   const rig = createCameraRig(camera, canvas, opts.reduceMotion, opts.onPosture);
   const outsideWorld = () => rig.setWorld({ ground: heightAt, obstacles: world.obstacles, limit: { x: 0, z: 0, r: PARK_RADIUS + 30 }, ceiling: Infinity, minDistance: 4, maxDistance: 520, blocked: (x, z) => inWater(x, z, 0.8) });
   outsideWorld();

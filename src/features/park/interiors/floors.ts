@@ -321,7 +321,7 @@ export function withFloors(kit: Kit, scene: InteriorScene, id: ModuleId, label: 
         b.add(partMat, new THREE.CylinderGeometry(ri, ri, wallH, 10, 1, true, a + dh, span / 2 - dh), [0, y + wallH / 2, 0]);
         b.add(wallMat, new THREE.CylinderGeometry(ri, ri, wallH - 2.4, 6, 1, true, a - dh, dh * 2), [0, y + 2.4 + (wallH - 2.4) / 2, 0]);
         if (style.glass) b.add(metal, new THREE.TorusGeometry(ri, 0.03, 4, 48, span), [0, y + 1.0, 0], [-Math.PI / 2, 0, b0 - Math.PI / 2]);
-        for (const e of [b0, b0 + span]) b.add(wallMat, new THREE.BoxGeometry(0.15, wallH, ro - ri), [Math.sin(e) * (ri + ro) / 2, y + wallH / 2, Math.cos(e) * (ri + ro) / 2], [0, e, 0]);
+        for (const e of k === slots.length - 1 ? [b0, b0 + span] : [b0]) b.add(wallMat, new THREE.BoxGeometry(0.15, wallH, ro - ri), [Math.sin(e) * (ri + ro) / 2, y + wallH / 2, Math.cos(e) * (ri + ro) / 2], [0, e, 0]);
         b.add(kit.mat(ROOM_FLOOR[type], { rough: type === 'lab' || type === 'booth' ? 0.4 : 0.7 }), new THREE.RingGeometry(ri, ro, 16, 1, b0 - Math.PI / 2, span), [0, y + 0.02, 0], [-Math.PI / 2, 0, 0]);
         for (const f of [0.35, 0.65]) {
           const la = b0 + span * f;
@@ -422,7 +422,10 @@ export function withFloors(kit: Kit, scene: InteriorScene, id: ModuleId, label: 
   });
 
   // Térreo: camada de detalhe em volta do salão (sem cobrir o que o prédio já tem).
-  enrichGround(kit, b, seats, scene.obstacles, R, H, accent, style.warm, thingRoot, things);
+  // O que já ocupa o térreo (móveis, balcões, estantes) e o alto do salão, pelo desenho: os detalhes novos desviam.
+  const occupied = [...scene.obstacles, ...footprint(scene.scene, () => 0, 0.05, 2.6, 0.5)];
+  const overhead = footprint(scene.scene, () => 0, H - 2.4, H - 0.2, 0.5);
+  enrichGround(kit, b, seats, occupied, overhead, R, H, accent, style.warm, thingRoot, things);
   // Torre do elevador: vidro, estrutura e uma cabine em cada andar; placa com o nome de cada andar.
   const topY = H + plan.length * STOREY;
   b.add(glass, new THREE.CylinderGeometry(1.4, 1.4, topY, 24, 1, true), [tower.x, topY / 2, tower.z]);
@@ -499,7 +502,7 @@ function layout(plan: Plan, n: number, apo: number, inner: number, zv: number, i
       const b0 = start + k * span;
       const a = b0 + span / 2;
       const mid = (ri + ro) / 2;
-      out.push({ x: Math.sin(a) * mid, z: Math.cos(a) * mid, face: a + Math.PI, w: mid * span * 0.9, d: ro - ri - 0.3, kind: 'wedge', b0, span, ri, ro });
+      out.push({ x: Math.sin(a) * mid, z: Math.cos(a) * mid, face: a + Math.PI, w: Math.min(mid * span * 0.9, 2 * (ri + 0.3) * Math.sin(span / 2) - 0.5), d: ro - ri - 0.3, kind: 'wedge', b0, span, ri, ro });
     }
     return out;
   }

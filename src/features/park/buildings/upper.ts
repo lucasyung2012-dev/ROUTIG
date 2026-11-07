@@ -105,7 +105,11 @@ export function upperFloors(kit: Kit, id: ModuleId, levels: number, base: number
     // Jardim interno a céu aberto: as copas aparecem pelo vão da cobertura.
     for (let k = 0; k < 3; k++) {
       const a = (k / 3) * Math.PI * 2 + Math.PI / 6;
-      b.add(leaf, new THREE.IcosahedronGeometry(1.4, 1), [Math.sin(a) * inner * 0.6, top - 1.0, Math.cos(a) * inner * 0.6]);
+      // As árvores do pátio ficam no chão do 1º andar (como por dentro).
+      const tx = Math.sin(a) * inner * 0.6;
+      const tz0 = Math.cos(a) * inner * 0.6;
+      b.add(kit.mat('#6B4F3A', { rough: 0.9 }), new THREE.CylinderGeometry(0.12, 0.18, 2.8, 8), [tx, base + 0.35 + 1.4, tz0]);
+      b.add(leaf, new THREE.IcosahedronGeometry(1.3, 1), [tx, base + 0.35 + 3.3, tz0]);
     }
   }
   if (form.plan === 'side') {
@@ -114,10 +118,10 @@ export function upperFloors(kit: Kit, id: ModuleId, levels: number, base: number
   }
   // Torre do elevador nos fundos, com as pontes de cada andar.
   const tz = -(r0 + 2.2);
-  b.add(glass, new THREE.CylinderGeometry(1.4, 1.4, top - base + 2, 24, 1, true), [0, base + (top - base + 2) / 2 - 1, tz]);
+  b.add(glass, new THREE.CylinderGeometry(1.4, 1.4, top + 1, 24, 1, true), [0, (top + 1) / 2, tz]);
   for (let k = 0; k < 6; k++) {
     const a = (k / 6) * Math.PI * 2 + Math.PI / 6;
-    b.add(metal, new THREE.BoxGeometry(0.12, top - base + 2, 0.12), [Math.sin(a) * 1.4, base + (top - base + 2) / 2 - 1, tz + Math.cos(a) * 1.4]);
+    b.add(metal, new THREE.BoxGeometry(0.12, top + 1, 0.12), [Math.sin(a) * 1.4, (top + 1) / 2, tz + Math.cos(a) * 1.4]);
   }
   b.add(slab, new THREE.CylinderGeometry(1.7, 1.7, 0.3, 24), [0, top + 1.15, tz]);
   for (let L = 1; L <= levels; L++) {

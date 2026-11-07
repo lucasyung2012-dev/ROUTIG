@@ -40,7 +40,7 @@ export const FORMS: Record<ModuleId, Form> = {
   finance: { sides: 6, rot: Math.PI / 6, setback: 0.07, twist: 0, plan: 'corridor', facade: 'stone', frame: '#D9D2C2' },
   music: { sides: 0, rot: 0, setback: 0.06, twist: 0, plan: 'corridor', facade: 'wood', frame: '#9A6B47' },
   academy: { sides: 4, rot: Math.PI / 4, setback: 0.06, twist: 0, plan: 'side', facade: 'brick', frame: '#A65A3F' },
-  projects: { sides: 6, rot: Math.PI / 6, setback: 0, twist: 0.14, plan: 'side', facade: 'panel', frame: '#F1E7DC' },
+  projects: { sides: 6, rot: Math.PI / 6, setback: 0, twist: 0, plan: 'side', facade: 'panel', frame: '#F1E7DC' },
   notes: { sides: 5, rot: 0, setback: 0, twist: 0, plan: 'open', facade: 'wood', frame: '#B08560' },
   inbox: { sides: 8, rot: Math.PI / 8, setback: 0.06, twist: 0, plan: 'open', facade: 'glass', frame: '#C3CDD8' },
   profile: { sides: 8, rot: Math.PI / 8, setback: 0.1, twist: 0, plan: 'open', facade: 'stone', frame: '#E6DCCB' },

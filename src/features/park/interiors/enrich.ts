@@ -76,7 +76,7 @@ function artPanel(c: Ctx, x: number, y: number, z: number, face: number, seed: n
 }
 
 /** Térreo: anel de detalhes junto ao vidro, pendentes e recepção, sem invadir o que já existe. */
-export function enrichGround(kit: Kit, b: Builder, seats: Seat[], obstacles: Obstacle[], R: number, H: number, accent: string, warm: boolean, root: THREE.Object3D, things: Thing[]) {
+export function enrichGround(kit: Kit, b: Builder, seats: Seat[], obstacles: Obstacle[], overhead: Obstacle[], R: number, H: number, accent: string, warm: boolean, root: THREE.Object3D, things: Thing[]) {
   const c: Ctx = { kit, b, seats, accent, warm, root, things, level: 0, top: false };
   const free = (x: number, z: number, r: number) => !obstacles.some((o) => Math.hypot(o.x - x, o.z - z) < o.r + r);
   const n = Math.max(10, Math.floor((Math.PI * 2 * R) / 5.5));
@@ -100,6 +100,7 @@ export function enrichGround(kit: Kit, b: Builder, seats: Seat[], obstacles: Obs
     const a = (k / 12) * Math.PI * 2 + 0.26;
     const x = Math.sin(a) * R * 0.62;
     const z = Math.cos(a) * R * 0.62;
+    if (overhead.some((o) => Math.hypot(o.x - x, o.z - z) < o.r + 0.5)) continue;
     c.b.add(m.metal, new THREE.CylinderGeometry(0.008, 0.008, 1.4, 4), [x, H - 0.7, z]);
     c.b.add(m.glow, new THREE.SphereGeometry(0.2, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), [x, H - 1.45, z], [Math.PI, 0, 0]);
   }

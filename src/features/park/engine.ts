@@ -14,6 +14,7 @@ import { createTown } from './town';
 import type { Conditions } from '@/domain/parkPeople';
 import { CLEAR_SKY, createWorld, lightAt, type Quality, type Season, type Sky } from './world';
 import type { ParkAudio } from './audio';
+import { DRUM_PADS, PIANO_KEYS, type Thing, type ThingCtx, type ThingKind } from './interiors/things';
 import type { ParkSnapshot } from './parkContext';
 import { footprint } from './collision';
 import type { InteriorScene } from './interiors/common';
@@ -52,12 +53,14 @@ export interface EngineOpts {
   onFloors: (count: number, current: number) => void;
   /** Sala de um andar escolhida (abre o painel real ligado a ela). */
   onZone: (z: { key: string; sector: string | null } | null) => void;
+  /** Piano ou bateria: abrir (ou fechar, null) o teclado/pads na tela. */
+  onInstrument: (k: 'piano' | 'drums' | null) => void;
   startMode: CamMode;
   /** Retomar de onde a pessoa estava (volta da interface 2D): sem abertura. */
   restore?: ParkSnapshot | null;
 }
 
-export type Hint = { kind: 'elevator' } | { kind: 'sit' } | { kind: 'view' } | { kind: 'tree' } | { kind: 'water' } | { kind: 'person'; name: string; activity: string };
+export type Hint = { kind: 'use'; what: ThingKind; key?: string; up?: boolean } | { kind: 'elevator' } | { kind: 'sit' } | { kind: 'view' } | { kind: 'tree' } | { kind: 'water' } | { kind: 'person'; name: string; activity: string };
 
 export interface Engine {
   setQuality: (q: Quality) => void;
@@ -98,6 +101,8 @@ export interface Engine {
   focusZone: (i: number) => void;
   /** Andar de elevador até o andar `n` (com cabine e portas). */
   rideTo: (n: number) => void;
+  /** Tocar a tecla/peça `i` do instrumento aberto (piano: PIANO_KEYS; bateria: DRUM_PADS). */
+  play: (i: number) => void;
   setData: (id: ModuleId, data: unknown) => void;
   project: () => Array<{ id: ModuleId; x: number; y: number; visible: boolean }>;
   dispose: () => void;
@@ -241,13 +246,8 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
     const sc = inside!.scene;
     const lv = sc.floors?.levels[L];
     if (!lv || L === 0) return { ground: () => 0, obstacles: sc.obstacles, limit: { x: 0, z: 0, r: sc.room.radius - 1.2 }, ceiling: lv?.ceiling ?? sc.room.height, minDistance: 1.5, maxDistance: sc.room.radius * 1.7 };
-    // Átrio aberto e fachada de vidro: só se passa pelas portas do terraço.
-    const atDoor = (x: number, z: number) => lv.doors.some((d) => Math.abs(Math.atan2(Math.sin(Math.atan2(x, z) - d), Math.cos(Math.atan2(x, z) - d))) < lv.doorHalf * 0.8);
-    const blocked = (x: number, z: number) => {
-      const r = Math.hypot(x, z);
-      return r < lv.inner + 0.5 || (Math.abs(r - lv.outer) < 0.3 && !atDoor(x, z));
-    };
-    return { ground: () => lv.y, obstacles: lv.obstacles, limit: { x: 0, z: 0, r: lv.walk }, ceiling: lv.ceiling, minDistance: 1.5, maxDistance: sc.room.radius * 1.7, blocked, wall: lv.outer };
+    // Cada planta diz onde não se pisa (vazios, núcleo, fachada fora das portas, borda do terraço).
+    return { ground: () => lv.y, obstacles: lv.obstacles, limit: { x: 0, z: 0, r: lv.walk }, ceiling: lv.ceiling, minDistance: 1.5, maxDistance: sc.room.radius * 1.7, blocked: lv.blocked, wall: lv.wallAt };
 
   };
   const setFloor = (L: number, move = true) => {
@@ -259,9 +259,8 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
     if (!move) return;
     const lv = levels[L]!;
     // Chega pelo elevador, nos fundos, olhando para dentro do prédio.
-    const z = -(lv.walk - 5);
-    if (rig.mode() !== 'orbit') rig.place(0, z, Math.PI);
-    else rig.glideTo(new THREE.Vector3(0, lv.y + 3.4, lv.walk - 1), new THREE.Vector3(0, lv.y + 1, -lv.inner), 900);
+    if (rig.mode() !== 'orbit') rig.place(lv.arrive.x, lv.arrive.z, Math.PI);
+    else rig.glideTo(new THREE.Vector3(0, lv.y + 3.4, lv.outer - 1), new THREE.Vector3(0, lv.y + 1, -lv.outer * 0.3), 900);
   };
   /* ---------- Elevador: entrar, fechar portas, subir/descer, abrir, sair ---------- */
   type Ride = { from: number; to: number; t0: number; start: THREE.Vector3; startLook: THREE.Vector3; mode: CamMode };
@@ -352,16 +351,19 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
     if (!z) return;
     if (z.level !== level) setFloor(z.level, false);
     const lv = inside!.scene.floors!.levels[z.level]!;
-    const r = Math.hypot(z.x, z.z) || 1;
-    const cx = -z.x / r;
-    const cz = -z.z / r;
-    if (rig.mode() !== 'orbit') rig.place(z.x + cx * 2.6, z.z + cz * 2.6, Math.atan2(cx, cz));
-    else rig.glideTo(new THREE.Vector3(z.x + cx * 5.5, lv.y + 2.8, z.z + cz * 5.5), new THREE.Vector3(z.x, lv.y + 1.4, z.z), 1000);
+    // Em frente à porta da sala, olhando para dentro dela.
+    const dx = z.ex - z.x;
+    const dz = z.ez - z.z;
+    const r = Math.hypot(dx, dz) || 1;
+    if (rig.mode() !== 'orbit') rig.place(z.ex, z.ez, Math.atan2(dx, dz));
+    else rig.glideTo(new THREE.Vector3(z.x + (dx / r) * 5.5, lv.y + 2.8, z.z + (dz / r) * 5.5), new THREE.Vector3(z.x, lv.y + 1.4, z.z), 1000);
     opts.onZone({ key: z.key, sector: z.sector });
   };
 
   const disposeInterior = () => {
     if (!inside) return;
+    if (instrument) opts.onInstrument(null);
+    instrument = null;
     // Pessoas e avatar são do parque: saem da cena antes de liberar o interior.
     inside.scene.scene.remove(avatar.group, indoorCrowd.group);
     const seen = new Set<THREE.BufferGeometry>();
@@ -465,8 +467,27 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
     const lv = inside?.scene.floors?.levels[level];
     if (!lv) return false;
     const p = rig.body().pos;
-    return Math.hypot(p.x, p.z + lv.walk) < 5.5;
+    if (level === 0) return Math.hypot(p.x, p.z + lv.walk) < 5.5;
+    const e = inside!.scene.floors!.elevator;
+    return Math.hypot(p.x - e.x, p.z - (e.z + 2.6)) < 4.6;
   };
+  /** Objeto funcional mais perto, neste andar. */
+  const thingNear = (p: { x: number; z: number }): Thing | null => {
+    const list = inside?.scene.floors?.things.filter((th) => th.level === level) ?? [];
+    let best: Thing | null = null;
+    let bd = Infinity;
+    for (const th of list) {
+      const d = Math.hypot(th.x - p.x, th.z - p.z);
+      const r = th.kind === 'room' ? 1.4 : th.kind === 'stairs' ? 1.6 : 1.5;
+      if (d < r && d < bd) {
+        bd = d;
+        best = th;
+      }
+    }
+    return best;
+  };
+  let instrument: Thing | null = null;
+  const thingCtx: ThingCtx = { note: (m, tb, delay) => audio?.note(m, tb, delay) };
   const floorSeat = (p: { x: number; z: number }) => {
     const lv = inside?.scene.floors?.levels[level];
     return lv ? near2(inside!.scene.floors!.seats.filter((s) => Math.abs(s.y - 0.45 - lv.y) < 0.5), p, 1.8) : null;
@@ -474,7 +495,17 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
   const findHint = (): Hint | null => {
     if (rig.posture() !== 'stand') return null;
     const p = rig.body().pos;
-    if (inside) return elevatorNear() ? { kind: 'elevator' } : floorSeat(p) ? { kind: 'sit' } : null;
+    if (inside) {
+      if (elevatorNear() && (inside.scene.floors?.levels.length ?? 1) > 1) return { kind: 'elevator' };
+      const th = thingNear(p);
+      if (th) {
+        const fl = inside.scene.floors!;
+        if (th.kind === 'room') return { kind: 'use', what: 'room', key: fl.zones[th.zone!]?.key };
+        if (th.kind === 'stairs') return { kind: 'use', what: 'stairs', up: level < fl.levels.length - 1 };
+        return { kind: 'use', what: th.kind };
+      }
+      return floorSeat(p) ? { kind: 'sit' } : null;
+    }
 
     if (near2(world.seats, p, 1.8)) return { kind: 'sit' };
     if (near2(world.viewpoints, p, 4)) return { kind: 'view' };
@@ -483,6 +514,36 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
     if (inWater(p.x, p.z, 4)) return { kind: 'water' };
     if (near2(world.treeSpots, p, 4)) return { kind: 'tree' };
     return null;
+  };
+  /** Usar um objeto funcional dos interiores. */
+  const useThing = (th: Thing) => {
+    const fl = inside?.scene.floors;
+    if (!fl) return;
+    if (th.kind === 'piano' || th.kind === 'drums') {
+      instrument = th;
+      rig.place(th.x, th.z, th.face);
+      return opts.onInstrument(th.kind);
+    }
+    if (th.kind === 'room') {
+      const z = fl.zones[th.zone!];
+      return z && opts.onZone({ key: z.key, sector: z.sector });
+    }
+    if (th.kind === 'stairs') {
+      // Sobe um andar (no último, desce), saindo da escada do núcleo no outro andar.
+      const to = level < fl.levels.length - 1 ? level + 1 : level - 1;
+      const there = fl.things.find((o) => o.kind === 'stairs' && o.level === to);
+      setFloor(to, false);
+      if (there) rig.place(there.x, there.z + 0.4, Math.PI);
+      else setFloor(to);
+      audio?.note(60, 'tom');
+      return;
+    }
+    if (th.kind === 'telescope') {
+      const lv = fl.levels[level]!;
+      rig.place(th.x, th.z, th.face + Math.PI);
+      return rig.observe(new THREE.Vector3(th.x + Math.sin(th.face) * 60, lv.y + 45, th.z + Math.cos(th.face) * 60));
+    }
+    th.act?.(thingCtx);
   };
   const interact = () => {
     if (rig.mode() === 'orbit' || rig.gliding()) return;
@@ -496,6 +557,8 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
     if (inside) {
       const levels = inside.scene.floors?.levels.length ?? 1;
       if (elevatorNear() && levels > 1) return opts.onElevator();
+      const th = thingNear(p);
+      if (th) return useThing(th);
       const s = floorSeat(p);
       if (s) rig.sit({ ...s, face: s.face + Math.PI });
       return;
@@ -700,6 +763,8 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
       renderer.render(outside, camera);
     } else {
       inside.scene.tick(t, camera);
+      const tn = performance.now();
+      inside.scene.floors?.things.forEach((th) => th.tick?.(tn));
       // Quem está neste prédio: sentados nas cadeiras das salas (estudando, trabalhando, lendo),
       // treinando ou tocando perto das salas do seu tipo. Lugares fixos por pessoa.
       {
@@ -909,6 +974,17 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
     setFloor: (n) => setFloor(n),
     zones: () => (inside?.scene.floors?.zones ?? []).map((z) => ({ level: z.level, key: z.key, sector: z.sector })),
     focusZone: (i) => focusZone(i),
+    play: (i) => {
+      if (!instrument) return;
+      instrument.press?.(i);
+      if (instrument.kind === 'piano') {
+        const k = PIANO_KEYS[i];
+        if (k) audio?.note(k.midi, 'piano');
+      } else {
+        const d = DRUM_PADS[i];
+        if (d) audio?.note(d === 'kick' ? 36 : d === 'snare' ? 38 : d === 'hat' ? 42 : 45, d);
+      }
+    },
     rideTo,
     setData: (id, data) => {
       dataCache.set(id, data);

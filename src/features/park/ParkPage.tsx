@@ -45,6 +45,7 @@ import { receptionData } from './receptionData';
 import { ModuleCenter } from './ModuleCenter';
 import { DEFAULT_FAB, FloatingCenterButton, PlacesMenu, type FabPlace } from './ParkUi';
 import { withFloors } from './interiors/floors';
+import { DRUM_PADS, PIANO_KEYS } from './interiors/things';
 import { clearParkContext, pushRecent, readParkContext, saveParkContext } from './parkContext';
 
 /** Preferências do parque neste aparelho (qualidade é do aparelho; o resto é gosto pessoal). */
@@ -195,6 +196,7 @@ export default function ParkPage() {
   const [floors, setFloors] = useState({ count: 1, current: 0 });
   const [zoneKey, setZoneKey] = useState<string | null>(null);
   const [elevator, setElevator] = useState(false);
+  const [instrument, setInstrument] = useState<'piano' | 'drums' | null>(null);
   // Painel no celular: só o título, meia tela ou tela cheia.
   const [sheet, setSheet] = useState<'peek' | 'half' | 'full'>('half');
   const [riding, setRiding] = useState(false);
@@ -286,6 +288,7 @@ export default function ParkPage() {
         },
         onFloors: (count, current) => setFloors({ count, current }),
         onElevator: () => setElevator(true),
+        onInstrument: setInstrument,
         onRiding: setRiding,
         onTalk: (x) => setTalk({ ...x, at: Date.now() }),
         onZone: (z) => {
@@ -686,12 +689,26 @@ export default function ParkPage() {
       )}
 
       {/* Andando (primeira e terceira pessoa): controle, botões de correr, pular e interagir, e dica */}
-      {camMode !== 'orbit' && !riding && !stick.hidden && <Joystick onMove={(x, y) => engine.current?.setMove(x, y)} onRun={(on) => engine.current?.setRun(on, 'stick')} label={t('park.joystick')} size={stick.size} side={stick.side} />}
-      {camMode !== 'orbit' && !riding && !stick.hidden && <ActionButtons side={stick.side === 'left' ? 'right' : 'left'} engine={engine} canInteract={!!hint || posture !== 'stand' || (!!near && !inside)} />}
-      {camMode !== 'orbit' && !riding && !elevator && (hint || posture !== 'stand') && (!near || !!inside) && (
+      {camMode !== 'orbit' && !riding && !instrument && !stick.hidden && <Joystick onMove={(x, y) => engine.current?.setMove(x, y)} onRun={(on) => engine.current?.setRun(on, 'stick')} label={t('park.joystick')} size={stick.size} side={stick.side} />}
+      {camMode !== 'orbit' && !riding && !instrument && !stick.hidden && <ActionButtons side={stick.side === 'left' ? 'right' : 'left'} engine={engine} canInteract={!!hint || posture !== 'stand' || (!!near && !inside)} />}
+      {camMode !== 'orbit' && !riding && !elevator && !instrument && (hint || posture !== 'stand') && (!near || !!inside) && (
         <InteractPrompt
           kind={posture !== 'stand' ? 'stand' : (hint?.kind ?? 'sit')}
-          title={posture !== 'stand' ? t('park.standUp') : hint?.kind === 'person' ? t('park.hints.greet', { name: hint.name }) : hint ? t(`park.hints.${hint.kind}`) : ''}
+          title={
+            posture !== 'stand'
+              ? t('park.standUp')
+              : hint?.kind === 'person'
+                ? t('park.hints.greet', { name: hint.name })
+                : hint?.kind === 'use'
+                  ? hint.what === 'room'
+                    ? t('park.use.room', { name: inside && hint.key ? t(`park.floorRooms.${inside}.${hint.key}` as MessageKey) : '' })
+                    : hint.what === 'stairs'
+                      ? t(hint.up ? 'park.use.stairsUp' : 'park.use.stairsDown')
+                      : t(`park.use.${hint.what}` as MessageKey)
+                  : hint
+                    ? t(`park.hints.${hint.kind}`)
+                    : ''
+          }
           detail={posture === 'stand' && hint?.kind === 'person' ? t('park.hints.person', { name: hint.name, activity: t(`park.activities.${hint.activity}` as MessageKey) }) : undefined}
           onAct={() => engine.current?.interact()}
         />
@@ -787,6 +804,7 @@ export default function ParkPage() {
         </div>
       )}
 
+      {instrument && inside && <InstrumentPanel kind={instrument} onPlay={(i) => engine.current?.play(i)} onClose={() => setInstrument(null)} />}
       {elevator && inside && (
         <ElevatorPanel
           floors={Array.from({ length: floors.count }, (_, n) => ({
@@ -963,7 +981,105 @@ function TalkBubble({ name, text, onDone }: { name: string; text: string; onDone
   );
 }
 
-const HINT_ICON = { sit: Armchair, view: Mountain, tree: TreePine, water: Waves, person: Smile, elevator: ArrowUpDown, enter: LogIn, stand: Footprints } as const;
+const HINT_ICON = { use: Hand, sit: Armchair, view: Mountain, tree: TreePine, water: Waves, person: Smile, elevator: ArrowUpDown, enter: LogIn, stand: Footprints } as const;
+
+/** Teclas do computador para o piano (Z…M = 1ª oitava, Q…U = 2ª, I = Dó agudo) e para os pads. */
+const PIANO_KEYMAP = 'zsxdcvgbhnjmq2w3er5t6y7ui';
+const DRUM_KEYMAP = 'asdf';
+
+/** Piano (duas oitavas) ou bateria (quatro pads) na tela: cada toque soa e mexe a tecla/peça no 3D. */
+function InstrumentPanel({ kind, onPlay, onClose }: { kind: 'piano' | 'drums'; onPlay: (i: number) => void; onClose: () => void }) {
+  const { t } = useSettings();
+  const [down, setDown] = useState<number | null>(null);
+  const hit = (i: number) => {
+    onPlay(i);
+    setDown(i);
+    window.setTimeout(() => setDown((d) => (d === i ? null : d)), 160);
+  };
+  useEffect(() => {
+    const map = kind === 'piano' ? PIANO_KEYMAP : DRUM_KEYMAP;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.stopImmediatePropagation();
+        return onClose();
+      }
+      const i = map.indexOf(e.key.toLowerCase());
+      if (i < 0 || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      hit(i);
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [kind]);
+  const whites = PIANO_KEYS.map((k, i) => ({ ...k, i })).filter((k) => !k.black);
+  return (
+    <div className="absolute inset-x-0 bottom-3 z-20 mx-auto w-[calc(100%-1.5rem)] max-w-2xl rounded-2xl bg-black/75 p-3 text-white shadow-lift ring-1 ring-white/20 backdrop-blur-md" role="dialog" aria-label={t(`park.instrument.${kind}`)}>
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-sm font-semibold">{t(`park.instrument.${kind}`)}</p>
+          <p className="hidden truncate text-xs text-white/70 sm:block">{t(kind === 'piano' ? 'park.instrument.pianoHint' : 'park.instrument.drumsHint')}</p>
+        </div>
+        <button type="button" onClick={onClose} className="flex items-center gap-1 rounded-xl bg-white/15 px-3 py-1.5 text-xs font-semibold ring-1 ring-white/25">
+          <X className="h-4 w-4" aria-hidden />
+          {t('park.instrument.close')}
+        </button>
+      </div>
+      {kind === 'piano' ? (
+        <div className="relative h-36 select-none touch-none sm:h-40">
+          <div className="flex h-full gap-[2px]">
+            {whites.map((k) => (
+              <button
+                key={k.i}
+                type="button"
+                aria-label={`${k.midi}`}
+                onPointerDown={(e) => {
+                  e.preventDefault();
+                  hit(k.i);
+                }}
+                className={`flex-1 rounded-b-md bg-[#F7F5EF] shadow-inner ring-1 ring-black/30 transition-transform ${down === k.i ? 'translate-y-0.5 bg-[#E2DED3]' : ''}`}
+              />
+            ))}
+          </div>
+          {PIANO_KEYS.map((k, i) => {
+            if (!k.black) return null;
+            const before = PIANO_KEYS.slice(0, i).filter((x) => !x.black).length;
+            const w = 100 / whites.length;
+            return (
+              <button
+                key={i}
+                type="button"
+                aria-label={`${k.midi}`}
+                onPointerDown={(e) => {
+                  e.preventDefault();
+                  hit(i);
+                }}
+                style={{ left: `calc(${before * w}% - ${w * 0.3}%)`, width: `${w * 0.6}%` }}
+                className={`absolute top-0 h-[60%] rounded-b-md bg-[#111] ring-1 ring-black ${down === i ? 'bg-[#333]' : ''}`}
+              />
+            );
+          })}
+        </div>
+      ) : (
+        <div className="grid grid-cols-4 gap-2 select-none touch-none">
+          {DRUM_PADS.map((p, i) => (
+            <button
+              key={p}
+              type="button"
+              onPointerDown={(e) => {
+                e.preventDefault();
+                hit(i);
+              }}
+              className={`h-24 rounded-2xl text-sm font-semibold ring-1 ring-white/30 transition-transform ${down === i ? 'scale-95 bg-brand' : 'bg-white/15'}`}
+            >
+              {t(`park.instrument.pads.${p}` as MessageKey)}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 /** Cartão "o que dá para fazer aqui": ícone, ação e quem/onde; tocar no cartão faz a ação. */
 function InteractPrompt({ kind, title, detail, onAct }: { kind: keyof typeof HINT_ICON; title: string; detail?: string; onAct: () => void }) {

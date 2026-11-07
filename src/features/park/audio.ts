@@ -8,6 +8,7 @@ import type * as THREE from 'three';
 import { LAKE, POIS, PONDS, lakeRadiusAt } from '@/domain/park';
 import { sound } from '@/features/focus/sound';
 import type { Sky } from './world';
+import type { Timbre } from './interiors/things';
 
 export const AUDIO_CATS = ['nature', 'water', 'weather', 'music', 'steps'] as const;
 export type AudioCat = (typeof AUDIO_CATS)[number];
@@ -26,6 +27,8 @@ export interface AudioInfo {
 export interface ParkAudio {
   update: (info: AudioInfo, dt: number) => void;
   setMix: (m: AudioMix) => void;
+  /** Instrumentos e objetos dos interiores: uma nota (MIDI) num timbre, daqui a `delay` segundos. */
+  note: (midi: number, timbre: Timbre, delay?: number) => void;
   dispose: () => void;
 }
 
@@ -177,9 +180,84 @@ export function createParkAudio(mix: AudioMix): ParkAudio | null {
 
   const ramp = (p: AudioParam, v: number, tc = 0.4) => p.setTargetAtTime(v, now(), tc);
 
+  // Instrumentos dos interiores (piano, bateria, sinos, toca-discos): no volume da música, sem abafar.
+  const inst = keep(ctx.createGain());
+  inst.connect(master);
+  const hz = (m: number) => 440 * 2 ** ((m - 69) / 12);
+  const note = (midi: number, timbre: Timbre, delay = 0) => {
+    const at = now() + delay + 0.005;
+    const out = ctx.createGain();
+    out.connect(inst);
+    const env = (g: GainNode, peak: number, attack: number, decay: number) => {
+      g.gain.setValueAtTime(0.0001, at);
+      g.gain.exponentialRampToValueAtTime(peak, at + attack);
+      g.gain.exponentialRampToValueAtTime(0.0001, at + decay);
+    };
+    const osc = (type: OscillatorType, f: number, peak: number, attack: number, decay: number, to?: number) => {
+      const o = ctx.createOscillator();
+      o.type = type;
+      o.frequency.setValueAtTime(f, at);
+      if (to) o.frequency.exponentialRampToValueAtTime(to, at + decay * 0.5);
+      const g = ctx.createGain();
+      env(g, peak, attack, decay);
+      o.connect(g).connect(out);
+      o.start(at);
+      o.stop(at + decay + 0.05);
+    };
+    const hiss = (peak: number, decay: number, freq: number, type: BiquadFilterType) => {
+      const src = ctx.createBufferSource();
+      src.buffer = white;
+      const fl = ctx.createBiquadFilter();
+      fl.type = type;
+      fl.frequency.value = freq;
+      const g = ctx.createGain();
+      env(g, peak, 0.002, decay);
+      src.connect(fl).connect(g).connect(out);
+      src.start(at, Math.random() * 1.5);
+      src.stop(at + decay + 0.05);
+    };
+    const f = hz(midi);
+    switch (timbre) {
+      case 'piano': {
+        // Martelo: fundamental + harmônicos que somem mais rápido, ataque curto e cauda longa.
+        const tail = 2.6 - Math.min(1.6, (midi - 48) * 0.03);
+        osc('triangle', f, 0.32, 0.004, tail);
+        osc('sine', f * 2, 0.12, 0.004, tail * 0.6);
+        osc('sine', f * 3, 0.05, 0.003, tail * 0.35);
+        osc('sine', f * 1.003, 0.1, 0.004, tail);
+        hiss(0.04, 0.03, 3000, 'bandpass');
+        break;
+      }
+      case 'kick':
+        osc('sine', 120, 0.9, 0.002, 0.45, 42);
+        break;
+      case 'snare':
+        osc('triangle', 190, 0.35, 0.002, 0.12, 150);
+        hiss(0.5, 0.22, 2400, 'highpass');
+        break;
+      case 'hat':
+        hiss(0.28, midi > 86 ? 0.05 : 0.09, 8000, 'highpass');
+        break;
+      case 'tom':
+        osc('sine', f * 1.5 < 60 ? 110 : f, 0.6, 0.003, 0.4, (f * 1.5 < 60 ? 110 : f) * 0.6);
+        break;
+      case 'bell':
+        osc('sine', f, 0.3, 0.003, 3.2);
+        osc('sine', f * 2.76, 0.12, 0.002, 1.6);
+        osc('sine', f * 5.4, 0.05, 0.002, 0.8);
+        break;
+      case 'pluck':
+        osc('triangle', f, 0.28, 0.006, 1.2);
+        osc('sine', f / 2, 0.12, 0.01, 1.4);
+        break;
+    }
+    window.setTimeout(() => out.disconnect(), (delay + 4) * 1000);
+  };
+
   const setMix = (m: AudioMix) => {
     ramp(master.gain, m.muted ? 0 : m.master, 0.1);
     AUDIO_CATS.forEach((c) => ramp(cat[c].gain, m[c], 0.1));
+    ramp(inst.gain, Math.max(0.15, m.music), 0.1);
   };
   setMix(mix);
 
@@ -246,6 +324,7 @@ export function createParkAudio(mix: AudioMix): ParkAudio | null {
   return {
     update,
     setMix,
+    note,
     dispose: () => {
       ramp(master.gain, 0, 0.05);
       window.setTimeout(() => {

@@ -7,7 +7,7 @@
  * Dentro dos prédios o som de fora fica abafado. Volume por categoria e silenciar.
  */
 import type * as THREE from 'three';
-import { LAKE, PLAYGROUND, POIS, PONDS, ROAD_RADIUS, lakeRadiusAt } from '@/domain/park';
+import { LAKE, PLAYGROUNDS, POIS, PONDS, ROAD_RADIUS, lakeRadiusAt } from '@/domain/park';
 import { sound } from '@/features/focus/sound';
 import type { Sky } from './world';
 import type { Timbre } from './interiors/things';
@@ -594,12 +594,13 @@ export function createParkAudio(mix: AudioMix): ParkAudio | null {
       window.setTimeout(() => p.disconnect(), 3200);
     }
     // Parquinho: crianças rindo e chamando, de dia e sem chuva.
-    const dk = Math.hypot(PLAYGROUND.x - c.x, PLAYGROUND.z - c.z);
+    const PG = PLAYGROUNDS.reduce((m, g) => (Math.hypot(g.x - c.x, g.z - c.z) < Math.hypot(m.x - c.x, m.z - c.z) ? g : m), PLAYGROUNDS[0]!);
+    const dk = Math.hypot(PG.x - c.x, PG.z - c.z);
     if (!info.inside && h > 8 && h < 18.5 && sky.rain < 0.15 && dk < 70 && performance.now() > kidAt) {
       kidAt = performance.now() + 700 + Math.random() * 2200;
       const n = 2 + Math.floor(Math.random() * 4);
       const base = 74 + Math.floor(Math.random() * 9);
-      const pos = { x: PLAYGROUND.x + (Math.random() - 0.5) * 14, y: 1, z: PLAYGROUND.z + (Math.random() - 0.5) * 14 };
+      const pos = { x: PG.x + (Math.random() - 0.5) * 14, y: 1, z: PG.z + (Math.random() - 0.5) * 14 };
       for (let i = 0; i < n; i++) note(base + (Math.random() < 0.4 ? i * 2 : 0), 'kid', i * (0.13 + Math.random() * 0.05), pos);
     }
     // Sapos na beira do lago, à noite.

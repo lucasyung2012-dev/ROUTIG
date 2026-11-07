@@ -150,18 +150,20 @@ export function createGrass(kit: Kit, ground: (x: number, z: number) => number, 
         const r = hash(ix * 3, iz * 7);
         const fade = d > RANGE - 8 ? (RANGE - d) / 8 : 1;
         const y = ground(x, z) - 0.02;
-        if (patch(x, z, 0.09, 1.3) > 0.78 && nw < NW && r < 0.55) {
+        // Mato e flores só no meio do gramado (a 2,5–3 m de qualquer borda), nunca na beira do caminho.
+        const deep = (k: number) => allowed(x + k, z) && allowed(x - k, z) && allowed(x, z + k) && allowed(x, z - k);
+        if (patch(x, z, 0.09, 1.3) > 0.8 && nw < NW && r < 0.55 && deep(2.5)) {
           const s = (0.8 + r * 0.7) * fade;
           m4.compose(v.set(x, y, z), q.setFromEuler(e.set(0, r * 6.28, 0)), sc.set(s, s * (0.9 + r * 0.5), s));
           weeds.setMatrixAt(nw, m4);
           weeds.setColorAt(nw++, c.set(r > 0.3 ? '#FFFFFF' : '#E8DDA8'));
           continue;
         }
-        if (patch(x, z, 0.13, 4.1) > 0.76 && nf < NF && r > 0.45) {
+        if (patch(x, z, 0.13, 4.1) > 0.8 && nf < NF && r > 0.45 && deep(3)) {
           const s = (0.8 + r * 0.5) * fade;
           m4.compose(v.set(x, y, z), q.setFromEuler(e.set(0, r * 6.28, 0)), sc.set(s, s, s));
           flowers.setMatrixAt(nf, m4);
-          flowers.setColorAt(nf++, c.set(flowerTones[Math.floor(hash(Math.floor(x / 6), Math.floor(z / 6)) * flowerTones.length)]!));
+          flowers.setColorAt(nf++, c.set(flowerTones[Math.floor(hash(Math.floor(x / 16), Math.floor(z / 16)) * flowerTones.length)]!));
         }
         const s = (0.7 + r * 0.8) * fade;
         m4.compose(v.set(x, y, z), q.setFromEuler(e.set(0, r * 6.28, 0)), sc.set(s, s * (0.8 + r * 0.6), s));

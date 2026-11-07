@@ -5,9 +5,10 @@
  */
 import * as THREE from 'three';
 import type { ModuleId } from '@/app/modules';
-import { LAKE, onPath, plazaCarts, ROAD_RADIUS, PARK_BUILDINGS, PARK_RADIUS, PARK_SCALE, PATH_WIDTH, PLAZA_RADIUS, POIS, PONDS, entranceOf, facingOf, heightAt, inWater, inField, isFreeGround, lakeRadiusAt, parkPaths, samplePath, seededRandom, treePositions, type ParkBuilding, type Point } from '@/domain/park';
+import { LAKE, onPath, plazaCarts, PLAYGROUNDS, ROAD_RADIUS, PARK_BUILDINGS, PARK_RADIUS, PARK_SCALE, PATH_WIDTH, PLAZA_RADIUS, POIS, PONDS, entranceOf, facingOf, heightAt, inWater, inField, isFreeGround, lakeRadiusAt, parkPaths, samplePath, seededRandom, treePositions, type ParkBuilding, type Point } from '@/domain/park';
 import { amenities, houses, neighborhood, sportsFields, streetTrees, type Seat, type Viewpoint } from './buildings/amenities';
 import { city } from './buildings/city';
+import { navGraph } from '@/domain/parkPeople';
 import { Builder, Kit, signTexture, cloud, forest, setWaterNight, setWaterSky, setWaterWeather, shrubs, sky, stars, water, type Plant, type TreeSpecies } from './kit';
 import { birds, butterflies, drone, fountain, leaves, rain } from './life';
 import { playground } from './playground';
@@ -177,7 +178,7 @@ export interface World {
   pickables: THREE.Object3D[];
   seats: Seat[];
   /** Anima o parquinho (balanços e gangorra). */
-  play: (s: { swings: number[]; seesaw: number }) => void;
+  play: (s: Array<{ swings: number[]; seesaw: number }>) => void;
   /** Sons da rua deste quadro (ônibus freando, buzina). */
   cityEvents: () => Array<{ x: number; z: number; kind: 'brake' | 'horn' }>;
   /** Cancela o que ainda ia ser montado (ao fechar o parque). */
@@ -675,9 +676,9 @@ export function createWorld(kit: Kit): World {
   const p = paths(kit);
   const plazaGroup = plaza(kit);
   // Parquinho (os brinquedos que mexem seguem as crianças).
-  const pg = playground(kit);
-  pg.group.updateMatrixWorld(true);
-  root.add(p.group, lampPosts(kit, p.lamps), plazaGroup, pg.group);
+  const pgs = PLAYGROUNDS.map((_, i) => playground(kit, i));
+  pgs.forEach((p) => p.group.updateMatrixWorld(true));
+  root.add(p.group, lampPosts(kit, p.lamps), plazaGroup, ...pgs.map((p) => p.group));
   const f = fountain(kit);
   f.group.scale.setScalar(1.7);
   root.add(f.group);
@@ -785,7 +786,7 @@ export function createWorld(kit: Kit): World {
   }, 1500);
   obstacles.push(...footprint(fields, heightAt));
   // Barracas, quiosques, mesas, bancos, pérgolas, passarela, praça; postes e troncos das árvores.
-  obstacles.push(...footprint(am.group, heightAt), ...footprint(ww, heightAt), ...footprint(plazaGroup, heightAt), ...footprint(pg.solid, heightAt));
+  obstacles.push(...footprint(am.group, heightAt), ...footprint(ww, heightAt), ...footprint(plazaGroup, heightAt), ...pgs.flatMap((p) => footprint(p.solid, heightAt)));
   for (const l of p.lamps) obstacles.push({ x: l.x, z: l.z, r: 0.25, h: heightAt(l.x, l.z) + 4.2 });
 
   // Árvores do parque e as da calçada do bairro (copas redondas e esguias alternadas).
@@ -845,8 +846,29 @@ export function createWorld(kit: Kit): World {
   const sunK = () => Math.max(0.3, 1 - weather.cloud * 0.4 - weather.rain * 0.25 - weather.fog * 0.3);
   const ms = mist(kit);
   // Grama em volta de quem anda: só em gramados, fora de caminhos, praça, água, lotes, quadras e convivência.
+  // Onde há piso feito pela gente (lounges, calçadas dos elevadores, parquinhos, caminhos dos portões
+  // até a rua e a calçada da rua): grama e mato nunca nascem em cima.
+  const zoneGrid = new Map<string, Array<{ x: number; z: number; r: number }>>();
+  for (const c of [...clearZones, ...PLAYGROUNDS.map((g) => ({ x: g.x, z: g.z, r: 12.5 }))])
+    for (let i = Math.floor((c.x - c.r) / 10); i <= Math.floor((c.x + c.r) / 10); i++)
+      for (let j = Math.floor((c.z - c.r) / 10); j <= Math.floor((c.z + c.r) / 10); j++) {
+        const k = `${i},${j}`;
+        zoneGrid.set(k, [...(zoneGrid.get(k) ?? []), c]);
+      }
+  const gateRays = navGraph().gates.map((gi) => {
+    const n = navGraph().nodes[gi]!;
+    return { a: Math.atan2(n.z, n.x), r: Math.hypot(n.x, n.z) };
+  });
+  const paved = (x: number, z: number) => {
+    const r = Math.hypot(x, z);
+    if (r > ROAD_RADIUS - 9) return true;
+    if ((zoneGrid.get(`${Math.floor(x / 10)},${Math.floor(z / 10)}`) ?? []).some((c) => Math.hypot(c.x - x, c.z - z) < c.r + 0.6)) return true;
+    const a = Math.atan2(z, x);
+    return gateRays.some((g) => r > g.r - 3 && Math.abs(Math.atan2(Math.sin(a - g.a), Math.cos(a - g.a))) * r < 2.4);
+  };
   const gr = createGrass(kit, heightAt, (x, z) => {
-    if (!isFreeGround(x, z, 0.2)) return false;
+    // Margem de 1 m: o caminho é desenhado em curva suave e passa um pouco da linha dos pontos.
+    if (!isFreeGround(x, z, 1.0) || paved(x, z)) return false;
     // Gramados em manchas (como um gramado de verdade, não grama alta em todo lugar).
     const n = Math.sin(x * 0.045) + Math.sin(z * 0.052 + 1.3) + Math.sin((x + z) * 0.027 + 0.4);
     return n > -0.4;
@@ -876,8 +898,8 @@ export function createWorld(kit: Kit): World {
     obstacles,
     pickables: [...buildings.values()].map((b) => b.group),
     // Todos os bancos do parque servem para sentar (inclusive os da praça).
-    seats: [...am.seats, ...plazaSeats(), ...pg.seats],
-    play: pg.tick,
+    seats: [...am.seats, ...plazaSeats(), ...pgs.flatMap((p) => p.seats)],
+    play: (st) => st.forEach((s, i) => pgs[i]?.tick(s)),
     cityEvents: () => streets?.events() ?? [],
     stop: () => window.clearTimeout(edgeTimer),
     lifts,

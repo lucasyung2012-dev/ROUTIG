@@ -5,7 +5,7 @@
  * os pais, placa e lixeira. Os brinquedos que mexem seguem as crianças (extras.play()).
  */
 import * as THREE from 'three';
-import { PLAY, PLAYGROUND, PLAY_ROT, heightAt, type Point } from '@/domain/park';
+import { PLAY, PLAYGROUNDS, heightAt, type Point } from '@/domain/park';
 import { Builder, signTexture, type Kit } from './kit';
 import { frame, parkBin, signBoard } from './props';
 import type { Seat } from './camera';
@@ -27,11 +27,12 @@ const tubeBetween = (a: [number, number, number], b: [number, number, number], r
   return g;
 };
 
-export function playground(kit: Kit): Playground {
+export function playground(kit: Kit, index = 0): Playground {
+  const G = PLAYGROUNDS[index] ?? PLAYGROUNDS[0]!;
   const group = new THREE.Group();
-  const y0 = heightAt(PLAYGROUND.x, PLAYGROUND.z);
-  group.position.set(PLAYGROUND.x, y0, PLAYGROUND.z);
-  group.rotation.y = PLAY_ROT;
+  const y0 = heightAt(G.x, G.z);
+  group.position.set(G.x, y0, G.z);
+  group.rotation.y = G.rot;
   const floor = new Builder();
   const b = new Builder();
   const put = frame(b, 0, 0, 0, 0);
@@ -197,9 +198,9 @@ export function playground(kit: Kit): Playground {
   // Bancos dos pais (de frente para os brinquedos), lixeira e placa na entrada.
   const seats: Seat[] = [];
   const local = (lx: number, lz: number): Point => {
-    const c = Math.cos(PLAY_ROT);
-    const s = Math.sin(PLAY_ROT);
-    return { x: PLAYGROUND.x + lx * c + lz * s, z: PLAYGROUND.z - lx * s + lz * c };
+    const c = Math.cos(G.rot);
+    const s = Math.sin(G.rot);
+    return { x: G.x + lx * c + lz * s, z: G.z - lx * s + lz * c };
   };
   for (const bn of PLAY.benches) {
     const f = frame(b, bn.x, 0, bn.z, bn.face);
@@ -209,7 +210,7 @@ export function playground(kit: Kit): Playground {
     f(wood, back, 0, 0.75, -0.25);
     for (const s of [-1, 1]) f(steel, new THREE.BoxGeometry(0.06, 0.45, 0.45), s * 0.8, 0.22, 0);
     const w = local(bn.x, bn.z);
-    seats.push({ x: w.x, y: y0 + 0.45, z: w.z, face: PLAY_ROT + bn.face });
+    seats.push({ x: w.x, y: y0 + 0.45, z: w.z, face: G.rot + bn.face });
   }
   parkBin(b, kit, 2.2, 0, R - 1.0, Math.PI);
   const tex = signTexture(kit, ['Parquinho', 'de 2 a 12 anos'], { bg: '#FEF3C7', fg: '#7C2D12', accent: '#F59E0B', w: 512, h: 256 });

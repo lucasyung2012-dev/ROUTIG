@@ -6,7 +6,7 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import type { ModuleId } from '@/app/modules';
-import { LAKE, PARK_BUILDINGS, PARK_RADIUS, PLAYGROUND, PLAZA_RADIUS, PONDS, heightAt, inWater, onPath } from '@/domain/park';
+import { LAKE, PARK_BUILDINGS, PARK_RADIUS, PLAYGROUNDS, PLAZA_RADIUS, PONDS, heightAt, inWater, onPath } from '@/domain/park';
 import { Kit } from './kit';
 import { createCameraRig, type CamMode, type MoveSettings, type Posture } from './camera';
 import { AVATAR_LOOK, createCrowd, type Figure } from './people';
@@ -688,7 +688,7 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
     if (typeof cmd === 'string' && cmd.startsWith('look:') && !inside) {
       const what = cmd.slice(5);
       const xz = what.split(',').map(Number);
-      const p = what === 'playground' ? PLAYGROUND : world.lifts.find((l) => l.id === what) ?? (xz.length === 2 && xz.every(Number.isFinite) ? { x: xz[0]!, z: xz[1]! } : null);
+      const p = what.startsWith('playground') ? (PLAYGROUNDS[Number(what.slice(10)) || 0] ?? null) : world.lifts.find((l) => l.id === what) ?? (xz.length === 2 && xz.every(Number.isFinite) ? { x: xz[0]!, z: xz[1]! } : null);
       if (!p) return;
       const y = heightAt(p.x, p.z);
       // Lounge: a câmera fica do lado de fora do prédio, olhando para ele.

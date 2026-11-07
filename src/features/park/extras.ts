@@ -5,7 +5,7 @@
  * pais no banco, pombos na praça (voam quando alguém chega perto), patos no lago e um gato de rua.
  * Tudo por hora do dia e clima: de noite e com chuva o parque esvazia.
  */
-import { LAKE, PARK_SCALE, PLAY, PLAYGROUND, PLAY_ROT, POIS, heightAt, lakeRadiusAt, onPath, playAt, plazaCarts, type Point } from '@/domain/park';
+import { LAKE, PARK_SCALE, PLAY, PLAYGROUNDS, POIS, heightAt, lakeRadiusAt, onPath, playAt, plazaCarts, type Point } from '@/domain/park';
 import { routeBetween } from '@/domain/parkPeople';
 import type { Figure } from './people';
 
@@ -50,7 +50,7 @@ export interface Extras {
   ducks: () => Duck[];
   cat: () => Quad | null;
   /** Ângulo de cada balanço (radianos) e inclinação da gangorra, para animar os brinquedos. */
-  play: () => { swings: number[]; seesaw: number };
+  play: () => Array<{ swings: number[]; seesaw: number }>;
   skaters: () => Point[];
   sounds: () => Array<{ x: number; z: number; kind: ExtraSound }>;
 }
@@ -134,9 +134,16 @@ export function createExtras(): Extras {
   const carts = plazaCarts();
 
   // Parquinho: seis crianças trocando de brincadeira e dois adultos no banco.
-  const kids = Array.from({ length: 6 }, (_, i) => ({ id: 400 + i, x: PLAYGROUND.x, z: PLAYGROUND.z, y: 0, yaw: 0, phase: i, pose: 'run' as Figure['pose'], scale: 0.56 + hash(400 + i) * 0.1, tx: 0, tz: 0, until: 0 }));
-  const swings = [0, 0, 0];
-  let seesaw = 0;
+  // Cada parquinho com as suas crianças (só os perto de quem olha são simulados).
+  const yards = PLAYGROUNDS.map((g, pi) => ({
+    pi,
+    x: g.x,
+    z: g.z,
+    rot: g.rot,
+    kids: Array.from({ length: 5 + (pi % 2) }, (_, i) => ({ id: 400 + pi * 10 + i, x: g.x, z: g.z, y: 0, yaw: 0, phase: i, pose: 'run' as Figure['pose'], scale: 0.56 + hash(400 + pi * 10 + i) * 0.1, tx: 0, tz: 0, until: 0 })),
+    swings: [0, 0, 0],
+    seesaw: 0,
+  }));
 
   // Pombos: bando no chão da praça.
   const pigeonList: Bird[] = Array.from({ length: 14 }, (_, i) => {
@@ -211,124 +218,128 @@ export function createExtras(): Extras {
         if (now > gardener.until) gardener.bed++;
       }
     }
-    // Parquinho: cada criança muda de brincadeira a cada ~25 s.
-    const playOn = hour > 8 && hour < 18.5 && rain < 0.15;
-    const occupied = [false, false, false];
-    let seesawKids = 0;
-    kids.forEach((k, i) => {
-      if (!playOn) return;
-      const role = (i + Math.floor(t / 25 + hash(i) * 3)) % 5;
-      const ground = heightAt(k.x, k.z);
-      k.y = ground;
-      if (role === 0 && !occupied[i % 3]) {
-        // Balanço: sobe e desce no arco da corrente, pernas no ritmo.
-        const s = i % 3;
-        occupied[s] = true;
-        const amp = 0.55 + hash(i + 7) * 0.2;
-        const ang = Math.sin(t * 2.2 + i) * amp;
-        swings[s] = ang;
-        const sw = PLAY.swings;
-        const lx = sw.x + (s - 1) * sw.gap;
-        const p = playAt(lx, sw.z + Math.sin(ang) * sw.chain);
-        k.x = p.x;
-        k.z = p.z;
-        k.y = heightAt(p.x, p.z) + sw.top - Math.cos(ang) * sw.chain - 0.05 - 0.53 * k.scale;
-        k.yaw = PLAY_ROT;
-        k.pose = 'swing';
-        k.phase = t * 2.2 + i;
-        return;
-      }
-      if (role === 1) {
-        // Escorregador: sobe a escada, senta lá em cima e desce escorregando; dá a volta correndo.
-        const sl = PLAY.slide;
-        const cyc = (t + i * 1.7) % 7;
-        const foot = playAt(sl.x, sl.z - 1.6);
-        const top = playAt(sl.x, sl.z - 0.5);
-        const end = playAt(sl.x, sl.z + sl.len);
-        if (cyc < 1.6) {
-          const q = cyc / 1.6;
-          k.x = foot.x + (top.x - foot.x) * q * 0.4;
-          k.z = foot.z + (top.z - foot.z) * q * 0.4;
-          k.y = heightAt(k.x, k.z) + q * sl.h;
-          k.pose = 'walk';
-          k.yaw = PLAY_ROT;
-          k.phase += dt * 9;
-        } else if (cyc < 2.6) {
-          k.x = top.x;
-          k.z = top.z;
-          k.y = heightAt(k.x, k.z) + sl.h + 0.05 - 0.53 * k.scale + 0.5;
-          k.pose = 'sit';
-          k.yaw = PLAY_ROT;
-        } else if (cyc < 3.8) {
-          const q = (cyc - 2.6) / 1.2;
-          const e = q * q;
-          k.x = top.x + (end.x - top.x) * e;
-          k.z = top.z + (end.z - top.z) * e;
-          k.y = heightAt(k.x, k.z) + (sl.h + 0.55) * (1 - e) + 0.3 * e - 0.53 * k.scale + 0.05;
-          k.pose = 'sit';
-          k.yaw = PLAY_ROT;
-          if (q < 0.05 && Math.random() < 0.3) sounds.push({ x: k.x, z: k.z, kind: 'kid' });
-        } else {
-          // Volta correndo pela lateral até a escada.
-          const q = (cyc - 3.8) / 3.2;
-          const mid = playAt(sl.x + 2, sl.z + 1);
-          const a = q < 0.5 ? end : mid;
-          const b = q < 0.5 ? mid : foot;
-          const qq = (q % 0.5) * 2;
-          k.x = a.x + (b.x - a.x) * qq;
-          k.z = a.z + (b.z - a.z) * qq;
-          k.y = heightAt(k.x, k.z);
-          k.yaw = Math.atan2(b.x - a.x, b.z - a.z);
-          k.pose = 'run';
-          k.phase += dt * 11;
+    for (const Y of yards) {
+      if (Math.hypot(Y.x - viewer.x, Y.z - viewer.z) > 170) continue;
+      const pa = (lx: number, lz: number) => playAt(lx, lz, Y.pi);
+      // Parquinho: cada criança muda de brincadeira a cada ~25 s.
+      const playOn = hour > 8 && hour < 18.5 && rain < 0.15;
+      const occupied = [false, false, false];
+      let seesawKids = 0;
+      Y.kids.forEach((k, i) => {
+        if (!playOn) return;
+        const role = (i + Math.floor(t / 25 + hash(i) * 3)) % 5;
+        const ground = heightAt(k.x, k.z);
+        k.y = ground;
+        if (role === 0 && !occupied[i % 3]) {
+          // Balanço: sobe e desce no arco da corrente, pernas no ritmo.
+          const s = i % 3;
+          occupied[s] = true;
+          const amp = 0.55 + hash(i + 7) * 0.2;
+          const ang = Math.sin(t * 2.2 + i) * amp;
+          Y.swings[s] = ang;
+          const sw = PLAY.swings;
+          const lx = sw.x + (s - 1) * sw.gap;
+          const p = pa(lx, sw.z + Math.sin(ang) * sw.chain);
+          k.x = p.x;
+          k.z = p.z;
+          k.y = heightAt(p.x, p.z) + sw.top - Math.cos(ang) * sw.chain - 0.05 - 0.53 * k.scale;
+          k.yaw = Y.rot;
+          k.pose = 'swing';
+          k.phase = t * 2.2 + i;
+          return;
         }
-        return;
-      }
-      if (role === 4 && seesawKids < 2) {
-        // Gangorra: um em cada ponta, sobe e desce.
-        const ss = PLAY.seesaw;
-        const side = seesawKids++ ? 1 : -1;
-        seesaw = Math.sin(t * 1.6) * 0.28;
-        const lx = ss.x + side * (ss.len / 2 - 0.3);
-        const p = playAt(lx, ss.z);
-        k.x = p.x;
-        k.z = p.z;
-        k.y = heightAt(p.x, p.z) + 0.45 + side * Math.sin(seesaw) * (ss.len / 2 - 0.3) - 0.53 * k.scale + 0.1;
-        k.yaw = PLAY_ROT + (side > 0 ? -Math.PI / 2 : Math.PI / 2);
-        k.pose = 'sit';
-        return;
-      }
-      if (role === 3) {
-        // Caixa de areia: sentado brincando (mãos mexendo).
-        const sd = PLAY.sand;
-        const p = playAt(sd.x + (hash(i + 30) - 0.5) * 2.4, sd.z + (hash(i + 31) - 0.5) * 1.8);
-        k.x = p.x;
-        k.z = p.z;
-        k.y = heightAt(p.x, p.z) + 0.12 - 0.42 * k.scale;
-        k.yaw = PLAY_ROT + hash(i + 32) * 6;
-        k.pose = 'draw';
-        k.phase += dt * 3;
-        return;
-      }
-      // Pega-pega: correm entre pontos do parquinho.
-      if (now > k.until || Math.hypot(k.tx - k.x, k.tz - k.z) < 0.4) {
-        const p = playAt((hash(now * 0.001 + i) - 0.5) * 12, (hash(now * 0.0013 + i * 3) - 0.5) * 10);
-        k.tx = p.x;
-        k.tz = p.z;
-        k.until = now + 4000;
-        if (Math.random() < 0.35) sounds.push({ x: k.x, z: k.z, kind: 'kid' });
-      }
-      const dx = k.tx - k.x;
-      const dz = k.tz - k.z;
-      const d = Math.hypot(dx, dz) || 1;
-      k.x += (dx / d) * 3 * dt;
-      k.z += (dz / d) * 3 * dt;
-      k.yaw = turn(k.yaw, Math.atan2(dx, dz), dt * 8);
-      k.pose = 'run';
-      k.phase += dt * 11;
-    });
-    for (let s = 0; s < 3; s++) if (!occupied[s]) swings[s] = (swings[s] ?? 0) * Math.max(0, 1 - dt * 0.6);
-    if (!seesawKids) seesaw *= Math.max(0, 1 - dt);
+        if (role === 1) {
+          // Escorregador: sobe a escada, senta lá em cima e desce escorregando; dá a volta correndo.
+          const sl = PLAY.slide;
+          const cyc = (t + i * 1.7) % 7;
+          const foot = pa(sl.x, sl.z - 1.6);
+          const top = pa(sl.x, sl.z - 0.5);
+          const end = pa(sl.x, sl.z + sl.len);
+          if (cyc < 1.6) {
+            const q = cyc / 1.6;
+            k.x = foot.x + (top.x - foot.x) * q * 0.4;
+            k.z = foot.z + (top.z - foot.z) * q * 0.4;
+            k.y = heightAt(k.x, k.z) + q * sl.h;
+            k.pose = 'walk';
+            k.yaw = Y.rot;
+            k.phase += dt * 9;
+          } else if (cyc < 2.6) {
+            k.x = top.x;
+            k.z = top.z;
+            k.y = heightAt(k.x, k.z) + sl.h + 0.05 - 0.53 * k.scale + 0.5;
+            k.pose = 'sit';
+            k.yaw = Y.rot;
+          } else if (cyc < 3.8) {
+            const q = (cyc - 2.6) / 1.2;
+            const e = q * q;
+            k.x = top.x + (end.x - top.x) * e;
+            k.z = top.z + (end.z - top.z) * e;
+            k.y = heightAt(k.x, k.z) + (sl.h + 0.55) * (1 - e) + 0.3 * e - 0.53 * k.scale + 0.05;
+            k.pose = 'sit';
+            k.yaw = Y.rot;
+            if (q < 0.05 && Math.random() < 0.3) sounds.push({ x: k.x, z: k.z, kind: 'kid' });
+          } else {
+            // Volta correndo pela lateral até a escada.
+            const q = (cyc - 3.8) / 3.2;
+            const mid = pa(sl.x + 2, sl.z + 1);
+            const a = q < 0.5 ? end : mid;
+            const b = q < 0.5 ? mid : foot;
+            const qq = (q % 0.5) * 2;
+            k.x = a.x + (b.x - a.x) * qq;
+            k.z = a.z + (b.z - a.z) * qq;
+            k.y = heightAt(k.x, k.z);
+            k.yaw = Math.atan2(b.x - a.x, b.z - a.z);
+            k.pose = 'run';
+            k.phase += dt * 11;
+          }
+          return;
+        }
+        if (role === 4 && seesawKids < 2) {
+          // Gangorra: um em cada ponta, sobe e desce.
+          const ss = PLAY.seesaw;
+          const side = seesawKids++ ? 1 : -1;
+          Y.seesaw = Math.sin(t * 1.6) * 0.28;
+          const lx = ss.x + side * (ss.len / 2 - 0.3);
+          const p = pa(lx, ss.z);
+          k.x = p.x;
+          k.z = p.z;
+          k.y = heightAt(p.x, p.z) + 0.45 + side * Math.sin(Y.seesaw) * (ss.len / 2 - 0.3) - 0.53 * k.scale + 0.1;
+          k.yaw = Y.rot + (side > 0 ? -Math.PI / 2 : Math.PI / 2);
+          k.pose = 'sit';
+          return;
+        }
+        if (role === 3) {
+          // Caixa de areia: sentado brincando (mãos mexendo).
+          const sd = PLAY.sand;
+          const p = pa(sd.x + (hash(i + 30) - 0.5) * 2.4, sd.z + (hash(i + 31) - 0.5) * 1.8);
+          k.x = p.x;
+          k.z = p.z;
+          k.y = heightAt(p.x, p.z) + 0.12 - 0.42 * k.scale;
+          k.yaw = Y.rot + hash(i + 32) * 6;
+          k.pose = 'draw';
+          k.phase += dt * 3;
+          return;
+        }
+        // Pega-pega: correm entre pontos do parquinho.
+        if (now > k.until || Math.hypot(k.tx - k.x, k.tz - k.z) < 0.4) {
+          const p = pa((hash(now * 0.001 + i) - 0.5) * 12, (hash(now * 0.0013 + i * 3) - 0.5) * 10);
+          k.tx = p.x;
+          k.tz = p.z;
+          k.until = now + 4000;
+          if (Math.random() < 0.35) sounds.push({ x: k.x, z: k.z, kind: 'kid' });
+        }
+        const dx = k.tx - k.x;
+        const dz = k.tz - k.z;
+        const d = Math.hypot(dx, dz) || 1;
+        k.x += (dx / d) * 3 * dt;
+        k.z += (dz / d) * 3 * dt;
+        k.yaw = turn(k.yaw, Math.atan2(dx, dz), dt * 8);
+        k.pose = 'run';
+        k.phase += dt * 11;
+      });
+      for (let s = 0; s < 3; s++) if (!occupied[s]) Y.swings[s] = (Y.swings[s] ?? 0) * Math.max(0, 1 - dt * 0.6);
+      if (!seesawKids) Y.seesaw *= Math.max(0, 1 - dt);
+    }
 
     // Pombos: bicam o chão andando aos pouquinhos; se alguém chega perto, o bando voa, dá uma volta e pousa em outro lugar.
     const near = pigeonList.some((b) => !b.flying && Math.hypot(b.x - viewer.x, b.z - viewer.z) < 3.2);
@@ -510,10 +521,11 @@ export function createExtras(): Extras {
       });
     const playOn = hourNow > 8 && hourNow < 18.5 && rainNow < 0.15;
     if (playOn) {
-      kids.forEach((k) => add({ ...look(k.id, true), x: k.x, y: k.y, z: k.z, yaw: k.yaw, pose: k.pose, phase: k.phase, stride: 1, scale: k.scale, expr: k.pose === 'run' || k.pose === 'swing' ? 'laugh' : 'smile' }));
-      PLAY.benches.forEach((b, i) => {
-        const p = playAt(b.x, b.z);
-        add({ ...look(380 + i), x: p.x, y: heightAt(p.x, p.z), z: p.z, yaw: PLAY_ROT + b.face, pose: i ? 'sit' : 'read', phase: performance.now() / 700, stride: 0, scale: 1, expr: 'smile' });
+      for (const Y of yards) Y.kids.forEach((k) => add({ ...look(k.id, true), x: k.x, y: k.y, z: k.z, yaw: k.yaw, pose: k.pose, phase: k.phase, stride: 1, scale: k.scale, expr: k.pose === 'run' || k.pose === 'swing' ? 'laugh' : 'smile' }));
+      for (const Y of yards)
+        PLAY.benches.forEach((b, i) => {
+        const p = playAt(b.x, b.z, Y.pi);
+        add({ ...look(380 + Y.pi * 3 + i), x: p.x, y: heightAt(p.x, p.z), z: p.z, yaw: Y.rot + b.face, pose: i ? 'sit' : 'read', phase: performance.now() / 700, stride: 0, scale: 1, expr: 'smile' });
       });
     }
     return out
@@ -528,7 +540,7 @@ export function createExtras(): Extras {
     pigeons: () => pigeonList,
     ducks: () => duckList,
     cat: () => catS,
-    play: () => ({ swings, seesaw }),
+    play: () => yards.map((Y) => ({ swings: Y.swings, seesaw: Y.seesaw })),
     skaters: () => riders.filter((r) => r.kind === 'skate' && active(r)).map((r) => ({ x: r.x, z: r.z })),
     sounds: () => sounds,
   };

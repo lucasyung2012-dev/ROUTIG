@@ -412,7 +412,7 @@ export function isFreeGround(x: number, z: number, pad = 0.5): boolean {
   if (inWater(x, z, 1 + pad) || inField(x, z, 2 + pad)) return false;
   if (PARK_BUILDINGS.some((b) => Math.hypot(x - b.x, z - b.z) < b.radius * 0.92 + pad)) return false;
   if (POIS.some((p) => Math.hypot(x - p.x, z - p.z) < 10 + pad)) return false;
-  if (playgroundSpot && Math.hypot(x - playgroundSpot.x, z - playgroundSpot.z) < 12 + pad) return false;
+  if (playSpots.some((p) => Math.hypot(x - p.x, z - p.z) < 12 + pad)) return false;
   const gx = Math.floor(x / 6);
   const gz = Math.floor(z / 6);
   for (let i = -1; i <= 1; i++)
@@ -459,7 +459,7 @@ export function treePositions(count: number, seed = 7): Array<{ x: number; z: nu
     if (POIS.some((q) => dist(p, q) < 9)) continue;
     if (Object.values(COURTS).some((q) => dist(p, q) < 10)) continue;
     if (inField(p.x, p.z, 6)) continue;
-    if (Math.hypot(p.x - PLAYGROUND.x, p.z - PLAYGROUND.z) < 16 || onStreet(p.x, p.z, 3)) continue;
+    if (PLAYGROUNDS.some((g) => Math.hypot(p.x - g.x, p.z - g.z) < 16) || onStreet(p.x, p.z, 3)) continue;
     const edge = parkEdgeAt(a);
     if ((r > edge + 12 && r < ROAD_RADIUS + 42) || (r > ROAD_RADIUS + 58 && r < ROAD_RADIUS + 114)) continue; // rua, casas e prédios do bairro (árvores entre eles)
     if (near(pathGrid, p, 4.5) || near(grid, p, 4.2)) continue;
@@ -540,18 +540,51 @@ export function onStreet(x: number, z: number, pad = 0): boolean {
 
 /* ---------- Parquinho ---------- */
 
-let playgroundSpot: Point | null = null;
-/** Parquinho das crianças: gramado livre de 26 m perto do jardim do Sul, encostado num caminho. */
-export const PLAYGROUND: Point = (() => {
-  for (let ring = 0; ring < 14; ring++)
-    for (let k = 0; k < 16; k++) {
-      const a = (k / 16) * Math.PI * 2;
-      const x = 20 * PARK_SCALE + Math.cos(a) * ring * 6;
-      const z = 120 * PARK_SCALE + Math.sin(a) * ring * 6;
-      if (isFreeGround(x, z, 10) && !isFreeGround(x, z, 14)) return (playgroundSpot = { x, z });
+let playSpots: Point[] = [];
+/** Giro de um parquinho: a entrada (lado +z dos brinquedos) fica para o caminho mais próximo. */
+function playRot(p: Point): number {
+  for (let r = 12; r < 24; r += 1)
+    for (let k = 0; k < 48; k++) {
+      const a = (k / 48) * Math.PI * 2;
+      if (onPath(p.x + Math.sin(a) * r, p.z + Math.cos(a) * r)) return a;
     }
-  return (playgroundSpot = { x: 30, z: 200 });
+  return 0;
+}
+/**
+ * Parquinhos espalhados pelo parque: gramados livres de uns 30 m (a cerca fica a 2 m de qualquer
+ * caminho, lote, água ou mirante), sempre com um caminho perto para chegar; o primeiro perto do
+ * jardim do Sul e os outros o mais longe possível uns dos outros (até quatro).
+ */
+export const PLAYGROUNDS: Array<Point & { rot: number }> = (() => {
+  const cands: Point[] = [];
+  for (let x = -360; x <= 360; x += 10)
+    for (let z = -360; z <= 360; z += 10) {
+      if (Math.hypot(x, z) > PARK_RADIUS - 25) continue;
+      if (PARK_BUILDINGS.some((b) => Math.hypot(b.x - x, b.z - z) < b.radius + 22)) continue;
+      if (isFreeGround(x, z, 13) && !isFreeGround(x, z, 19)) cands.push({ x, z });
+    }
+  const south = { x: 20 * PARK_SCALE, z: 120 * PARK_SCALE };
+  const out: Point[] = [];
+  if (cands.length) out.push(cands.reduce((m, c) => (dist(c, south) < dist(m, south) ? c : m), cands[0]!));
+  while (out.length < 4) {
+    let best: Point | null = null;
+    let bd = 0;
+    for (const c of cands) {
+      const d = Math.min(...out.map((o) => dist(o, c)));
+      if (d > bd) {
+        bd = d;
+        best = c;
+      }
+    }
+    if (!best || bd < 110) break;
+    out.push(best);
+  }
+  if (!out.length) out.push({ x: 30, z: 200 });
+  playSpots = out;
+  return out.map((p) => ({ ...p, rot: playRot(p) }));
 })();
+/** O primeiro parquinho (perto do jardim do Sul). */
+export const PLAYGROUND: Point = PLAYGROUNDS[0]!;
 
 /** Carrinhos da praça (pipoca e água de coco): entre os bancos, fora das saídas dos caminhos. */
 export function plazaCarts(): Array<{ x: number; z: number; face: number; kind: 'popcorn' | 'coconut' }> {
@@ -580,18 +613,11 @@ export const PLAY = {
   benches: [{ x: -1.5, z: 9.2, face: Math.PI }, { x: 2.5, z: 9.2, face: Math.PI }],
 };
 
-/** Giro do parquinho: a entrada (lado +z dos brinquedos) fica para o caminho mais próximo. */
-export const PLAY_ROT: number = (() => {
-  for (let r = 11; r < 22; r += 1)
-    for (let k = 0; k < 48; k++) {
-      const a = (k / 48) * Math.PI * 2;
-      if (onPath(PLAYGROUND.x + Math.sin(a) * r, PLAYGROUND.z + Math.cos(a) * r)) return a;
-    }
-  return 0;
-})();
-/** Ponto do parquinho (coordenadas locais dos brinquedos) no mundo. */
-export function playAt(lx: number, lz: number): Point {
-  const c = Math.cos(PLAY_ROT);
-  const s = Math.sin(PLAY_ROT);
-  return { x: PLAYGROUND.x + lx * c + lz * s, z: PLAYGROUND.z - lx * s + lz * c };
+export const PLAY_ROT: number = PLAYGROUNDS[0]!.rot;
+/** Ponto do parquinho `i` (coordenadas locais dos brinquedos) no mundo. */
+export function playAt(lx: number, lz: number, i = 0): Point {
+  const g = PLAYGROUNDS[i] ?? PLAYGROUNDS[0]!;
+  const c = Math.cos(g.rot);
+  const s = Math.sin(g.rot);
+  return { x: g.x + lx * c + lz * s, z: g.z - lx * s + lz * c };
 }

@@ -2,7 +2,25 @@
 
 Leia este arquivo no começo de toda conversa nova sobre o ROUTIG. A especificação completa é o "ROUTIG — Prompt Master" (35 partes), fornecido pelo dono do produto. Decisões em [DECISOES.md](DECISOES.md), arquitetura em [ARQUITETURA.md](ARQUITETURA.md).
 
-**Atualizado:** 2026-11-06 (**V2.1 publicada**; V1 concluída em 2026-11-05)
+**Atualizado:** 2026-11-07 (V2.1 + rodada de ajustes do Lucas; login e sincronização prontos, aguardando o ID do cliente Google)
+
+## Estado da conversa (2026-11-07, ajustes da V2.1)
+
+- **Feito e publicado (CI verde):**
+  - Configurações → Parque 3D: gráficos, desempenho (quadros por segundo) e tamanho do botão da Central.
+  - Botão da Central arrastável; andares e salas num menu compacto; painel da sala no celular com três alturas.
+  - Controles: correr segurando (ou joystick na borda), pular e interagir no toque; cartão de interação com ícone.
+  - Moradores articulados com rosto, cabelo, mãos e sapatos; livro, violão, caderno de desenho e câmera nas mãos; sentam em bancos de verdade; cumprimento com aceno e fala (sem zoom).
+  - Colisão pelo desenho real: prédios, barracas, quiosques, postes, troncos e móveis.
+  - Interior desenhado sobre o parque de verdade: a janela mostra o parque.
+  - Elevador com cabine, portas, escolha de andar e viagem animada.
+  - Salas dos andares com paredes, porta, piso, luz e mobília por tipo; estilo próprio por prédio.
+  - Casas da borda maiores e em 4 estilos.
+  - Árvores e arbustos com folhagem; caminhos refeitos sem cruzar lotes nem água (teste novo); postes, cafés, quiosques, bancos e arquibancada em ordem.
+  - **Conta Google e sincronização** (Configurações → Conta e sincronização), conforme D1/D2/D10/D11.
+- **Aguardando o Lucas:** criar o ID do cliente no Google Cloud (docs/GOOGLE-CLOUD.md) para testar login e sincronização de verdade. Sem ele, só a junção e a criptografia foram testadas (testes automáticos).
+- **Ainda não feito:** exteriores dos 18 prédios redesenhados com os pavimentos da seção 10; personagem com modelo realista (hoje figura articulada estilizada); sincronizar os arquivos da Library.
+- **Não verificado:** iPad e iPhone reais; som.
 
 ## Estado da conversa (2026-11-06, V2.1)
 

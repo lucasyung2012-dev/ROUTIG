@@ -94,6 +94,8 @@ export interface World {
   pickables: THREE.Object3D[];
   seats: Seat[];
   viewpoints: Viewpoint[];
+  /** Árvores (para observar de perto). */
+  treeSpots: Plant[];
   spots: Array<{ id: string; x: number; z: number; kind: string }>;
   tick: (t: number, dt: number, focus: THREE.Vector3, cam: THREE.Vector3) => void;
   setLight: (l: Light) => void;
@@ -459,7 +461,8 @@ export function createWorld(kit: Kit): World {
   root.add(am.group, houses(kit));
   root.add(walkway(kit, buildings.get('tasks')?.def, buildings.get('calendar')?.def));
 
-  const trees = forest(kit, plants());
+  const plantList = plants();
+  const trees = forest(kit, plantList);
   const meadow = meadows(kit);
   root.add(trees.group, ...meadow);
   // Luzes de fim de ano em volta da praça (só aparecem no evento).
@@ -506,6 +509,7 @@ export function createWorld(kit: Kit): World {
     obstacles,
     pickables: [...buildings.values()].map((b) => b.group),
     seats: am.seats,
+    treeSpots: plantList,
     viewpoints: am.viewpoints,
     spots: am.spots,
     tick: (t, dt, focus, cam) => {

@@ -6,9 +6,12 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import type { ModuleId } from '@/app/modules';
-import { PARK_RADIUS, heightAt, inWater } from '@/domain/park';
+import { LAKE, PARK_RADIUS, PONDS, heightAt, inWater } from '@/domain/park';
 import { Kit } from './kit';
-import { createCameraRig, type CamMode } from './camera';
+import { createCameraRig, type CamMode, type MoveSettings, type Posture } from './camera';
+import { AVATAR_LOOK, createCrowd } from './people';
+import { createTown } from './town';
+import type { Conditions } from '@/domain/parkPeople';
 import { TIMES, createWorld, type Light, type Quality, type Season, type TimeOfDay, type Weather } from './world';
 import type { InteriorScene } from './interiors/common';
 
@@ -31,7 +34,15 @@ export interface EngineOpts {
   onInside: (id: ModuleId | null) => void;
   /** Primeira pessoa: prédio cuja entrada está bem perto. */
   onNear: (id: ModuleId | null) => void;
+  /** Modo de câmera em uso (muda sozinho ao deslizar até um prédio e voltar). */
+  onMode: (m: CamMode) => void;
+  /** O que dá para fazer aqui (sentar, observar) e a postura atual. */
+  onHint: (h: Hint | null) => void;
+  onPosture: (p: Posture) => void;
+  startMode: CamMode;
 }
+
+export type Hint = { kind: 'sit' } | { kind: 'view' } | { kind: 'tree' } | { kind: 'water' } | { kind: 'person'; name: string; activity: string };
 
 export interface Engine {
   setQuality: (q: Quality) => void;
@@ -43,6 +54,16 @@ export interface Engine {
   cameraInfo: () => { x: number; z: number; yaw: number; inside: boolean };
   setCamMode: (m: CamMode) => void;
   setMove: (x: number, y: number) => void;
+  setRun: (on: boolean) => void;
+  jump: () => void;
+  /** Botão de interagir: entrar, sentar, observar ou levantar. */
+  interact: () => void;
+  setMoveSettings: (s: MoveSettings) => void;
+  /** Quantas pessoas desenhar no máximo (0 = nenhuma). */
+  setCrowd: (max: number) => void;
+  /** Hora simulada (0–24) para as rotinas dos moradores. */
+  setHour: (h: number) => void;
+  census: () => { outside: number; total: number };
   flyTo: (id: ModuleId | 'plaza') => void;
   enter: (id: ModuleId) => void;
   exit: () => void;
@@ -77,9 +98,30 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
   pmrem.dispose();
 
   const camera = new THREE.PerspectiveCamera(48, 1, 0.3, 1400);
-  const rig = createCameraRig(camera, canvas, opts.reduceMotion);
+  const rig = createCameraRig(camera, canvas, opts.reduceMotion, opts.onPosture);
   const outsideWorld = () => rig.setWorld({ ground: heightAt, obstacles: world.obstacles, limit: { x: 0, z: 0, r: PARK_RADIUS + 30 }, ceiling: Infinity, minDistance: 4, maxDistance: 380, blocked: (x, z) => inWater(x, z, 0.8) });
   outsideWorld();
+
+  /* ---------- Pessoas: avatar (terceira pessoa) e moradores ---------- */
+  const avatar = createCrowd(kit, 1);
+  outside.add(avatar.group);
+  const crowd = createCrowd(kit, 40);
+  outside.add(crowd.group);
+  const town = createTown();
+  let crowdMax = 16;
+  let season: Conditions['season'] = 'summer';
+  let simHour = 12;
+  const conditions = (): Conditions => {
+    const w = weather as string;
+    return { hour: simHour, day: Math.floor(Date.now() / 86400000), rain: w === 'rain' ? 0.7 : 0, fog: w === 'fog' ? 0.8 : 0, wind: w === 'wind' ? 0.8 : 0, season };
+  };
+  let settled = false;
+  const bodyFigure = () => {
+    const b = rig.body();
+    const sitting = rig.posture() === 'sit';
+    avatar.set([{ x: b.pos.x, y: b.pos.y, z: b.pos.z, yaw: b.yaw + Math.PI, pose: sitting ? 'sit' : b.speed > 0.2 ? 'walk' : 'stand', phase: walkPhase, stride: Math.min(1, b.speed / 3.6), ...AVATAR_LOOK, scale: 1 }]);
+  };
+  let walkPhase = 0;
 
   // Interior aberto (um por vez).
   let inside: { id: ModuleId; kit: Kit; scene: InteriorScene } | null = null;
@@ -94,6 +136,7 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
     rig.controls.target.set(0, 0, 0);
     rig.glideTo(intro, HOME.target.clone(), 5600);
   }
+  rig.setMode(opts.startMode);
 
   /* ---------- Toque: escolher prédio (fora) ou setor (dentro) ---------- */
   const ray = new THREE.Raycaster();
@@ -173,9 +216,8 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
         if (cached !== undefined) scene.setData(cached);
         inside = { id, kit: ikit, scene };
         rig.setWorld({ ground: () => 0, obstacles: scene.obstacles, limit: { x: 0, z: 0, r: scene.room.radius - 1.2 }, ceiling: scene.room.height, minDistance: 1.5, maxDistance: scene.room.radius * 1.7 });
-        const v = fit(scene.view('entry'));
-        camera.position.copy(v.cam);
-        rig.controls.target.copy(v.target);
+        scene.scene.add(avatar.group);
+        if (rig.mode() !== 'orbit') rig.place(v.cam.x, v.cam.z, Math.atan2(-(v.target.x - v.cam.x), -(v.target.z - v.cam.z)));
         recompile(scene.scene);
         opts.onInside(id);
       }),
@@ -194,6 +236,8 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
       const center = new THREE.Vector3(b.def.x, heightAt(b.def.x, b.def.z) + 4, b.def.z);
       camera.position.copy(center).addScaledVector(out, b.def.radius * 1.5).setY(center.y + 12);
       rig.controls.target.copy(center);
+      outside.add(avatar.group);
+      if (rig.mode() !== 'orbit') rig.place(b.entrance.x + out.x * 3, b.entrance.z + out.z * 3, Math.atan2(-out.x, -out.z));
       opts.onInside(null);
     });
   };
@@ -210,7 +254,66 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
     rig.glideTo(cam, target, 1600);
   };
 
+  /* ---------- Interações: sentar, observar mirante, árvore, água ou alguém ---------- */
+  const near2 = <T extends { x: number; z: number }>(list: T[], p: { x: number; z: number }, r: number): T | null => {
+    let best: T | null = null;
+    let bd = r;
+    for (const o of list) {
+      const d = Math.hypot(o.x - p.x, o.z - p.z);
+      if (d < bd) {
+        bd = d;
+        best = o;
+      }
+    }
+    return best;
+  };
+  const waterPoint = (p: { x: number; z: number }) => {
+    const all = [{ x: LAKE.x, z: LAKE.z }, ...PONDS];
+    return all.reduce((m, o) => (Math.hypot(o.x - p.x, o.z - p.z) < Math.hypot(m.x - p.x, m.z - p.z) ? o : m), all[0]!);
+  };
+  const findHint = (): Hint | null => {
+    if (rig.posture() !== 'stand' || inside) return null;
+    const p = rig.body().pos;
+    if (near2(world.seats, p, 1.8)) return { kind: 'sit' };
+    if (near2(world.viewpoints, p, 4)) return { kind: 'view' };
+    const who = town.nearest(p, 2.6);
+    if (who) return { kind: 'person', name: who.name, activity: who.activity };
+    if (inWater(p.x, p.z, 4)) return { kind: 'water' };
+    if (near2(world.treeSpots, p, 4)) return { kind: 'tree' };
+    return null;
+  };
+  const interact = () => {
+    if (rig.mode() === 'orbit' || rig.gliding()) return;
+    if (rig.posture() !== 'stand') {
+      rig.sit(null);
+      rig.observe(null);
+      return;
+    }
+    if (near && !inside) return enter(near);
+    if (inside) return;
+    const p = rig.body().pos;
+    const seat = near2(world.seats, p, 1.8);
+    if (seat) return rig.sit({ ...seat, face: seat.face + Math.PI });
+    const vp = near2(world.viewpoints, p, 4);
+    if (vp) {
+      rig.place(vp.x, vp.z, rig.body().yaw);
+      return rig.observe(new THREE.Vector3(vp.x + Math.sin(vp.view) * 90, vp.y - 4, vp.z + Math.cos(vp.view) * 90));
+    }
+    const who = town.nearest(p, 2.6);
+    if (who) return rig.observe(new THREE.Vector3(who.x, heightAt(who.x, who.z) + 1.5, who.z));
+    if (inWater(p.x, p.z, 4)) {
+      const w = waterPoint(p);
+      const dx = w.x - p.x;
+      const dz = w.z - p.z;
+      const l = Math.hypot(dx, dz) || 1;
+      return rig.observe(new THREE.Vector3(p.x + (dx / l) * 12, -0.4, p.z + (dz / l) * 12));
+    }
+    const tree = near2(world.treeSpots, p, 4);
+    if (tree) return rig.observe(new THREE.Vector3(tree.x, (tree.y ?? heightAt(tree.x, tree.z)) + 5 * tree.s, tree.z));
+  };
+
   /* ---------- Qualidade ---------- */
+
   let quality: Quality = opts.quality;
   let fpsCap: number = QUALITY[quality].fpsCap;
   const resize = () => {
@@ -298,6 +401,9 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
   let frames = 0;
   let statsAt = performance.now();
   let near: ModuleId | null = null;
+  let lastMode: CamMode = rig.mode();
+  let hintFrame = 0;
+  let hint: string | null = null;
   const t0 = performance.now();
   const loop = (now: number) => {
     raf = requestAnimationFrame(loop);
@@ -310,22 +416,56 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
       current = applyLight(blend);
     }
     rig.update(dt, now);
+    const mode = rig.mode();
+    if (mode !== lastMode) {
+      lastMode = mode;
+      opts.onMode(mode);
+    }
+    const body = rig.body();
+    walkPhase += dt * body.speed * 2.6;
+    avatar.group.visible = mode === 'third' && !rig.gliding();
+    if (avatar.group.visible) bodyFigure();
     const t = opts.reduceMotion ? 0 : (now - t0) / 1000;
     if (!inside) {
       world.tick(t, opts.reduceMotion ? 0 : dt, rig.focus(), camera.position);
-      // Primeira pessoa: avisa quando a entrada de um prédio está a poucos passos.
-      if (rig.mode() === 'walk') {
+      // Moradores: a rotina anda com a hora; só os mais próximos são desenhados.
+      if (crowdMax > 0) {
+        if (!settled) {
+          town.settle(conditions());
+          settled = true;
+        }
+        const viewer = mode === 'orbit' ? rig.controls.target : body.pos;
+        town.step(opts.reduceMotion ? dt * 0.5 : dt, conditions(), mode === 'orbit' ? { x: 1e5, z: 1e5 } : viewer, now);
+        crowd.set(town.visible(viewer, crowdMax, mode === 'orbit' ? 260 : 140));
+      }
+      // Andando: avisa quando a entrada de um prédio está a poucos passos e o que dá para fazer aqui.
+      if (mode !== 'orbit') {
         let best: ModuleId | null = null;
         world.buildings.forEach((b, id) => {
-          if (opts.interiors[id] && Math.hypot(camera.position.x - b.entrance.x, camera.position.z - b.entrance.z) < 13) best = id;
+          if (opts.interiors[id] && Math.hypot(body.pos.x - b.entrance.x, body.pos.z - b.entrance.z) < 13) best = id;
         });
+        if (++hintFrame % 8 === 0) {
+          const h = best ? null : findHint();
+          const key = h ? JSON.stringify(h) : null;
+          if (key !== hint) {
+            hint = key;
+            opts.onHint(h);
+          }
+        }
+
         if (best !== near) {
           near = best;
           opts.onNear(near);
         }
-      } else if (near) {
-        near = null;
-        opts.onNear(null);
+      } else {
+        if (near) {
+          near = null;
+          opts.onNear(null);
+        }
+        if (hint) {
+          hint = null;
+          opts.onHint(null);
+        }
       }
       renderer.render(outside, camera);
     } else {
@@ -347,7 +487,10 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
     setQuality,
     setTime,
     setWeather,
-    setSeason: (s) => world.setSeason(s),
+    setSeason: (s) => {
+      season = s;
+      world.setSeason(s);
+    },
     setFestive: (on) => world.setFestive(on),
     cameraInfo: () => {
       const dir = new THREE.Vector3();
@@ -356,6 +499,19 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
     },
     setCamMode: (m) => rig.setMode(m),
     setMove: rig.setMove,
+    setRun: rig.setRun,
+    jump: rig.jump,
+    interact,
+    setMoveSettings: rig.setSettings,
+    setCrowd: (max) => {
+      crowdMax = max;
+      crowd.group.visible = max > 0;
+    },
+    setHour: (h) => {
+      if (Math.abs(h - simHour) > 0.5) settled = false;
+      simHour = h;
+    },
+    census: () => town.census(),
     flyTo,
     enter,
     exit,

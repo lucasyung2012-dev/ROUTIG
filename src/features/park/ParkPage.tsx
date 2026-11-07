@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useRef, useState, type PointerEvent as RPointerEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type MutableRefObject, type PointerEvent as RPointerEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Footprints, Home, LogIn, LogOut, Menu, Navigation, SlidersHorizontal, X } from 'lucide-react';
+import { Camera, ChevronsUp, FastForward, Footprints, Hand, Home, LogIn, LogOut, Menu, Navigation, SlidersHorizontal, UserRound, X } from 'lucide-react';
 import { MODULES, NAV_MODULE_IDS, type ModuleId } from '@/app/modules';
 import { useSettings } from '@/app/SettingsProvider';
 import type { MessageKey } from '@/i18n';
@@ -21,8 +21,8 @@ import { sound } from '@/features/focus/sound';
 import { Minimap } from './Minimap';
 import { useToast } from '@/ui/toast';
 import { cn } from '@/ui/cn';
-import type { CamMode } from './camera';
-import { createEngine, type Engine, type InteriorFactory, type Stats } from './engine';
+import type { CamMode, MoveSettings, Posture } from './camera';
+import { createEngine, type Engine, type Hint, type InteriorFactory, type Stats } from './engine';
 import { festiveOn, seasonOf, type Quality, type Season, type TimeOfDay, type Weather } from './world';
 import { createInboxInterior, DESTINATIONS, INBOX_SECTORS, type InboxSector } from './interiors/inbox';
 import { createDashboardInterior, createProfileInterior, createSettingsInterior, DASHBOARD_SECTORS, PROFILE_SECTORS, SETTINGS_ROOMS, type DashboardData, type DashboardSector, type ProfileSector, type SettingsRoom } from './interiors/central';
@@ -51,6 +51,26 @@ interface ParkPrefs {
   season?: Season | 'auto';
   sound?: boolean;
   minimap?: boolean;
+  cam?: CamMode;
+  move?: MoveSettings;
+  stick?: Stick;
+  people?: People;
+}
+type Stick = { size: 's' | 'm' | 'l'; side: 'left' | 'right' };
+type People = 'off' | 'few' | 'normal';
+const DEFAULT_MOVE: MoveSettings = { sensitivity: 1, speed: 1, invertY: false };
+const DEFAULT_STICK: Stick = { size: 'm', side: 'left' };
+const CAM_ORDER: CamMode[] = ['walk', 'third', 'orbit'];
+const CAM_ICON = { walk: Footprints, third: UserRound, orbit: Camera } as const;
+const HOUR_OF: Record<TimeOfDay, number> = { day: 12, dusk: 18.2, night: 21.5 };
+
+/** Quantas pessoas desenhar: iPhone 6–12, iPad 12–24 (V2.1, seção 6), menos no modo econômico. */
+function crowdCap(people: People, quality: Quality): number {
+  if (people === 'off') return 0;
+  const small = Math.min(window.innerWidth, window.innerHeight) < 500;
+  const base = small ? 12 : 24;
+  const k = (people === 'few' ? 0.5 : 1) * (quality === 'low' ? 0.5 : 1);
+  return Math.max(small ? 6 : 12, Math.round(base * k));
 }
 const PREFS_KEY = 'routig.park.prefs';
 function readPrefs(): ParkPrefs {
@@ -134,7 +154,13 @@ export default function ParkPage() {
   const [ambient, setAmbient] = useState(saved.sound ?? false);
   const [minimap, setMinimap] = useState(saved.minimap ?? true);
   const [labels, setLabels] = useState(saved.labels ?? true);
-  const [camMode, setCamMode] = useState<CamMode>('orbit');
+  const [camMode, setCamMode] = useState<CamMode>(saved.cam ?? 'walk');
+  const [move, setMoveSet] = useState<MoveSettings>({ ...DEFAULT_MOVE, ...saved.move });
+  const [stick, setStick] = useState<Stick>({ ...DEFAULT_STICK, ...saved.stick });
+  const [people, setPeople] = useState<People>(saved.people ?? 'normal');
+  const [hint, setHint] = useState<Hint | null>(null);
+  const [posture, setPosture] = useState<Posture>('stand');
+  const [census, setCensus] = useState<{ outside: number; total: number } | null>(null);
   const [stats, setStats] = useState<Stats | null>(null);
   const [showStats, setShowStats] = useState(saved.stats ?? true);
   const [picked, setPicked] = useState<ModuleId | null>(null);
@@ -218,6 +244,10 @@ export default function ParkPage() {
           setSector(null);
         },
         onNear: setNear,
+        onMode: setCamMode,
+        onHint: setHint,
+        onPosture: setPosture,
+        startMode: camMode,
       });
       engine.current.setTime(time);
     } catch {
@@ -250,7 +280,29 @@ export default function ParkPage() {
   useEffect(() => engine.current?.setWeather(weather), [weather]);
   useEffect(() => engine.current?.setSeason(seasonMode === 'auto' ? seasonOf(new Date()) : seasonMode), [seasonMode]);
   useEffect(() => engine.current?.setFestive(festiveOn(new Date())), []);
-  useEffect(() => writePrefs({ quality, labels, stats: showStats, weather, season: seasonMode, sound: ambient, minimap }), [quality, labels, showStats, weather, seasonMode, ambient, minimap]);
+  useEffect(() => writePrefs({ quality, labels, stats: showStats, weather, season: seasonMode, sound: ambient, minimap, cam: camMode, move, stick, people }), [quality, labels, showStats, weather, seasonMode, ambient, minimap, camMode, move, stick, people]);
+  useEffect(() => engine.current?.setMoveSettings(move), [move]);
+  useEffect(() => engine.current?.setCrowd(crowdCap(people, quality)), [people, quality]);
+  useEffect(() => engine.current?.setHour(HOUR_OF[time]), [time]);
+  useEffect(() => {
+    if (!options) return;
+    const read = () => setCensus(engine.current?.census() ?? null);
+    read();
+    const id = window.setInterval(read, 2000);
+    return () => window.clearInterval(id);
+  }, [options]);
+  // Teclado: E interage, V troca a câmera.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement | null;
+      if (el && (el.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName))) return;
+      if (e.code === 'KeyE') engine.current?.interact();
+      if (e.code === 'KeyV' && !e.ctrlKey && !e.metaKey) setCamMode((m) => CAM_ORDER[(CAM_ORDER.indexOf(m) + 1) % CAM_ORDER.length]!);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
   // Som ambiente do parque: o mesmo motor de sons do Focus (sem duplicar). Durante uma sessão de foco, o Focus manda no som.
   const focus = useFocus();
   const focusRunning = !!focus.timer;
@@ -367,7 +419,7 @@ export default function ParkPage() {
               </Select>
             )}
             <IconButton label={inside ? t('park.entryView') : t('park.plaza')} icon={<Home className="h-5 w-5" />} onClick={() => (inside ? (setSector(null), engine.current?.focusSector('entry')) : engine.current?.flyTo('plaza'))} className="bg-surface/90" />
-            <IconButton label={camMode === 'walk' ? t('park.freeCam') : t('park.walk')} icon={<Footprints className="h-5 w-5" />} active={camMode === 'walk'} onClick={() => setCamMode((m) => (m === 'walk' ? 'orbit' : 'walk'))} className="bg-surface/90" />
+            <CamButton mode={camMode} label={t('park.nextCam', { mode: t(`park.camModes.${camMode}`) })} onClick={() => setCamMode((m) => CAM_ORDER[(CAM_ORDER.indexOf(m) + 1) % CAM_ORDER.length]!)} />
             <IconButton label={t('park.options')} icon={<SlidersHorizontal className="h-5 w-5" />} active={options} onClick={() => setOptions((o) => !o)} className="bg-surface/90" />
           </div>
         </div>
@@ -391,7 +443,8 @@ export default function ParkPage() {
       {/* Opções do ambiente */}
       {options && (
         <div className="absolute right-3 top-[4.25rem] z-10 flex max-h-[calc(100%-6rem)] w-72 flex-col gap-3 overflow-y-auto rounded-2xl bg-surface p-4 shadow-lift ring-1 ring-line safe-top" role="dialog" aria-label={t('park.options')}>
-          <Segmented<TimeOfDay> label={t('park.time')} value={time} onChange={setTime} options={(['day', 'dusk', 'night'] as const).map((v) => ({ value: v, label: t(`park.times.${v}`) }))} className="w-full" />
+          <Segmented<CamMode> label={t('park.camMode')} value={camMode} onChange={setCamMode} options={CAM_ORDER.map((v) => ({ value: v, label: t(`park.camModes.${v}`) }))} className="w-full" />
+$1 value={time} onChange={setTime} options={(['day', 'dusk', 'night'] as const).map((v) => ({ value: v, label: t(`park.times.${v}`) }))} className="w-full" />
           <Segmented<Quality> label={t('park.quality')} value={quality} onChange={setQuality} options={(['low', 'medium', 'high'] as const).map((q) => ({ value: q, label: t(`park.q.${q}`) }))} className="w-full" />
           <Segmented<Weather> label={t('park.weather')} value={weather} onChange={setWeather} options={(['clear', 'cloudy', 'rain', 'fog'] as const).map((v) => ({ value: v, label: t(`park.weathers.${v}`) }))} className="w-full" />
           <label className="flex items-center justify-between gap-3 text-sm text-fg">
@@ -417,12 +470,20 @@ export default function ParkPage() {
           <Switch label={t('park.minimapToggle')} checked={minimap} onChange={setMinimap} />
           <Switch label={t('park.labels')} checked={labels} onChange={setLabels} />
           <Switch label={t('park.showStats')} checked={showStats} onChange={setShowStats} />
+          <Segmented<People> label={t('park.people')} value={people} onChange={setPeople} options={(['off', 'few', 'normal'] as const).map((v) => ({ value: v, label: t(`park.peopleLevels.${v}`) }))} className="w-full" />
+          {census && people !== 'off' && <p className="-mt-2 text-xs text-muted">{t('park.peopleNow', { count: census.outside, total: census.total })}</p>}
+          <h3 className="pt-1 text-xs font-semibold uppercase tracking-wide text-muted">{t('park.controls')}</h3>
+          <Range label={t('park.sensitivity')} min={0.5} max={2} value={move.sensitivity} onChange={(v) => setMoveSet({ ...move, sensitivity: v })} />
+          <Range label={t('park.speed')} min={0.6} max={1.6} value={move.speed} onChange={(v) => setMoveSet({ ...move, speed: v })} />
+          <Switch label={t('park.invertY')} checked={move.invertY} onChange={(on) => setMoveSet({ ...move, invertY: on })} />
+          <Segmented<Stick['size']> label={t('park.stickSize')} value={stick.size} onChange={(v) => setStick({ ...stick, size: v })} options={(['s', 'm', 'l'] as const).map((v) => ({ value: v, label: t(`park.stickSizes.${v}`) }))} className="w-full" />
+          <Segmented<Stick['side']> label={t('park.stickSide')} value={stick.side} onChange={(v) => setStick({ ...stick, side: v })} options={(['left', 'right'] as const).map((v) => ({ value: v, label: t(`park.sides.${v}`) }))} className="w-full" />
         </div>
       )}
 
       {/* Medições (para os testes de desempenho) */}
       {showStats && (
-        <div className={cn('pointer-events-none absolute bottom-3 rounded-xl bg-black/60 px-3 py-2 font-mono text-[0.7rem] leading-relaxed text-white safe-bottom', camMode === 'walk' ? 'right-3' : 'left-3')}>
+        <div className={cn('pointer-events-none absolute bottom-3 rounded-xl bg-black/60 px-3 py-2 font-mono text-[0.7rem] leading-relaxed text-white safe-bottom', camMode !== 'orbit' ? 'right-3 bottom-auto top-[4.5rem] sm:top-auto sm:bottom-3' : 'left-3')}>
           {stats ? (
             <>
               <div>{t('park.fps', { fps: stats.fps })}</div>
@@ -435,10 +496,18 @@ export default function ParkPage() {
         </div>
       )}
 
-      {/* Primeira pessoa: controle de andar (toque) e dica */}
-      {camMode === 'walk' && <Joystick onMove={(x, y) => engine.current?.setMove(x, y)} label={t('park.joystick')} />}
-      {camMode === 'walk' && !near && <p className="pointer-events-none absolute bottom-24 right-3 hidden max-w-xs rounded-xl bg-black/50 px-3 py-2 text-[0.7rem] text-white md:block">{t('park.walkHint')}</p>}
-      {camMode === 'walk' && near && !inside && (
+      {/* Andando (primeira e terceira pessoa): controle, botões de correr, pular e interagir, e dica */}
+      {camMode !== 'orbit' && <Joystick onMove={(x, y) => engine.current?.setMove(x, y)} label={t('park.joystick')} size={stick.size} side={stick.side} />}
+      {camMode !== 'orbit' && <ActionButtons side={stick.side === 'left' ? 'right' : 'left'} engine={engine} canInteract={!!hint || posture !== 'stand' || (!!near && !inside)} />}
+      {camMode !== 'orbit' && !inside && (hint || posture !== 'stand') && !near && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-44 flex justify-center">
+          <span className="rounded-full bg-black/60 px-3 py-1.5 text-xs font-medium text-white">
+            {posture !== 'stand' ? t('park.standUp') : hint?.kind === 'person' ? t('park.hints.person', { name: hint.name, activity: t(`park.activities.${hint.activity}` as MessageKey) }) : hint ? t(`park.hints.${hint.kind}`) : ''} · E
+          </span>
+        </div>
+      )}
+      {camMode !== 'orbit' && !near && !hint && <p className="pointer-events-none absolute bottom-24 right-3 hidden max-w-xs rounded-xl bg-black/50 px-3 py-2 text-[0.7rem] text-white md:block">{t('park.walkHint')}</p>}
+      {camMode !== 'orbit' && near && !inside && (
         <div className="absolute inset-x-0 bottom-36 flex justify-center">
           <Button variant="primary" icon={<LogIn className="h-4 w-4" />} onClick={() => engine.current?.enter(near)}>
             {t('park.enterNamed', { name: t(`park.names.${near}`) })}
@@ -523,7 +592,7 @@ export default function ParkPage() {
         </section>
       )}
 
-      {minimap && !inside && !options && camMode === 'orbit' && (
+      {minimap && !inside && !options && (
         <div className="absolute right-3 top-[4.5rem] safe-top">
           <Minimap engine={engine} onPick={setPicked} />
         </div>
@@ -565,7 +634,8 @@ function ModuleMenu({ onClose }: { onClose: () => void }) {
 }
 
 /** Controle de andar na tela (primeira pessoa). */
-function Joystick({ onMove, label }: { onMove: (x: number, y: number) => void; label: string }) {
+function Joystick({ onMove, label, size, side }: { onMove: (x: number, y: number) => void; label: string; size: Stick['size']; side: Stick['side'] }) {
+  const px = size === 's' ? 104 : size === 'l' ? 160 : 128;
   const base = useRef<HTMLDivElement>(null);
   const [knob, setKnob] = useState({ x: 0, y: 0 });
   const id = useRef<number | null>(null);
@@ -591,8 +661,8 @@ function Joystick({ onMove, label }: { onMove: (x: number, y: number) => void; l
       ref={base}
       role="application"
       aria-label={label}
-      className="absolute bottom-8 left-6 h-32 w-32 rounded-full bg-black/35 ring-2 ring-white/40 backdrop-blur-sm safe-bottom"
-      style={{ touchAction: 'none' }}
+      className={cn('absolute bottom-8 rounded-full bg-black/35 ring-2 ring-white/40 backdrop-blur-sm safe-bottom', side === 'left' ? 'left-6' : 'right-6')}
+      style={{ touchAction: 'none', width: px, height: px }}
       onPointerDown={(e) => {
         id.current = e.pointerId;
         e.currentTarget.setPointerCapture(e.pointerId);
@@ -602,12 +672,60 @@ function Joystick({ onMove, label }: { onMove: (x: number, y: number) => void; l
       onPointerUp={end}
       onPointerCancel={end}
     >
-      <div className="absolute left-1/2 top-1/2 h-14 w-14 rounded-full bg-white/80 shadow-lift" style={{ transform: `translate(calc(-50% + ${knob.x * 36}px), calc(-50% + ${knob.y * 36}px))` }} />
+      <div className="absolute left-1/2 top-1/2 h-14 w-14 rounded-full bg-white/80 shadow-lift" style={{ transform: `translate(calc(-50% + ${knob.x * px * 0.28}px), calc(-50% + ${knob.y * px * 0.28}px))` }} />
     </div>
   );
 }
 
+/** Botão que troca a câmera (1ª pessoa → 3ª pessoa → livre). */
+function CamButton({ mode, label, onClick }: { mode: CamMode; label: string; onClick: () => void }) {
+  const Icon = CAM_ICON[mode];
+  return <IconButton label={label} icon={<Icon className="h-5 w-5" />} active={mode !== 'orbit'} onClick={onClick} className="bg-surface/90" />;
+}
+
+/** Correr (liga e desliga), pular e interagir: do lado oposto ao controle de andar. */
+function ActionButtons({ side, engine, canInteract }: { side: 'left' | 'right'; engine: MutableRefObject<Engine | null>; canInteract: boolean }) {
+  const { t } = useSettings();
+  const [running, setRunning] = useState(false);
+  const btn = 'flex h-14 w-14 items-center justify-center rounded-full bg-black/40 text-white ring-2 ring-white/40 backdrop-blur-sm active:bg-white/30';
+  return (
+    <div className={cn('absolute bottom-8 flex items-end gap-3 safe-bottom', side === 'right' ? 'right-6' : 'left-6')}>
+      <button
+        type="button"
+        aria-label={t('park.run')}
+        aria-pressed={running}
+        className={cn(btn, running && 'bg-white/40')}
+        onClick={() => {
+          engine.current?.setRun(!running);
+          setRunning(!running);
+        }}
+      >
+        <FastForward className="h-6 w-6" />
+      </button>
+      <button type="button" aria-label={t('park.jump')} className={btn} onClick={() => engine.current?.jump()}>
+        <ChevronsUp className="h-6 w-6" />
+      </button>
+      <button type="button" aria-label={t('park.interact')} disabled={!canInteract} className={cn(btn, 'h-16 w-16', !canInteract && 'opacity-40')} onClick={() => engine.current?.interact()}>
+        <Hand className="h-7 w-7" />
+      </button>
+    </div>
+  );
+}
+
+function Range({ label, min, max, value, onChange }: { label: string; min: number; max: number; value: number; onChange: (v: number) => void }) {
+  return (
+    <label className="flex flex-col gap-1 text-sm text-fg">
+      <span className="flex justify-between">
+        {label}
+        <span className="tabular-nums text-muted">{value.toFixed(1)}×</span>
+      </span>
+      <input type="range" min={min} max={max} step={0.1} value={value} onChange={(e) => onChange(Number(e.target.value))} className="w-full accent-[rgb(var(--accent))]" />
+    </label>
+  );
+}
+
 /** Aparelho sem 3D: a navegação 2D continua completa. */
+
 function NoWebgl() {
   const { t } = useSettings();
   const ids: ModuleId[] = ['dashboard', ...NAV_MODULE_IDS.filter((id) => id !== 'dashboard'), 'profile', 'settings'];

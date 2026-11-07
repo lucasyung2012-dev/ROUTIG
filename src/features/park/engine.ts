@@ -14,6 +14,7 @@ import { createTown } from './town';
 import type { Conditions } from '@/domain/parkPeople';
 import { CLEAR_SKY, createWorld, lightAt, type Quality, type Season, type Sky } from './world';
 import type { ParkAudio } from './audio';
+import type { ParkSnapshot } from './parkContext';
 import type { InteriorScene } from './interiors/common';
 
 export interface Stats {
@@ -41,6 +42,8 @@ export interface EngineOpts {
   onHint: (h: Hint | null) => void;
   onPosture: (p: Posture) => void;
   startMode: CamMode;
+  /** Retomar de onde a pessoa estava (volta da interface 2D): sem abertura. */
+  restore?: ParkSnapshot | null;
 }
 
 export type Hint = { kind: 'sit' } | { kind: 'view' } | { kind: 'tree' } | { kind: 'water' } | { kind: 'person'; name: string; activity: string };
@@ -69,6 +72,8 @@ export interface Engine {
   /** Hora mostrada agora (durante a transição, a intermediária). */
   hour: () => number;
   census: () => { outside: number; total: number };
+  /** Onde a pessoa está agora (para retomar depois). */
+  snapshot: () => ParkSnapshot;
   flyTo: (id: ModuleId | 'plaza') => void;
   enter: (id: ModuleId) => void;
   exit: () => void;
@@ -130,7 +135,7 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
 
   camera.position.copy(HOME.cam);
   rig.controls.target.copy(HOME.target);
-  if (!opts.reduceMotion) {
+  if (!opts.reduceMotion && !opts.restore) {
     // Abertura: a câmera desce do alto sobre o parque e para diante da praça.
     const intro = new THREE.CatmullRomCurve3([new THREE.Vector3(-220, 190, 260), new THREE.Vector3(-90, 110, 170), new THREE.Vector3(20, 60, 110), HOME.cam.clone()]);
     camera.position.copy(intro.getPoint(0));
@@ -138,6 +143,22 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
     rig.glideTo(intro, HOME.target.clone(), 5600);
   }
   rig.setMode(opts.startMode);
+  // Volta da interface 2D: mesmo lugar, mesma direção, mesmo modo de câmera e, se for o caso, dentro do mesmo prédio.
+  const restoreFrom = (s: ParkSnapshot) => {
+    const apply = () => {
+      camera.position.set(...s.cam);
+      rig.controls.target.set(...s.target);
+      rig.setMode(s.mode);
+      if (s.mode !== 'orbit') rig.place(s.body.x, s.body.z, s.body.yaw);
+      camera.lookAt(rig.controls.target);
+    };
+    if (s.inside && opts.interiors[s.inside]) {
+      if (s.mode !== 'orbit') rig.setMode('orbit');
+      // O interior é criado mais abaixo; espera o primeiro quadro.
+      requestAnimationFrame(() => enter(s.inside!, apply));
+    } else apply();
+  };
+  if (opts.restore) restoreFrom(opts.restore);
 
   /* ---------- Toque: escolher prédio (fora) ou setor (dentro) ---------- */
   const ray = new THREE.Raycaster();
@@ -198,34 +219,35 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
     inside = null;
   };
 
-  const enter = (id: ModuleId) => {
+  const enter = (id: ModuleId, instant?: () => void) => {
     const factory = opts.interiors[id];
     const b = world.buildings.get(id);
     if (!factory || !b || inside) return;
     opts.onPick(null);
     const front = new THREE.Vector3(b.entrance.x, heightAt(b.entrance.x, b.entrance.z) + 2.4, b.entrance.z);
     const door = new THREE.Vector3(b.def.x, front.y + 1, b.def.z);
-    rig.glideTo(front, door, 1500, () =>
-      fadeSwap(() => {
-        const ikit = new Kit();
-        const scene = factory(ikit);
-        ikit.glowing.forEach((m) => (m.emissiveIntensity = 1));
-        scene.scene.environment = QUALITY[quality].env ? envTex : null;
-        scene.scene.environmentIntensity = 0.55;
-        scene.setDetail(quality);
-        const cached = dataCache.get(id);
-        if (cached !== undefined) scene.setData(cached);
-        inside = { id, kit: ikit, scene };
-        rig.setWorld({ ground: () => 0, obstacles: scene.obstacles, limit: { x: 0, z: 0, r: scene.room.radius - 1.2 }, ceiling: scene.room.height, minDistance: 1.5, maxDistance: scene.room.radius * 1.7 });
-        const v = fit(scene.view('entry'));
-        camera.position.copy(v.cam);
-        rig.controls.target.copy(v.target);
-        scene.scene.add(avatar.group);
-        if (rig.mode() !== 'orbit') rig.place(v.cam.x, v.cam.z, Math.atan2(-(v.target.x - v.cam.x), -(v.target.z - v.cam.z)));
-        recompile(scene.scene);
-        opts.onInside(id);
-      }),
-    );
+    const swap = () => {
+      const ikit = new Kit();
+      const scene = factory(ikit);
+      ikit.glowing.forEach((m) => (m.emissiveIntensity = 1));
+      scene.scene.environment = QUALITY[quality].env ? envTex : null;
+      scene.scene.environmentIntensity = 0.55;
+      scene.setDetail(quality);
+      const cached = dataCache.get(id);
+      if (cached !== undefined) scene.setData(cached);
+      inside = { id, kit: ikit, scene };
+      rig.setWorld({ ground: () => 0, obstacles: scene.obstacles, limit: { x: 0, z: 0, r: scene.room.radius - 1.2 }, ceiling: scene.room.height, minDistance: 1.5, maxDistance: scene.room.radius * 1.7 });
+      const v = fit(scene.view('entry'));
+      camera.position.copy(v.cam);
+      rig.controls.target.copy(v.target);
+      scene.scene.add(avatar.group);
+      if (rig.mode() !== 'orbit') rig.place(v.cam.x, v.cam.z, Math.atan2(-(v.target.x - v.cam.x), -(v.target.z - v.cam.z)));
+      recompile(scene.scene);
+      opts.onInside(id);
+      instant?.();
+    };
+    if (instant) return swap();
+    rig.glideTo(front, door, 1500, () => fadeSwap(swap));
   };
 
   const exit = () => {
@@ -531,6 +553,16 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
       hourSet = true;
     },
     census: () => town.census(),
+    snapshot: () => {
+      const b = rig.body();
+      return {
+        cam: camera.position.toArray() as [number, number, number],
+        target: rig.controls.target.toArray() as [number, number, number],
+        mode: rig.mode(),
+        body: { x: b.pos.x, z: b.pos.z, yaw: b.yaw },
+        inside: inside?.id ?? null,
+      };
+    },
     hour: () => shownHour,
     flyTo,
     enter,

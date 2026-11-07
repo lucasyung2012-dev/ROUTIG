@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type MutableRefObject, type PointerEvent as RPointerEvent } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Camera, ChevronsUp, FastForward, Footprints, Hand, Home, LogIn, LogOut, Menu, Navigation, RotateCcw, SlidersHorizontal, UserRound, X } from 'lucide-react';
+import { Camera, ChevronsUp, FastForward, Footprints, Hand, Home, LayoutGrid, LogIn, LogOut, Monitor, Navigation, RotateCcw, SlidersHorizontal, UserRound, X } from 'lucide-react';
 import { MODULES, NAV_MODULE_IDS, type ModuleId } from '@/app/modules';
 import { useSettings } from '@/app/SettingsProvider';
 import type { MessageKey } from '@/i18n';
@@ -42,6 +42,8 @@ import { ACADEMY_SECTORS, INSIGHTS_SECTORS, LANGUAGES_SECTORS, LIBRARY_SECTORS, 
 import { useAcademyData } from '@/features/academy/useAcademyData';
 import { useLanguages } from '@/features/languages/useLanguages';
 import { receptionData } from './receptionData';
+import { ModuleCenter } from './ModuleCenter';
+import { clearParkContext, pushRecent, readParkContext, saveParkContext } from './parkContext';
 
 /** Preferências do parque neste aparelho (qualidade é do aparelho; o resto é gosto pessoal). */
 interface ParkPrefs {
@@ -170,7 +172,7 @@ export default function ParkPage() {
   const [ambient, setAmbient] = useState(saved.sound ?? false);
   const [minimap, setMinimap] = useState(saved.minimap ?? true);
   const [labels, setLabels] = useState(saved.labels ?? true);
-  const [camMode, setCamMode] = useState<CamMode>(saved.cam ?? 'walk');
+  const [camMode, setCamMode] = useState<CamMode>(() => readParkContext()?.mode ?? saved.cam ?? 'walk');
   const [move, setMoveSet] = useState<MoveSettings>({ ...DEFAULT_MOVE, ...saved.move });
   const [stick, setStick] = useState<Stick>({ ...DEFAULT_STICK, ...saved.stick });
   const [people, setPeople] = useState<People>(saved.people ?? 'normal');
@@ -184,7 +186,9 @@ export default function ParkPage() {
   const [sector, setSector] = useState<string | null>(null);
   const [near, setNear] = useState<ModuleId | null>(null);
   const [failed, setFailed] = useState(false);
-  const [menu, setMenu] = useState(false);
+  const [center, setCenter] = useState(false);
+  const navigate = useNavigate();
+  const restore = useMemo(readParkContext, []);
   const [options, setOptions] = useState(false);
 
   /* ---------- Dados reais para os interiores ---------- */
@@ -260,11 +264,13 @@ export default function ParkPage() {
           setSector(null);
         },
         onNear: setNear,
+        restore,
         onMode: setCamMode,
         onHint: setHint,
         onPosture: setPosture,
         startMode: camMode,
       });
+      clearParkContext();
       engine.current.setHour(clockAuto ? hourNow() : manualHour);
       engine.current.setWeather(skyAuto ? autoSky(new Date()) : manualSky);
     } catch {
@@ -369,6 +375,21 @@ export default function ParkPage() {
     };
   }, [ambient, focusRunning]);
   useEffect(() => audioRef.current?.setMix(mix), [mix]);
+  // Interface 2D a partir do parque: guarda onde a pessoa está para retomar ao voltar.
+  const open2D = (id: ModuleId) => {
+    if (engine.current) saveParkContext(engine.current.snapshot());
+    pushRecent(id);
+    navigate(MODULES[id].path);
+  };
+  const enterFromCenter = (id: ModuleId) => {
+    setCenter(false);
+    pushRecent(id);
+    if (inside === id) return;
+    if (inside) {
+      engine.current?.exit();
+      window.setTimeout(() => engine.current?.enter(id), 700);
+    } else engine.current?.enter(id);
+  };
   const restoreDefaults = () => {
     setCamMode('walk');
     setMoveSet(DEFAULT_MOVE);
@@ -467,9 +488,7 @@ export default function ParkPage() {
             <Button variant="secondary" icon={<LogOut className="h-4 w-4" />} onClick={() => engine.current?.exit()} className="bg-surface/90">
               {t('park.exit')}
             </Button>
-          ) : (
-            <IconButton label={t('park.menu')} icon={<Menu className="h-5 w-5" />} onClick={() => setMenu(true)} className="bg-surface/90" />
-          )}
+          ) : null}
           <span className="hidden truncate rounded-xl bg-surface/80 px-3 py-2 text-xs font-semibold text-fg sm:inline">{inside ? t(`park.names.${inside}`) : t('park.title')}</span>
           <div className="ml-auto flex flex-wrap items-center gap-2">
             {!inside && (
@@ -613,7 +632,7 @@ export default function ParkPage() {
 
       {/* Medições (para os testes de desempenho) */}
       {showStats && (
-        <div className={cn('pointer-events-none absolute bottom-3 rounded-xl bg-black/60 px-3 py-2 font-mono text-[0.7rem] leading-relaxed text-white safe-bottom', camMode !== 'orbit' ? 'right-3 bottom-auto top-[4.5rem] sm:top-auto sm:bottom-3' : 'left-3')}>
+        <div className={cn('pointer-events-none absolute bottom-3 rounded-xl bg-black/60 px-3 py-2 font-mono text-[0.7rem] leading-relaxed text-white safe-bottom', camMode !== 'orbit' ? 'bottom-auto right-3 top-[15rem]' : 'left-3')}>
           {stats ? (
             <>
               <div>{t('park.fps', { fps: stats.fps })}</div>
@@ -668,9 +687,9 @@ export default function ParkPage() {
             <Button size="sm" variant="secondary" icon={<Navigation className="h-4 w-4" />} onClick={() => engine.current?.flyTo(pick.id)}>
               {t('park.flyTo')}
             </Button>
-            <Link to={MODULES[pick.id].path} className="inline-flex h-9 items-center rounded-xl px-3 text-sm font-medium text-fg ring-1 ring-inset ring-line hover:bg-surface-2">
+            <Button size="sm" variant="ghost" icon={<Monitor className="h-4 w-4" />} onClick={() => open2D(pick.id)}>
               {t('park.openModule')}
-            </Link>
+            </Button>
           </div>
         </div>
       )}
@@ -728,37 +747,17 @@ export default function ParkPage() {
         </div>
       )}
 
-      {menu && <ModuleMenu onClose={() => setMenu(false)} />}
-    </div>
-  );
-}
+      {/* Central de Módulos: botão flutuante */}
+      <button
+        type="button"
+        onClick={() => setCenter(true)}
+        aria-label={t('park.center.open')}
+        className="absolute left-3 top-1/2 flex h-14 w-14 -translate-y-1/2 items-center justify-center rounded-2xl bg-brand text-white shadow-glow ring-2 ring-white/30"
+      >
+        <LayoutGrid className="h-6 w-6" aria-hidden />
+      </button>
+      {center && <ModuleCenter inside={inside} onClose={() => setCenter(false)} onEnter={enterFromCenter} onOpen2D={open2D} />}
 
-/** Navegação 2D: todos os módulos sem passar pelo 3D (acessibilidade e atalho). */
-function ModuleMenu({ onClose }: { onClose: () => void }) {
-  const { t } = useSettings();
-  const ids: ModuleId[] = ['dashboard', ...NAV_MODULE_IDS.filter((id) => id !== 'dashboard'), 'profile', 'settings'];
-  return (
-    <div className="fixed inset-0 z-40">
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} aria-hidden />
-      <nav aria-label={t('park.menu')} className="absolute inset-y-0 left-0 flex w-72 max-w-[85vw] flex-col bg-surface shadow-lift safe-top">
-        <div className="flex items-center justify-between border-b border-line/70 p-3">
-          <span className="text-sm font-semibold text-fg">{t('park.menu')}</span>
-          <IconButton label={t('common.close')} icon={<X className="h-5 w-5" />} onClick={onClose} />
-        </div>
-        <ul className="flex-1 overflow-y-auto p-2">
-          {ids.map((id) => {
-            const Icon = MODULES[id].icon;
-            return (
-              <li key={id}>
-                <Link to={MODULES[id].path} className="flex h-11 items-center gap-3 rounded-xl px-3 text-[0.9rem] font-medium text-fg hover:bg-surface-2">
-                  <Icon className="h-5 w-5 text-muted" aria-hidden />
-                  {t(`modules.${id}`)}
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
-      </nav>
     </div>
   );
 }

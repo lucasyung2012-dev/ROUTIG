@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
-import { Menu, Monitor, Moon, Pause, Search, Sun, Timer, WifiOff } from 'lucide-react';
+import { readParkContext } from '@/features/park/parkContext';
+import { Menu, Monitor, Moon, Pause, Search, Sun, Timer, Trees, WifiOff } from 'lucide-react';
 import { useSettings } from '@/app/SettingsProvider';
 import type { ThemeSetting } from '@/domain/settings';
 import { Logo } from '@/brand/Logo';
@@ -97,6 +98,12 @@ function Shell() {
           <Link to="/" className="hidden items-center gap-2 sm:flex md:hidden" aria-label={t('park.title')}>
             <Logo size={28} className="h-7 w-7" />
           </Link>
+          {readParkContext() && (
+            <Link to="/" className="flex h-10 shrink-0 items-center gap-2 rounded-xl bg-brand px-3 text-sm font-semibold text-white shadow-glow">
+              <Trees className="h-4 w-4" aria-hidden />
+              <span className="hidden sm:inline">{t('park.center.back')}</span>
+            </Link>
+          )}
 
           <button
             type="button"

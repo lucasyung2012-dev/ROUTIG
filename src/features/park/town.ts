@@ -29,6 +29,8 @@ interface Agent {
   look: number;
   /** Qual fala usar ao ser cumprimentado (varia). */
   line: number;
+  talkUntil: number;
+  smileUntil: number;
 }
 
 export interface Town {
@@ -47,6 +49,7 @@ export interface Town {
 
 const WALK = 1.35;
 const HAIRS = ['#2F2A26', '#5A3B24', '#8A5A2B', '#1B1B1B', '#C9A063', '#7A7A7A', '#3B2A20'];
+const EYES = ['#4A3426', '#2E5A3A', '#3B5B8C', '#6B4E2E', '#2B2B2B'];
 
 const SEATED: PersonPose[] = ['sit', 'read', 'play', 'draw'];
 
@@ -76,7 +79,7 @@ export function createTown(seats: Seat[] = []): Town {
   const agents: Agent[] = people.map((p) => {
     const slot = groupSlot.get(p.group) ?? 0;
     groupSlot.set(p.group, slot + 1);
-    return { p, slot, x: p.home.x, z: p.home.z, yaw: 0, activity: 'home', route: [], ri: 0, pose: 'stand', phase: Math.random() * 6, away: true, block: -1, waveUntil: 0, waveCool: 0, seat: -1, look: 0, line: Math.floor(Math.random() * 3) };
+    return { p, slot, x: p.home.x, z: p.home.z, yaw: 0, activity: 'home', route: [], ri: 0, pose: 'stand', phase: Math.random() * 6, away: true, block: -1, waveUntil: 0, waveCool: 0, seat: -1, look: 0, line: Math.floor(Math.random() * 3), talkUntil: 0, smileUntil: 0 };
   });
 
   const strollRoute = (a: Agent): Point[] => {
@@ -131,6 +134,14 @@ export function createTown(seats: Seat[] = []): Town {
     for (const a of agents) {
       if (Math.floor(c.hour) !== a.block && (c.hour * 60) % 60 >= (a.p.id % 12) * 2) plan(a, c, false);
       if (a.away && a.activity === 'home') continue;
+      // Cumprimentada: para o que estava fazendo, vira para o visitante, acena e fala.
+      if (now < a.talkUntil) {
+        if (a.seat < 0) a.yaw = Math.atan2(viewer.x - a.x, viewer.z - a.z);
+        a.look = 0;
+        a.pose = SEATED.includes(a.pose) ? a.pose : 'wave';
+        a.phase += dt * 2;
+        continue;
+      }
       const target = a.route[a.ri];
       if (target && (a.ri < a.route.length - 1 || Math.hypot(target.x - a.x, target.z - a.z) > 0.3)) {
         const dx = target.x - a.x;
@@ -220,6 +231,13 @@ export function createTown(seats: Seat[] = []): Town {
           pants: a.p.pants,
           skin: a.p.skin,
           hair: HAIRS[a.p.id % HAIRS.length],
+          hairStyle: (a.p.id * 7) % 4,
+          eyes: EYES[(a.p.id * 5) % EYES.length],
+          shortSleeves: a.p.id % 2 === 0,
+          shorts: a.p.id % 3 === 0,
+          seed: a.p.id,
+          // Rosto: fala logo depois do cumprimento e sorri; na roda de conversa, fala e ri por vezes.
+          expr: performance.now() < a.talkUntil ? 'talk' : performance.now() < a.smileUntil ? 'smile' : a.activity === 'chat' && a.pose !== 'walk' ? (Math.floor(performance.now() / 2500 + a.slot) % 3 === 0 ? 'talk' : 'smile') : 'neutral',
           scale: a.p.scale,
         };
       });
@@ -252,6 +270,8 @@ export function createTown(seats: Seat[] = []): Town {
       if (!best) return null;
       best.waveUntil = now + 3200;
       best.waveCool = now + 3200;
+      best.talkUntil = now + 1900;
+      best.smileUntil = now + 4500;
       best.line = (best.line + 1) % 3;
       return { name: best.p.name, activity: best.activity, x: best.x, z: best.z, line: best.line };
     },

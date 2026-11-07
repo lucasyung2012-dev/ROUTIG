@@ -28,7 +28,19 @@ export interface Figure {
   scale: number;
   /** Virar a cabeça (radianos), por exemplo para olhar quem chega. */
   look?: number;
+  /** Expressão do rosto: sorrindo ao cumprimentar, boca mexendo ao falar. */
+  expr?: 'neutral' | 'smile' | 'talk';
+  /** 0 curto, 1 comprido, 2 coque, 3 cacheado. */
+  hairStyle?: number;
+  /** Cor dos olhos (íris). */
+  eyes?: string;
+  /** Manga curta (antebraço à mostra) e bermuda (canela à mostra). */
+  shortSleeves?: boolean;
+  shorts?: boolean;
+  /** Fase própria para piscar em tempos diferentes. */
+  seed?: number;
 }
+
 
 export interface Crowd {
   group: THREE.Group;
@@ -97,7 +109,20 @@ function headGeo(): THREE.BufferGeometry {
   return m;
 }
 
-function hairGeo(): THREE.BufferGeometry {
+function hairGeo(style = 0): THREE.BufferGeometry {
+  if (style === 3) {
+    // Cacheado: cachos arredondados formando o volume.
+    const parts: THREE.BufferGeometry[] = [];
+    for (let i = 0; i < 26; i++) {
+      const a = (i / 26) * Math.PI * 2 * 3.1;
+      const v = 0.15 + (i / 26) * 0.75;
+      const c = new THREE.SphereGeometry(0.036, 8, 6);
+      c.translate(Math.sin(a) * Math.sin(v * 1.6) * 0.1, 0.03 + Math.cos(v * 1.6) * 0.1, Math.cos(a) * Math.sin(v * 1.6) * 0.1 - 0.012);
+      if (Math.cos(a) * Math.sin(v * 1.6) > 0.06 && v > 0.45) continue;
+      parts.push(c.toNonIndexed());
+    }
+    return mergeGeometries(parts)!;
+  }
   const cap = new THREE.SphereGeometry(0.107, 18, 10, 0, Math.PI * 2, 0, Math.PI * 0.52);
   cap.scale(0.93, 1.12, 1.04);
   cap.translate(0, 0.012, -0.008);
@@ -105,36 +130,77 @@ function hairGeo(): THREE.BufferGeometry {
   back.scale(0.95, 1.1, 1.05);
   back.translate(0, -0.005, -0.012);
   const parts = [cap.toNonIndexed(), back.toNonIndexed()];
+  if (style === 1) {
+    // Comprido: cai atrás até os ombros.
+    const fall = new THREE.CylinderGeometry(0.1, 0.085, 0.24, 16, 1, true, Math.PI * 0.55, Math.PI * 0.9);
+    fall.translate(0, -0.08, -0.012);
+    parts.push(fall.toNonIndexed());
+  } else if (style === 2) {
+    // Coque no alto, atrás.
+    const bun = new THREE.SphereGeometry(0.045, 12, 8);
+    bun.translate(0, 0.085, -0.075);
+    parts.push(bun.toNonIndexed());
+  }
   const m = mergeGeometries(parts)!;
   parts.forEach((p) => p.dispose());
   return m;
 }
 
-function eyesGeo(): THREE.BufferGeometry {
+/** Branco dos olhos (amêndoa), íris com pupila, sobrancelhas e as três bocas (neutra, sorriso, falando). */
+function scleraGeo(): THREE.BufferGeometry {
   const parts: THREE.BufferGeometry[] = [];
   for (const s of [-1, 1]) {
-    const e = new THREE.SphereGeometry(0.012, 8, 6);
-    e.translate(s * 0.034, 0.018, 0.088);
+    const e = new THREE.SphereGeometry(0.017, 12, 8);
+    e.scale(1.25, 0.75, 0.45);
+    e.translate(s * 0.035, 0.016, 0.083);
     parts.push(e.toNonIndexed());
-    const brow = new THREE.BoxGeometry(0.032, 0.006, 0.008);
-    brow.rotateZ(s * -0.12);
-    brow.translate(s * 0.034, 0.04, 0.09);
-    parts.push(brow.toNonIndexed());
   }
-  const mouth = new THREE.BoxGeometry(0.03, 0.005, 0.006);
-  mouth.translate(0, -0.05, 0.088);
-  parts.push(mouth.toNonIndexed());
   return mergeGeometries(parts)!;
+}
+function irisGeo(): THREE.BufferGeometry {
+  const parts: THREE.BufferGeometry[] = [];
+  for (const s of [-1, 1]) {
+    const e = new THREE.SphereGeometry(0.0095, 10, 8);
+    e.scale(1, 1, 0.4);
+    e.translate(s * 0.035, 0.016, 0.0905);
+    parts.push(e.toNonIndexed());
+  }
+  return mergeGeometries(parts)!;
+}
+function browGeo(): THREE.BufferGeometry {
+  const parts: THREE.BufferGeometry[] = [];
+  for (const s of [-1, 1]) {
+    const b = new THREE.CapsuleGeometry(0.0045, 0.03, 3, 6);
+    b.rotateZ(Math.PI / 2 + s * 0.12);
+    b.translate(s * 0.036, 0.042, 0.088);
+    parts.push(b.toNonIndexed());
+  }
+  return mergeGeometries(parts)!;
+}
+function mouthGeo(kind: 'neutral' | 'smile' | 'talk'): THREE.BufferGeometry {
+  if (kind === 'talk') {
+    const m = new THREE.SphereGeometry(0.014, 10, 8);
+    m.scale(1.2, 0.8, 0.35);
+    m.translate(0, -0.05, 0.086);
+    return m;
+  }
+  const t = new THREE.TorusGeometry(kind === 'smile' ? 0.02 : 0.03, 0.0045, 6, 14, kind === 'smile' ? Math.PI * 0.8 : Math.PI * 0.25);
+  t.rotateZ(kind === 'smile' ? Math.PI + Math.PI * 0.1 : Math.PI + Math.PI * 0.375);
+  t.translate(0, kind === 'smile' ? -0.036 : -0.022, 0.088);
+  return t;
 }
 
 function handGeo(): THREE.BufferGeometry {
-  const palm = new THREE.BoxGeometry(0.07, 0.08, 0.028);
-  palm.translate(0, -0.04, 0);
-  const fingers = new THREE.BoxGeometry(0.066, 0.05, 0.022);
+  // Palma e dedos arredondados (nada de bloco), polegar à parte.
+  const palm = new THREE.CapsuleGeometry(0.03, 0.04, 4, 10);
+  palm.scale(1.15, 1, 0.5);
+  palm.translate(0, -0.045, 0);
+  const fingers = new THREE.CapsuleGeometry(0.027, 0.035, 4, 10);
+  fingers.scale(1.2, 1, 0.45);
   fingers.translate(0, -0.1, 0.004);
-  const thumb = new THREE.BoxGeometry(0.018, 0.045, 0.02);
+  const thumb = new THREE.CapsuleGeometry(0.01, 0.03, 3, 6);
   thumb.rotateZ(0.5);
-  thumb.translate(0.038, -0.045, 0.012);
+  thumb.translate(0.036, -0.05, 0.012);
   const parts = [palm, fingers, thumb].map((g) => g.toNonIndexed());
   const m = mergeGeometries(parts)!;
   m.computeVertexNormals();
@@ -303,8 +369,11 @@ export function createCrowd(kit: Kit, capacity: number, shadows = true): Crowd {
   const pelvis = mk(new THREE.SphereGeometry(0.15, 14, 8).scale(1.12, 0.6, 0.72), cloth);
   const torso = mk(torsoGeo(), cloth);
   const head = mk(headGeo(), skin);
-  const hair = mk(hairGeo(), cloth);
-  const eyes = mk(eyesGeo(), kit.mat('#1F2937', { rough: 0.4 }), 1, false);
+  const hairs = [0, 1, 2, 3].map((k) => mk(hairGeo(k), cloth));
+  const sclera = mk(scleraGeo(), kit.mat('#F7F5F0', { rough: 0.3 }), 1, false);
+  const iris = mk(irisGeo(), kit.mat('#ffffff', { rough: 0.2 }), 1, false);
+  const brows = mk(browGeo(), cloth, 1, false);
+  const mouths = { neutral: mk(mouthGeo('neutral'), kit.mat('#A85A50', { rough: 0.5 }), 1, false), smile: mk(mouthGeo('smile'), kit.mat('#A85A50', { rough: 0.5 }), 1, false), talk: mk(mouthGeo('talk'), kit.mat('#5A2A26', { rough: 0.6 }), 1, false) };
   const upper = mk(limb(0.055, 0.045, UPPER), cloth, 2);
   const fore = mk(limb(0.043, 0.034, FORE), skin, 2);
   const hand = mk(handGeo(), skin, 2);
@@ -315,7 +384,8 @@ export function createCrowd(kit: Kit, capacity: number, shadows = true): Crowd {
   const guitar = mk(guitarGeo(), kit.mat('#B5713A', { rough: 0.45 }), 1, false);
   const sketch = mk(sketchGeo(), kit.mat('#FAFAF7', { rough: 0.9 }), 1, false);
   const camera = mk(cameraGeo(), kit.mat('#1F2328', { rough: 0.35, metal: 0.4 }), 1, false);
-  const parts = [pelvis, torso, head, hair, eyes, upper, fore, hand, thigh, shin, shoe];
+  const parts = [pelvis, torso, head, sclera, iris, brows, upper, fore, hand, thigh, shin, shoe];
+  const variants = [...hairs, ...Object.values(mouths)];
   const props = { book, guitar, sketch, camera };
 
   const base = new THREE.Matrix4();
@@ -323,6 +393,7 @@ export function createCrowd(kit: Kit, capacity: number, shadows = true): Crowd {
   const m1 = new THREE.Matrix4();
   const m2 = new THREE.Matrix4();
   const m3 = new THREE.Matrix4();
+  const m2b = new THREE.Matrix4();
   const q = new THREE.Quaternion();
   const e = new THREE.Euler();
   const v = new THREE.Vector3();
@@ -334,10 +405,14 @@ export function createCrowd(kit: Kit, capacity: number, shadows = true): Crowd {
     return out.multiplyMatrices(parent, tmp);
   };
   const counts = { book: 0, guitar: 0, sketch: 0, camera: 0 };
+  const vCount = new Map<THREE.InstancedMesh, number>();
+  const blinkM = new THREE.Matrix4().makeScale(1, 0.12, 1);
 
   const set = (list: Figure[]) => {
     const n = Math.min(capacity, list.length);
     counts.book = counts.guitar = counts.sketch = counts.camera = 0;
+    vCount.clear();
+    const now = performance.now() / 1000;
     for (let i = 0; i < n; i++) {
       const f = list[i]!;
       const j = joints(f);
@@ -349,8 +424,22 @@ export function createCrowd(kit: Kit, capacity: number, shadows = true): Crowd {
       torso.setMatrixAt(i, m2);
       step(m3, m2, 0, TORSO + 0.2, 0.01, j.headPitch, j.headYaw);
       head.setMatrixAt(i, m3);
-      hair.setMatrixAt(i, m3);
-      eyes.setMatrixAt(i, m3);
+      // Rosto: olhos (piscam de vez em quando), sobrancelhas (sobem ao sorrir), boca da expressão.
+      const blink = (now + (f.seed ?? i) * 1.37) % 4.3 < 0.13;
+      const eyeM = blink ? m1.multiplyMatrices(m3, blinkM) : m3;
+      sclera.setMatrixAt(i, eyeM);
+      iris.setMatrixAt(i, eyeM);
+      brows.setMatrixAt(i, f.expr === 'smile' ? step(m2b, m3, 0, 0.006, 0) : m3);
+      const hm = hairs[(f.hairStyle ?? 0) % 4]!;
+      const hi = vCount.get(hm) ?? 0;
+      vCount.set(hm, hi + 1);
+      hm.setMatrixAt(hi, m3);
+      hm.setColorAt(hi, c.set(f.hair ?? '#3B2A20'));
+      const expr = f.expr === 'talk' ? (Math.floor(now * 7 + i) % 2 ? 'talk' : 'neutral') : (f.expr ?? 'neutral');
+      const mm = mouths[expr];
+      const mi = vCount.get(mm) ?? 0;
+      vCount.set(mm, mi + 1);
+      mm.setMatrixAt(mi, m3);
       // Braços: ombro → cotovelo → mão.
       for (let k = 0; k < 2; k++) {
         const side = k === 0 ? -1 : 1;
@@ -391,16 +480,23 @@ export function createCrowd(kit: Kit, capacity: number, shadows = true): Crowd {
         fore.setColorAt(i * 2 + k, c);
         hand.setColorAt(i * 2 + k, c);
       }
-      hair.setColorAt(i, c.set(f.hair ?? '#3B2A20'));
-      eyes.setColorAt(i, c.set('#1F2937'));
+      brows.setColorAt(i, c.set(f.hair ?? '#3B2A20').multiplyScalar(0.8));
+      iris.setColorAt(i, c.set(f.eyes ?? '#4A3426'));
+      // Manga curta e bermuda mostram a pele; senão, a roupa.
+      if (!f.shortSleeves) for (let k = 0; k < 2; k++) fore.setColorAt(i * 2 + k, c.set(f.shirt));
       for (let k = 0; k < 2; k++) {
         thigh.setColorAt(i * 2 + k, c.set(f.pants));
-        shin.setColorAt(i * 2 + k, c);
+        shin.setColorAt(i * 2 + k, f.shorts ? c.set(f.skin) : c.set(f.pants));
         shoe.setColorAt(i * 2 + k, c.set('#2B2B2B'));
       }
     }
     for (const im of parts) {
       im.count = im === upper || im === fore || im === hand || im === thigh || im === shin || im === shoe ? n * 2 : n;
+      im.instanceMatrix.needsUpdate = true;
+      if (im.instanceColor) im.instanceColor.needsUpdate = true;
+    }
+    for (const im of variants) {
+      im.count = vCount.get(im) ?? 0;
       im.instanceMatrix.needsUpdate = true;
       if (im.instanceColor) im.instanceColor.needsUpdate = true;
     }
@@ -414,4 +510,4 @@ export function createCrowd(kit: Kit, capacity: number, shadows = true): Crowd {
 }
 
 /** Avatar universal do visitante: cores neutras, sem gênero nem idade definidos. */
-export const AVATAR_LOOK = { shirt: '#5B8DB8', pants: '#3F4756', skin: '#C9A27E', hair: '#2F2A26' } as const;
+export const AVATAR_LOOK = { shirt: '#5B8DB8', pants: '#3F4756', skin: '#C9A27E', hair: '#2F2A26', hairStyle: 0, eyes: '#4A3426' } as const;

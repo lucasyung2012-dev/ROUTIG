@@ -117,7 +117,7 @@ O minimapa do parque desenha esta planta com os caminhos e o lago.
 |---|---|---|
 | Ambientes reais com mobília e interfaces funcionais | Parcial | Térreo: os setores da V2, cada um com o painel real do módulo. Andares: salas com mobília (mesas, estantes, telas, sofás) que abrem o painel real correspondente. Várias salas abrem o **mesmo** painel (ex.: as salas de Projects abrem o estúdio). |
 | Salas por andar como na seção 11 | Parcial | Todas as salas listadas existem com placa (101 salas). 6 não têm tela própria e não abrem nada (Insights: criação de dashboards, personalização de indicadores; Music: descanso; Sports: recuperação e descanso). Idiomas: as salas por idioma (português, inglês etc.) não existem como salas; os idiomas reais aparecem no térreo. |
-| Circulação vertical | Conforme | Navegador: botões Térreo / 1º / 2º andar na Biblioteca; no 1º andar aparecem o átrio com guarda-corpo, as salas com placa e os bancos do terraço. A dica "Elevador: próximo andar · E" aparece perto da torre. |
+| Circulação vertical | Conforme | Portas para o terraço em 4 lados; fora delas, a fachada de vidro bloqueia a passagem. Navegador: botões Térreo / 1º / 2º andar na Biblioteca; no 1º andar aparecem o átrio com guarda-corpo, as salas com placa e os bancos do terraço. A dica "Elevador: próximo andar · E" aparece perto da torre. |
 | Navegáveis em primeira pessoa e câmera livre | Conforme | O motor troca o "chão" e os limites por andar; o átrio aberto bloqueia a passagem. |
 | Library dona dos arquivos; Notes preserva edição | Conforme | Sem mudança nos módulos; os painéis são os mesmos da V2. |
 
@@ -139,7 +139,7 @@ O minimapa do parque desenha esta planta com os caminhos e o lago.
 | Central de Módulos: botão flutuante, no parque e nos interiores | Conforme | Botão à esquerda, sempre visível. |
 | Barra lateral com 18 módulos, cartões, busca, favoritos, recentes, atalhos | Conforme | `ModuleCenter.tsx`. Navegador: abriu, a busca "fina" achou Finanças, a estrela fixou a Library nos favoritos. Favoritos e recentes ficam neste aparelho. |
 | Abrir o 2D completo ou entrar no prédio | Conforme | Navegador: "Entrar no prédio" levou para dentro da Biblioteca; "Abrir em 2D" abriu `#/library`. |
-| Voltar ao contexto (posição, orientação, modo, prédio, interação) | Parcial | Navegador: "Voltar ao parque" no 2D voltou para dentro da Biblioteca, na 3ª pessoa. O andar não voltava (voltou no térreo); corrigido no commit seguinte, ainda não conferido no navegador. O painel aberto (setor ou sala) também volta desde o último commit, ainda não conferido no navegador. Sentado ou observando não volta. |
+| Voltar ao contexto (posição, orientação, modo, prédio, interação) | Conforme | Navegador: na Biblioteca, 2º andar, 3ª pessoa, com a sala "Arquivo de preservação" aberta → "Abrir em 2D" → "Voltar ao parque": voltou no mesmo prédio, mesmo andar, mesmo modo e com o mesmo painel aberto. Sentado ou observando não volta (levanta). |
 
 ## 13. Personagens e vida
 
@@ -229,7 +229,6 @@ O minimapa do parque desenha esta planta com os caminhos e o lago.
 4. **Salas sem tela própria** (6): decidir se ganham tela nova ou saem da planta.
 5. **Grama e flores com vento; luzes acendendo uma a uma; contraste e escala da interface.**
 6. **LOD dos prédios distantes** com transição suave.
-7. **Conferir no navegador a volta do 2D no mesmo andar e com o painel aberto.**
 
 ## Commits da V2.1
 
@@ -243,3 +242,6 @@ O minimapa do parque desenha esta planta com os caminhos e o lago.
 | `de2f827` | Interiores com andares |
 | `bbc8ef9` | Borboletas, folhas caindo, ocultar controles; esta auditoria |
 | `e724bb5` | Volta do 2D no mesmo andar; chegada do elevador; câmera da 3ª pessoa sem atravessar o vidro; fonte não empurra a câmera |
+| `3019ccb` | Volta do 2D reabre o painel; figuras com cabelo, olhos e mãos |
+| `61b8a57` | Portas para o terraço; a fachada bloqueia a passagem e a câmera da 3ª pessoa |
+| (este) | Textos com `{x}` (6 textos novos mostravam chaves sobrando) |

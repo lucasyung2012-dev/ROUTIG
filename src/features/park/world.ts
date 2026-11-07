@@ -8,7 +8,7 @@ import type { ModuleId } from '@/app/modules';
 import { LAKE, PARK_BUILDINGS, PARK_RADIUS, PATH_WIDTH, PLAZA_RADIUS, PONDS, entranceOf, facingOf, heightAt, inWater, lakeRadiusAt, parkPaths, samplePath, seededRandom, treePositions, type ParkBuilding, type Point } from '@/domain/park';
 import { amenities, houses, type Seat, type Viewpoint } from './buildings/amenities';
 import { Builder, Kit, cloud, forest, setWaterNight, setWaterWeather, shrubs, sky, stars, water, type Plant, type TreeSpecies } from './kit';
-import { birds, drone, fountain, rain } from './life';
+import { birds, butterflies, drone, fountain, leaves, rain } from './life';
 import { dashboardBuilding, inboxBuilding, profileBuilding, settingsBuilding, type DetailedBuilding } from './buildings/central';
 import { academyBuilding, insightsBuilding, languagesBuilding, libraryBuilding, notesBuilding } from './buildings/north';
 import { calendarBuilding, financeBuilding, projectsBuilding, tasksBuilding } from './buildings/east';
@@ -628,6 +628,12 @@ export function createWorld(kit: Kit): World {
   const sunK = () => Math.max(0.3, 1 - weather.cloud * 0.4 - weather.rain * 0.25 - weather.fog * 0.3);
   const ms = mist(kit);
   root.add(ms.mesh);
+  // Borboletas nos jardins (Sul, pérgola, praça, mirante do lago) e folhas caindo no outono ou com vento.
+  const bf = butterflies(kit, [[-30, 150], [-15, 148], [40, 145], [-45, 135], [15, 20], [-18, -14], [-78, 70], [-8, -128], [5, 175]].map(([x, z]) => ({ x: x!, y: heightAt(x!, z!), z: z! })));
+  const lv = leaves(kit);
+  root.add(bf.mesh, lv.mesh);
+  let season: Season = 'summer';
+  let glowNow = 0;
   // Chão molhado: terreno, caminhos e praça ficam mais escuros e brilhantes com a chuva e secam devagar.
   const wetMats = [kit.mat('#ffffff', { vertexColors: true, rough: 0.95 }), kit.mat('#B8AE98', { rough: 0.9 }), kit.mat('#DCD3C0', { rough: 0.85 }), kit.mat('#C7B48E', { rough: 0.95 }), kit.mat('#E7E1D3', { rough: 0.85 })];
   const dry = wetMats.map((m) => ({ rough: m.roughness, color: m.color.clone() }));
@@ -662,6 +668,8 @@ export function createWorld(kit: Kit): World {
       });
       if (weather.rain > 0.02) rn.tick(dt, focus, weather.wind);
       ms.tick(focus, weather.fog, t);
+      bf.tick(t, glowNow < 0.3 && weather.rain < 0.2 && weather.wind < 0.6);
+      lv.tick(dt, t, focus, (season === 'autumn' ? 0.7 : 0) + Math.max(0, weather.wind - 0.45) * 1.4, weather.wind);
       wet += ((weather.rain > 0.1 ? 1 : 0) - wet) * Math.min(1, dt * (weather.rain > 0.1 ? 0.25 : 0.05));
       if (Math.abs(wet - wetShown) > 0.02) {
         wetShown = wet;
@@ -676,6 +684,7 @@ export function createWorld(kit: Kit): World {
       for (const l of lodItems) l.obj.visible = Math.hypot(cam.x - l.x, cam.z - l.z) < l.far;
     },
     setLight: (l) => {
+      glowNow = l.glow;
       skyTop.set(l.skyTop);
       skyBottom.set(l.skyBottom);
       const g = grey();
@@ -709,6 +718,7 @@ export function createWorld(kit: Kit): World {
     },
 
     setSeason: (s) => {
+      season = s;
       // Cor das copas e das floradas pela estação (só visual).
       // Estações do Brasil, mantendo a identidade tropical: palmeiras e copas largas seguem verdes;
       // o ipê floresce amarelo no inverno, a primavera traz o lilás, o outono amarela as emergentes.

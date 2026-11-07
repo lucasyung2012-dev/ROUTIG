@@ -4,6 +4,7 @@
  */
 import * as THREE from 'three';
 import { seededRandom } from '@/domain/park';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { Builder, water, type Kit } from './kit';
 import { createLogo3D } from './logo3d';
 
@@ -186,3 +187,84 @@ export function rain(kit: Kit): { lines: THREE.LineSegments; tick: (dt: number, 
 
 /* ---------- Montagem ---------- */
 
+
+/** Borboletas nos jardins (de dia, sem chuva nem vento forte): voo sinuoso em volta das flores. */
+export function butterflies(kit: Kit, spots: Array<{ x: number; y: number; z: number }>, count = 36): { mesh: THREE.InstancedMesh; tick: (t: number, active: boolean) => void } {
+  const wing = new THREE.PlaneGeometry(0.16, 0.12);
+  wing.translate(0.08, 0, 0);
+  const left = wing.clone();
+  left.rotateY(Math.PI);
+  const geo = kit.own(mergeGeometries([wing.toNonIndexed(), left.toNonIndexed()])!);
+  wing.dispose();
+  left.dispose();
+  const mesh = new THREE.InstancedMesh(geo, kit.own(new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, vertexColors: false })), count);
+  const colors = ['#F59E0B', '#FDE68A', '#F472B6', '#60A5FA', '#FFFFFF'];
+  const c = new THREE.Color();
+  const seeds = Array.from({ length: count }, (_, i) => ({ spot: spots[i % Math.max(1, spots.length)]!, ph: i * 1.7, r: 1.5 + (i % 4) }));
+  seeds.forEach((_, i) => mesh.setColorAt(i, c.set(colors[i % colors.length]!)));
+  mesh.frustumCulled = false;
+  const m4 = new THREE.Matrix4();
+  const q = new THREE.Quaternion();
+  const e = new THREE.Euler();
+  const v = new THREE.Vector3();
+  const s = new THREE.Vector3();
+  return {
+    mesh,
+    tick: (t, active) => {
+      mesh.visible = active && spots.length > 0;
+      if (!mesh.visible) return;
+      seeds.forEach((b, i) => {
+        const a = t * 0.6 + b.ph;
+        v.set(b.spot.x + Math.cos(a) * b.r + Math.sin(a * 2.3) * 0.6, b.spot.y + 0.6 + Math.abs(Math.sin(a * 1.7)) * 0.9, b.spot.z + Math.sin(a) * b.r);
+        const flap = 0.25 + Math.abs(Math.sin(t * 18 + b.ph)) * 0.75;
+        q.setFromEuler(e.set(0, -a, 0));
+        s.set(flap, 1, 1);
+        m4.compose(v, q, s);
+        mesh.setMatrixAt(i, m4);
+      });
+      mesh.instanceMatrix.needsUpdate = true;
+    },
+  };
+}
+
+/** Folhas caindo em volta de quem olha (outono e vento): giram e derivam com o vento. */
+export function leaves(kit: Kit, count = 160): { mesh: THREE.InstancedMesh; tick: (dt: number, t: number, center: THREE.Vector3, amount: number, wind: number) => void } {
+  const geo = kit.own(new THREE.PlaneGeometry(0.14, 0.09));
+  const mesh = new THREE.InstancedMesh(geo, kit.own(new THREE.MeshLambertMaterial({ side: THREE.DoubleSide })), count);
+  const rnd = seededRandom(31);
+  const p = Array.from({ length: count }, () => ({ x: (rnd() - 0.5) * 50, y: rnd() * 14, z: (rnd() - 0.5) * 50, ph: rnd() * 6 }));
+  const c = new THREE.Color();
+  const tones = ['#C98A3A', '#D9A441', '#B5562B', '#8C9A3C', '#E0B04A'];
+  p.forEach((_, i) => mesh.setColorAt(i, c.set(tones[i % tones.length]!)));
+  mesh.frustumCulled = false;
+  mesh.visible = false;
+  const m4 = new THREE.Matrix4();
+  const q = new THREE.Quaternion();
+  const e = new THREE.Euler();
+  const v = new THREE.Vector3();
+  const one = new THREE.Vector3(1, 1, 1);
+  return {
+    mesh,
+    tick: (dt, t, center, amount, wind) => {
+      mesh.visible = amount > 0.05;
+      if (!mesh.visible) return;
+      mesh.count = Math.round(count * Math.min(1, amount));
+      for (let i = 0; i < mesh.count; i++) {
+        const l = p[i]!;
+        l.y -= dt * (0.6 + Math.sin(t + l.ph) * 0.2);
+        l.x += dt * (wind * 3 + Math.sin(t * 0.7 + l.ph) * 0.4);
+        if (l.y < 0) {
+          l.y = 12 + rnd() * 3;
+          l.x = (rnd() - 0.5) * 50;
+          l.z = (rnd() - 0.5) * 50;
+        }
+        if (l.x > 25) l.x -= 50;
+        v.set(center.x + l.x, center.y + l.y, center.z + l.z);
+        q.setFromEuler(e.set(t * 2 + l.ph, t * 1.3 + l.ph, 0));
+        m4.compose(v, q, one);
+        mesh.setMatrixAt(i, m4);
+      }
+      mesh.instanceMatrix.needsUpdate = true;
+    },
+  };
+}

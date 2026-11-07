@@ -4780,6 +4780,8 @@ export const en: Messages = {
     stickSize: 'Control size',
     stickSizes: { s: 'Small', m: 'Medium', l: 'Large' },
     stickSide: 'Control side',
+    hideControls: 'Hide on-screen controls',
+    hideControlsHint: 'For keyboard and mouse; on touch, dragging still turns the view.',
     sides: { left: 'Left', right: 'Right' },
     people: 'Residents',
     peopleLevels: { off: 'None', few: 'Few', normal: 'Normal' },

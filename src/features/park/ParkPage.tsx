@@ -64,7 +64,7 @@ interface ParkPrefs {
   stick?: Stick;
   people?: People;
 }
-type Stick = { size: 's' | 'm' | 'l'; side: 'left' | 'right' };
+type Stick = { size: 's' | 'm' | 'l'; side: 'left' | 'right'; hidden?: boolean };
 type People = 'off' | 'few' | 'normal';
 const DEFAULT_MOVE: MoveSettings = { sensitivity: 1, speed: 1, invertY: false };
 const DEFAULT_STICK: Stick = { size: 'm', side: 'left' };
@@ -660,6 +660,7 @@ export default function ParkPage() {
           <Switch label={t('park.invertY')} checked={move.invertY} onChange={(on) => setMoveSet({ ...move, invertY: on })} />
           <Segmented<Stick['size']> label={t('park.stickSize')} value={stick.size} onChange={(v) => setStick({ ...stick, size: v })} options={(['s', 'm', 'l'] as const).map((v) => ({ value: v, label: t(`park.stickSizes.${v}`) }))} className="w-full" />
           <Segmented<Stick['side']> label={t('park.stickSide')} value={stick.side} onChange={(v) => setStick({ ...stick, side: v })} options={(['left', 'right'] as const).map((v) => ({ value: v, label: t(`park.sides.${v}`) }))} className="w-full" />
+          <Switch label={t('park.hideControls')} hint={t('park.hideControlsHint')} checked={!!stick.hidden} onChange={(on) => setStick({ ...stick, hidden: on })} />
           <Button variant="secondary" icon={<RotateCcw className="h-4 w-4" />} onClick={restoreDefaults}>
             {t('park.restore')}
           </Button>
@@ -682,8 +683,8 @@ export default function ParkPage() {
       )}
 
       {/* Andando (primeira e terceira pessoa): controle, botões de correr, pular e interagir, e dica */}
-      {camMode !== 'orbit' && <Joystick onMove={(x, y) => engine.current?.setMove(x, y)} label={t('park.joystick')} size={stick.size} side={stick.side} />}
-      {camMode !== 'orbit' && <ActionButtons side={stick.side === 'left' ? 'right' : 'left'} engine={engine} canInteract={!!hint || posture !== 'stand' || (!!near && !inside)} />}
+      {camMode !== 'orbit' && !stick.hidden && <Joystick onMove={(x, y) => engine.current?.setMove(x, y)} label={t('park.joystick')} size={stick.size} side={stick.side} />}
+      {camMode !== 'orbit' && !stick.hidden && <ActionButtons side={stick.side === 'left' ? 'right' : 'left'} engine={engine} canInteract={!!hint || posture !== 'stand' || (!!near && !inside)} />}
       {camMode !== 'orbit' && (hint || posture !== 'stand') && (!near || !!inside) && (
         <div className="pointer-events-none absolute inset-x-0 bottom-44 flex justify-center">
           <span className="rounded-full bg-black/60 px-3 py-1.5 text-xs font-medium text-white">

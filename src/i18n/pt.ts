@@ -4778,6 +4778,8 @@ export const pt = {
     stickSize: 'Tamanho do controle',
     stickSizes: { s: 'Pequeno', m: 'Médio', l: 'Grande' },
     stickSide: 'Lado do controle',
+    hideControls: 'Ocultar controles na tela',
+    hideControlsHint: 'Para teclado e mouse; no toque, arrastar continua girando a vista.',
     sides: { left: 'Esquerda', right: 'Direita' },
     people: 'Moradores',
     peopleLevels: { off: 'Nenhum', few: 'Poucos', normal: 'Normal' },

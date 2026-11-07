@@ -574,6 +574,13 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
     const b = world.buildings.get(id);
     if (!b) return;
     const out = new THREE.Vector3(b.entrance.x - b.def.x, 0, b.entrance.z - b.def.z).normalize();
+    // Andando (1ª ou 3ª pessoa): aparece em frente à entrada, de frente para a porta.
+    if (rig.mode() !== 'orbit') {
+      const p = doors.portals.get(id);
+      const fx = p ? p.x : b.entrance.x;
+      const fz = p ? p.z : b.entrance.z;
+      return fadeSwap(() => rig.place(fx + out.x * 6, fz + out.z * 6, Math.atan2(out.x, out.z)));
+    }
     const y = heightAt(b.def.x, b.def.z);
     const target = new THREE.Vector3(b.def.x, y + Math.min(8, b.top * 0.3), b.def.z);
     const cam = target.clone().addScaledVector(out, b.def.radius * 1.9).setY(y + b.def.radius * 1.1);
@@ -1196,6 +1203,7 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
           g.dispose();
         }
       });
+      world.stop();
       kit.dispose();
       envTex.dispose();
       renderer.dispose();

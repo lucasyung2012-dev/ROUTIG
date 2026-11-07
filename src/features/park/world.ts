@@ -5,7 +5,7 @@
  */
 import * as THREE from 'three';
 import type { ModuleId } from '@/app/modules';
-import { LAKE, onPath, plazaCarts, PARK_BUILDINGS, PARK_RADIUS, PARK_SCALE, PATH_WIDTH, PLAZA_RADIUS, POIS, PONDS, entranceOf, facingOf, heightAt, inWater, inField, isFreeGround, lakeRadiusAt, parkPaths, samplePath, seededRandom, treePositions, type ParkBuilding, type Point } from '@/domain/park';
+import { LAKE, onPath, plazaCarts, ROAD_RADIUS, PARK_BUILDINGS, PARK_RADIUS, PARK_SCALE, PATH_WIDTH, PLAZA_RADIUS, POIS, PONDS, entranceOf, facingOf, heightAt, inWater, inField, isFreeGround, lakeRadiusAt, parkPaths, samplePath, seededRandom, treePositions, type ParkBuilding, type Point } from '@/domain/park';
 import { amenities, houses, neighborhood, sportsFields, streetTrees, type Seat, type Viewpoint } from './buildings/amenities';
 import { city } from './buildings/city';
 import { Builder, Kit, signTexture, cloud, forest, setWaterNight, setWaterSky, setWaterWeather, shrubs, sky, stars, water, type Plant, type TreeSpecies } from './kit';
@@ -180,6 +180,8 @@ export interface World {
   play: (s: { swings: number[]; seesaw: number }) => void;
   /** Sons da rua deste quadro (ônibus freando, buzina). */
   cityEvents: () => Array<{ x: number; z: number; kind: 'brake' | 'horn' }>;
+  /** Cancela o que ainda ia ser montado (ao fechar o parque). */
+  stop: () => void;
   viewpoints: Viewpoint[];
   /** Árvores (para observar de perto). */
   treeSpots: Plant[];
@@ -750,13 +752,19 @@ export function createWorld(kit: Kit): World {
   const am = amenities(kit);
   const ww = walkway(kit, buildings.get('tasks')?.def, buildings.get('calendar')?.def);
   const fields = sportsFields(kit);
-  const hood = neighborhood(kit);
-  ticks.push(hood.tick);
-  // Ruas do bairro: avenida, transversais, semáforos, ônibus, bancas, carros.
-  const streets = city(kit);
-  ticks.push(streets.tick);
-  root.add(streets.group);
-  root.add(am.group, houses(kit), ww, fields, hood.group);
+  root.add(am.group, ww, fields);
+  // Borda do mapa (bairro, casas, avenida, ônibus): monta logo depois que o parque aparece, para a
+  // abertura não esperar por ela; e só é desenhada com a câmera perto da borda ou no alto.
+  const edge = new THREE.Group();
+  root.add(edge);
+  let streets: ReturnType<typeof city> | null = null;
+  const edgeTimer = window.setTimeout(() => {
+    const hood = neighborhood(kit);
+    streets = city(kit);
+    edge.add(hood.group, houses(kit), streets.group);
+    ticks.push(hood.tick, streets.tick);
+    kit.glowing.forEach((m) => (m.emissiveIntensity = 0.15 + glowNow * 1.6));
+  }, 1500);
   obstacles.push(...footprint(fields, heightAt));
   // Barracas, quiosques, mesas, bancos, pérgolas, passarela, praça; postes e troncos das árvores.
   obstacles.push(...footprint(am.group, heightAt), ...footprint(ww, heightAt), ...footprint(plazaGroup, heightAt), ...footprint(pg.solid, heightAt));
@@ -852,7 +860,8 @@ export function createWorld(kit: Kit): World {
     // Todos os bancos do parque servem para sentar (inclusive os da praça).
     seats: [...am.seats, ...plazaSeats(), ...pg.seats],
     play: pg.tick,
-    cityEvents: () => streets.events(),
+    cityEvents: () => streets?.events() ?? [],
+    stop: () => window.clearTimeout(edgeTimer),
     treeSpots: plantList,
     viewpoints: am.viewpoints,
     spots: am.spots,
@@ -887,6 +896,7 @@ export function createWorld(kit: Kit): World {
       sun.target.position.copy(focus);
       sun.position.copy(focus).addScaledVector(sunDir, 200);
       for (const l of lodItems) l.obj.visible = Math.hypot(cam.x - l.x, cam.z - l.z) < l.far !== !!l.invert;
+      edge.visible = Math.abs(Math.hypot(cam.x, cam.z) - ROAD_RADIUS) < 300 || cam.y > 90;
     },
     setLight: (l) => {
       glowNow = l.glow;

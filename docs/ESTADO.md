@@ -2,7 +2,16 @@
 
 Leia este arquivo no começo de toda conversa nova sobre o ROUTIG. A especificação completa é o "ROUTIG — Prompt Master" (35 partes), fornecido pelo dono do produto. Decisões em [DECISOES.md](DECISOES.md), arquitetura em [ARQUITETURA.md](ARQUITETURA.md).
 
-**Atualizado:** 2026-11-07 (V2.1 + rodada de ajustes do Lucas; login e sincronização prontos, aguardando o ID do cliente Google)
+**Atualizado:** 2026-11-08 (arquitetura própria de cada prédio e objetos funcionais; login e sincronização prontos, aguardando o ID do cliente Google)
+
+## Estado da conversa (2026-11-08, arquitetura de cada prédio e objetos funcionais)
+
+- **Feito e publicado (CI verde):**
+  - Cada prédio com arquitetura própria, por dentro e por fora (`src/features/park/forms.ts`): seis plantas de andar (átrio com galerias: Dashboard e Library; núcleo com escada em caracol: Calendar, Insights, Settings; corredor com salas dos dois lados: Tasks, Finance, Music; mezanino sobre pé-direito alto: Academy, Projects; planta livre com ilhas: Notes, Inbox, Profile, Sports; anel em volta de jardim a céu aberto: Languages, Habits, Focus, Goals), forma própria (redonda, quadrada, pentagonal, hexagonal, octogonal, 12 lados), recuo e giro por andar (Insights e Projects torcidos) e seis fachadas (vidro, pedra, tijolo, brises, ripas de madeira, painéis com janela em fita).
+  - Exterior com a mesma forma e fachada dos andares de dentro, pilares sob a laje, torre do elevador nos fundos com pontes, claraboia do átrio, núcleo acima da cobertura, jardim aberto.
+  - Objetos funcionais (`interiors/things.ts`): piano de cauda com teclado na tela (25 teclas, teclas afundam no 3D; teclado Z–M / Q–U), bateria com 4 pads, toca-discos (disco gira e toca), luminárias que acendem e apagam (térreo e andares), globo que gira, relógio de pé na hora real que bate as horas, luneta que olha o céu, escada do núcleo que sobe/desce andar, porta de cada sala abre o painel real dela.
+- **Testado no navegador:** Music (corredor, salas, piano abre e responde ao toque e ao teclado sem erros), Languages (jardim e galeria do 2º andar), exteriores de Music, Academy, Insights, Library e Languages.
+- **Não verificado:** som do piano/bateria/sinos (não dá para ouvir no teste), escada do núcleo (Calendar/Insights/Settings), luneta, globo e relógio em uso, iPad/iPhone real.
 
 ## Estado da conversa (2026-11-08, realismo do parque)
 

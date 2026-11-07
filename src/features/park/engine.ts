@@ -260,7 +260,7 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
     const lv = levels[L]!;
     // Chega pelo elevador, nos fundos, olhando para dentro do prédio.
     if (rig.mode() !== 'orbit') rig.place(lv.arrive.x, lv.arrive.z, Math.PI);
-    else rig.glideTo(new THREE.Vector3(0, lv.y + 3.4, lv.outer - 1), new THREE.Vector3(0, lv.y + 1, -lv.outer * 0.3), 900);
+    else rig.glideTo(new THREE.Vector3(lv.arrive.x, lv.y + 3.3, lv.arrive.z - 0.8), new THREE.Vector3(lv.arrive.x, lv.y + 0.6, lv.arrive.z + 9), 900);
   };
   /* ---------- Elevador: entrar, fechar portas, subir/descer, abrir, sair ---------- */
   type Ride = { from: number; to: number; t0: number; start: THREE.Vector3; startLook: THREE.Vector3; mode: CamMode };

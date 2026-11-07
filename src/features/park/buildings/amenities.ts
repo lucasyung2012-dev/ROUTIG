@@ -7,6 +7,7 @@ import * as THREE from 'three';
 import { navGraph } from '@/domain/parkPeople';
 import { PARK_BUILDINGS, PATH_WIDTH, PLAZA_RADIUS, POIS, ROAD_RADIUS, SPORT_FIELDS, heightAt, inWater, parkPaths, residences, samplePath, seededRandom, type Poi } from '@/domain/park';
 import { Builder, type Kit } from '../kit';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
 export interface Seat {
   x: number;
@@ -397,7 +398,7 @@ export function sportsFields(kit: Kit): THREE.Group {
  * caminhos ligando os portões do parque à rua, e uma faixa de prédios residenciais e comerciais
  * (4 a 8 andares, janelas que acendem à noite, varandas, térreo com lojas) atrás das casas.
  */
-export function neighborhood(kit: Kit): THREE.Group {
+export function neighborhood(kit: Kit): { group: THREE.Group; tick: (t: number) => void } {
   const g = new THREE.Group();
   const b = new Builder();
   const asphalt = kit.mat('#4A4F57', { rough: 0.9 });
@@ -466,43 +467,186 @@ export function neighborhood(kit: Kit): THREE.Group {
     void mx;
     void mz;
   }
-  // Prédios do bairro.
+  // Faixas de pedestre em cada portão do parque.
+  for (const gi of navGraph().gates) {
+    const p = navGraph().nodes[gi]!;
+    const a = Math.atan2(p.z, p.x);
+    for (let k = -3; k <= 3; k++) {
+      const t = a + (k * 0.6) / ROAD_RADIUS;
+      const x = Math.cos(t) * ROAD_RADIUS;
+      const z = Math.sin(t) * ROAD_RADIUS;
+      b.add(stripe, new THREE.BoxGeometry(6.4, 0.02, 0.35), [x, heightAt(x, z) + 0.085, z], [0, -t, 0]);
+    }
+  }
+  // Prédios do bairro: residenciais (varandas, janelas nos quatro lados, caixa-d'água) e
+  // comerciais (pele de vidro, letreiro), térreo com lojas, marquises e toldos.
   const rnd = seededRandom(909);
-  const facades = ['#E8E2D6', '#D9DEE5', '#EADCCB', '#CFD8DC', '#E4D5C3', '#DDE6E1'].map((c) => kit.mat(c, { rough: 0.85 }));
-  const glassW = kit.mat('#FFE2A8', { glow: true, rough: 0.35 });
+  const facades = ['#E8E2D6', '#D9DEE5', '#EADCCB', '#CFD8DC', '#E4D5C3', '#DDE6E1', '#C9B8A6', '#B8C4CF'].map((c) => kit.mat(c, { rough: 0.85 }));
+  const glassDay = kit.mat('#6F93AE', { rough: 0.15, metal: 0.5 });
+  const glassLit = kit.mat('#FFE2A8', { glow: true, rough: 0.35 });
+  const curtain = kit.mat('#7FA4BF', { glass: true });
   const dark = kit.mat('#3A4250', { rough: 0.5, metal: 0.3 });
+  const trim = kit.mat('#F4F5F7', { rough: 0.6 });
+  const frameW = kit.mat('#E9ECEF', { rough: 0.5 });
   const shop = kit.mat('#9FD3E8', { glass: true });
+  const rail = kit.mat('#CFE7F5', { glass: true });
+  const leafM = kit.mat('#4C9A4F', { rough: 0.9 });
+  const tankM = kit.mat('#E5E7EB', { rough: 0.5, metal: 0.2 });
+  const awnings = ['#14B8A6', '#F59E0B', '#EF4444', '#6366F1', '#16A34A', '#DB2777'].map((c) => kit.mat(c, { rough: 0.6 }));
   for (let i = 0; i < 26; i++) {
     const a = (i / 26) * Math.PI * 2 + (rnd() - 0.5) * 0.08;
     const rr = ROAD_RADIUS + 70 + rnd() * 30;
     const x = Math.cos(a) * rr;
     const z = Math.sin(a) * rr;
     const y = Math.min(heightAt(x - 8, z - 8), heightAt(x + 8, z + 8), heightAt(x, z));
-    const floors = 4 + Math.floor(rnd() * 5);
+    const commercial = i % 5 === 2;
+    const floors = commercial ? 3 + Math.floor(rnd() * 3) : 4 + Math.floor(rnd() * 5);
     const fh = 3.1;
     const w = 16 + rnd() * 10;
     const d = 12 + rnd() * 6;
     const rot = Math.PI / 2 - a + Math.PI;
     const H = floors * fh + 4;
     const P = (lx: number, ly: number, lz: number): [number, number, number] => [x + lx * Math.cos(rot) + lz * Math.sin(rot), y + ly, z - lx * Math.sin(rot) + lz * Math.cos(rot)];
+    const R: [number, number, number] = [0, rot, 0];
     const fac = facades[i % facades.length]!;
-    b.add(kit.mat('#B9B3A8', { rough: 0.95 }), new THREE.BoxGeometry(w + 2, 2, d + 2), P(0, -1, 0), [0, rot, 0]);
-    b.add(fac, new THREE.BoxGeometry(w, H, d), P(0, H / 2, 0), [0, rot, 0]);
-    // Térreo com lojas (vitrines) e toldo.
-    b.add(shop, new THREE.BoxGeometry(w * 0.9, 3, 0.1), P(0, 1.6, d / 2 + 0.02), [0, rot, 0]);
-    b.add(kit.mat(['#14B8A6', '#F59E0B', '#EF4444', '#6366F1'][i % 4]!, { rough: 0.6 }), new THREE.BoxGeometry(w * 0.9, 0.12, 1.4), P(0, 3.6, d / 2 + 0.7), [0, rot, 0]);
-    // Andares: faixa de janelas e varandas.
+    b.add(kit.mat('#B9B3A8', { rough: 0.95 }), new THREE.BoxGeometry(w + 2, 2, d + 2), P(0, -1, 0), R);
+    b.add(commercial ? curtain : fac, new THREE.BoxGeometry(w, H, d), P(0, H / 2, 0), R);
+    // Térreo: lojas com vitrine, porta, letreiro aceso e toldo; marquise sobre a calçada.
+    const shops = Math.max(2, Math.floor(w / 6));
+    for (let k = 0; k < shops; k++) {
+      const sw = w / shops;
+      const lx = -w / 2 + sw * (k + 0.5);
+      b.add(shop, new THREE.BoxGeometry(sw - 0.5, 2.8, 0.1), P(lx, 1.5, d / 2 + 0.03), R);
+      b.add(dark, new THREE.BoxGeometry(0.12, 3.2, 0.2), P(lx - sw / 2 + 0.1, 1.6, d / 2 + 0.05), R);
+      b.add(dark, new THREE.BoxGeometry(1.1, 2.3, 0.12), P(lx + sw * 0.25, 1.15, d / 2 + 0.08), R);
+      b.add(awnings[(i + k) % awnings.length]!, new THREE.BoxGeometry(sw - 0.6, 0.12, 1.5), P(lx, 3.3, d / 2 + 0.75), [0.18, rot, 0]);
+      b.add(glassLit, new THREE.BoxGeometry(sw * 0.6, 0.45, 0.08), P(lx, 3.75, d / 2 + 0.06), R);
+    }
+    // Andares: janelas com caixilho nos quatro lados, faixa de laje, varandas e ar-condicionado.
     for (let f = 0; f < floors; f++) {
       const fy = 4 + f * fh + 1.5;
-      for (let k = 0; k < Math.floor(w / 3); k++) {
-        const lx = -w / 2 + 1.6 + k * 3;
-        b.add(rnd() > 0.35 ? glassW : dark, new THREE.BoxGeometry(1.6, 1.5, 0.08), P(lx, fy, d / 2 + 0.03), [0, rot, 0]);
+      b.add(trim, new THREE.BoxGeometry(w + 0.16, 0.18, d + 0.16), P(0, fy - 1.55, 0), R);
+      if (commercial) continue;
+      for (const side of [1, -1]) {
+        for (let k = 0; k < Math.floor(w / 3); k++) {
+          const lx = -w / 2 + 1.6 + k * 3;
+          const lit = rnd() > 0.75;
+          b.add(frameW, new THREE.BoxGeometry(1.75, 1.65, 0.06), P(lx, fy, side * (d / 2 + 0.02)), R);
+          b.add(lit ? glassLit : glassDay, new THREE.BoxGeometry(1.55, 1.45, 0.06), P(lx, fy, side * (d / 2 + 0.05)), R);
+          b.add(frameW, new THREE.BoxGeometry(0.05, 1.45, 0.08), P(lx, fy, side * (d / 2 + 0.07)), R);
+        }
       }
-      if (f % 2 === 0) b.add(kit.mat('#F4F5F7', { rough: 0.6 }), new THREE.BoxGeometry(w * 0.85, 0.15, 1.2), P(0, fy - 1.4, d / 2 + 0.6), [0, rot, 0]);
+      for (const side of [1, -1])
+        for (let k = 0; k < Math.floor(d / 3.5); k++) {
+          const lz = -d / 2 + 1.8 + k * 3.5;
+          b.add(frameW, new THREE.BoxGeometry(0.06, 1.65, 1.75), P(side * (w / 2 + 0.02), fy, lz), R);
+          b.add(glassDay, new THREE.BoxGeometry(0.06, 1.45, 1.55), P(side * (w / 2 + 0.05), fy, lz), R);
+        }
+      if (f % 2 === 0) {
+        // Varanda com guarda-corpo de vidro e um vaso.
+        b.add(trim, new THREE.BoxGeometry(w * 0.4, 0.15, 1.3), P(-w * 0.2, fy - 1.4, d / 2 + 0.65), R);
+        b.add(rail, new THREE.BoxGeometry(w * 0.4, 1.0, 0.04), P(-w * 0.2, fy - 0.85, d / 2 + 1.28), R);
+        b.add(leafM, new THREE.IcosahedronGeometry(0.35, 1), P(-w * 0.35, fy - 1.0, d / 2 + 0.8), R);
+      } else b.add(tankM, new THREE.BoxGeometry(0.8, 0.5, 0.4), P(w * 0.3, fy - 0.9, d / 2 + 0.25), R);
     }
-    b.add(dark, new THREE.BoxGeometry(w + 0.4, 0.4, d + 0.4), P(0, H + 0.2, 0), [0, rot, 0]);
-    b.add(dark, new THREE.BoxGeometry(3, 2, 3), P(w * 0.25, H + 1.2, 0), [0, rot, 0]);
+    if (commercial) {
+      // Montantes da pele de vidro e letreiro no alto.
+      for (let k = 0; k <= Math.floor(w / 2); k++) b.add(dark, new THREE.BoxGeometry(0.1, H - 4, 0.14), P(-w / 2 + k * 2, 4 + (H - 4) / 2, d / 2 + 0.05), R);
+      b.add(glassLit, new THREE.BoxGeometry(w * 0.5, 1.2, 0.2), P(0, H - 1, d / 2 + 0.15), R);
+    }
+    // Cobertura: platibanda, caixa-d'água, casa de máquinas e antena.
+    for (const [sx, sz, lw, ld] of [[0, d / 2, w, 0.3], [0, -d / 2, w, 0.3], [w / 2, 0, 0.3, d], [-w / 2, 0, 0.3, d]] as const) b.add(dark, new THREE.BoxGeometry(lw + 0.3, 0.9, ld + 0.3), P(sx, H + 0.45, sz), R);
+    b.add(tankM, new THREE.CylinderGeometry(1.1, 1.1, 2.2, 16), P(-w * 0.25, H + 1.6, -d * 0.15), R);
+    b.add(dark, new THREE.BoxGeometry(3, 2.2, 3), P(w * 0.22, H + 1.1, 0), R);
+    b.add(dark, new THREE.CylinderGeometry(0.05, 0.05, 4, 6), P(w * 0.3, H + 4, d * 0.2), R);
   }
   g.add(b.build());
-  return g;
+  // Carros: estacionados junto à calçada externa e rodando na rua (poucas instâncias, um desenho só).
+  const carGeo = (() => {
+    const body = new THREE.BoxGeometry(1.8, 0.65, 4.2);
+    body.translate(0, 0.55, 0);
+    const cab = new THREE.BoxGeometry(1.6, 0.55, 2.2);
+    cab.translate(0, 1.1, -0.2);
+    const parts = [body, cab];
+    for (const [wx, wz] of [[-0.85, 1.35], [0.85, 1.35], [-0.85, -1.35], [0.85, -1.35]] as const) {
+      const wh = new THREE.CylinderGeometry(0.34, 0.34, 0.25, 12);
+      wh.rotateZ(Math.PI / 2);
+      wh.translate(wx, 0.34, wz);
+      parts.push(wh);
+    }
+    return mergeGeometries(parts.map((p) => p.toNonIndexed()))!;
+  })();
+  const glassCar = (() => {
+    const gl = new THREE.BoxGeometry(1.62, 0.42, 2.0);
+    gl.translate(0, 1.12, -0.2);
+    return gl;
+  })();
+  const parked = 70;
+  const moving = 10;
+  const cars = new THREE.InstancedMesh(kit.own(carGeo), kit.mat('#ffffff', { rough: 0.35, metal: 0.4 }), parked + moving);
+  const windows = new THREE.InstancedMesh(kit.own(glassCar), kit.mat('#1F2A36', { rough: 0.1, metal: 0.6 }), parked + moving);
+  cars.castShadow = true;
+  const carColors = ['#E5E7EB', '#1F2937', '#9CA3AF', '#B91C1C', '#1D4ED8', '#F8FAFC', '#065F46', '#78716C'];
+  const m4 = new THREE.Matrix4();
+  const q = new THREE.Quaternion();
+  const one = new THREE.Vector3(1, 1, 1);
+  const col = new THREE.Color();
+  const placeCar = (i: number, a: number, r: number, dir: number) => {
+    const x = Math.cos(a) * r;
+    const z = Math.sin(a) * r;
+    q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), -a + (dir > 0 ? 0 : Math.PI));
+    m4.compose(new THREE.Vector3(x, heightAt(x, z) + 0.06, z), q, one);
+    cars.setMatrixAt(i, m4);
+    windows.setMatrixAt(i, m4);
+  };
+  const gates = navGraph().gates.map((gi) => {
+    const p = navGraph().nodes[gi]!;
+    return Math.atan2(p.z, p.x);
+  });
+  let pk = 0;
+  for (let k = 0; k < 400 && pk < parked; k++) {
+    const a = (k / 400) * Math.PI * 2;
+    if (rnd() > 0.35 || gates.some((gA) => Math.abs(Math.atan2(Math.sin(a - gA), Math.cos(a - gA))) < 0.03)) continue;
+    placeCar(pk, a, ROAD_RADIUS + 2.4, k % 2 ? 1 : -1);
+    cars.setColorAt(pk++, col.set(carColors[Math.floor(rnd() * carColors.length)]!));
+  }
+  const lanes = Array.from({ length: moving }, (_, k) => ({ a: (k / moving) * Math.PI * 2, dir: k % 2 ? 1 : -1, speed: 7 + rnd() * 4 }));
+  lanes.forEach((_, k) => cars.setColorAt(parked + k, col.set(carColors[(k * 3) % carColors.length]!)));
+  cars.count = windows.count = pk + moving;
+  g.add(cars, windows);
+  let last = 0;
+  const tick = (t: number) => {
+    const dt = last ? Math.min(0.1, t - last) : 0;
+    last = t;
+    lanes.forEach((l, k) => {
+      // Mão dupla: cada sentido na sua faixa; carros andam devagar (rua de bairro).
+      l.a += (l.dir * l.speed * dt) / ROAD_RADIUS;
+      placeCar(pk + k, l.a, ROAD_RADIUS + (l.dir > 0 ? 1.7 : -1.7), l.dir);
+    });
+    cars.instanceMatrix.needsUpdate = true;
+    windows.instanceMatrix.needsUpdate = true;
+  };
+  return { group: g, tick };
+}
+
+/** Árvores da calçada externa do bairro (fora do campus), uma a cada ~15 m, longe dos portões. */
+export function streetTrees(): Array<{ x: number; z: number; s: number }> {
+  const out: Array<{ x: number; z: number; s: number }> = [];
+  const houses = residences();
+  const gates = navGraph().gates.map((gi) => {
+    const p = navGraph().nodes[gi]!;
+    return Math.atan2(p.z, p.x);
+  });
+  const n = Math.round((Math.PI * 2 * (ROAD_RADIUS + 6.5)) / 15);
+  for (let k = 0; k < n; k++) {
+    const a = (k / n) * Math.PI * 2;
+    if (gates.some((gA) => Math.abs(Math.atan2(Math.sin(a - gA), Math.cos(a - gA))) < 0.04)) continue;
+    for (const r of [ROAD_RADIUS + 7.6, ROAD_RADIUS - 7.6]) {
+      const x = Math.cos(a) * r;
+      const z = Math.sin(a) * r;
+      if (houses.some((h) => Math.hypot(h.x - x, h.z - z) < 13)) continue;
+      out.push({ x: Math.cos(a) * r, z: Math.sin(a) * r, s: 0.8 + ((k * 37) % 10) / 30 });
+    }
+  }
+  return out;
 }

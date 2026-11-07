@@ -499,7 +499,7 @@ export function forest(kit: Kit, plants: Plant[]): Forest {
   plants.forEach((p) => bySpecies.set(p.species, [...(bySpecies.get(p.species) ?? []), p]));
   const sway = { uTime: { value: 0 }, uWind: { value: 0 } };
   // Por espécie: perto (todas as folhas, galhos, sombra) e longe (menos folhas maiores, tronco simples, sem sombra).
-  type TreeSet = { list: Plant[]; trunkM: THREE.Matrix4[]; crownM: THREE.Matrix4[]; near: [THREE.InstancedMesh, THREE.InstancedMesh]; far: [THREE.InstancedMesh, THREE.InstancedMesh]; species: TreeSpecies; mat: THREE.MeshStandardMaterial };
+  type TreeSet = { list: Plant[]; trunkM: THREE.Matrix4[]; crownM: THREE.Matrix4[]; crownC: THREE.Color[]; near: [THREE.InstancedMesh, THREE.InstancedMesh]; far: [THREE.InstancedMesh, THREE.InstancedMesh]; species: TreeSpecies; mat: THREE.MeshStandardMaterial };
   const sets: TreeSet[] = [];
   bySpecies.forEach((list, sp) => {
     const def = SPECIES[sp];
@@ -532,8 +532,15 @@ export function forest(kit: Kit, plants: Plant[]): Forest {
     };
     const yaw = new THREE.Vector3(0, 1, 0);
     const trunkM = list.map((p) => new THREE.Matrix4().compose(new THREE.Vector3(p.x, p.y ?? 0, p.z), new THREE.Quaternion().setFromAxisAngle(yaw, p.x * 1.7 + p.z), new THREE.Vector3(p.s, p.s, p.s)));
-    const crownM = list.map((p) => new THREE.Matrix4().compose(new THREE.Vector3(p.x, (p.y ?? 0) + def.crownY * p.s, p.z), new THREE.Quaternion().setFromAxisAngle(yaw, p.x * 1.7 + p.z), new THREE.Vector3(p.s, p.s, p.s)));
-    sets.push({ list, trunkM, crownM, near: [mk(trunkGeo, trunkMat, true), mk(crownGeo, crownMat, true)], far: [mk(farTrunkGeo, trunkMat, false), mk(farCrownGeo, crownMat, false)], species: sp, mat: crownMat });
+    // Cada árvore com a sua copa: largura, altura e tom um pouco diferentes (nada de clones).
+    const hv = (p: Plant, k: number) => {
+      const v = Math.sin(p.x * 12.9898 * k + p.z * 78.233) * 43758.5453;
+      return v - Math.floor(v);
+    };
+    const crownM = list.map((p) => new THREE.Matrix4().compose(new THREE.Vector3(p.x, (p.y ?? 0) + def.crownY * p.s, p.z), new THREE.Quaternion().setFromAxisAngle(yaw, p.x * 1.7 + p.z), new THREE.Vector3(p.s * (0.88 + hv(p, 1) * 0.28), p.s * (0.88 + hv(p, 2) * 0.24), p.s * (0.88 + hv(p, 3) * 0.28))));
+    const tones = ['#FFFFFF', '#F1F7DE', '#DDEBC8', '#FFF4D6', '#E6EFE0'].map((c) => new THREE.Color(c));
+    const crownC = list.map((p) => tones[Math.floor(hv(p, 4) * tones.length)]!);
+    sets.push({ list, trunkM, crownM, crownC, near: [mk(trunkGeo, trunkMat, true), mk(crownGeo, crownMat, true)], far: [mk(farTrunkGeo, trunkMat, false), mk(farCrownGeo, crownMat, false)], species: sp, mat: crownMat });
   });
   let fraction = 1;
   let lastX = Infinity;
@@ -548,19 +555,23 @@ export function forest(kit: Kit, plants: Plant[]): Forest {
         const p = st.list[i]!;
         if (Math.hypot(p.x - cx, p.z - cz) < TREE_NEAR) {
           st.near[0].setMatrixAt(a, st.trunkM[i]!);
+          st.near[1].setColorAt(a, st.crownC[i]!);
           st.near[1].setMatrixAt(a++, st.crownM[i]!);
         } else {
           st.far[0].setMatrixAt(b, st.trunkM[i]!);
+          st.far[1].setColorAt(b, st.crownC[i]!);
           st.far[1].setMatrixAt(b++, st.crownM[i]!);
         }
       }
       for (const m of st.near) {
         m.count = a;
         m.instanceMatrix.needsUpdate = true;
+        if (m.instanceColor) m.instanceColor.needsUpdate = true;
       }
       for (const m of st.far) {
         m.count = b;
         m.instanceMatrix.needsUpdate = true;
+        if (m.instanceColor) m.instanceColor.needsUpdate = true;
       }
     }
   };

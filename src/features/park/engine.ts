@@ -665,6 +665,13 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
       rig.place(th.x, th.z + 0.4, Math.PI);
       useThing(th);
     }
+    // 'cam:x,y,z,tx,ty,tz': câmera livre exatamente nesse ponto, olhando para o alvo.
+    if (typeof cmd === 'string' && cmd.startsWith('cam:') && !inside) {
+      const v = cmd.slice(4).split(',').map(Number);
+      if (v.length !== 6 || !v.every(Number.isFinite)) return;
+      rig.setMode('orbit');
+      rig.glideTo(new THREE.Vector3(v[0], v[1], v[2]), new THREE.Vector3(v[3], v[4], v[5]), 600);
+    }
     // 'look:playground', 'look:<prédio>' (lounge do elevador) ou 'look:x,z': câmera livre olhando o ponto.
     if (typeof cmd === 'string' && cmd.startsWith('look:') && !inside) {
       const what = cmd.slice(5);

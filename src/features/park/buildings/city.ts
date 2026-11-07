@@ -113,9 +113,10 @@ export function city(kit: Kit): City {
   const g = new THREE.Group();
   const b = new Builder();
   const rnd = seededRandom(5150);
-  const asphalt = kit.mat('#454A52', { rough: 0.92 });
-  const walk = kit.mat('#CBC4B6', { rough: 0.9 });
-  const curb = kit.mat('#9E978A', { rough: 0.9 });
+  // Faixas de rua desenhadas dos dois lados (a ordem dos vértices muda com o sentido de cada rua).
+  const asphalt = kit.mat('#454A52', { rough: 0.92, side: THREE.DoubleSide });
+  const walk = kit.mat('#CBC4B6', { rough: 0.9, side: THREE.DoubleSide });
+  const curb = kit.mat('#9E978A', { rough: 0.9, side: THREE.DoubleSide });
   const stripe = kit.mat('#F2E6B8', { rough: 0.7 });
   const white = kit.mat('#F4F4F2', { rough: 0.7 });
   const pole = kit.mat('#334155', { metal: 0.8, rough: 0.3 });
@@ -143,13 +144,6 @@ export function city(kit: Kit): City {
     geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
     geo.setIndex(idx);
     geo.computeVertexNormals();
-    // A face de cima tem de olhar para o céu (a ordem dos vértices depende do sentido da faixa).
-    if ((geo.attributes.normal as THREE.BufferAttribute).getY(0) < 0) {
-      const ix = geo.index!.array as unknown as number[];
-      for (let t = 0; t < ix.length; t += 3) [ix[t + 1], ix[t + 2]] = [ix[t + 2]!, ix[t + 1]!];
-      geo.index!.needsUpdate = true;
-      geo.computeVertexNormals();
-    }
     b.add(mat, geo);
   };
   const ring = (r: number, w: number, mat: THREE.Material, lift: number) =>
@@ -164,7 +158,7 @@ export function city(kit: Kit): City {
   for (const s of [-1, 1]) {
     ring(OUTER_ROAD + s * 4.6, 0.3, curb, 0.24);
     ring(OUTER_ROAD + s * 6.5, 3.6, walk, 0.22);
-    ring(OUTER_ROAD + s * 0.12, 0.1, kit.mat('#E8B33C', { rough: 0.6 }), 0.135);
+    ring(OUTER_ROAD + s * 0.12, 0.1, kit.mat('#E8B33C', { rough: 0.6, side: THREE.DoubleSide }), 0.135);
   }
   for (let i = 0; i < 220; i++) {
     const a = (i / 220) * Math.PI * 2;

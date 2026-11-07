@@ -4,6 +4,14 @@ Leia este arquivo no começo de toda conversa nova sobre o ROUTIG. A especifica�
 
 **Atualizado:** 2026-11-07 (parque vivo: som, gente, bichos, bairro e entradas; login e sincronização prontos, aguardando o ID do cliente Google)
 
+## Estado da conversa (2026-11-07, noite: palco, parquinhos, ônibus, luneta, documentação)
+
+- **Documentação completa do estado atual** (pedido do ChatGPT, sem alterar o projeto) entregue ao Lucas como `ROUTIG_CURRENT_STATE.md` (fora do repositório), sobre o commit `271227b`.
+- **Feito e publicado (CI verde):** até 4 parquinhos espalhados (com crianças, só simulados perto de quem olha), grama e mato fora de caminhos (margem de 1 m), calçadas, lounges, parquinhos e caminhos dos portões; flores do campo em canteiros de uma cor longe da beira; palco detalhado (telão, letreiro, cobertura em arco, refletores, caixas, retorno, bateria, teclado, microfones, amplificadores) com o chão nivelado em volta (`heightAt`); pessoas chegando aos pontos, esperando (em pé ou no banco), embarcando quando o ônibus para e descendo; luneta mostra Lua com crateras, Saturno e estrelas; poltronas, mesinha e plantas do lounge do elevador procuram lugar livre em todos os térreos.
+- **Testado no navegador:** palco visto do público; segundo parquinho completo.
+- **Não verificado:** pessoas no ponto de ônibus, luneta, demais parquinhos de perto, som, iPad/iPhone. Abertura voltou a ~2,9 s (parquinhos e cálculo das posições).
+- **Observação:** com `core.autocrlf=true`, `git stash pop` reescreve arquivos com CRLF; os scripts de edição precisam dos arquivos em LF.
+
 ## Estado da conversa (2026-11-07, parque vivo: som, gente, bichos, bairro e entradas)
 
 - **Feito e publicado (CI verde):**

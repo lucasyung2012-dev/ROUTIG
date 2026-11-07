@@ -6,7 +6,7 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import type { ModuleId } from '@/app/modules';
-import { LAKE, PARK_RADIUS, PONDS, heightAt, inWater, onPath } from '@/domain/park';
+import { LAKE, PARK_BUILDINGS, PARK_RADIUS, PLAZA_RADIUS, PONDS, heightAt, inWater, onPath } from '@/domain/park';
 import { Kit } from './kit';
 import { createCameraRig, type CamMode, type MoveSettings, type Posture } from './camera';
 import { AVATAR_LOOK, createCrowd, type Figure } from './people';
@@ -17,6 +17,9 @@ import type { ParkAudio } from './audio';
 import { DRUM_PADS, PIANO_KEYS, type Thing, type ThingCtx, type ThingKind } from './interiors/things';
 import type { ParkSnapshot } from './parkContext';
 import { footprint } from './collision';
+import { entryDoors } from './doors';
+import { createExtras } from './extras';
+import { createAnimals } from './animals';
 import type { InteriorScene } from './interiors/common';
 
 export interface Stats {
@@ -172,6 +175,13 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
   const crowd = createCrowd(kit, 40);
   outside.add(crowd.group);
   const town = createTown(world.seats);
+  // Gente de passagem (bicicleta, skate, corrida, jardineiro, vendedores, crianças) e bichos.
+  const extras = createExtras();
+  const animals = createAnimals(kit);
+  outside.add(animals.group);
+  const doors = entryDoors(kit, world.buildings, (id) => !!opts.interiors[id]);
+  outside.add(doors.group);
+  town.setDoors(new Map([...doors.portals].map(([id, p]) => [id, { x: p.x + Math.sin(p.facing) * 0.4, z: p.z + Math.cos(p.facing) * 0.4 }])));
   // Moradores dentro do prédio aberto (estudando, trabalhando, treinando...).
   const indoorCrowd = createCrowd(kit, 40);
   // Bolas dos jogos (tênis amarela, futebol branca).
@@ -189,6 +199,10 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
     avatar.set([{ x: b.pos.x, y: b.pos.y, z: b.pos.z, yaw: sitting ? b.yaw + Math.PI : b.heading, pose: sitting ? 'sit' : b.running && b.speed > 3 ? 'run' : b.speed > 0.2 ? 'walk' : performance.now() < avatarWaveUntil ? 'wave' : 'stand', expr: performance.now() < avatarWaveUntil - 1300 ? 'talk' : performance.now() < avatarWaveUntil ? 'smile' : Math.floor(performance.now() / 7000) % 5 === 0 ? 'smile' : 'neutral', phase: b.speed > 0.2 ? walkPhase : performance.now() / 500, stride: Math.min(1, b.speed / 2.5), ...AVATAR_LOOK, scale: 1 }]);
   };
   let walkPhase = 0;
+  let lastStep = 0;
+  /** Quanto de árvore há em volta de quem ouve (0 a 1), recalculado de vez em quando. */
+  let treeNear = 0.4;
+  let treeFrame = 0;
 
   // Interior aberto (um por vez).
   let inside: { id: ModuleId; kit: Kit; scene: InteriorScene } | null = null;
@@ -308,6 +322,60 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
     opts.onRiding(true);
   };
   const ease2 = (k: number) => (k < 0.5 ? 2 * k * k : 1 - (-2 * k + 2) ** 2 / 2);
+  /** Subida (ou descida) pela escada em caracol: entra no núcleo, gira subindo degrau a degrau e sai no outro andar. */
+  let climb: { from: number; to: number; t0: number; r: number; mode: CamMode; steps: number } | null = null;
+  const CLIMB_MS = 3600;
+  const stepClimb = (now: number) => {
+    const fl = inside?.scene.floors;
+    if (!climb || !fl) return false;
+    const k = Math.min(1, (now - climb.t0) / CLIMB_MS);
+    const up = climb.to > climb.from;
+    const yFrom = fl.levels[climb.from]!.y;
+    const yTo = fl.levels[climb.to]!.y;
+    const yLow = Math.min(yFrom, yTo);
+    const H = Math.abs(yTo - yFrom);
+    const rr = (climb.r - 0.3) / 2 + 0.1;
+    const turn = Math.PI * 2 * (17 / 18);
+    const EYE_Y = 1.62;
+    const at = (u: number) => {
+      const a = -0.4 - u * turn;
+      return new THREE.Vector3(Math.sin(a) * rr, yLow + u * H + EYE_Y, Math.cos(a) * rr);
+    };
+    const doorAt = (y: number) => new THREE.Vector3(0, y + EYE_Y, climb!.r + 0.7);
+    const uStart = up ? 0 : 1;
+    const uEnd = 1 - uStart;
+    if (k < 0.14) {
+      const q = ease2(k / 0.14);
+      camera.position.lerpVectors(doorAt(yFrom), at(uStart), q);
+      camera.lookAt(at(up ? 0.1 : 0.9).setY(yFrom + EYE_Y + (up ? 0.3 : -0.3)));
+    } else if (k < 0.86) {
+      const s = (k - 0.14) / 0.72;
+      const u = up ? s : 1 - s;
+      // Um degrau por vez: sobe um pouco, assenta (balanço do passo), som de cada pisada.
+      const step = Math.floor(s * 17);
+      if (step > climb.steps) {
+        climb.steps = step;
+        audio?.note(up ? 50 + (step % 2) * 2 : 48, 'tom');
+      }
+      camera.position.copy(at(u)).add(new THREE.Vector3(0, Math.abs(Math.sin(s * 17 * Math.PI)) * 0.04, 0));
+      const ahead = at(Math.max(0, Math.min(1, u + (up ? 0.08 : -0.08))));
+      camera.lookAt(ahead.setY(ahead.y + (up ? 0.25 : -0.35)));
+    } else if (k < 1) {
+      const q = ease2((k - 0.86) / 0.14);
+      camera.position.lerpVectors(at(uEnd), doorAt(yTo), q);
+      camera.lookAt(new THREE.Vector3(0, yTo + 1.5, climb.r + 8));
+    } else {
+      const to = climb.to;
+      climb = null;
+      opts.onRiding(false);
+      const there = fl.things.find((o) => o.kind === 'stairs' && o.level === to);
+      setFloor(to, false);
+      if (there) rig.place(there.x, there.z + 0.4, Math.PI);
+      else setFloor(to);
+      return false;
+    }
+    return true;
+  };
   /** Um quadro da viagem; devolve true enquanto a câmera é do elevador. */
   const stepRide = (now: number) => {
     const fl = inside?.scene.floors;
@@ -442,13 +510,33 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
       camera.position.copy(v.cam);
       rig.controls.target.copy(v.target);
       scene.scene.add(avatar.group, indoorCrowd.group);
-      if (rig.mode() !== 'orbit') rig.place(v.cam.x, v.cam.z, Math.atan2(-(v.target.x - v.cam.x), -(v.target.z - v.cam.z)));
+      if (rig.mode() !== 'orbit') {
+        rig.place(v.cam.x, v.cam.z, Math.atan2(-(v.target.x - v.cam.x), -(v.target.z - v.cam.z)));
+        // Acabou de passar pela porta: dá alguns passos para dentro do saguão.
+        if (!instant) {
+          const dx = v.target.x - v.cam.x;
+          const dz = v.target.z - v.cam.z;
+          const r = Math.hypot(dx, dz) || 1;
+          rig.autoWalk(v.cam.x + (dx / r) * 2.6, v.cam.z + (dz / r) * 2.6, 1.9, () => undefined);
+        }
+      }
       recompile(scene.scene);
       opts.onInside(id);
+      doors.hold(id, false);
       instant?.();
     };
     if (instant) return swap();
-    rig.glideTo(front, door, 1500, () => fadeSwap(swap));
+    const portal = doors.portals.get(id);
+    if (!portal) return rig.glideTo(front, door, 1500, () => fadeSwap(swap));
+    // Entrada de verdade: a porta abre (ou o portão do jardim), anda-se até o vão e entra.
+    doors.hold(id, true);
+    const ox = Math.sin(portal.facing);
+    const oz = Math.cos(portal.facing);
+    if (rig.mode() !== 'orbit') return rig.autoWalk(portal.x - ox * 0.6, portal.z - oz * 0.6, 2.0, () => fadeSwap(swap));
+    const look = new THREE.Vector3(portal.x, portal.y + 1.4, portal.z);
+    rig.glideTo(new THREE.Vector3(portal.x + ox * 7, portal.y + 2.4, portal.z + oz * 7), look, 1400, () =>
+      rig.glideTo(new THREE.Vector3(portal.x + ox * 0.3, portal.y + 1.6, portal.z + oz * 0.3), new THREE.Vector3(portal.x - ox * 4, portal.y + 1.5, portal.z - oz * 4), 1200, () => fadeSwap(swap)),
+    );
   };
 
   const exit = () => {
@@ -466,7 +554,16 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
       camera.position.copy(center).addScaledVector(out, b.def.radius * 1.5).setY(center.y + 12);
       rig.controls.target.copy(center);
       outside.add(avatar.group);
-      if (rig.mode() !== 'orbit') rig.place(b.entrance.x + out.x * 3, b.entrance.z + out.z * 3, Math.atan2(-out.x, -out.z));
+      const portal = doors.portals.get(id);
+      if (rig.mode() !== 'orbit' && portal) {
+        // Sai pela porta aberta e anda alguns passos para fora; a porta fecha atrás.
+        const ox = Math.sin(portal.facing);
+        const oz = Math.cos(portal.facing);
+        doors.openNow(id);
+        doors.hold(id, true);
+        rig.place(portal.x + ox * 0.7, portal.z + oz * 0.7, Math.atan2(-ox, -oz));
+        rig.autoWalk(portal.x + ox * 4.5, portal.z + oz * 4.5, 2.0, () => doors.hold(id, false));
+      } else if (rig.mode() !== 'orbit') rig.place(b.entrance.x + out.x * 3, b.entrance.z + out.z * 3, Math.atan2(-out.x, -out.z));
       opts.onInside(null);
     });
   };
@@ -568,11 +665,9 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
     if (th.kind === 'stairs') {
       // Sobe um andar (no último, desce), saindo da escada do núcleo no outro andar.
       const to = level < fl.levels.length - 1 ? level + 1 : level - 1;
-      const there = fl.things.find((o) => o.kind === 'stairs' && o.level === to);
-      setFloor(to, false);
-      if (there) rig.place(there.x, there.z + 0.4, Math.PI);
-      else setFloor(to);
-      audio?.note(60, 'tom');
+      rig.setMove(0, 0);
+      climb = { from: level, to, t0: performance.now(), r: th.z - 1, mode: rig.mode(), steps: 0 };
+      opts.onRiding(true);
       return;
     }
     if (th.kind === 'telescope') {
@@ -740,7 +835,7 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
     last = now;
     frames++;
     stepEnv(dt);
-    const riding = stepRide(now);
+    const riding = stepRide(now) || stepClimb(now);
     if (!riding) rig.update(dt, now);
     const mode = rig.mode();
     if (mode !== lastMode) {
@@ -751,11 +846,24 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
     // O ciclo de passos cresce com a velocidade (2 m andando, 4 m correndo), como numa pessoa: ritmo
     // de 1,2 passada por segundo andando e 1,8 correndo, em vez de pernas girando rápido.
     walkPhase += (dt * body.speed * Math.PI * 2) / (0.9 + 0.45 * body.speed);
+    // Passos no ritmo da passada (um por pé), com o som do piso: pedra, grama, madeira, piso ou poça.
+    const stepIdx = Math.floor(walkPhase / Math.PI);
+    if (stepIdx !== lastStep) {
+      lastStep = stepIdx;
+      if (mode !== 'orbit' && !riding && !body.airborne && body.speed > 0.4) {
+        const p = body.pos;
+        const paved = onPath(p.x, p.z) || Math.hypot(p.x, p.z) < PLAZA_RADIUS + 0.5 || PARK_BUILDINGS.some((b) => Math.hypot(p.x - b.x, p.z - b.z) < b.radius * 0.8);
+        const surface = inside ? 'floor' : inWater(p.x, p.z, 0) ? 'wood' : weather.rain > 0.25 && paved ? 'wet' : paved ? 'stone' : 'grass';
+        audio?.footstep(surface, Math.min(0.55, 0.25 + body.speed * 0.05) * (body.running ? 1.3 : 1));
+      }
+    }
     avatar.group.visible = mode === 'third' && !rig.gliding() && !riding;
     if (avatar.group.visible) bodyFigure();
     const t = opts.reduceMotion ? 0 : (now - t0) / 1000;
     if (!inside) {
       world.tick(t, opts.reduceMotion ? 0 : dt, rig.focus(), camera.position);
+      // Portas automáticas: abrem para o visitante e para quem está chegando a pé (com o som do trilho).
+      for (const p of doors.tick(dt, [body.pos, ...town.walkers()])) if (Math.hypot(p.x - body.pos.x, p.z - body.pos.z) < 30) audio?.note(p.kind === 'slide' ? 40 : 52, p.kind === 'slide' ? 'door' : 'gate', 0, { x: p.x, y: 1.5, z: p.z });
       // Moradores: a rotina anda com a hora; só os mais próximos são desenhados.
       if (crowdMax > 0) {
         if (!settled) {
@@ -764,12 +872,27 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
         }
         const viewer = mode === 'orbit' ? rig.controls.target : body.pos;
         town.step(opts.reduceMotion ? dt * 0.5 : dt, conditions(), mode === 'orbit' ? { x: 1e5, z: 1e5 } : viewer, now);
-        crowd.set(town.visible(viewer, crowdMax, mode === 'orbit' ? 260 : 140));
+        extras.step(opts.reduceMotion ? dt * 0.5 : dt, shownHour, weather.rain, mode === 'orbit' ? { x: 1e5, z: 1e5 } : viewer, now);
+        world.play(extras.play());
+        // Moradores e gente de passagem juntos, os mais perto primeiro.
+        const range = mode === 'orbit' ? 260 : 140;
+        const people = [...town.visible(viewer, crowdMax, range), ...extras.visible(viewer, crowdMax, range)];
+        people.sort((u, v) => Math.hypot(u.x - viewer.x, u.z - viewer.z) - Math.hypot(v.x - viewer.x, v.z - viewer.z));
+        crowd.set(people.slice(0, crowdMax + 8));
+        const cat = extras.cat();
+        animals.set([...town.pets(), ...(cat ? [cat] : [])].filter((a) => Math.hypot(a.x - viewer.x, a.z - viewer.z) < range), extras.pigeons(), extras.ducks());
+        for (const sn of extras.sounds()) {
+          if (Math.hypot(sn.x - viewer.x, sn.z - viewer.z) > 50) continue;
+          const midi = sn.kind === 'bikebell' ? 0 : sn.kind === 'kid' ? 76 + Math.floor(Math.random() * 6) : sn.kind === 'coo' ? 57 : sn.kind === 'quack' ? 66 : 70;
+          if (sn.kind === 'kid') for (let i = 0; i < 3; i++) audio?.note(midi + i * 2, 'kid', i * 0.14, { x: sn.x, y: 1, z: sn.z });
+          else audio?.note(midi, sn.kind, 0, { x: sn.x, y: sn.kind === 'coo' ? 0.2 : 0.5, z: sn.z });
+        }
         // Sons dos jogos perto de quem está olhando: chute, raquetada, apito, torcida.
         for (const hit of town.hits()) {
           const dd = Math.hypot(hit.x - viewer.x, hit.z - viewer.z);
           if (dd > 60) continue;
-          if (hit.kind === 'kick') audio?.note(45, 'ball');
+          if (hit.kind === 'bark') audio?.note(62 + Math.floor(Math.random() * 5), 'bark', 0, { x: hit.x, y: 0.5, z: hit.z });
+          else if (hit.kind === 'kick') audio?.note(45, 'ball');
           else if (hit.kind === 'racket') audio?.note(64, 'ball');
           else if (hit.kind === 'whistle') audio?.note(100, 'whistle');
           else for (let i = 0; i < 8; i++) audio?.note(58 + ((i * 5) % 9), 'voice', i * 0.09);
@@ -874,7 +997,13 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
       renderer.render(inside.scene.scene, camera);
       renderer.autoClear = true;
     }
-    audio?.update({ listener: camera, inside: !!inside, hour: shownHour, sky: weather, steps: mode === 'orbit' || rig.gliding() ? 0 : body.airborne ? 0 : body.speed }, dt);
+    if (++treeFrame % 40 === 0) {
+      const c = camera.position;
+      let n = 0;
+      for (const tr of world.treeSpots) if (Math.abs(tr.x - c.x) < 30 && Math.abs(tr.z - c.z) < 30) n++;
+      treeNear = Math.min(1, n / 18);
+    }
+    audio?.update({ listener: camera, inside: !!inside, hour: shownHour, sky: weather, steps: mode === 'orbit' || rig.gliding() ? 0 : body.airborne ? 0 : body.speed, trees: treeNear, season, skaters: inside ? [] : extras.skaters() }, dt);
     if (now - statsAt >= 1000) {
       opts.onStats({ fps: Math.round((frames * 1000) / (now - statsAt)), calls: renderer.info.render.calls, triangles: renderer.info.render.triangles });
       frames = 0;

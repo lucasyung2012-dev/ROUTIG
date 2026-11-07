@@ -412,6 +412,7 @@ export function isFreeGround(x: number, z: number, pad = 0.5): boolean {
   if (inWater(x, z, 1 + pad) || inField(x, z, 2 + pad)) return false;
   if (PARK_BUILDINGS.some((b) => Math.hypot(x - b.x, z - b.z) < b.radius * 0.92 + pad)) return false;
   if (POIS.some((p) => Math.hypot(x - p.x, z - p.z) < 10 + pad)) return false;
+  if (playgroundSpot && Math.hypot(x - playgroundSpot.x, z - playgroundSpot.z) < 12 + pad) return false;
   const gx = Math.floor(x / 6);
   const gz = Math.floor(z / 6);
   for (let i = -1; i <= 1; i++)
@@ -458,6 +459,7 @@ export function treePositions(count: number, seed = 7): Array<{ x: number; z: nu
     if (POIS.some((q) => dist(p, q) < 9)) continue;
     if (Object.values(COURTS).some((q) => dist(p, q) < 10)) continue;
     if (inField(p.x, p.z, 6)) continue;
+    if (Math.hypot(p.x - PLAYGROUND.x, p.z - PLAYGROUND.z) < 16 || onStreet(p.x, p.z, 3)) continue;
     const edge = parkEdgeAt(a);
     if ((r > edge + 12 && r < ROAD_RADIUS + 42) || (r > ROAD_RADIUS + 58 && r < ROAD_RADIUS + 114)) continue; // rua, casas e prédios do bairro (árvores entre eles)
     if (near(pathGrid, p, 4.5) || near(grid, p, 4.2)) continue;
@@ -491,4 +493,105 @@ export function onPath(x: number, z: number, r = 0): boolean {
     for (let j = -2; j <= 2; j++)
       for (const s of walkGrid.get(`${cx + i},${cz + j}`) ?? []) if (Math.hypot(s.x - x, s.z - z) < s.h + r) return true;
   return false;
+}
+
+/* ---------- Bairro: avenida externa e ruas transversais ---------- */
+
+/** Avenida que contorna o bairro, atrás da faixa de prédios. */
+export const OUTER_ROAD = ROAD_RADIUS + 128;
+
+let crossCache: number[] | null = null;
+/**
+ * Ângulos das ruas transversais que ligam a rua do parque à avenida externa: dez, espalhadas,
+ * cada uma no maior vão entre duas casas do seu trecho (a rua nunca passa por cima de um lote).
+ */
+export function crossStreets(): number[] {
+  if (crossCache) return crossCache;
+  const homes = residences();
+  const clearance = (a: number) => Math.min(...homes.map((h) => Math.abs(Math.atan2(Math.sin(Math.atan2(h.z, h.x) - a), Math.cos(Math.atan2(h.z, h.x) - a))) * Math.hypot(h.x, h.z) - 10));
+  const out: number[] = [];
+  for (let k = 0; k < 10; k++) {
+    let best = 0;
+    let bestC = -Infinity;
+    for (let i = Math.round(k * 5.2); i < Math.round((k + 1) * 5.2); i++) {
+      const a = ((i + 0.5) / 52) * Math.PI * 2;
+      for (const d of [-0.012, 0, 0.012]) {
+        const c = clearance(a + d);
+        if (c > bestC) {
+          bestC = c;
+          best = a + d;
+        }
+      }
+    }
+    out.push(best);
+  }
+  crossCache = out;
+  return out;
+}
+
+/** Ponto em cima de rua do bairro (avenida externa ou transversal), com margem `pad`. */
+export function onStreet(x: number, z: number, pad = 0): boolean {
+  const r = Math.hypot(x, z);
+  if (Math.abs(r - OUTER_ROAD) < 6.5 + pad) return true;
+  if (r < ROAD_RADIUS || r > OUTER_ROAD) return false;
+  const a = Math.atan2(z, x);
+  return crossStreets().some((c) => Math.abs(Math.atan2(Math.sin(a - c), Math.cos(a - c))) * r < 6.5 + pad);
+}
+
+/* ---------- Parquinho ---------- */
+
+let playgroundSpot: Point | null = null;
+/** Parquinho das crianças: gramado livre de 26 m perto do jardim do Sul, encostado num caminho. */
+export const PLAYGROUND: Point = (() => {
+  for (let ring = 0; ring < 14; ring++)
+    for (let k = 0; k < 16; k++) {
+      const a = (k / 16) * Math.PI * 2;
+      const x = 20 * PARK_SCALE + Math.cos(a) * ring * 6;
+      const z = 120 * PARK_SCALE + Math.sin(a) * ring * 6;
+      if (isFreeGround(x, z, 10) && !isFreeGround(x, z, 14)) return (playgroundSpot = { x, z });
+    }
+  return (playgroundSpot = { x: 30, z: 200 });
+})();
+
+/** Carrinhos da praça (pipoca e água de coco): entre os bancos, fora das saídas dos caminhos. */
+export function plazaCarts(): Array<{ x: number; z: number; face: number; kind: 'popcorn' | 'coconut' }> {
+  const out: Array<{ x: number; z: number; face: number; kind: 'popcorn' | 'coconut' }> = [];
+  for (let k = 0; k < 16 && out.length < 2; k++) {
+    const a = (k / 8) * Math.PI * 2 + Math.PI / 8 + (k >= 8 ? Math.PI / 16 : 0);
+    const x = Math.sin(a) * 12;
+    const z = Math.cos(a) * 12;
+    if (onPath(x, z, 2.5) || out.some((o) => Math.hypot(o.x - x, o.z - z) < 14)) continue;
+    out.push({ x, z, face: a, kind: out.length ? 'coconut' : 'popcorn' });
+  }
+  return out;
+}
+
+/**
+ * Brinquedos do parquinho, em volta do centro (PLAYGROUND), virados para a entrada: balanço de
+ * três lugares, escorregador, gangorra, caixa de areia, cavalinho de mola e dois bancos para os pais.
+ */
+export const PLAY = {
+  radius: 11,
+  swings: { x: -5.5, z: -3.5, n: 3, gap: 1.4, top: 2.4, chain: 1.85 },
+  slide: { x: 4.5, z: -5, h: 1.5, len: 3.4 },
+  seesaw: { x: 4.5, z: 4, len: 3.6 },
+  sand: { x: -5, z: 4.5, w: 4.2, d: 3.4 },
+  spring: { x: 0, z: 0.5 },
+  benches: [{ x: -1.5, z: 9.2, face: Math.PI }, { x: 2.5, z: 9.2, face: Math.PI }],
+};
+
+/** Giro do parquinho: a entrada (lado +z dos brinquedos) fica para o caminho mais próximo. */
+export const PLAY_ROT: number = (() => {
+  for (let r = 11; r < 22; r += 1)
+    for (let k = 0; k < 48; k++) {
+      const a = (k / 48) * Math.PI * 2;
+      if (onPath(PLAYGROUND.x + Math.sin(a) * r, PLAYGROUND.z + Math.cos(a) * r)) return a;
+    }
+  return 0;
+})();
+/** Ponto do parquinho (coordenadas locais dos brinquedos) no mundo. */
+export function playAt(lx: number, lz: number): Point {
+  const c = Math.cos(PLAY_ROT);
+  const s = Math.sin(PLAY_ROT);
+  return { x: PLAYGROUND.x + lx * c + lz * s, z: PLAYGROUND.z - lx * s + lz * c };
 }

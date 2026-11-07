@@ -71,6 +71,8 @@ export interface CameraRig {
   /** Pés do corpo, direção e velocidade atual (avatar, NPCs, minimapa). */
   body: () => { pos: THREE.Vector3; yaw: number; speed: number; airborne: boolean; running: boolean; heading: number };
   glideTo: (cam: THREE.Vector3 | THREE.Curve<THREE.Vector3>, target: THREE.Vector3, ms: number, done?: () => void) => void;
+  /** Anda sozinho até um ponto (entrar por uma porta); `done` ao chegar ou se algo barrar o caminho. */
+  autoWalk: (x: number, z: number, speed: number, done: () => void) => void;
   gliding: () => boolean;
   update: (dt: number, now: number) => void;
   /** Ponto que a câmera olha (chuva, rótulos). */
@@ -115,6 +117,7 @@ export function createCameraRig(camera: THREE.PerspectiveCamera, canvas: HTMLCan
   let running = false;
   /** Para onde o corpo olha (segue a direção do movimento; parado, fica como estava). */
   let heading = Math.PI;
+  let auto: { x: number; z: number; speed: number; done: () => void; best: number; stall: number } | null = null;
   const move = new THREE.Vector2();
   const keys = new Set<string>();
   const focusPt = new THREE.Vector3();
@@ -296,6 +299,8 @@ export function createCameraRig(camera: THREE.PerspectiveCamera, canvas: HTMLCan
     if (keys.has('KeyS') || keys.has('ArrowDown')) fy -= 1;
     if (keys.has('KeyA')) fx -= 1;
     if (keys.has('KeyD')) fx += 1;
+    // No piloto automático (entrando ou saindo de um prédio) o controle fica parado.
+    if (auto) fx = fy = 0;
     if (keys.has('ArrowLeft')) yaw += dt * 1.8 * settings.sensitivity;
     if (keys.has('ArrowRight')) yaw -= dt * 1.8 * settings.sensitivity;
     const len = Math.hypot(fx, fy);
@@ -316,6 +321,27 @@ export function createCameraRig(camera: THREE.PerspectiveCamera, canvas: HTMLCan
     const fwd = new THREE.Vector2(-Math.sin(yaw), -Math.cos(yaw));
     const right = new THREE.Vector2(-fwd.y, fwd.x);
     const want = fwd.multiplyScalar(fy * top).add(right.multiplyScalar(fx * top));
+    if (auto) {
+      // Vai reto até o ponto, a câmera vira devagar para ficar atrás; chegou ou travou, termina.
+      const dx = auto.x - feet.x;
+      const dz = auto.z - feet.z;
+      const d = Math.hypot(dx, dz);
+      if (d < auto.best - 0.04) {
+        auto.best = d;
+        auto.stall = 0;
+      } else auto.stall += dt;
+      if (d < 0.35 || auto.stall > 0.6) {
+        const done = auto.done;
+        auto = null;
+        want.set(0, 0);
+        done();
+      } else {
+        want.set((dx / d) * auto.speed, (dz / d) * auto.speed);
+        const ty = Math.atan2(-dx, -dz);
+        yaw += Math.atan2(Math.sin(ty - yaw), Math.cos(ty - yaw)) * Math.min(1, dt * 2.5);
+        running = false;
+      }
+    }
     // Aceleração e desaceleração suaves (nada de parar seco); no ar, controle reduzido.
     const k = Math.min(1, dt * (want.lengthSq() > vel.lengthSq() ? 6 : 9) * (airborne ? 0.35 : 1));
     vel.lerp(want, k);
@@ -457,6 +483,10 @@ export function createCameraRig(camera: THREE.PerspectiveCamera, canvas: HTMLCan
     observe,
     posture: () => posture,
     body: () => ({ pos: feet, yaw, speed: vel.length(), airborne, running, heading }),
+    autoWalk: (x, z, speed, done) => {
+      setPosture('stand');
+      auto = { x, z, speed, done, best: Infinity, stall: 0 };
+    },
     glideTo: (cam, target, ms, done) => {
       if (mode !== 'orbit') {
         // Desliza na câmera livre e volta ao modo de antes ao chegar.

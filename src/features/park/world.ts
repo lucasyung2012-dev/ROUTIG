@@ -5,10 +5,12 @@
  */
 import * as THREE from 'three';
 import type { ModuleId } from '@/app/modules';
-import { LAKE, onPath, PARK_BUILDINGS, PARK_RADIUS, PARK_SCALE, PATH_WIDTH, PLAZA_RADIUS, POIS, PONDS, entranceOf, facingOf, heightAt, inWater, inField, isFreeGround, lakeRadiusAt, parkPaths, samplePath, seededRandom, treePositions, type ParkBuilding, type Point } from '@/domain/park';
+import { LAKE, onPath, plazaCarts, PARK_BUILDINGS, PARK_RADIUS, PARK_SCALE, PATH_WIDTH, PLAZA_RADIUS, POIS, PONDS, entranceOf, facingOf, heightAt, inWater, inField, isFreeGround, lakeRadiusAt, parkPaths, samplePath, seededRandom, treePositions, type ParkBuilding, type Point } from '@/domain/park';
 import { amenities, houses, neighborhood, sportsFields, streetTrees, type Seat, type Viewpoint } from './buildings/amenities';
-import { Builder, Kit, cloud, forest, setWaterNight, setWaterSky, setWaterWeather, shrubs, sky, stars, water, type Plant, type TreeSpecies } from './kit';
+import { Builder, Kit, signTexture, cloud, forest, setWaterNight, setWaterSky, setWaterWeather, shrubs, sky, stars, water, type Plant, type TreeSpecies } from './kit';
 import { birds, butterflies, drone, fountain, leaves, rain } from './life';
+import { playground } from './playground';
+import { frame, roundBox, signBoard } from './props';
 import { dashboardBuilding, inboxBuilding, profileBuilding, settingsBuilding, type DetailedBuilding } from './buildings/central';
 import { academyBuilding, insightsBuilding, languagesBuilding, libraryBuilding, notesBuilding } from './buildings/north';
 import { calendarBuilding, financeBuilding, projectsBuilding, tasksBuilding } from './buildings/east';
@@ -172,6 +174,8 @@ export interface World {
   obstacles: Obstacle[];
   pickables: THREE.Object3D[];
   seats: Seat[];
+  /** Anima o parquinho (balanços e gangorra). */
+  play: (s: { swings: number[]; seesaw: number }) => void;
   viewpoints: Viewpoint[];
   /** Árvores (para observar de perto). */
   treeSpots: Plant[];
@@ -396,9 +400,67 @@ function plaza(kit: Kit): THREE.Group {
     b.add(kit.mat('#D9D2C3', { rough: 0.6 }), new THREE.CylinderGeometry(2.4, 2.5, 0.55, 32), [x, 0.3, z]);
     b.add(kit.mat('#5C8F48', { rough: 1 }), new THREE.CylinderGeometry(2.2, 2.2, 0.05, 32), [x, 0.6, z]);
   }
+  // Carrinhos de pipoca e de água de coco (o vendedor fica do lado de dentro da praça).
+  for (const c of plazaCarts()) cart(kit, b, c);
   const g = b.build();
   g.add(curb);
   return g;
+}
+
+/** Carrinho de vendedor: caixa com frisos, rodas raiadas, alça, guarda-sol listrado e a mercadoria. */
+function cart(kit: Kit, b: Builder, c: { x: number; z: number; face: number; kind: 'popcorn' | 'coconut' }) {
+  const put = frame(b, c.x, 0.06, c.z, c.face);
+  const pop = c.kind === 'popcorn';
+  const bodyM = kit.mat(pop ? '#C81E1E' : '#15803D', { rough: 0.4, metal: 0.15 });
+  const trim = kit.mat('#F8FAFC', { rough: 0.5 });
+  const steel = kit.mat('#B8BEC6', { metal: 0.85, rough: 0.25 });
+  const tire = kit.mat('#1F2328', { rough: 0.7 });
+  put(bodyM, roundBox(1.3, 0.62, 0.7, 0.05), 0, 0.3, 0);
+  for (const yy of [0.33, 0.9]) put(trim, new THREE.BoxGeometry(1.34, 0.05, 0.74), 0, yy, 0);
+  for (const s of [-1, 1]) {
+    put(tire, new THREE.TorusGeometry(0.3, 0.04, 8, 24), s * 0.72, 0.34, 0, 0, Math.PI / 2);
+    put(steel, new THREE.CylinderGeometry(0.04, 0.04, 0.1, 10), s * 0.72, 0.34, 0, 0, 0, Math.PI / 2);
+    for (let k = 0; k < 6; k++) put(steel, new THREE.BoxGeometry(0.012, 0.56, 0.012), s * 0.72, 0.34, 0, (k / 6) * Math.PI);
+  }
+  put(steel, new THREE.CylinderGeometry(0.025, 0.025, 0.3, 8), 0, 0.15, 0.3);
+  put(steel, new THREE.CylinderGeometry(0.02, 0.02, 1.0, 8), 0, 1.0, -0.45, 0, 0, Math.PI / 2);
+  for (const s of [-1, 1]) put(steel, new THREE.CylinderGeometry(0.02, 0.02, 0.2, 8), s * 0.5, 0.95, -0.38, Math.PI / 2);
+  // Placa na frente, virada para quem passa.
+  const tex = signTexture(kit, [pop ? 'PIPOCA' : 'ÁGUA DE COCO', pop ? 'doce e salgada' : 'gelada'], { bg: pop ? '#FEF3C7' : '#ECFCCB', fg: pop ? '#991B1B' : '#14532D', accent: pop ? '#DC2626' : '#16A34A', w: 512, h: 256 });
+  signBoard(b, kit, tex, c.x + Math.sin(c.face) * 0.37, 0.7, c.z + Math.cos(c.face) * 0.37, c.face, 0.9, 0.4);
+  if (pop) {
+    // Vitrine de vidro com a pipoca dentro, panela de estourar e saquinhos de papel.
+    const glass = kit.mat('#E0F2FE', { glass: true });
+    put(glass, new THREE.BoxGeometry(1.0, 0.62, 0.56), 0, 1.24, 0);
+    for (const [w, hh, d, x, y, z] of [[1.02, 0.03, 0.03, 0, 0.93, 0.28], [1.02, 0.03, 0.03, 0, 0.93, -0.28], [1.02, 0.03, 0.03, 0, 1.55, 0.28], [1.02, 0.03, 0.03, 0, 1.55, -0.28], [0.03, 0.64, 0.03, 0.5, 1.24, 0.28], [0.03, 0.64, 0.03, -0.5, 1.24, 0.28], [0.03, 0.64, 0.03, 0.5, 1.24, -0.28], [0.03, 0.64, 0.03, -0.5, 1.24, -0.28]] as const)
+      put(bodyM, new THREE.BoxGeometry(w, hh, d), x, y, z);
+    const corn = kit.mat('#FFF3C4', { rough: 0.9 });
+    for (let k = 0; k < 60; k++) put(corn, new THREE.IcosahedronGeometry(0.03 + (k % 3) * 0.008, 0), -0.42 + ((k * 37) % 84) / 100, 0.98 + ((k * 13) % 9) / 60, -0.22 + ((k * 23) % 44) / 100, k, k * 2, 0);
+    put(steel, new THREE.CylinderGeometry(0.12, 0.1, 0.16, 16), 0.15, 1.4, 0);
+    put(steel, new THREE.SphereGeometry(0.12, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2), 0.15, 1.48, 0, 0, 0, 0, [1, 0.4, 1]);
+    put(kit.mat('#FFE7B0', { glow: true }), new THREE.BoxGeometry(0.9, 0.02, 0.04), 0, 1.53, 0);
+    for (let k = 0; k < 5; k++) put(trim, new THREE.BoxGeometry(0.1, 0.16, 0.06), 0.56, 0.98 + k * 0.004, -0.2 + k * 0.08, 0, 0.1 * k);
+  } else {
+    // Bandeja com cocos verdes empilhados, alguns abertos com canudo, e a caixa térmica.
+    put(kit.mat('#8B6545', { rough: 0.8 }), new THREE.BoxGeometry(0.9, 0.05, 0.6), -0.15, 0.95, 0);
+    const coco = [kit.mat('#5B8C2A', { rough: 0.6 }), kit.mat('#7BA33A', { rough: 0.6 })];
+    let k = 0;
+    for (let layer = 0; layer < 3; layer++)
+      for (let i = 0; i < 4 - layer; i++)
+        for (let j = 0; j < 3 - layer; j++) put(coco[k++ % 2]!, new THREE.SphereGeometry(0.1, 12, 10), -0.45 + i * 0.2 + layer * 0.1, 1.07 + layer * 0.16, -0.2 + j * 0.2 + layer * 0.1, 0, k, 0, [1, 1.15, 1]);
+    for (const x of [0.12, 0.28]) {
+      put(coco[0]!, new THREE.SphereGeometry(0.1, 12, 10), x, 1.07, 0.22, 0, 0, 0, [1, 1.1, 1]);
+      put(trim, new THREE.CircleGeometry(0.05, 12), x, 1.185, 0.22, -Math.PI / 2);
+      put(kit.mat('#EC4899', { rough: 0.5 }), new THREE.CylinderGeometry(0.006, 0.006, 0.22, 6), x + 0.02, 1.27, 0.22, 0, 0, -0.2);
+    }
+    put(kit.mat('#F8FAFC', { rough: 0.4 }), roundBox(0.34, 0.3, 0.4, 0.03), 0.4, 0.95, -0.05);
+    put(kit.mat('#2563EB', { rough: 0.4 }), roundBox(0.36, 0.05, 0.42, 0.03), 0.4, 1.25, -0.05);
+  }
+  // Guarda-sol de gomos alternados.
+  put(steel, new THREE.CylinderGeometry(0.022, 0.022, 1.7, 8), 0, 1.75, -0.3);
+  const cols = pop ? ['#DC2626', '#F8FAFC'] : ['#16A34A', '#FACC15'];
+  for (let k = 0; k < 8; k++) put(kit.mat(cols[k % 2]!, { rough: 0.7, side: THREE.DoubleSide }), new THREE.ConeGeometry(1.05, 0.38, 2, 1, true, (k / 8) * Math.PI * 2, Math.PI / 4), 0, 2.72, -0.3);
+  put(steel, new THREE.SphereGeometry(0.04, 8, 6), 0, 2.93, -0.3);
 }
 
 /* ---------- Postes em instâncias ---------- */
@@ -604,7 +666,10 @@ export function createWorld(kit: Kit): World {
   root.add(terrain(kit));
   const p = paths(kit);
   const plazaGroup = plaza(kit);
-  root.add(p.group, lampPosts(kit, p.lamps), plazaGroup);
+  // Parquinho (os brinquedos que mexem seguem as crianças).
+  const pg = playground(kit);
+  pg.group.updateMatrixWorld(true);
+  root.add(p.group, lampPosts(kit, p.lamps), plazaGroup, pg.group);
   const f = fountain(kit);
   f.group.scale.setScalar(1.7);
   root.add(f.group);
@@ -669,7 +734,7 @@ export function createWorld(kit: Kit): World {
   root.add(am.group, houses(kit), ww, fields, hood.group);
   obstacles.push(...footprint(fields, heightAt));
   // Barracas, quiosques, mesas, bancos, pérgolas, passarela, praça; postes e troncos das árvores.
-  obstacles.push(...footprint(am.group, heightAt), ...footprint(ww, heightAt), ...footprint(plazaGroup, heightAt));
+  obstacles.push(...footprint(am.group, heightAt), ...footprint(ww, heightAt), ...footprint(plazaGroup, heightAt), ...footprint(pg.solid, heightAt));
   for (const l of p.lamps) obstacles.push({ x: l.x, z: l.z, r: 0.25, h: heightAt(l.x, l.z) + 4.2 });
 
   // Árvores do parque e as da calçada do bairro (copas redondas e esguias alternadas).
@@ -757,7 +822,8 @@ export function createWorld(kit: Kit): World {
     obstacles,
     pickables: [...buildings.values()].map((b) => b.group),
     // Todos os bancos do parque servem para sentar (inclusive os da praça).
-    seats: [...am.seats, ...plazaSeats()],
+    seats: [...am.seats, ...plazaSeats(), ...pg.seats],
+    play: pg.tick,
     treeSpots: plantList,
     viewpoints: am.viewpoints,
     spots: am.spots,

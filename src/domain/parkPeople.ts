@@ -5,7 +5,7 @@
  * Tudo determinístico por dia e hora: a mesma hora mostra o mesmo campus. Sem missões.
  */
 import type { ModuleId } from '@/app/modules';
-import { PARK_BUILDINGS, PARK_SCALE, SPORT_FIELDS, entranceOf, PLAZA_RADIUS, POIS, dist, inWater, parkPaths, residences, seededRandom, type Point } from './park';
+import { PARK_BUILDINGS, PARK_SCALE, ROAD_RADIUS, SPORT_FIELDS, entranceOf, PLAZA_RADIUS, POIS, dist, inWater, parkPaths, residences, seededRandom, type Point } from './park';
 
 export type Activity = 'home' | 'cafe' | 'read' | 'study' | 'sport' | 'music' | 'view' | 'chat' | 'stroll' | 'picnic' | 'draw' | 'photo' | 'work' | 'gym';
 export type PersonPose = 'stand' | 'walk' | 'sit' | 'read' | 'play' | 'wave' | 'exercise' | 'draw' | 'photo' | 'tennis' | 'kick' | 'cheer' | 'keeper' | 'run';
@@ -239,12 +239,24 @@ export function routeBetween(a: Point, b: Point): Point[] {
   return [a, ...ids.map((k) => g.nodes[k]!), b];
 }
 
-/** Rota de/para casa: até o portão mais próximo da casa e, de lá, em linha reta. */
+/**
+ * Rota de/para casa: pelos caminhos até o portão mais próximo, faixa de pedestre, calçada do
+ * bairro até a frente da casa e a porta (dá para ver gente chegando e saindo de casa).
+ */
 export function routeHome(from: Point, home: Point, leaving: boolean): Point[] {
   const g = navGraph();
   const gate = g.gates.reduce((m, k) => (dist(g.nodes[k]!, home) < dist(g.nodes[m]!, home) ? k : m), g.gates[0] ?? 0);
-  const r = routeBetween(leaving ? from : g.nodes[gate]!, leaving ? g.nodes[gate]! : from);
-  return leaving ? [...r, home] : [home, ...r];
+  const gp = g.nodes[gate]!;
+  const at = (a: number, r: number): Point => ({ x: Math.cos(a) * r, z: Math.sin(a) * r });
+  const ga = Math.atan2(gp.z, gp.x);
+  const ha = Math.atan2(home.z, home.x);
+  const leg: Point[] = [at(ga, ROAD_RADIUS - 6.5), at(ga, ROAD_RADIUS + 5)];
+  const d = Math.atan2(Math.sin(ha - ga), Math.cos(ha - ga));
+  const n = Math.max(1, Math.ceil(Math.abs(d) / 0.04));
+  for (let i = 1; i <= n; i++) leg.push(at(ga + (d * i) / n, ROAD_RADIUS + 5));
+  leg.push(at(ha, Math.hypot(home.x, home.z) - 6), home);
+  const r = routeBetween(leaving ? from : gp, leaving ? gp : from);
+  return leaving ? [...r, ...leg] : [...[...leg].reverse(), ...r];
 }
 
 /* ---------- Rotina ---------- */

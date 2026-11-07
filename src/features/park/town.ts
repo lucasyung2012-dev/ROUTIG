@@ -8,6 +8,7 @@ import { PARK_SCALE, SPORT_FIELDS, heightAt, type Point } from '@/domain/park';
 import type { ModuleId } from '@/app/modules';
 import { styleOf, type Expr, type Figure } from './people';
 import type { Seat } from './camera';
+import type { Quad } from './extras';
 
 interface Agent {
   p: Person;
@@ -57,7 +58,13 @@ export interface Town {
   /** Cumprimentar quem está perto: a pessoa olha, acena e responde. */
   greet: (p: { x: number; z: number }, r: number, now: number) => { name: string; activity: Activity; x: number; z: number; line: number; seed: number } | null;
   /** Chutes, raquetadas, apito e comemoração deste passo (para o som). */
-  hits: () => Array<{ x: number; z: number; kind: 'kick' | 'racket' | 'whistle' | 'cheer' }>;
+  hits: () => Array<{ x: number; z: number; kind: 'kick' | 'racket' | 'whistle' | 'cheer' | 'bark' }>;
+  /** Cachorros passeando com os donos (com a guia). */
+  pets: () => Quad[];
+  /** Portas dos prédios: quem vai entrar anda até o vão da porta antes de sumir lá dentro. */
+  setDoors: (d: Map<ModuleId, Point>) => void;
+  /** Quem está andando ao ar livre agora (abre as portas automáticas). */
+  walkers: () => Array<{ x: number; z: number }>;
 }
 
 const WALK = 1.35;
@@ -88,6 +95,7 @@ export function createTown(seats: Seat[] = []): Town {
     return { x: seats[best]!.x, z: seats[best]!.z };
   };
   const people = campusPeople();
+  let doorAt = new Map<ModuleId, Point>();
   const groupSlot = new Map<number, number>();
   const agents: Agent[] = people.map((p) => {
     const slot = groupSlot.get(p.group) ?? 0;
@@ -177,7 +185,15 @@ export function createTown(seats: Seat[] = []): Town {
             a.route = strollRoute(a);
             a.ri = 0;
           } else if (a.activity === 'home') a.away = true;
-          else a.inside = indoorOf(a.p, a.activity, conditionsRef);
+          else {
+            const id = indoorOf(a.p, a.activity, conditionsRef);
+            const d = id ? doorAt.get(id) : undefined;
+            // Ainda na calçada: vai até a porta (que abre) e só então entra.
+            if (d && Math.hypot(d.x - a.x, d.z - a.z) > 0.5) {
+              a.route.push(d);
+              a.ri = a.route.length - 1;
+            } else a.inside = id;
+          }
         } else {
           a.x += (dx / d) * sp * dt;
           a.z += (dz / d) * sp * dt;
@@ -238,7 +254,7 @@ export function createTown(seats: Seat[] = []): Town {
   };
   const near = (a: Agent, f: { x: number; z: number; w: number; d: number }, pad: number) => Math.abs(a.x - f.x) < f.w / 2 + pad && Math.abs(a.z - f.z) < f.d / 2 + pad;
   /** Batidas e chutes que soaram neste passo (o motor toca o som se estiver perto). */
-  let hits: Array<{ x: number; z: number; kind: 'kick' | 'racket' | 'whistle' | 'cheer' }> = [];
+  let hits: Array<{ x: number; z: number; kind: 'kick' | 'racket' | 'whistle' | 'cheer' | 'bark' }> = [];
   // Futebol: quem está com a bola, a bola no ar (de onde, para onde, quanto tempo), chute a gol e comemoração.
   const fb = { owner: -1, holdUntil: 0, fx: 0, fz: 0, tx: 0, tz: 0, t0: 0, dur: 0, shot: false, target: -1, kicker: -1, kickUntil: 0, cheer: -1, cheerUntil: 0, resetAt: 0 };
   const hash = (n: number) => {
@@ -412,11 +428,74 @@ export function createTown(seats: Seat[] = []): Town {
     }
   };
 
+  /* ---------- Cachorros: um em cada oito moradores passeia com o seu ---------- */
+  const DOG_COLORS = ['#C08A4F', '#2B2B2B', '#F2E6D0', '#8B5A2B', '#D9B98A', '#5C4033', '#A0A0A0', '#E8D5B0'];
+  const dogs = agents
+    .filter((a) => a.p.id % 8 === 3)
+    .map((a, i) => ({ owner: a, x: a.x, z: a.z, yaw: 0, phase: 0, gait: 0, sit: false, color: DOG_COLORS[i % DOG_COLORS.length]!, size: 0.75 + ((i * 37) % 10) / 20, tx: a.x, tz: a.z, until: 0, barkCool: 0 }));
+  const dogOut = (d: (typeof dogs)[number]) => !(d.owner.away && d.owner.activity === 'home') && !d.owner.inside;
+  const stepDogs = (dt: number, viewer: { x: number; z: number }, now: number) => {
+    for (const d of dogs) {
+      const o = d.owner;
+      if (!dogOut(d)) {
+        d.x = o.x;
+        d.z = o.z;
+        continue;
+      }
+      const fwd = { x: Math.sin(o.yaw), z: Math.cos(o.yaw) };
+      const right = { x: -Math.cos(o.yaw), z: Math.sin(o.yaw) };
+      if (o.pose === 'walk' || o.pose === 'run') {
+        // Andando junto: um pouco à frente e do lado, na ponta da guia.
+        d.tx = o.x + fwd.x * 0.7 + right.x * 0.8;
+        d.tz = o.z + fwd.z * 0.7 + right.z * 0.8;
+        d.sit = false;
+        d.until = now + 2000;
+      } else if (now > d.until) {
+        // Dono parado: fareja por perto ou senta do lado.
+        d.sit = Math.random() < 0.4;
+        const a = Math.random() * Math.PI * 2;
+        const r = d.sit ? 0.8 : 1 + Math.random() * 1;
+        d.tx = o.x + Math.cos(a) * r;
+        d.tz = o.z + Math.sin(a) * r;
+        d.until = now + 3000 + Math.random() * 6000;
+      }
+      const dx = d.tx - d.x;
+      const dz = d.tz - d.z;
+      const dist = Math.hypot(dx, dz);
+      const sp = Math.min(dist * 3, 3.6);
+      if (dist > 0.12) {
+        d.x += (dx / dist) * sp * dt;
+        d.z += (dz / dist) * sp * dt;
+        let dy = Math.atan2(dx, dz) - d.yaw;
+        dy = Math.atan2(Math.sin(dy), Math.cos(dy));
+        d.yaw += dy * Math.min(1, dt * 7);
+      }
+      // A guia não deixa passar de 2,2 m do dono.
+      const lx = d.x - o.x;
+      const lz = d.z - o.z;
+      const ll = Math.hypot(lx, lz);
+      if (ll > 2.2) {
+        d.x = o.x + (lx / ll) * 2.2;
+        d.z = o.z + (lz / ll) * 2.2;
+      }
+      d.gait = sp > 1.7 ? 2 : sp > 0.25 ? 1 : 0;
+      d.phase += dt * (d.gait === 2 ? 11 : d.gait === 1 ? 7 : 2);
+      // Late para quem chega perto (e às vezes para outro cachorro).
+      const dv = Math.hypot(viewer.x - d.x, viewer.z - d.z);
+      const other = dogs.some((e) => e !== d && dogOut(e) && Math.hypot(e.x - d.x, e.z - d.z) < 5);
+      if ((dv < 5 || other) && now > d.barkCool) {
+        d.barkCool = now + 15000 + Math.random() * 20000;
+        if (dv < 5 || Math.random() < 0.5) hits.push({ x: d.x, z: d.z, kind: 'bark' });
+      }
+    }
+  };
+
   let conditionsRef: Conditions = { hour: 12, day: 0, rain: 0, fog: 0, wind: 0, season: 'summer' };
   const wrappedStep: Town['step'] = (dt, c, viewer, now) => {
     conditionsRef = c;
     step(dt, c, viewer, now);
     games(dt, now);
+    stepDogs(dt, viewer, now);
   };
 
   /**
@@ -484,6 +563,28 @@ export function createTown(seats: Seat[] = []): Town {
       return { outside, total: agents.length, byActivity: by };
     },
     balls: () => ballList,
+    pets: () =>
+      dogs.filter(dogOut).map((d) => {
+        const o = d.owner;
+        const seated = SEATED.includes(o.pose);
+        const right = { x: -Math.cos(o.yaw), z: Math.sin(o.yaw) };
+        const oy = o.seat >= 0 && seated ? seats[o.seat]!.y - 0.44 : heightAt(o.x, o.z);
+        return {
+          kind: 'dog' as const,
+          x: d.x,
+          y: heightAt(d.x, d.z),
+          z: d.z,
+          yaw: d.yaw,
+          phase: d.phase,
+          gait: d.gait,
+          sit: d.sit && d.gait === 0,
+          color: d.color,
+          size: d.size,
+          leash: { x: o.x + right.x * 0.3 * o.p.scale, y: oy + (seated ? 0.62 : 0.86) * o.p.scale, z: o.z + right.z * 0.3 * o.p.scale },
+        };
+      }),
+    setDoors: (d) => void (doorAt = d),
+    walkers: () => agents.filter((a) => !a.away && !a.inside && a.pose === 'walk').map((a) => ({ x: a.x, z: a.z })),
     hits: () => hits,
     insideOf: (id) =>
       agents

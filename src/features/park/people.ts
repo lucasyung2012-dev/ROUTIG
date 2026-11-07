@@ -19,7 +19,7 @@ function smooth(g: THREE.BufferGeometry): THREE.BufferGeometry {
   return m;
 }
 
-export type Pose = 'stand' | 'walk' | 'sit' | 'read' | 'play' | 'wave' | 'exercise' | 'draw' | 'photo' | 'tennis' | 'kick' | 'cheer' | 'keeper' | 'run';
+export type Pose = 'stand' | 'walk' | 'sit' | 'read' | 'play' | 'wave' | 'exercise' | 'draw' | 'photo' | 'tennis' | 'kick' | 'cheer' | 'keeper' | 'run' | 'bike' | 'skate' | 'water' | 'swing';
 export type Outfit = 'tee' | 'shirt' | 'jacket' | 'hoodie' | 'dress' | 'sport';
 export type Expr = 'neutral' | 'smile' | 'talk' | 'surprised' | 'laugh';
 
@@ -54,6 +54,8 @@ export interface Figure {
   shoes?: string;
   /** Cor do solado e do cadarço. */
   sole?: string;
+  /** Cor da bicicleta, do skate ou do regador. */
+  gear?: string;
   /** 0 curto, 1 comprido, 2 coque, 3 cacheado. */
   hairStyle?: number;
   /** Cor dos olhos (íris). */
@@ -423,6 +425,108 @@ function crewGeo(): THREE.BufferGeometry {
   return g;
 }
 
+/** Tubo entre dois pontos (quadro da bicicleta). */
+function tube(a: [number, number, number], b: [number, number, number], r: number): THREE.BufferGeometry {
+  const va = new THREE.Vector3(...a);
+  const vb = new THREE.Vector3(...b);
+  const g = new THREE.CylinderGeometry(r, r, va.distanceTo(vb), 8);
+  g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), vb.clone().sub(va).normalize()));
+  g.translate((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2);
+  return g.toNonIndexed();
+}
+/** Quadro: tubos, garfo, guidão com manoplas, selim, para-lama e corrente (rodas e pedivela à parte, girando). */
+function bikeGeo(): THREE.BufferGeometry {
+  const crank: [number, number, number] = [0, 0.3, 0.17];
+  const seatTop: [number, number, number] = [0, 0.86, -0.05];
+  const headTop: [number, number, number] = [0, 0.9, 0.42];
+  const headBot: [number, number, number] = [0, 0.66, 0.46];
+  const rear: [number, number, number] = [0, 0.34, -0.5];
+  const front: [number, number, number] = [0, 0.34, 0.58];
+  const parts = [
+    tube(crank, seatTop, 0.018),
+    tube([0, 0.8, -0.03], headTop, 0.017),
+    tube(crank, headBot, 0.02),
+    tube(headBot, headTop, 0.022),
+    tube(headBot, front, 0.014),
+    tube(crank, rear, 0.012),
+    tube([0, 0.78, -0.04], rear, 0.011),
+    tube(headTop, [0, 0.98, 0.38], 0.014),
+    tube([-0.26, 0.98, 0.38], [0.26, 0.98, 0.38], 0.012),
+    tube(seatTop, [0, 0.9, -0.06], 0.012),
+  ];
+  for (const s of [-1, 1]) parts.push(tube([s * 0.2, 0.98, 0.38], [s * 0.27, 0.98, 0.38], 0.02));
+  const saddle = new THREE.CapsuleGeometry(0.05, 0.14, 3, 8);
+  saddle.rotateX(Math.PI / 2);
+  saddle.scale(1, 0.4, 1);
+  saddle.translate(0, 0.93, -0.06);
+  parts.push(saddle.toNonIndexed());
+  const fender = new THREE.TorusGeometry(0.36, 0.02, 4, 14, Math.PI * 0.6);
+  fender.rotateY(Math.PI / 2);
+  fender.rotateX(-Math.PI * 0.2);
+  fender.translate(0, 0.34, -0.5);
+  parts.push(fender.toNonIndexed());
+  return mergeGeometries(parts)!;
+}
+/** Roda: pneu, aro, cubo e raios (gira em volta do eixo x). */
+function wheelGeo(): THREE.BufferGeometry {
+  const tire = new THREE.TorusGeometry(0.33, 0.022, 6, 28);
+  tire.rotateY(Math.PI / 2);
+  const rim = new THREE.TorusGeometry(0.3, 0.008, 4, 28);
+  rim.rotateY(Math.PI / 2);
+  const hub = new THREE.CylinderGeometry(0.025, 0.025, 0.08, 8);
+  hub.rotateZ(Math.PI / 2);
+  const parts = [tire.toNonIndexed(), rim.toNonIndexed(), hub.toNonIndexed()];
+  for (let k = 0; k < 12; k++) {
+    const a = (k / 12) * Math.PI * 2;
+    parts.push(tube([0, 0, 0], [0, Math.sin(a) * 0.3, Math.cos(a) * 0.3], 0.0025));
+  }
+  return mergeGeometries(parts)!;
+}
+/** Pedivela com coroa e dois pedais (gira com a pedalada). */
+function crankGeo(): THREE.BufferGeometry {
+  const ring = new THREE.TorusGeometry(0.09, 0.008, 4, 20);
+  ring.rotateY(Math.PI / 2);
+  ring.translate(0.04, 0, 0);
+  const parts = [ring.toNonIndexed(), tube([0.05, 0, 0], [0.05, 0.17, 0], 0.01), tube([-0.05, 0, 0], [-0.05, -0.17, 0], 0.01)];
+  for (const s of [-1, 1]) {
+    const pedal = new THREE.BoxGeometry(0.09, 0.02, 0.06);
+    pedal.translate(s * 0.1, s * 0.17, 0);
+    parts.push(pedal.toNonIndexed());
+  }
+  return mergeGeometries(parts)!;
+}
+/** Shape de skate com rodinhas e trucks. */
+function boardGeo(): THREE.BufferGeometry {
+  const deck = new THREE.CapsuleGeometry(0.1, 0.6, 4, 10);
+  deck.rotateX(Math.PI / 2);
+  deck.scale(1, 0.12, 1);
+  deck.translate(0, 0.085, 0);
+  const parts = [deck.toNonIndexed()];
+  for (const z of [-0.26, 0.26]) {
+    parts.push(tube([-0.08, 0.04, z], [0.08, 0.04, z], 0.008));
+    for (const s of [-1, 1]) {
+      const w = new THREE.CylinderGeometry(0.028, 0.028, 0.03, 10);
+      w.rotateZ(Math.PI / 2);
+      w.translate(s * 0.09, 0.028, z);
+      parts.push(w.toNonIndexed());
+    }
+  }
+  return mergeGeometries(parts)!;
+}
+/** Regador de jardim com bico comprido e alça. */
+function canGeo(): THREE.BufferGeometry {
+  const body = new THREE.CylinderGeometry(0.09, 0.1, 0.2, 14);
+  body.translate(0, -0.18, 0.06);
+  const spout = tube([0, -0.22, 0.14], [0, -0.1, 0.36], 0.012);
+  const rose = new THREE.CylinderGeometry(0.03, 0.018, 0.04, 10);
+  rose.rotateX(-0.9);
+  rose.translate(0, -0.09, 0.38);
+  const handle = new THREE.TorusGeometry(0.07, 0.01, 4, 12, Math.PI);
+  handle.rotateY(Math.PI / 2);
+  handle.translate(0, -0.07, 0.04);
+  return mergeGeometries([body.toNonIndexed(), spout, rose.toNonIndexed(), handle.toNonIndexed()])!;
+}
+
 function bookGeo(): THREE.BufferGeometry {
   const parts: THREE.BufferGeometry[] = [];
   for (const s of [-1, 1]) {
@@ -655,6 +759,68 @@ function joints(f: Figure): Joints {
       j.headPitch = -0.04;
       j.lean = -0.02;
       break;
+    case 'bike': {
+      // Pedalando: pelve no selim, pés nos pedais (cinemática inversa da perna até o pedal girando),
+      // tronco inclinado e mãos no guidão.
+      j.hip = 0.98;
+      const L1 = THIGH;
+      const L2 = SHIN;
+      for (let k = 0; k < 2; k++) {
+        const th = p + k * Math.PI;
+        const tz = 0.17 + Math.cos(th) * 0.17;
+        const ty = -0.63 + Math.sin(th) * 0.17;
+        const d = Math.min(L1 + L2 - 0.01, Math.hypot(tz, ty));
+        const knee = Math.acos(Math.max(-1, Math.min(1, (L1 * L1 + L2 * L2 - d * d) / (2 * L1 * L2))));
+        const beta = Math.acos(Math.max(-1, Math.min(1, (L1 * L1 + d * d - L2 * L2) / (2 * L1 * d))));
+        j.hf[k] = Math.atan2(tz, -ty) + beta;
+        j.kf[k] = Math.PI - knee;
+      }
+      j.lean = 0.38;
+      j.sf = [1.05, 1.05];
+      j.ef = [0.35, 0.35];
+      j.abd = [0.22, 0.22];
+      j.headPitch = -0.3;
+      break;
+    }
+    case 'skate': {
+      // Skate: joelhos dobrados, braços um pouco abertos para equilibrar; de tempos em tempos a
+      // perna de trás desce e empurra o chão.
+      const push = Math.max(0, Math.sin(p * 0.5));
+      const k = push > 0.55 ? (push - 0.55) / 0.45 : 0;
+      j.hip = HIP - 0.08 - k * 0.04;
+      j.hf = [0.35, 0.18 - k * 0.6];
+      j.kf = [0.6, 0.38 - k * 0.2];
+      j.legOut = 0.09;
+      j.abd = [0.4 + Math.sin(p) * 0.08, 0.35 - Math.sin(p) * 0.08];
+      j.sf = [0.1, -0.1];
+      j.ef = [0.35, 0.3];
+      j.lean = 0.12 + k * 0.1;
+      j.twist = 0.15;
+      break;
+    }
+    case 'water':
+      // Regando: braço direito à frente segurando o regador, olhando para o canteiro.
+      j.sf = [0.1, 0.85];
+      j.ef = [0.3, 0.25];
+      j.abd = [0.08, 0.15];
+      j.headPitch = 0.4;
+      j.lean = 0.15;
+      j.kf = [0.15, 0.15];
+      j.hf = [0.12, 0.12];
+      break;
+    case 'swing': {
+      // No balanço: sentado, mãos nas correntes acima dos ombros, pernas esticam na ida e dobram na volta.
+      const w = Math.sin(p);
+      j.hip = SIT_HIP;
+      j.hf = [1.35 + w * 0.3, 1.35 + w * 0.3];
+      j.kf = [1.1 - w * 0.55, 1.1 - w * 0.55];
+      j.sf = [2.6, 2.6];
+      j.ef = [0.35, 0.35];
+      j.abd = [0.12, 0.12];
+      j.lean = -0.15 - w * 0.15;
+      j.headPitch = -0.1;
+      break;
+    }
     case 'exercise': {
       const k = Math.abs(Math.sin(p));
       j.abd = [0.2 + k * 2.6, 0.2 + k * 2.6];
@@ -709,6 +875,12 @@ export function createCrowd(kit: Kit, capacity: number, shadows = true): Crowd {
   const hem = mk(ringGeo(0.155, 0.075, 1.12, 0.68, 0.01), kit.mat('#ffffff', { rough: 0.85, side: THREE.DoubleSide }), 1, false);
   const belt = mk(beltGeo(), kit.mat('#ffffff', { rough: 0.45, metal: 0.2 }), 1, false);
   const crew = mk(crewGeo(), cloth, 1, false);
+  // Veículos e ferramentas das pessoas (bicicleta, skate, regador).
+  const bike = mk(bikeGeo(), kit.mat('#ffffff', { rough: 0.35, metal: 0.5 }));
+  const wheel = mk(wheelGeo(), kit.mat('#2A2D31', { rough: 0.6, metal: 0.3 }), 2, false);
+  const crankM = mk(crankGeo(), kit.mat('#9CA3AF', { rough: 0.3, metal: 0.8 }), 1, false);
+  const board = mk(boardGeo(), kit.mat('#ffffff', { rough: 0.6 }));
+  const canM = mk(canGeo(), kit.mat('#ffffff', { rough: 0.4, metal: 0.4 }), 1, false);
   const book = mk(bookGeo(), kit.mat('#F5F0E6', { rough: 0.9, side: THREE.DoubleSide }), 1, false);
   const guitar = mk(guitarGeo(), kit.mat('#B5713A', { rough: 0.45 }), 1, false);
   const sketch = mk(sketchGeo(), kit.mat('#FAFAF7', { rough: 0.9 }), 1, false);
@@ -726,7 +898,7 @@ export function createCrowd(kit: Kit, capacity: number, shadows = true): Crowd {
   const specs = mk(glassesGeo(), kit.mat('#1F1F22', { rough: 0.3, metal: 0.4 }), 1, false);
   const backpack = mk(bagGeo(), kit.mat('#ffffff', { rough: 0.7 }));
   const cheeks = mk(cheekGeo(), kit.own(new THREE.MeshStandardMaterial({ color: '#F2A2A0', roughness: 0.8, transparent: true, opacity: 0.5, depthWrite: false })), 1, false);
-  const extra = [jacket, collar, stripe, hood, skirt, ...caps, specs, backpack, cheeks, sole, sock, sleeve, cuff, hem, belt, crew];
+  const extra = [jacket, collar, stripe, hood, skirt, ...caps, specs, backpack, cheeks, sole, sock, sleeve, cuff, hem, belt, crew, bike, wheel, crankM, board, canM];
   const mouthOpen = mk(mouthGeo('open'), kit.mat('#5A2A26', { rough: 0.6 }), 1, false);
   const mouthLaugh = mk(mouthGeo('laugh'), kit.mat('#7A2E2A', { rough: 0.6, side: THREE.DoubleSide }), 1, false);
   const squintM = new THREE.Matrix4().makeScale(1, 0.45, 1);
@@ -773,7 +945,7 @@ export function createCrowd(kit: Kit, capacity: number, shadows = true): Crowd {
       // Tronco e cabeça.
       step(m1, base, 0, j.hip, 0);
       pelvis.setMatrixAt(i, m1);
-      step(m2, m1, 0, 0.03, 0, -j.lean, j.twist);
+      step(m2, m1, 0, 0.03, 0, j.lean, j.twist);
       torso.setMatrixAt(i, m2);
       const outfit = f.outfit ?? 'tee';
       const acc = f.accent ?? '#F4F4F5';
@@ -839,6 +1011,13 @@ export function createCrowd(kit: Kit, capacity: number, shadows = true): Crowd {
         shoe.setMatrixAt(i * 2 + k, m1);
         pushV(sole, m1, f.sole ?? (f.shoes === '#7C4A2D' ? '#3B2A1E' : '#F4F4F2'));
       }
+      // Bicicleta (quadro, rodas girando com a pedalada e pedivela), skate sob os pés, regador na mão.
+      if (f.pose === 'bike') {
+        pushV(bike, base, f.gear ?? '#1F6FB2');
+        for (const z of [-0.5, 0.58]) pushV(wheel, step(m1, base, 0, 0.34, z, -f.phase * 1.6));
+        pushV(crankM, step(m1, base, 0, 0.3, 0.17, -f.phase));
+      } else if (f.pose === 'skate') pushV(board, base, f.gear ?? '#B45309');
+      else if (f.pose === 'water') pushV(canM, step(m1, handR, 0, -0.06, 0.02), f.gear ?? '#16A34A');
       // Objeto da atividade.
       if (j.prop) {
         const im = props[j.prop];

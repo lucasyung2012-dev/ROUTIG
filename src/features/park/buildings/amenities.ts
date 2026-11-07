@@ -457,7 +457,8 @@ export function neighborhood(kit: Kit): { group: THREE.Group; tick: (t: number) 
       }
       if (i > 0) {
         const k = (i - 1) * 2;
-        idx.push(k, k + 1, k + 2, k + 1, k + 3, k + 2);
+        // Ordem anti-horária vista de cima (face para o céu; antes a rua só aparecia por baixo).
+        idx.push(k, k + 2, k + 1, k + 1, k + 2, k + 3);
       }
     }
     const geo = new THREE.BufferGeometry();

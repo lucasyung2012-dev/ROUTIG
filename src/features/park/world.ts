@@ -385,7 +385,7 @@ function plaza(kit: Kit): THREE.Group {
     const a = (i / 8) * Math.PI * 2 + Math.PI / 8;
     const x = Math.sin(a) * 21.5;
     const z = Math.cos(a) * 21.5;
-    if (onPath(x, z, 1.2)) continue; // o canteiro não fecha a saída de um caminho
+    if (onPath(x, z, 2.7)) continue; // o canteiro (2,5 m de raio) não encosta em caminho nenhum
     b.add(kit.mat('#D9D2C3', { rough: 0.6 }), new THREE.CylinderGeometry(2.4, 2.5, 0.55, 32), [x, 0.3, z]);
     b.add(kit.mat('#5C8F48', { rough: 1 }), new THREE.CylinderGeometry(2.2, 2.2, 0.05, 32), [x, 0.6, z]);
   }

@@ -150,6 +150,10 @@ export function water(kit: Kit, radius: number, color = '#2E9BD6'): { mesh: THRE
 }
 
 /** Ajusta o escurecimento noturno de todas as águas criadas por `water`. */
+export function setWaterNight(mesh: THREE.Mesh, night: number) {
+  const m = mesh.material as THREE.ShaderMaterial;
+  if (m.uniforms?.night) m.uniforms.night.value = night;
+}
 
 /** Chuva (gotas na superfície) e vento (ondulação) nas águas criadas por `water`. */
 export function setWaterWeather(mesh: THREE.Mesh, rain: number, wind: number) {

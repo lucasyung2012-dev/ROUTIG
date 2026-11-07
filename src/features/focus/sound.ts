@@ -27,7 +27,12 @@ class SoundEngine {
     return typeof window !== 'undefined' && !!(window.AudioContext ?? (window as unknown as { webkitAudioContext?: unknown }).webkitAudioContext);
   }
 
-  private noise(kind: 'white' | 'pink' | 'brown'): AudioBuffer | null {
+  /** Contexto de áudio compartilhado (o parque usa o mesmo, sem abrir outro). */
+  get context(): AudioContext | null {
+    return this.ctx;
+  }
+
+  noise(kind: 'white' | 'pink' | 'brown'): AudioBuffer | null {
     const ctx = this.ctx;
     if (!ctx) return null;
     const len = ctx.sampleRate * 4;

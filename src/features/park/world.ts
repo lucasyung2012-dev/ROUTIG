@@ -7,7 +7,7 @@ import * as THREE from 'three';
 import type { ModuleId } from '@/app/modules';
 import { LAKE, PARK_BUILDINGS, PARK_RADIUS, PATH_WIDTH, PLAZA_RADIUS, PONDS, entranceOf, facingOf, heightAt, inWater, lakeRadiusAt, parkPaths, samplePath, seededRandom, treePositions, type ParkBuilding, type Point } from '@/domain/park';
 import { amenities, houses, type Seat, type Viewpoint } from './buildings/amenities';
-import { Builder, Kit, cloud, forest, setWaterNight, shrubs, sky, stars, water, type Plant, type TreeSpecies } from './kit';
+import { Builder, Kit, cloud, forest, setWaterNight, setWaterWeather, shrubs, sky, stars, water, type Plant, type TreeSpecies } from './kit';
 import { birds, drone, fountain, rain } from './life';
 import { dashboardBuilding, inboxBuilding, profileBuilding, settingsBuilding, type DetailedBuilding } from './buildings/central';
 import { academyBuilding, insightsBuilding, languagesBuilding, libraryBuilding, notesBuilding } from './buildings/north';
@@ -16,9 +16,48 @@ import { focusBuilding, goalsBuilding, habitsBuilding, musicBuilding, sportsBuil
 import { prototypeBuilding } from './buildings/prototype';
 import type { Obstacle } from './camera';
 
-export type TimeOfDay = 'day' | 'dusk' | 'night';
 export type Quality = 'low' | 'medium' | 'high';
-export type Weather = 'clear' | 'cloudy' | 'rain' | 'fog';
+/** Clima combinável (V2.1, seção 15): cada componente de 0 a 1; chuva com vento e neblina, por exemplo. */
+export interface Sky {
+  cloud: number;
+  rain: number;
+  fog: number;
+  wind: number;
+}
+export const CLEAR_SKY: Sky = { cloud: 0.1, rain: 0, fog: 0, wind: 0.15 };
+export type SkyPreset = 'sun' | 'cloudy' | 'rain' | 'fog' | 'wind' | 'storm';
+export const SKY_PRESETS: Record<SkyPreset, Sky> = {
+  sun: CLEAR_SKY,
+  cloudy: { cloud: 0.8, rain: 0, fog: 0.1, wind: 0.3 },
+  rain: { cloud: 0.9, rain: 0.6, fog: 0.15, wind: 0.3 },
+  fog: { cloud: 0.5, rain: 0, fog: 0.85, wind: 0 },
+  wind: { cloud: 0.4, rain: 0, fog: 0, wind: 0.9 },
+  storm: { cloud: 1, rain: 1, fog: 0.3, wind: 0.85 },
+};
+
+/** Clima automático: muda devagar ao longo do dia, sempre igual para a mesma data e hora. */
+export function autoSky(d: Date): Sky {
+  const day = Math.floor(d.getTime() / 86400000);
+  const block = Math.floor(d.getHours() / 3);
+  const r = Math.abs(Math.sin(day * 12.9898 + block * 78.233) * 43758.5453) % 1;
+  const morning = d.getHours() >= 5 && d.getHours() < 9;
+  if (morning && r < 0.25) return SKY_PRESETS.fog;
+  if (r < 0.55) return CLEAR_SKY;
+  if (r < 0.75) return SKY_PRESETS.cloudy;
+  if (r < 0.85) return SKY_PRESETS.wind;
+  if (r < 0.97) return SKY_PRESETS.rain;
+  return SKY_PRESETS.storm;
+}
+
+/** Fases do dia (V2.1, seção 14). */
+export type DayPhase = 'night' | 'dawn' | 'morning' | 'afternoon' | 'sunset';
+export function phaseOf(hour: number): DayPhase {
+  if (hour >= 5 && hour < 7) return 'dawn';
+  if (hour >= 7 && hour < 12) return 'morning';
+  if (hour >= 12 && hour < 17) return 'afternoon';
+  if (hour >= 17 && hour < 19.5) return 'sunset';
+  return 'night';
+}
 export type Season = 'spring' | 'summer' | 'autumn' | 'winter';
 
 /** Estação pela data, no hemisfério sul (Brasil). */
@@ -48,11 +87,47 @@ export interface Light {
   glow: number;
 }
 
-export const TIMES: Record<TimeOfDay, Light> = {
-  day: { skyTop: '#4F9FE0', skyBottom: '#D6ECF7', sun: '#FFF6E5', sunI: 1.8, hemiI: 0.75, sunDir: [0.45, 0.8, 0.35], glow: 0 },
-  dusk: { skyTop: '#3B4C8C', skyBottom: '#F6A86B', sun: '#FFB27A', sunI: 1.3, hemiI: 0.6, sunDir: [-0.9, 0.25, 0.25], glow: 0.55 },
-  night: { skyTop: '#060B22', skyBottom: '#1B2550', sun: '#9DB4FF', sunI: 0.35, hemiI: 0.22, sunDir: [-0.4, 0.8, -0.5], glow: 1 },
-};
+type Key = Omit<Light, 'sunDir'>;
+/** Pontos do ciclo de luz; entre eles, tudo é interpolado (sem saltos). */
+const KEYS: Array<[number, Key]> = [
+  [0, { skyTop: '#060B22', skyBottom: '#1B2550', sun: '#9DB4FF', sunI: 0.35, hemiI: 0.22, glow: 1 }],
+  [4.8, { skyTop: '#0A1030', skyBottom: '#2A2F5A', sun: '#9DB4FF', sunI: 0.3, hemiI: 0.24, glow: 1 }],
+  [6, { skyTop: '#4A5A9A', skyBottom: '#F4B183', sun: '#FFB98A', sunI: 0.9, hemiI: 0.45, glow: 0.55 }],
+  [7.5, { skyTop: '#5AA4E2', skyBottom: '#E3F1F8', sun: '#FFF0D6', sunI: 1.55, hemiI: 0.68, glow: 0 }],
+  [12, { skyTop: '#4F9FE0', skyBottom: '#D6ECF7', sun: '#FFF6E5', sunI: 1.9, hemiI: 0.78, glow: 0 }],
+  [16, { skyTop: '#5598D8', skyBottom: '#F1E4C8', sun: '#FFE2B0', sunI: 1.6, hemiI: 0.7, glow: 0 }],
+  [17.6, { skyTop: '#4A62A8', skyBottom: '#F8B27A', sun: '#FFA868', sunI: 1.3, hemiI: 0.58, glow: 0.25 }],
+  [18.5, { skyTop: '#3B4C8C', skyBottom: '#F08A5D', sun: '#FF8E55', sunI: 0.95, hemiI: 0.48, glow: 0.65 }],
+  [19.5, { skyTop: '#1E2A5E', skyBottom: '#6A5A8C', sun: '#B9A7FF', sunI: 0.45, hemiI: 0.3, glow: 0.95 }],
+  [21, { skyTop: '#060B22', skyBottom: '#1B2550', sun: '#9DB4FF', sunI: 0.35, hemiI: 0.22, glow: 1 }],
+  [24, { skyTop: '#060B22', skyBottom: '#1B2550', sun: '#9DB4FF', sunI: 0.35, hemiI: 0.22, glow: 1 }],
+];
+const mixHex = (a: string, b: string, k: number) => `#${new THREE.Color(a).lerp(new THREE.Color(b), k).getHexString()}`;
+
+/** Luz de qualquer hora (0–24): cores do céu, sol (ou lua), intensidade e luzes artificiais. */
+export function lightAt(hour: number): Light {
+  const h = ((hour % 24) + 24) % 24;
+  let i = 0;
+  while (i < KEYS.length - 2 && KEYS[i + 1]![0] <= h) i++;
+  const [h0, a] = KEYS[i]!;
+  const [h1, b] = KEYS[i + 1]!;
+  const k = h1 > h0 ? (h - h0) / (h1 - h0) : 0;
+  // Sol nasce a leste (+x), passa alto ao meio-dia e se põe a oeste; à noite, a lua.
+  let sunDir: [number, number, number];
+  if (h >= 5.6 && h <= 18.9) {
+    const ang = ((h - 5.6) / 13.3) * Math.PI;
+    sunDir = [Math.cos(ang) * 0.9, Math.max(0.1, Math.sin(ang)), 0.35];
+  } else sunDir = [-0.4, 0.8, -0.5];
+  return {
+    skyTop: mixHex(a.skyTop, b.skyTop, k),
+    skyBottom: mixHex(a.skyBottom, b.skyBottom, k),
+    sun: mixHex(a.sun, b.sun, k),
+    sunI: a.sunI + (b.sunI - a.sunI) * k,
+    hemiI: a.hemiI + (b.hemiI - a.hemiI) * k,
+    glow: a.glow + (b.glow - a.glow) * k,
+    sunDir,
+  };
+}
 
 /** Prédios com projeto detalhado (os demais chegam nos próximos blocos). */
 const DETAILED: Partial<Record<ModuleId, (kit: Kit) => DetailedBuilding>> = {
@@ -99,13 +174,67 @@ export interface World {
   spots: Array<{ id: string; x: number; z: number; kind: string }>;
   tick: (t: number, dt: number, focus: THREE.Vector3, cam: THREE.Vector3) => void;
   setLight: (l: Light) => void;
-  setWeather: (w: Weather) => void;
+  setWeather: (w: Sky) => void;
   setSeason: (s: Season) => void;
   setFestive: (on: boolean) => void;
   setDetail: (q: Quality) => void;
 }
 
+/* ---------- Névoa baixa (segue o relevo) ---------- */
+
+function mist(kit: Kit): { mesh: THREE.InstancedMesh; tick: (center: THREE.Vector3, fog: number, t: number) => void } {
+  const c = document.createElement('canvas');
+  c.width = c.height = 64;
+  const g = c.getContext('2d');
+  if (g) {
+    const grd = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+    grd.addColorStop(0, 'rgba(255,255,255,1)');
+    grd.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = grd;
+    g.fillRect(0, 0, 64, 64);
+  }
+  const tex = kit.own(new THREE.CanvasTexture(c));
+  const mat = kit.own(new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0, depthWrite: false, color: '#E6ECF2', fog: false }));
+  const geo = kit.own(new THREE.PlaneGeometry(1, 1));
+  geo.rotateX(-Math.PI / 2);
+  const N = 14;
+  const STEP = 16;
+  const mesh = new THREE.InstancedMesh(geo, mat, N * N * 2);
+  mesh.frustumCulled = false;
+  mesh.renderOrder = 2;
+  mesh.visible = false;
+  const m4 = new THREE.Matrix4();
+  const q = new THREE.Quaternion();
+  const e = new THREE.Euler();
+  const v = new THREE.Vector3();
+  const sc = new THREE.Vector3();
+  return {
+    mesh,
+    tick: (center, fog, t) => {
+      mesh.visible = fog > 0.05;
+      if (!mesh.visible) return;
+      mat.opacity = Math.min(0.55, fog * 0.6);
+      const cx = Math.round(center.x / STEP) * STEP;
+      const cz = Math.round(center.z / STEP) * STEP;
+      let k = 0;
+      for (let layer = 0; layer < 2; layer++)
+        for (let i = 0; i < N; i++)
+          for (let j = 0; j < N; j++) {
+            const x = cx + (i - N / 2) * STEP + Math.sin(t * 0.05 + j + layer) * 4;
+            const z = cz + (j - N / 2) * STEP + Math.cos(t * 0.04 + i) * 4;
+            // Mais densa nos vales e na beira d'água: fica rente ao chão, acompanhando o relevo.
+            v.set(x, heightAt(x, z) + 0.8 + layer * 1.6, z);
+            sc.setScalar(STEP * (2.2 + layer * 0.6));
+            m4.compose(v, q.setFromEuler(e.set(0, i * 1.7 + j, 0)), sc);
+            mesh.setMatrixAt(k++, m4);
+          }
+      mesh.instanceMatrix.needsUpdate = true;
+    },
+  };
+}
+
 /* ---------- Terreno ---------- */
+
 
 function terrain(kit: Kit): THREE.Mesh {
   const size = 820;
@@ -494,12 +623,19 @@ export function createWorld(kit: Kit): World {
   rn.lines.scale.set(2, 1, 2);
   root.add(bd.mesh, dr.group, rn.lines);
 
-  let weather: Weather = 'clear';
-  const GREY: Record<Weather, number> = { clear: 0, cloudy: 0.4, rain: 0.6, fog: 0.7 };
-  const SUN: Record<Weather, number> = { clear: 1, cloudy: 0.6, rain: 0.45, fog: 0.5 };
+  let weather: Sky = { ...CLEAR_SKY };
+  const grey = () => Math.min(0.85, Math.max(weather.cloud * 0.55, weather.rain * 0.7, weather.fog * 0.6));
+  const sunK = () => Math.max(0.3, 1 - weather.cloud * 0.4 - weather.rain * 0.25 - weather.fog * 0.3);
+  const ms = mist(kit);
+  root.add(ms.mesh);
+  // Chão molhado: terreno, caminhos e praça ficam mais escuros e brilhantes com a chuva e secam devagar.
+  const wetMats = [kit.mat('#ffffff', { vertexColors: true, rough: 0.95 }), kit.mat('#B8AE98', { rough: 0.9 }), kit.mat('#DCD3C0', { rough: 0.85 }), kit.mat('#C7B48E', { rough: 0.95 }), kit.mat('#E7E1D3', { rough: 0.85 })];
+  const dry = wetMats.map((m) => ({ rough: m.roughness, color: m.color.clone() }));
+  let wet = 0;
+  let wetShown = -1;
   const skyTop = new THREE.Color();
   const skyBottom = new THREE.Color();
-  const sunDir = new THREE.Vector3(...TIMES.day.sunDir).normalize();
+  const sunDir = new THREE.Vector3(...lightAt(12).sunDir).normalize();
 
   return {
     root,
@@ -517,14 +653,23 @@ export function createWorld(kit: Kit): World {
       lk.water.tick(t * 0.6);
       lk.ponds.forEach((p) => p.tick(t * 0.8));
       ticks.forEach((fn) => fn(t));
-      trees.tick(t);
+      trees.tick(t, weather.wind);
       bd.tick(t);
       dr.tick(t);
       clouds.forEach((c, i) => {
-        c.position.x += dt * (1.6 + (i % 3) * 0.5);
+        c.position.x += dt * (1.6 + (i % 3) * 0.5 + weather.wind * 9);
         if (c.position.x > 380) c.position.x = -380;
       });
-      if (weather === 'rain') rn.tick(dt, focus);
+      if (weather.rain > 0.02) rn.tick(dt, focus, weather.wind);
+      ms.tick(focus, weather.fog, t);
+      wet += ((weather.rain > 0.1 ? 1 : 0) - wet) * Math.min(1, dt * (weather.rain > 0.1 ? 0.25 : 0.05));
+      if (Math.abs(wet - wetShown) > 0.02) {
+        wetShown = wet;
+        wetMats.forEach((m, i) => {
+          m.roughness = dry[i]!.rough * (1 - wet * 0.6);
+          m.color.copy(dry[i]!.color).multiplyScalar(1 - wet * 0.22);
+        });
+      }
       // A sombra acompanha onde a câmera olha (um mapa de sombra pequeno e nítido).
       sun.target.position.copy(focus);
       sun.position.copy(focus).addScaledVector(sunDir, 200);
@@ -533,17 +678,17 @@ export function createWorld(kit: Kit): World {
     setLight: (l) => {
       skyTop.set(l.skyTop);
       skyBottom.set(l.skyBottom);
-      const g = GREY[weather];
+      const g = grey();
       if (g > 0) {
         skyTop.lerp(new THREE.Color('#5B6676'), g);
         skyBottom.lerp(new THREE.Color('#9AA5B4'), g);
       }
       sk.set(skyTop, skyBottom);
       sun.color.set(l.sun);
-      sun.intensity = l.sunI * SUN[weather];
+      sun.intensity = l.sunI * sunK();
       hemi.intensity = l.hemiI;
       sunDir.set(...l.sunDir).normalize();
-      (st.material as THREE.PointsMaterial).opacity = weather === 'clear' ? l.glow : l.glow * 0.2;
+      (st.material as THREE.PointsMaterial).opacity = l.glow * (1 - grey());
       kit.glowing.forEach((m) => (m.emissiveIntensity = 0.15 + l.glow * 1.6));
       setWaterNight(lk.water.mesh, l.glow * 0.8);
       f.waters.forEach((w) => setWaterNight(w, l.glow * 0.8));
@@ -551,18 +696,27 @@ export function createWorld(kit: Kit): World {
     },
     setWeather: (w) => {
       weather = w;
-      rn.lines.visible = w === 'rain';
-      bd.mesh.visible = w === 'clear' || w === 'cloudy';
-      clouds.forEach((c) => (c.visible = true));
-      clouds.forEach((c) => c.scale.setScalar(w === 'clear' ? 2.2 : 3.2));
+      rn.lines.visible = w.rain > 0.02;
+      rn.setAmount(w.rain);
+      bd.mesh.visible = w.rain < 0.2 && w.wind < 0.75 && w.fog < 0.6;
+      clouds.forEach((c, i) => {
+        c.visible = i < 4 + Math.round(w.cloud * 8);
+        c.scale.setScalar(2.2 + w.cloud * 1.4);
+      });
+      setWaterWeather(lk.water.mesh, w.rain, w.wind);
+      lk.ponds.forEach((p) => setWaterWeather(p.mesh, w.rain, w.wind));
+      f.waters.forEach((m) => setWaterWeather(m, w.rain, w.wind));
     },
+
     setSeason: (s) => {
       // Cor das copas e das floradas pela estação (só visual).
+      // Estações do Brasil, mantendo a identidade tropical: palmeiras e copas largas seguem verdes;
+      // o ipê floresce amarelo no inverno, a primavera traz o lilás, o outono amarela as emergentes.
       const crowns: Record<Season, Partial<Record<TreeSpecies, string>>> = {
-        spring: { round: '#5DAF55', conifer: '#2F7A4A', slender: '#7BC25A', blossom: '#F7A8CC' },
-        summer: { round: '#4C9A4F', conifer: '#2F7A4A', slender: '#6BAA4E', blossom: '#8CC06A' },
-        autumn: { round: '#C98A3A', conifer: '#3E7A4A', slender: '#D9A441', blossom: '#D9643A' },
-        winter: { round: '#7FA08A', conifer: '#3D6B50', slender: '#94AE98', blossom: '#B7C7BD' },
+        spring: { round: '#58A851', conifer: '#2F7A4A', slender: '#6DB552', blossom: '#B794F4', palm: '#5DAF55' },
+        summer: { round: '#4C9A4F', conifer: '#2F7A4A', slender: '#5FA34A', blossom: '#6FAF5A', palm: '#5DAF55' },
+        autumn: { round: '#6E9B4A', conifer: '#3E7A4A', slender: '#B5A04A', blossom: '#C9A045', palm: '#6FA855' },
+        winter: { round: '#5E8F55', conifer: '#3D6B50', slender: '#7E9A5C', blossom: '#F2C230', palm: '#5DAF55' },
       };
       trees.setSeason(crowns[s]);
       meadow[0]!.visible = s !== 'winter';

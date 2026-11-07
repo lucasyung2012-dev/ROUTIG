@@ -12,7 +12,8 @@ import { createCameraRig, type CamMode, type MoveSettings, type Posture } from '
 import { AVATAR_LOOK, createCrowd } from './people';
 import { createTown } from './town';
 import type { Conditions } from '@/domain/parkPeople';
-import { TIMES, createWorld, type Light, type Quality, type Season, type TimeOfDay, type Weather } from './world';
+import { CLEAR_SKY, createWorld, lightAt, type Quality, type Season, type Sky } from './world';
+import type { ParkAudio } from './audio';
 import type { InteriorScene } from './interiors/common';
 
 export interface Stats {
@@ -46,8 +47,10 @@ export type Hint = { kind: 'sit' } | { kind: 'view' } | { kind: 'tree' } | { kin
 
 export interface Engine {
   setQuality: (q: Quality) => void;
-  setTime: (t: TimeOfDay) => void;
-  setWeather: (w: Weather) => void;
+  /** Clima alvo; a mudança é gradual. */
+  setWeather: (w: Sky) => void;
+  /** Som espacial do parque (null desliga). */
+  setAudio: (a: ParkAudio | null) => void;
   setSeason: (s: Season) => void;
   setFestive: (on: boolean) => void;
   /** Posição e direção da câmera no parque (para o minimapa). */
@@ -61,8 +64,10 @@ export interface Engine {
   setMoveSettings: (s: MoveSettings) => void;
   /** Quantas pessoas desenhar no máximo (0 = nenhuma). */
   setCrowd: (max: number) => void;
-  /** Hora simulada (0–24) para as rotinas dos moradores. */
+  /** Hora do parque (0–24): luz contínua e rotina dos moradores; a mudança é gradual. */
   setHour: (h: number) => void;
+  /** Hora mostrada agora (durante a transição, a intermediária). */
+  hour: () => number;
   census: () => { outside: number; total: number };
   flyTo: (id: ModuleId | 'plaza') => void;
   enter: (id: ModuleId) => void;
@@ -110,11 +115,7 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
   const town = createTown();
   let crowdMax = 16;
   let season: Conditions['season'] = 'summer';
-  let simHour = 12;
-  const conditions = (): Conditions => {
-    const w = weather as string;
-    return { hour: simHour, day: Math.floor(Date.now() / 86400000), rain: w === 'rain' ? 0.7 : 0, fog: w === 'fog' ? 0.8 : 0, wind: w === 'wind' ? 0.8 : 0, season };
-  };
+  const conditions = (): Conditions => ({ hour: shownHour, day: Math.floor(Date.now() / 86400000), rain: weather.rain, fog: weather.fog, wind: weather.wind, season });
   let settled = false;
   const bodyFigure = () => {
     const b = rig.body();
@@ -216,6 +217,9 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
         if (cached !== undefined) scene.setData(cached);
         inside = { id, kit: ikit, scene };
         rig.setWorld({ ground: () => 0, obstacles: scene.obstacles, limit: { x: 0, z: 0, r: scene.room.radius - 1.2 }, ceiling: scene.room.height, minDistance: 1.5, maxDistance: scene.room.radius * 1.7 });
+        const v = fit(scene.view('entry'));
+        camera.position.copy(v.cam);
+        rig.controls.target.copy(v.target);
         scene.scene.add(avatar.group);
         if (rig.mode() !== 'orbit') rig.place(v.cam.x, v.cam.z, Math.atan2(-(v.target.x - v.cam.x), -(v.target.z - v.cam.z)));
         recompile(scene.scene);
@@ -352,47 +356,52 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
     resize();
   };
 
-  /* ---------- Hora do dia e chuva (transição suave) ---------- */
-  let time: TimeOfDay = 'day';
-  let weather: Weather = 'clear';
-  let blend = 1;
-  let from: Light = { ...TIMES.day };
-  const lerpColor = (a: string, b: string, k: number) => `#${new THREE.Color(a).lerp(new THREE.Color(b), k).getHexString()}`;
-  const applyLight = (k: number): Light => {
-    const to = TIMES[time];
-    const l: Light = {
-      skyTop: lerpColor(from.skyTop, to.skyTop, k),
-      skyBottom: lerpColor(from.skyBottom, to.skyBottom, k),
-      sun: lerpColor(from.sun, to.sun, k),
-      sunI: THREE.MathUtils.lerp(from.sunI, to.sunI, k),
-      hemiI: THREE.MathUtils.lerp(from.hemiI, to.hemiI, k),
-      glow: THREE.MathUtils.lerp(from.glow, to.glow, k),
-      sunDir: from.sunDir.map((v, i) => THREE.MathUtils.lerp(v, to.sunDir[i]!, k)) as [number, number, number],
-    };
+  /* ---------- Hora (ciclo contínuo de luz) e clima (transições graduais) ---------- */
+  let targetHour = 12;
+  let shownHour = 12;
+  const targetSky: Sky = { ...CLEAR_SKY };
+  const weather: Sky = { ...CLEAR_SKY };
+  let lastLightHour = -1;
+  let hourSet = false;
+  let skySet = false;
+  let skyChanged = true;
+  const applyLight = () => {
+    const l = lightAt(shownHour);
     world.setLight(l);
     const fog = outside.fog as THREE.Fog;
     fog.color.set(l.skyBottom);
-    if (weather !== 'clear') fog.color.lerp(new THREE.Color('#9AA5B4'), weather === 'cloudy' ? 0.35 : 0.65);
-    fog.near = weather === 'fog' ? 30 : weather === 'rain' ? 160 : 320;
-    fog.far = weather === 'fog' ? 240 : weather === 'rain' ? 620 : 950;
+    const grey = Math.min(0.8, Math.max(weather.cloud * 0.4, weather.rain * 0.65, weather.fog * 0.75));
+    fog.color.lerp(new THREE.Color(l.glow > 0.6 ? '#2A3045' : '#9AA5B4'), grey);
+    // Neblina fecha a vista; chuva também, um pouco.
+    fog.near = THREE.MathUtils.lerp(320, 22, weather.fog) * (1 - weather.rain * 0.45);
+    fog.far = THREE.MathUtils.lerp(950, 200, weather.fog) * (1 - weather.rain * 0.3);
     renderer.toneMappingExposure = 0.95 - l.glow * 0.08;
     outside.environmentIntensity = 0.7 - l.glow * 0.55;
-    return l;
+    lastLightHour = shownHour;
+    skyChanged = false;
   };
-  let current = applyLight(1);
-  const setTime = (t: TimeOfDay) => {
-    from = { ...current };
-    time = t;
-    blend = opts.reduceMotion ? 1 : 0;
-    current = applyLight(blend);
+  const stepEnv = (dt: number) => {
+    // Menor caminho no relógio (23h → 1h passa pela meia-noite), com velocidade que cresce com a distância.
+    const d = ((((targetHour - shownHour) % 24) + 36) % 24) - 12;
+    if (Math.abs(d) > 1e-4) {
+      const step = opts.reduceMotion ? d : Math.sign(d) * Math.min(Math.abs(d), dt * Math.max(0.4, Math.abs(d) * 2));
+      shownHour = (((shownHour + step) % 24) + 24) % 24;
+    }
+    for (const k of ['cloud', 'rain', 'fog', 'wind'] as const) {
+      const dv = targetSky[k] - weather[k];
+      if (dv === 0) continue;
+      weather[k] = Math.abs(dv) < 2e-3 || opts.reduceMotion ? targetSky[k] : weather[k] + dv * Math.min(1, dt * 0.7);
+      skyChanged = true;
+    }
+    if (skyChanged) world.setWeather(weather);
+    if (skyChanged || Math.abs(shownHour - lastLightHour) > 0.004) applyLight();
   };
-  const setWeather = (w: Weather) => {
-    weather = w;
-    world.setWeather(w);
-    current = applyLight(blend);
-  };
+  world.setWeather(weather);
+  applyLight();
+  let audio: ParkAudio | null = null;
 
-  const ro = new ResizeObserver(resize);
+  const ro = new ResizeObserver
+(resize);
   ro.observe(canvas);
 
   /* ---------- Laço de desenho ---------- */
@@ -411,10 +420,7 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
     const dt = Math.min(0.1, (now - (last || now)) / 1000);
     last = now;
     frames++;
-    if (blend < 1) {
-      blend = Math.min(1, blend + dt / 1.6);
-      current = applyLight(blend);
-    }
+    stepEnv(dt);
     rig.update(dt, now);
     const mode = rig.mode();
     if (mode !== lastMode) {
@@ -472,6 +478,7 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
       inside.scene.tick(t, camera);
       renderer.render(inside.scene.scene, camera);
     }
+    audio?.update({ listener: camera, inside: !!inside, hour: shownHour, sky: weather, steps: mode === 'orbit' || rig.gliding() ? 0 : body.airborne ? 0 : body.speed }, dt);
     if (now - statsAt >= 1000) {
       opts.onStats({ fps: Math.round((frames * 1000) / (now - statsAt)), calls: renderer.info.render.calls, triangles: renderer.info.render.triangles });
       frames = 0;
@@ -485,8 +492,15 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
   const v = new THREE.Vector3();
   return {
     setQuality,
-    setTime,
-    setWeather,
+    setWeather: (w) => {
+      Object.assign(targetSky, w);
+      if (!skySet) Object.assign(weather, w);
+      skyChanged = true;
+      skySet = true;
+    },
+    setAudio: (a) => {
+      audio = a;
+    },
     setSeason: (s) => {
       season = s;
       world.setSeason(s);
@@ -508,10 +522,16 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
       crowd.group.visible = max > 0;
     },
     setHour: (h) => {
-      if (Math.abs(h - simHour) > 0.5) settled = false;
-      simHour = h;
+      const d = Math.abs(((((h - shownHour) % 24) + 36) % 24) - 12);
+      // Saltos grandes de hora: os moradores já aparecem onde estariam.
+      if (d > 0.5) settled = false;
+      targetHour = h;
+      // Ao abrir, a luz já nasce na hora certa (sem atravessar o dia).
+      if (!hourSet) shownHour = h;
+      hourSet = true;
     },
     census: () => town.census(),
+    hour: () => shownHour,
     flyTo,
     enter,
     exit,

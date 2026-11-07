@@ -889,5 +889,5 @@ function bodyRadius(g: THREE.Object3D): number {
   });
   if (!rs.length) return Infinity;
   rs.sort((a, b) => a - b);
-  return rs[Math.floor(rs.length * 0.95)]!;
+  return rs[Math.floor(rs.length * 0.7)]!;
 }

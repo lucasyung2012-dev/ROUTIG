@@ -5,7 +5,7 @@
  */
 import * as THREE from 'three';
 import type { ModuleId } from '@/app/modules';
-import { LAKE, PARK_BUILDINGS, PARK_RADIUS, PARK_SCALE, PATH_WIDTH, PLAZA_RADIUS, POIS, PONDS, entranceOf, facingOf, heightAt, inWater, inField, isFreeGround, lakeRadiusAt, parkPaths, samplePath, seededRandom, treePositions, type ParkBuilding, type Point } from '@/domain/park';
+import { LAKE, onPath, PARK_BUILDINGS, PARK_RADIUS, PARK_SCALE, PATH_WIDTH, PLAZA_RADIUS, POIS, PONDS, entranceOf, facingOf, heightAt, inWater, inField, isFreeGround, lakeRadiusAt, parkPaths, samplePath, seededRandom, treePositions, type ParkBuilding, type Point } from '@/domain/park';
 import { amenities, houses, neighborhood, sportsFields, streetTrees, type Seat, type Viewpoint } from './buildings/amenities';
 import { Builder, Kit, cloud, forest, setWaterNight, setWaterSky, setWaterWeather, shrubs, sky, stars, water, type Plant, type TreeSpecies } from './kit';
 import { birds, butterflies, drone, fountain, leaves, rain } from './life';
@@ -616,7 +616,8 @@ export function createWorld(kit: Kit): World {
       group = d.group;
       top = d.top;
       // Os andares de cima por fora, iguais aos de dentro (seção 10).
-      const up = upperFloors(kit, def.id, FLOOR_PLANS[def.id]?.length ?? 0, d.top - 2, d.core, def.color, bodyRadius(d.group));
+      const fc = facingOf(def);
+      const up = upperFloors(kit, def.id, FLOOR_PLANS[def.id]?.length ?? 0, d.top - 2, d.core, def.color, bodyRadius(d.group), (lx, lz) => !onPath(def.x + lx * Math.cos(fc) + lz * Math.sin(fc), def.z - lx * Math.sin(fc) + lz * Math.cos(fc), 0.6));
       d.group.add(up.group);
       // Fachada peça a peça de perto; de longe, o mesmo volume e as mesmas cores, mais leve.
       if (up.near && up.far) lodItems.push({ obj: up.near, x: def.x, z: def.z, far: 240, base: 240 }, { obj: up.far, x: def.x, z: def.z, far: 240, base: 240, invert: true });

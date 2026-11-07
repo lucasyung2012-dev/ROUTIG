@@ -467,3 +467,28 @@ export function treePositions(count: number, seed = 7): Array<{ x: number; z: nu
   }
   return out;
 }
+
+
+let pathGrid: Map<string, Array<{ x: number; z: number; h: number }>> | null = null;
+/**
+ * Ponto (com raio `r`) em cima de algum caminho do parque, na parte onde se anda (largura do
+ * caminho). Serve para nada de bancos, mesas, postes ou pilares no meio da passagem.
+ */
+export function onPath(x: number, z: number, r = 0): boolean {
+  if (!pathGrid) {
+    pathGrid = new Map();
+    for (const p of parkPaths())
+      for (const s of samplePath(p.points, 1.2)) {
+        const k = `${Math.floor(s.x / 4)},${Math.floor(s.z / 4)}`;
+        const list = pathGrid.get(k) ?? [];
+        list.push({ x: s.x, z: s.z, h: PATH_WIDTH[p.kind] / 2 });
+        pathGrid.set(k, list);
+      }
+  }
+  const cx = Math.floor(x / 4);
+  const cz = Math.floor(z / 4);
+  for (let i = -2; i <= 2; i++)
+    for (let j = -2; j <= 2; j++)
+      for (const s of pathGrid.get(`${cx + i},${cz + j}`) ?? []) if (Math.hypot(s.x - x, s.z - z) < s.h + r) return true;
+  return false;
+}

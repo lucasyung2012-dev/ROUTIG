@@ -14,7 +14,7 @@ import { FORMS, apothem, circle, facade, facadeMats, levelRot, levelScale, outli
 
 const STOREY = 4.4;
 
-export function upperFloors(kit: Kit, id: ModuleId, levels: number, base: number, core: number, accent: string, body = Infinity): { group: THREE.Group; top: number; near: THREE.Object3D | null; far: THREE.Object3D | null } {
+export function upperFloors(kit: Kit, id: ModuleId, levels: number, base: number, core: number, accent: string, body = Infinity, clear: (lx: number, lz: number) => boolean = () => true): { group: THREE.Group; top: number; near: THREE.Object3D | null; far: THREE.Object3D | null } {
   const g = new THREE.Group();
   const b = new Builder();
   // Detalhe de perto (fachada peça a peça, guarda-corpos, floreiras, frisos) e versão de longe.
@@ -43,6 +43,7 @@ export function upperFloors(kit: Kit, id: ModuleId, levels: number, base: number
     for (let k = 0; k < n; k++) {
       const a = (k / n) * Math.PI * 2 + Math.PI / n;
       if (Math.abs(Math.sin(a)) < 0.2 && Math.cos(a) > 0) continue; // livre na frente (entrada)
+      if (!clear(Math.sin(a) * r0 * 0.93, Math.cos(a) * r0 * 0.93)) continue; // nunca em cima de caminho
       b.add(col, new THREE.CylinderGeometry(0.35, 0.42, base + 0.4, 12), [Math.sin(a) * r0 * 0.93, (base + 0.4) / 2, Math.cos(a) * r0 * 0.93]);
     }
   }

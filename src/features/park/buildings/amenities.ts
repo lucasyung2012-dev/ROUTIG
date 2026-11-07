@@ -5,7 +5,7 @@
  */
 import * as THREE from 'three';
 import { navGraph } from '@/domain/parkPeople';
-import { PARK_BUILDINGS, PATH_WIDTH, PLAZA_RADIUS, POIS, ROAD_RADIUS, SPORT_FIELDS, heightAt, inWater, parkPaths, residences, samplePath, seededRandom, type Poi } from '@/domain/park';
+import { onPath, PARK_BUILDINGS, PATH_WIDTH, PLAZA_RADIUS, POIS, ROAD_RADIUS, SPORT_FIELDS, heightAt, inWater, parkPaths, residences, samplePath, seededRandom, type Poi } from '@/domain/park';
 import { Builder, type Kit } from '../kit';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
@@ -46,6 +46,7 @@ export function amenities(kit: Kit): Amenities {
 
   /** Banco de 0,45 m de assento (escala da V2.1), virado para `face`. */
   const bench = (x: number, z: number, face: number) => {
+    if (onPath(x, z, 0.9)) return;
     const y = heightAt(x, z);
     const back = face + Math.PI;
     b.add(wood, new THREE.BoxGeometry(1.8, 0.08, 0.5), [x, y + 0.45, z], [0, face, 0]);
@@ -55,6 +56,7 @@ export function amenities(kit: Kit): Amenities {
   };
   /** Mesa de 0,75 m com dois bancos. */
   const table = (x: number, z: number, rot: number, umbrella: boolean) => {
+    if (onPath(x, z, 1.4)) return;
     const y = heightAt(x, z);
     b.add(wood, new THREE.CylinderGeometry(0.55, 0.55, 0.05, 20), [x, y + 0.75, z]);
     b.add(dark, new THREE.CylinderGeometry(0.05, 0.08, 0.75, 8), [x, y + 0.37, z]);
@@ -71,6 +73,25 @@ export function amenities(kit: Kit): Amenities {
     }
   };
 
+  // Peças na altura de quem anda (postes, floreiras, degraus, balcões) não ficam em cima de caminho;
+  // nem o que elas seguram (telhadinho de quiosque). Pisos rentes ao chão e vigas longas ficam.
+  const rawAdd = b.add.bind(b);
+  const box = new THREE.Box3();
+  b.add = (m, g, pos, rot, sc) => {
+    if (pos) {
+      g.computeBoundingBox();
+      box.copy(g.boundingBox!);
+      const s = Math.max(...(sc ?? [1, 1, 1]));
+      const ground = heightAt(pos[0], pos[2]);
+      const top = pos[1] + box.max.y * s - ground;
+      const r = Math.max(box.max.x - box.min.x, box.max.z - box.min.z) * s * 0.5;
+      if (top > 0.3 && r < 3 && onPath(pos[0], pos[2], r * 0.6)) {
+        g.dispose();
+        return b;
+      }
+    }
+    return rawAdd(m, g, pos, rot, sc);
+  };
   // Pontos dos caminhos (para virar cafés e quiosques de frente para quem passa e pôr bancos à beira).
   const lines = parkPaths().filter((l) => l.kind !== 'trail');
   const pathPts = lines.flatMap((l) => samplePath(l.points, 3));

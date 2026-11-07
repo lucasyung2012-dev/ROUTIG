@@ -551,7 +551,11 @@ export function createWorld(kit: Kit): World {
 
   // Prédios.
   const buildings = new Map<ModuleId, PlacedBuilding>();
-  const obstacles: Obstacle[] = [{ x: 0, z: 0, r: 4 * 1.7, h: 8 }];
+  const obstacles: Obstacle[] = [
+    // Fonte: a bacia (baixa, a câmera passa por cima) e a escultura no meio.
+    { x: 0, z: 0, r: 4 * 1.7, h: 1.6 },
+    { x: 0, z: 0, r: 1.2, h: 9 },
+  ];
   const ticks: Array<(t: number) => void> = [];
   const lodItems: Array<{ obj: THREE.Object3D; x: number; z: number; far: number }> = [];
   for (const def of PARK_BUILDINGS) {

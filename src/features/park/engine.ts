@@ -152,6 +152,7 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
   // Volta da interface 2D: mesmo lugar, mesma direção, mesmo modo de câmera e, se for o caso, dentro do mesmo prédio.
   const restoreFrom = (s: ParkSnapshot) => {
     const apply = () => {
+      if (s.level) setFloor(s.level, false);
       camera.position.set(...s.cam);
       rig.controls.target.set(...s.target);
       rig.setMode(s.mode);
@@ -230,7 +231,7 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
     if (!move) return;
     const lv = levels[L]!;
     // Chega pelo elevador, nos fundos, olhando para dentro do prédio.
-    const z = -(lv.walk - 1.2);
+    const z = -(lv.walk - 5);
     if (rig.mode() !== 'orbit') rig.place(0, z, Math.PI);
     else rig.glideTo(new THREE.Vector3(0, lv.y + 3.4, lv.walk - 1), new THREE.Vector3(0, lv.y + 1, -lv.inner), 900);
   };
@@ -347,7 +348,7 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
     const lv = inside?.scene.floors?.levels[level];
     if (!lv) return false;
     const p = rig.body().pos;
-    return Math.hypot(p.x, p.z + (level === 0 ? inside!.scene.room.radius - 1.2 : lv.walk - 1.2)) < 3.2;
+    return Math.hypot(p.x, p.z + lv.walk) < 5.5;
   };
   const floorSeat = (p: { x: number; z: number }) => {
     const lv = inside?.scene.floors?.levels[level];
@@ -633,6 +634,7 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
         mode: rig.mode(),
         body: { x: b.pos.x, z: b.pos.z, yaw: b.yaw },
         inside: inside?.id ?? null,
+        level,
       };
     },
     hour: () => shownHour,

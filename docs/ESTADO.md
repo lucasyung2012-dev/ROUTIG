@@ -2,7 +2,7 @@
 
 Leia este arquivo no começo de toda conversa nova sobre o ROUTIG. A especificação completa é o "ROUTIG — Prompt Master" (35 partes), fornecido pelo dono do produto. Decisões em [DECISOES.md](DECISOES.md), arquitetura em [ARQUITETURA.md](ARQUITETURA.md).
 
-**Atualizado:** 2026-11-05 (**V1 concluída**, versão 1.0.1 com as correções da auditoria)
+**Atualizado:** 2026-11-06 (**V2.1 publicada**; V1 concluída em 2026-11-05)
 
 ## Estado da conversa (2026-11-06, fim do dia)
 

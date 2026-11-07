@@ -117,7 +117,7 @@ O minimapa do parque desenha esta planta com os caminhos e o lago.
 |---|---|---|
 | Ambientes reais com mobília e interfaces funcionais | Parcial | Térreo: os setores da V2, cada um com o painel real do módulo. Andares: salas com mobília (mesas, estantes, telas, sofás) que abrem o painel real correspondente. Várias salas abrem o **mesmo** painel (ex.: as salas de Projects abrem o estúdio). |
 | Salas por andar como na seção 11 | Parcial | Todas as salas listadas existem com placa (101 salas). 6 não têm tela própria e não abrem nada (Insights: criação de dashboards, personalização de indicadores; Music: descanso; Sports: recuperação e descanso). Idiomas: as salas por idioma (português, inglês etc.) não existem como salas; os idiomas reais aparecem no térreo. |
-| Circulação vertical | Conforme | Elevador (Interagir perto da torre, ou os botões de andar no topo). |
+| Circulação vertical | Conforme | Navegador: botões Térreo / 1º / 2º andar na Biblioteca; no 1º andar aparecem o átrio com guarda-corpo, as salas com placa e os bancos do terraço. A dica "Elevador: próximo andar · E" aparece perto da torre. |
 | Navegáveis em primeira pessoa e câmera livre | Conforme | O motor troca o "chão" e os limites por andar; o átrio aberto bloqueia a passagem. |
 | Library dona dos arquivos; Notes preserva edição | Conforme | Sem mudança nos módulos; os painéis são os mesmos da V2. |
 
@@ -137,9 +137,9 @@ O minimapa do parque desenha esta planta com os caminhos e o lago.
 | Aceleração e desaceleração naturais; salto moderado | Conforme | `tests/parkCamera.test.ts`: aceleração, parada, pulo de 0,4–0,65 m. |
 | Sem salto sentado nem durante transições | Conforme | Pular sentado só levanta; durante deslizes não há movimento. |
 | Central de Módulos: botão flutuante, no parque e nos interiores | Conforme | Botão à esquerda, sempre visível. |
-| Barra lateral com 18 módulos, cartões, busca, favoritos, recentes, atalhos | Conforme | `ModuleCenter.tsx`. Favoritos e recentes ficam neste aparelho. |
-| Abrir o 2D completo ou entrar no prédio | Conforme | Botões "Abrir em 2D" e "Entrar no prédio". |
-| Voltar ao contexto (posição, orientação, modo, prédio, interação) | Parcial | Posição, direção, modo de câmera e prédio voltam. A interação aberta (setor ou painel) não volta. |
+| Barra lateral com 18 módulos, cartões, busca, favoritos, recentes, atalhos | Conforme | `ModuleCenter.tsx`. Navegador: abriu, a busca "fina" achou Finanças, a estrela fixou a Library nos favoritos. Favoritos e recentes ficam neste aparelho. |
+| Abrir o 2D completo ou entrar no prédio | Conforme | Navegador: "Entrar no prédio" levou para dentro da Biblioteca; "Abrir em 2D" abriu `#/library`. |
+| Voltar ao contexto (posição, orientação, modo, prédio, interação) | Parcial | Navegador: "Voltar ao parque" no 2D voltou para dentro da Biblioteca, na 3ª pessoa. O andar não voltava (voltou no térreo); corrigido no commit seguinte, ainda não conferido no navegador. A interação aberta (setor ou painel) não volta. |
 
 ## 13. Personagens e vida
 
@@ -200,7 +200,7 @@ O minimapa do parque desenha esta planta com os caminhos e o lago.
 | LOD progressivo sem "aparecer de repente" | Parcial | Arbustos, flores e placas somem pela distância; pessoas só as mais próximas. Prédios distantes não trocam de modelo, e a troca é direta (sem dissolver). |
 | Detalhe ao se aproximar; interior completo ao entrar | Conforme | Interior criado ao entrar e descartado ao sair; transição com escurecimento curto, sem tela de carregamento. |
 | Modos Econômico, Alto, Máximo, Automático | Conforme | Opções → Gráficos. Automático baixa um nível com menos de 38 qps por 4 s e sobe com folga por 12 s. |
-| Desempenho no iPad e iPhone | Não verificado | Sem aparelho real nesta rodada. |
+| Desempenho no iPad e iPhone | Não verificado | Sem aparelho real nesta rodada. No navegador do computador: 124 desenhos por quadro no parque (praça, à noite) e 64–75 dentro da Biblioteca; quadros por segundo não medidos (painel oculto). |
 | Memória: liberar o que não é usado | Parcial | Interior descartado ao sair (geometrias e materiais); som desligado libera os nós. Sem medição de memória. |
 
 ## 18. Acessibilidade

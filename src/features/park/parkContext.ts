@@ -12,6 +12,8 @@ export interface ParkSnapshot {
   mode: CamMode;
   body: { x: number; z: number; yaw: number };
   inside: ModuleId | null;
+  /** Andar dentro do prédio (0 = térreo). */
+  level?: number;
 }
 
 const CTX_KEY = 'routig.park.context';

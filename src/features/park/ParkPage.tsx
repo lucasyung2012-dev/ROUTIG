@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type MutableRefObject, type PointerEvent as RPointerEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Camera, ChevronsUp, FastForward, Footprints, Hand, Home, LogIn, LogOut, Monitor, Navigation, RotateCcw, SlidersHorizontal, UserRound, X } from 'lucide-react';
+import { Armchair, ArrowUpDown, Camera, ChevronsUp, FastForward, Footprints, Hand, Home, LogIn, Mountain, Smile, TreePine, Waves, LogOut, Monitor, Navigation, RotateCcw, SlidersHorizontal, UserRound, X } from 'lucide-react';
 import { MODULES, NAV_MODULE_IDS, type ModuleId } from '@/app/modules';
 import { useSettings } from '@/app/SettingsProvider';
 import type { MessageKey } from '@/i18n';
@@ -194,6 +194,7 @@ export default function ParkPage() {
   const [center, setCenter] = useState(false);
   const [floors, setFloors] = useState({ count: 1, current: 0 });
   const [zoneKey, setZoneKey] = useState<string | null>(null);
+  const [talk, setTalk] = useState<{ name: string; activity: string; line: number; at: number } | null>(null);
   const reopened = useRef(false);
   const navigate = useNavigate();
   const restore = useMemo(readParkContext, []);
@@ -280,6 +281,7 @@ export default function ParkPage() {
           setZoneKey(null);
         },
         onFloors: (count, current) => setFloors({ count, current }),
+        onTalk: (x) => setTalk({ ...x, at: Date.now() }),
         onZone: (z) => {
           if (z?.sector === '@options') {
             setOptions(true);
@@ -678,23 +680,18 @@ export default function ParkPage() {
       )}
 
       {/* Andando (primeira e terceira pessoa): controle, botões de correr, pular e interagir, e dica */}
-      {camMode !== 'orbit' && !stick.hidden && <Joystick onMove={(x, y) => engine.current?.setMove(x, y)} label={t('park.joystick')} size={stick.size} side={stick.side} />}
+      {camMode !== 'orbit' && !stick.hidden && <Joystick onMove={(x, y) => engine.current?.setMove(x, y)} onRun={(on) => engine.current?.setRun(on, 'stick')} label={t('park.joystick')} size={stick.size} side={stick.side} />}
       {camMode !== 'orbit' && !stick.hidden && <ActionButtons side={stick.side === 'left' ? 'right' : 'left'} engine={engine} canInteract={!!hint || posture !== 'stand' || (!!near && !inside)} />}
       {camMode !== 'orbit' && (hint || posture !== 'stand') && (!near || !!inside) && (
-        <div className="pointer-events-none absolute inset-x-0 bottom-44 flex justify-center">
-          <span className="rounded-full bg-black/60 px-3 py-1.5 text-xs font-medium text-white">
-            {posture !== 'stand' ? t('park.standUp') : hint?.kind === 'person' ? t('park.hints.person', { name: hint.name, activity: t(`park.activities.${hint.activity}` as MessageKey) }) : hint ? t(`park.hints.${hint.kind}`) : ''} · E
-          </span>
-        </div>
+        <InteractPrompt
+          kind={posture !== 'stand' ? 'stand' : (hint?.kind ?? 'sit')}
+          title={posture !== 'stand' ? t('park.standUp') : hint?.kind === 'person' ? t('park.hints.greet', { name: hint.name }) : hint ? t(`park.hints.${hint.kind}`) : ''}
+          detail={posture === 'stand' && hint?.kind === 'person' ? t('park.hints.person', { name: hint.name, activity: t(`park.activities.${hint.activity}` as MessageKey) }) : undefined}
+          onAct={() => engine.current?.interact()}
+        />
       )}
       {camMode !== 'orbit' && !near && !hint && <p className="pointer-events-none absolute bottom-24 right-3 hidden max-w-xs rounded-xl bg-black/50 px-3 py-2 text-[0.7rem] text-white md:block">{t('park.walkHint')}</p>}
-      {camMode !== 'orbit' && near && !inside && (
-        <div className="absolute inset-x-0 bottom-36 flex justify-center">
-          <Button variant="primary" icon={<LogIn className="h-4 w-4" />} onClick={() => engine.current?.enter(near)}>
-            {t('park.enterNamed', { name: t(`park.names.${near}`) })}
-          </Button>
-        </div>
-      )}
+      {camMode !== 'orbit' && near && !inside && <InteractPrompt kind="enter" title={t('park.enterNamed', { name: t(`park.names.${near}`) })} detail={t(`modules.${near}`)} onAct={() => engine.current?.enter(near)} />}
       {camMode === 'orbit' && !picked && !sector && <p className="pointer-events-none absolute bottom-3 right-3 hidden max-w-xs rounded-xl bg-black/50 px-3 py-2 text-[0.7rem] text-white md:block">{t(inside ? 'park.gesturesInside' : 'park.gestures')}</p>}
 
       {/* Prédio tocado */}
@@ -780,6 +777,7 @@ export default function ParkPage() {
         </div>
       )}
 
+      {talk && <TalkBubble key={talk.at} name={talk.name} text={`${t(`park.talk.hi${talk.line}` as MessageKey)} ${t(`park.talk.${talk.activity}` as MessageKey)}`} onDone={() => setTalk(null)} />}
       {/* Central de Módulos: botão flutuante (arraste para mudar de lugar) */}
       <FloatingCenterButton place={fab} onMove={setFab} onOpen={() => setCenter(true)} label={t('park.center.open')} />
       {center && <ModuleCenter inside={inside} onClose={() => setCenter(false)} onEnter={enterFromCenter} onOpen2D={open2D} />}
@@ -789,7 +787,7 @@ export default function ParkPage() {
 }
 
 /** Controle de andar na tela (primeira pessoa). */
-function Joystick({ onMove, label, size, side }: { onMove: (x: number, y: number) => void; label: string; size: Stick['size']; side: Stick['side'] }) {
+function Joystick({ onMove, onRun, label, size, side }: { onMove: (x: number, y: number) => void; onRun?: (on: boolean) => void; label: string; size: Stick['size']; side: Stick['side'] }) {
   const px = size === 's' ? 104 : size === 'l' ? 160 : 128;
   const base = useRef<HTMLDivElement>(null);
   const [knob, setKnob] = useState({ x: 0, y: 0 });
@@ -805,11 +803,13 @@ function Joystick({ onMove, label, size, side }: { onMove: (x: number, y: number
     }
     setKnob({ x, y });
     onMove(x, -y);
+    onRun?.(Math.hypot(x, y) > 0.95);
   };
   const end = () => {
     id.current = null;
     setKnob({ x: 0, y: 0 });
     onMove(0, 0);
+    onRun?.(false);
   };
   return (
     <div
@@ -838,30 +838,86 @@ function CamButton({ mode, label, onClick }: { mode: CamMode; label: string; onC
   return <IconButton label={label} icon={<Icon className="h-5 w-5" />} active={mode !== 'orbit'} onClick={onClick} className="bg-surface/90" />;
 }
 
-/** Correr (liga e desliga), pular e interagir: do lado oposto ao controle de andar. */
+/**
+ * Correr (segure), pular e interagir: do lado oposto ao controle de andar. Respondem no toque
+ * (sem esperar soltar) e correr para quando o dedo sai do botão.
+ */
 function ActionButtons({ side, engine, canInteract }: { side: 'left' | 'right'; engine: MutableRefObject<Engine | null>; canInteract: boolean }) {
   const { t } = useSettings();
   const [running, setRunning] = useState(false);
-  const btn = 'flex h-14 w-14 items-center justify-center rounded-full bg-black/40 text-white ring-2 ring-white/40 backdrop-blur-sm active:bg-white/30';
+  const run = (on: boolean) => {
+    engine.current?.setRun(on);
+    setRunning(on);
+  };
+  useEffect(() => () => engine.current?.setRun(false), []);
+  const btn = 'flex h-14 w-14 select-none items-center justify-center rounded-full bg-black/40 text-white ring-2 ring-white/40 backdrop-blur-sm transition active:scale-95';
   return (
-    <div className={cn('absolute bottom-8 flex items-end gap-3 safe-bottom', side === 'right' ? 'right-6' : 'left-6')}>
+    <div className={cn('absolute bottom-8 flex items-end gap-3 safe-bottom', side === 'right' ? 'right-6' : 'left-6')} style={{ touchAction: 'none' }}>
       <button
         type="button"
         aria-label={t('park.run')}
         aria-pressed={running}
-        className={cn(btn, running && 'bg-white/40')}
-        onClick={() => {
-          engine.current?.setRun(!running);
-          setRunning(!running);
+        className={cn(btn, running && 'bg-white/45 ring-white')}
+        onPointerDown={(e) => {
+          e.currentTarget.setPointerCapture(e.pointerId);
+          run(true);
         }}
+        onPointerUp={() => run(false)}
+        onPointerCancel={() => run(false)}
+        onLostPointerCapture={() => run(false)}
+        onContextMenu={(e) => e.preventDefault()}
       >
         <FastForward className="h-6 w-6" />
       </button>
-      <button type="button" aria-label={t('park.jump')} className={btn} onClick={() => engine.current?.jump()}>
+      <button type="button" aria-label={t('park.jump')} className={btn} onPointerDown={() => engine.current?.jump()}>
         <ChevronsUp className="h-6 w-6" />
       </button>
-      <button type="button" aria-label={t('park.interact')} disabled={!canInteract} className={cn(btn, 'h-16 w-16', !canInteract && 'opacity-40')} onClick={() => engine.current?.interact()}>
+      <button type="button" aria-label={t('park.interact')} disabled={!canInteract} className={cn(btn, 'h-16 w-16', canInteract ? 'bg-accent/80 ring-white' : 'opacity-40')} onPointerDown={() => canInteract && engine.current?.interact()}>
         <Hand className="h-7 w-7" />
+      </button>
+    </div>
+  );
+}
+
+/** Balão de fala de um morador que respondeu ao cumprimento; some sozinho. */
+function TalkBubble({ name, text, onDone }: { name: string; text: string; onDone: () => void }) {
+  useEffect(() => {
+    const id = window.setTimeout(onDone, 4500);
+    return () => window.clearTimeout(id);
+  }, []);
+  return (
+    <div className="pointer-events-none absolute inset-x-0 top-[5.5rem] z-10 flex justify-center px-3">
+      <div role="status" className="flex max-w-sm animate-fade-up items-start gap-3 rounded-2xl bg-surface/95 px-3 py-2.5 shadow-lift ring-1 ring-line">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand text-sm font-semibold text-white">{name.slice(0, 1)}</span>
+        <span className="min-w-0">
+          <span className="block text-xs font-semibold text-muted">{name}</span>
+          <span className="block text-sm text-fg">{text}</span>
+        </span>
+      </div>
+    </div>
+  );
+}
+
+const HINT_ICON = { sit: Armchair, view: Mountain, tree: TreePine, water: Waves, person: Smile, elevator: ArrowUpDown, enter: LogIn, stand: Footprints } as const;
+
+/** Cartão "o que dá para fazer aqui": ícone, ação e quem/onde; tocar no cartão faz a ação. */
+function InteractPrompt({ kind, title, detail, onAct }: { kind: keyof typeof HINT_ICON; title: string; detail?: string; onAct: () => void }) {
+  const Icon = HINT_ICON[kind];
+  return (
+    <div className="pointer-events-none absolute inset-x-0 bottom-32 flex justify-center px-3 sm:bottom-36">
+      <button
+        type="button"
+        onClick={onAct}
+        className="pointer-events-auto flex max-w-sm animate-fade-up items-center gap-3 rounded-2xl bg-black/65 py-2 pl-2 pr-3 text-left text-white shadow-lift ring-1 ring-white/25 backdrop-blur-md"
+      >
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand shadow-glow">
+          <Icon className="h-5 w-5" aria-hidden />
+        </span>
+        <span className="min-w-0">
+          <span className="block truncate text-sm font-semibold">{title}</span>
+          {detail && <span className="block truncate text-xs text-white/75">{detail}</span>}
+        </span>
+        <kbd className="ml-1 hidden rounded-md bg-white/15 px-1.5 py-0.5 text-[0.7rem] font-semibold ring-1 ring-white/30 md:block">E</kbd>
       </button>
     </div>
   );

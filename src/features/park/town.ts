@@ -6,6 +6,7 @@
 import { activityAt, campusPeople, poseFor, routeBetween, routeHome, spotFor, type Activity, type Conditions, type Person, type PersonPose } from '@/domain/parkPeople';
 import { heightAt, type Point } from '@/domain/park';
 import type { Figure } from './people';
+import type { Seat } from './camera';
 
 interface Agent {
   p: Person;
@@ -23,6 +24,11 @@ interface Agent {
   block: number;
   waveUntil: number;
   waveCool: number;
+  /** Banco ocupado (índice) e para onde a cabeça olha. */
+  seat: number;
+  look: number;
+  /** Qual fala usar ao ser cumprimentado (varia). */
+  line: number;
 }
 
 export interface Town {
@@ -35,18 +41,42 @@ export interface Town {
   /** Quantos estão no campus agora e o que fazem (painel de opções). */
   census: () => { outside: number; total: number; byActivity: Partial<Record<Activity, number>> };
   nearest: (p: { x: number; z: number }, r: number) => { name: string; activity: Activity; x: number; z: number } | null;
+  /** Cumprimentar quem está perto: a pessoa olha, acena e responde. */
+  greet: (p: { x: number; z: number }, r: number, now: number) => { name: string; activity: Activity; x: number; z: number; line: number } | null;
 }
 
 const WALK = 1.35;
 const HAIRS = ['#2F2A26', '#5A3B24', '#8A5A2B', '#1B1B1B', '#C9A063', '#7A7A7A', '#3B2A20'];
 
-export function createTown(): Town {
+const SEATED: PersonPose[] = ['sit', 'read', 'play', 'draw'];
+
+export function createTown(seats: Seat[] = []): Town {
+  const taken = new Set<number>();
+  /** Banco livre mais perto de um ponto (as pessoas sentam em bancos de verdade). */
+  const takeSeat = (a: Agent, near: Point) => {
+    if (a.seat >= 0) taken.delete(a.seat);
+    a.seat = -1;
+    if (!SEATED.includes(poseFor(a.activity, a.slot))) return near;
+    let best = -1;
+    let bd = 16;
+    seats.forEach((st, i) => {
+      const d = Math.hypot(st.x - near.x, st.z - near.z);
+      if (d < bd && !taken.has(i)) {
+        bd = d;
+        best = i;
+      }
+    });
+    if (best < 0) return near;
+    taken.add(best);
+    a.seat = best;
+    return { x: seats[best]!.x, z: seats[best]!.z };
+  };
   const people = campusPeople();
   const groupSlot = new Map<number, number>();
   const agents: Agent[] = people.map((p) => {
     const slot = groupSlot.get(p.group) ?? 0;
     groupSlot.set(p.group, slot + 1);
-    return { p, slot, x: p.home.x, z: p.home.z, yaw: 0, activity: 'home', route: [], ri: 0, pose: 'stand', phase: Math.random() * 6, away: true, block: -1, waveUntil: 0, waveCool: 0 };
+    return { p, slot, x: p.home.x, z: p.home.z, yaw: 0, activity: 'home', route: [], ri: 0, pose: 'stand', phase: Math.random() * 6, away: true, block: -1, waveUntil: 0, waveCool: 0, seat: -1, look: 0, line: Math.floor(Math.random() * 3) };
   });
 
   const strollRoute = (a: Agent): Point[] => {
@@ -71,7 +101,7 @@ export function createTown(): Town {
         a.route = [];
         return;
       }
-      const s = next === 'stroll' ? strollRoute(a)[0]! : spotFor(a.p, next, c, a.slot);
+      const s = next === 'stroll' ? strollRoute(a)[0]! : takeSeat(a, spotFor(a.p, next, c, a.slot));
       a.x = s.x;
       a.z = s.z;
       a.away = false;
@@ -80,9 +110,11 @@ export function createTown(): Town {
       return;
     }
     const here = { x: a.x, z: a.z };
+    if (a.seat >= 0) taken.delete(a.seat);
+    a.seat = -1;
     if (next === 'home') a.route = a.away ? [] : routeHome(here, a.p.home, true);
     else {
-      const dest = next === 'stroll' ? null : spotFor(a.p, next, c, a.slot);
+      const dest = next === 'stroll' ? null : takeSeat(a, spotFor(a.p, next, c, a.slot));
       const go = dest ? (a.away || prev === 'home' ? routeHome(dest, a.p.home, false) : routeBetween(here, dest)) : a.away ? routeHome(strollRoute(a).at(-1)!, a.p.home, false) : strollRoute(a);
       a.route = go;
       if (a.away) {
@@ -127,18 +159,31 @@ export function createTown(): Town {
         a.phase += dt * sp * 4.2;
         continue;
       }
-      // Parado na atividade.
-      a.pose = poseFor(a.activity, a.slot);
+      // Parado na atividade (sentado só se achou banco; senão, em pé).
+      const want = poseFor(a.activity, a.slot);
+      a.pose = SEATED.includes(want) && a.seat < 0 ? (want === 'sit' ? 'stand' : want === 'draw' ? 'photo' : 'stand') : want;
+      if (a.seat >= 0) a.yaw = seats[a.seat]!.face;
       a.phase += dt * 2;
       const dv = Math.hypot(viewer.x - a.x, viewer.z - a.z);
-      if (dv < 4.5 && now > a.waveCool && (a.pose === 'stand' || a.pose === 'sit')) {
+      // Quem está perto vira a cabeça para o visitante (cada um com seu jeito: alguns nem olham).
+      let lookTo = 0;
+      if (dv < 6 && a.p.id % 3 !== 0) {
+        const d = Math.atan2(viewer.x - a.x, viewer.z - a.z) - a.yaw;
+        lookTo = Math.max(-1.1, Math.min(1.1, Math.atan2(Math.sin(d), Math.cos(d))));
+      }
+      a.look += (lookTo - a.look) * Math.min(1, dt * 4);
+      if (dv < 4.5 && now > a.waveCool && a.p.id % 2 === 0 && (a.pose === 'stand' || a.pose === 'sit')) {
+
         // Reação de proximidade: olha e acena para quem chega perto (no máximo a cada 40 s).
         a.waveUntil = now + 2200;
         a.waveCool = now + 40000;
       }
       if (now < a.waveUntil) {
-        a.yaw = Math.atan2(viewer.x - a.x, viewer.z - a.z);
-        if (a.pose === 'stand') a.pose = 'wave';
+        if (a.seat < 0) {
+          a.yaw = Math.atan2(viewer.x - a.x, viewer.z - a.z);
+          a.look = 0;
+        }
+        if (a.pose === 'stand' || a.pose === 'photo') a.pose = 'wave';
       } else if (a.activity === 'chat' || a.activity === 'music') {
         // Em roda: virados para o centro do grupo.
         const s = spotFor(a.p, a.activity, { ...conditionsRef, hour: a.block + 0.5 }, 0);
@@ -161,10 +206,11 @@ export function createTown(): Town {
       .sort((u, v) => u.d - v.d)
       .slice(0, max)
       .map(({ a }) => {
-        const seated = a.pose === 'sit' || a.pose === 'read' || a.pose === 'play';
+        const st = a.seat >= 0 && SEATED.includes(a.pose) ? seats[a.seat] : undefined;
         return {
           x: a.x,
-          y: heightAt(a.x, a.z) + (seated ? 0.0 : 0),
+          y: st ? st.y - 0.44 : heightAt(a.x, a.z),
+          look: a.pose === 'walk' ? 0 : a.look,
           z: a.z,
           yaw: a.yaw,
           pose: a.pose,
@@ -191,6 +237,23 @@ export function createTown(): Town {
         by[a.activity] = (by[a.activity] ?? 0) + 1;
       }
       return { outside, total: agents.length, byActivity: by };
+    },
+    greet: (p, r, now) => {
+      let best: Agent | null = null;
+      let bd = r;
+      for (const a of agents) {
+        if (a.away) continue;
+        const d = Math.hypot(a.x - p.x, a.z - p.z);
+        if (d < bd) {
+          bd = d;
+          best = a;
+        }
+      }
+      if (!best) return null;
+      best.waveUntil = now + 3200;
+      best.waveCool = now + 3200;
+      best.line = (best.line + 1) % 3;
+      return { name: best.p.name, activity: best.activity, x: best.x, z: best.z, line: best.line };
     },
     nearest: (p, r) => {
       let best: Agent | null = null;

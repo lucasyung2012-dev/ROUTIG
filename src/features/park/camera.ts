@@ -58,7 +58,7 @@ export interface CameraRig {
   setSettings: (s: MoveSettings) => void;
   /** Controle de andar na tela: x = lado, y = frente (-1..1). */
   setMove: (x: number, y: number) => void;
-  setRun: (on: boolean) => void;
+  setRun: (on: boolean, src?: 'btn' | 'stick') => void;
   jump: () => void;
   /** Coloca o corpo em um ponto (pés no chão), olhando para `yaw`. */
   place: (x: number, z: number, yaw: number) => void;
@@ -104,7 +104,7 @@ export function createCameraRig(camera: THREE.PerspectiveCamera, canvas: HTMLCan
   let posture: Posture = 'stand';
   let seatEye = 0;
   let fovTarget = BASE_FOV;
-  let runBtn = false;
+  const runSrc = { btn: false, stick: false };
   let wantJump = false;
   const feet = new THREE.Vector3();
   let vy = 0;
@@ -303,7 +303,7 @@ export function createCameraRig(camera: THREE.PerspectiveCamera, canvas: HTMLCan
       feet.y = Math.max(feet.y, world.ground(feet.x, feet.z));
     }
     if (posture === 'sit') return;
-    const run = runBtn || keys.has('ShiftLeft') || keys.has('ShiftRight');
+    const run = runSrc.btn || runSrc.stick || keys.has('ShiftLeft') || keys.has('ShiftRight');
     const top = (run ? 7.5 : 3.6) * settings.speed;
     const fwd = new THREE.Vector2(-Math.sin(yaw), -Math.cos(yaw));
     const right = new THREE.Vector2(-fwd.y, fwd.x);
@@ -427,8 +427,8 @@ export function createCameraRig(camera: THREE.PerspectiveCamera, canvas: HTMLCan
       settings = s;
     },
     setMove: (x, y) => move.set(x, y),
-    setRun: (on) => {
-      runBtn = on;
+    setRun: (on, src = 'btn') => {
+      runSrc[src] = on;
     },
     jump: () => {
       wantJump = true;

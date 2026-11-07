@@ -6,8 +6,8 @@
  */
 import { COURTS, PARK_BUILDINGS, PLAZA_RADIUS, POIS, dist, inWater, parkPaths, residences, seededRandom, type Point } from './park';
 
-export type Activity = 'home' | 'cafe' | 'read' | 'study' | 'sport' | 'music' | 'view' | 'chat' | 'stroll' | 'picnic';
-export type PersonPose = 'stand' | 'walk' | 'sit' | 'read' | 'play' | 'wave' | 'exercise';
+export type Activity = 'home' | 'cafe' | 'read' | 'study' | 'sport' | 'music' | 'view' | 'chat' | 'stroll' | 'picnic' | 'draw' | 'photo';
+export type PersonPose = 'stand' | 'walk' | 'sit' | 'read' | 'play' | 'wave' | 'exercise' | 'draw' | 'photo';
 
 export interface Person {
   id: number;
@@ -38,7 +38,7 @@ const NAMES = ['Ana', 'Bruno', 'Carla', 'Diego', 'Elisa', 'Fábio', 'Gabi', 'Hei
 const SHIRTS = ['#E07A5F', '#3D9970', '#F2CC8F', '#81B29A', '#5B8DB8', '#C06C84', '#F4A259', '#6C5B7B', '#EEEEEE', '#2E4057', '#D1495B', '#66A182', '#EDAE49', '#8E7DBE'];
 const PANTS = ['#2F3542', '#4A5568', '#6B4F3A', '#1F3A5F', '#7A7A7A', '#A68A64', '#334155'];
 const SKINS = ['#F1C9A5', '#E0AC86', '#C68863', '#A86F4C', '#8D5A3B', '#6B4229', '#F5D5B8'];
-const ALL: Activity[] = ['cafe', 'read', 'study', 'sport', 'music', 'view', 'chat', 'stroll'];
+const ALL: Activity[] = ['cafe', 'read', 'study', 'sport', 'music', 'view', 'chat', 'stroll', 'draw', 'photo'];
 
 export const PEOPLE_COUNT = 64;
 
@@ -90,6 +90,9 @@ export const ACTIVITY_SPOTS: Record<Exclude<Activity, 'home' | 'stroll'>, Point[
   view: [poi('mirante-colina'), poi('mirante-lago')],
   chat: [{ x: 14, z: 12 }, { x: -14, z: -12 }, poi('praca-leste')],
   picnic: [{ x: -45, z: 140 }, { x: 40, z: 145 }],
+  // Desenhar nos jardins (pérgola, gramado do Sul, beira do lago) e fotografar a arquitetura.
+  draw: [poi('pergola-sul'), { x: -45, z: 140 }, poi('mirante-lago')],
+  photo: [{ x: 0, z: -28 }, { x: 30, z: 20 }, { x: 10, z: -120 }],
 };
 
 /** Atividades com teto (café, pérgola, leitura): a chuva leva as pessoas para elas. */
@@ -259,7 +262,8 @@ export function activityAt(p: Person, c: Conditions): Activity {
   else pick = p.likes[Math.floor(r * 1000) % p.likes.length]!;
   if (c.rain > 0.15 && !COVERED.includes(pick)) pick = r < 0.6 ? 'cafe' : 'read';
   if (c.fog > 0.5 && pick === 'view') pick = 'stroll';
-  if (c.wind > 0.7 && (pick === 'view' || pick === 'picnic')) pick = 'cafe';
+  if (c.wind > 0.7 && (pick === 'view' || pick === 'picnic' || pick === 'draw')) pick = 'cafe';
+  if (pick === 'photo' && (block < 7 || block > 18)) pick = 'stroll';
   return pick;
 }
 
@@ -296,6 +300,10 @@ export function poseFor(a: Activity, slot: number): PersonPose {
       return slot === 0 ? 'play' : 'stand';
     case 'picnic':
       return 'sit';
+    case 'draw':
+      return 'draw';
+    case 'photo':
+      return 'photo';
     default:
       return 'stand';
   }
@@ -312,4 +320,6 @@ export const ACTIVITY_LABEL: Record<Activity, string> = {
   chat: 'conversando',
   stroll: 'caminhando',
   picnic: 'no piquenique',
+  draw: 'desenhando',
+  photo: 'fotografando',
 };

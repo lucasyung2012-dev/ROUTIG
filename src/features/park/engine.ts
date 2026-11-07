@@ -41,6 +41,8 @@ export interface EngineOpts {
   /** O que dá para fazer aqui (sentar, observar) e a postura atual. */
   onHint: (h: Hint | null) => void;
   onPosture: (p: Posture) => void;
+  /** Alguém respondeu ao cumprimento (nome, atividade e qual fala). */
+  onTalk: (t: { name: string; activity: string; line: number }) => void;
   /** Interior: quantos andares tem o prédio e em qual a pessoa está. */
   onFloors: (count: number, current: number) => void;
   /** Sala de um andar escolhida (abre o painel real ligado a ela). */
@@ -64,7 +66,7 @@ export interface Engine {
   cameraInfo: () => { x: number; z: number; yaw: number; inside: boolean };
   setCamMode: (m: CamMode) => void;
   setMove: (x: number, y: number) => void;
-  setRun: (on: boolean) => void;
+  setRun: (on: boolean, src?: 'btn' | 'stick') => void;
   jump: () => void;
   /** Botão de interagir: entrar, sentar, observar ou levantar. */
   interact: () => void;
@@ -126,7 +128,8 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
   outside.add(avatar.group);
   const crowd = createCrowd(kit, 40);
   outside.add(crowd.group);
-  const town = createTown();
+  const town = createTown(world.seats);
+  let avatarWaveUntil = 0;
   let crowdMax = 16;
   let season: Conditions['season'] = 'summer';
   const conditions = (): Conditions => ({ hour: shownHour, day: Math.floor(Date.now() / 86400000), rain: weather.rain, fog: weather.fog, wind: weather.wind, season });
@@ -134,7 +137,7 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
   const bodyFigure = () => {
     const b = rig.body();
     const sitting = rig.posture() === 'sit';
-    avatar.set([{ x: b.pos.x, y: b.pos.y, z: b.pos.z, yaw: b.yaw + Math.PI, pose: sitting ? 'sit' : b.speed > 0.2 ? 'walk' : 'stand', phase: walkPhase, stride: Math.min(1, b.speed / 3.6), ...AVATAR_LOOK, scale: 1 }]);
+    avatar.set([{ x: b.pos.x, y: b.pos.y, z: b.pos.z, yaw: b.yaw + Math.PI, pose: sitting ? 'sit' : b.speed > 0.2 ? 'walk' : performance.now() < avatarWaveUntil ? 'wave' : 'stand', phase: b.speed > 0.2 ? walkPhase : performance.now() / 500, stride: Math.min(1, b.speed / 3.6), ...AVATAR_LOOK, scale: 1 }]);
   };
   let walkPhase = 0;
 
@@ -400,8 +403,14 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
       rig.place(vp.x, vp.z, rig.body().yaw);
       return rig.observe(new THREE.Vector3(vp.x + Math.sin(vp.view) * 90, vp.y - 4, vp.z + Math.cos(vp.view) * 90));
     }
-    const who = town.nearest(p, 2.6);
-    if (who) return rig.observe(new THREE.Vector3(who.x, heightAt(who.x, who.z) + 1.5, who.z));
+    const who = town.greet(p, 2.8, performance.now());
+    if (who) {
+      // Cumprimento (V2.1, 13.7): virar para a pessoa, acenar; ela olha, acena e responde.
+      rig.place(p.x, p.z, Math.atan2(-(who.x - p.x), -(who.z - p.z)));
+      avatarWaveUntil = performance.now() + 2200;
+      opts.onTalk({ name: who.name, activity: who.activity, line: who.line });
+      return;
+    }
     if (inWater(p.x, p.z, 4)) {
       const w = waterPoint(p);
       const dx = w.x - p.x;

@@ -11,6 +11,7 @@ import { city } from './buildings/city';
 import { Builder, Kit, signTexture, cloud, forest, setWaterNight, setWaterSky, setWaterWeather, shrubs, sky, stars, water, type Plant, type TreeSpecies } from './kit';
 import { birds, butterflies, drone, fountain, leaves, rain } from './life';
 import { playground } from './playground';
+import { ground } from './ground';
 import { frame, roundBox, signBoard } from './props';
 import { dashboardBuilding, inboxBuilding, profileBuilding, settingsBuilding, type DetailedBuilding } from './buildings/central';
 import { academyBuilding, insightsBuilding, languagesBuilding, libraryBuilding, notesBuilding } from './buildings/north';
@@ -764,6 +765,9 @@ export function createWorld(kit: Kit): World {
   // Árvores do parque e as da calçada do bairro (copas redondas e esguias alternadas).
   const plantList = [...plants().filter((p) => !onPath(p.x, p.z, 0.9 * p.s) && !clearZones.some((c) => Math.hypot(c.x - p.x, c.z - p.z) < c.r + p.s)), ...streetTrees().map((p, i) => ({ x: p.x, y: heightAt(p.x, p.z), z: p.z, s: p.s, species: (i % 3 ? 'round' : 'slender') as Plant['species'] }))];
   const trees = forest(kit, plantList);
+  // Poças depois da chuva, grama gasta nos atalhos e na frente dos bancos, folhas secas no chão.
+  const gnd = ground(kit, am.seats, plantList);
+  root.add(gnd.group);
   for (const t of plantList) if (Math.hypot(t.x, t.z) < PARK_RADIUS + 30) obstacles.push({ x: t.x, z: t.z, r: 0.3 * t.s, h: (t.y ?? 0) + 3 });
   const meadow = meadows(kit);
   root.add(trees.group, ...meadow);
@@ -873,6 +877,7 @@ export function createWorld(kit: Kit): World {
       wet += ((weather.rain > 0.1 ? 1 : 0) - wet) * Math.min(1, dt * (weather.rain > 0.1 ? 0.25 : 0.05));
       if (Math.abs(wet - wetShown) > 0.02) {
         wetShown = wet;
+        gnd.setWet(wet);
         wetMats.forEach((m, i) => {
           m.roughness = dry[i]!.rough * (1 - wet * 0.6);
           m.color.copy(dry[i]!.color).multiplyScalar(1 - wet * 0.22);
@@ -934,6 +939,7 @@ export function createWorld(kit: Kit): World {
         winter: { round: '#5E8F55', conifer: '#3D6B50', slender: '#7E9A5C', blossom: '#F2C230', palm: '#5DAF55' },
       };
       trees.setSeason(crowns[s]);
+      gnd.setSeason(s);
       meadow[0]!.visible = s !== 'winter';
     },
     setFestive: (on) => {

@@ -10,6 +10,7 @@ import type { ModuleId } from '@/app/modules';
 import type { Builder, Kit } from '../kit';
 import type { Obstacle, Seat } from '../camera';
 import { clock, drums, globe, lamp as floorLamp, piano, record, telescope, type Thing } from './things';
+import { extinguisher, recycleStation, waterCooler } from '../props';
 
 interface Ctx {
   kit: Kit;
@@ -208,22 +209,10 @@ export interface Lobby {
 
 /** Apoio do andar: bebedouro, lixeiras de reciclagem e extintor na parede (encostados no vidro). */
 function service(c: Ctx, x: number, y: number, z: number) {
-  const m = mats(c);
-  // Bebedouro com galão.
-  c.b.add(m.white, new THREE.BoxGeometry(0.35, 1.0, 0.35), [x, y + 0.5, z]);
-  c.b.add(c.kit.mat('#9FD3E8', { glass: true }), new THREE.CylinderGeometry(0.14, 0.14, 0.42, 16), [x, y + 1.22, z]);
-  c.b.add(m.dark, new THREE.BoxGeometry(0.2, 0.06, 0.04), [x, y + 0.8, z + 0.18]);
-  // Lixeiras de reciclagem (azul, vermelho, verde, amarelo).
-  ['#2563EB', '#DC2626', '#16A34A', '#EAB308'].forEach((col, k) => {
-    const bx = x + 0.55 + k * 0.42;
-    c.b.add(c.kit.mat(col, { rough: 0.5 }), new THREE.BoxGeometry(0.36, 0.7, 0.36), [bx, y + 0.35, z]);
-    c.b.add(m.dark, new THREE.BoxGeometry(0.38, 0.04, 0.38), [bx, y + 0.72, z]);
-  });
-  // Extintor no suporte, com placa.
-  const ex = x + 2.35;
-  c.b.add(c.kit.mat('#DC2626', { rough: 0.35, metal: 0.2 }), new THREE.CylinderGeometry(0.09, 0.09, 0.5, 14), [ex, y + 0.55, z]);
-  c.b.add(m.dark, new THREE.CylinderGeometry(0.02, 0.02, 0.1, 6), [ex, y + 0.85, z]);
-  c.b.add(c.kit.mat('#DC2626', { rough: 0.6 }), new THREE.BoxGeometry(0.3, 0.3, 0.02), [ex, y + 1.45, z - 0.05]);
+  // Bebedouro de galão, estação de reciclagem de quatro cestos e extintor no suporte da parede.
+  waterCooler(c.b, c.kit, x, y, z, 0);
+  recycleStation(c.b, c.kit, x + 1.45, y, z + 0.05, 0);
+  extinguisher(c.b, c.kit, x + 2.75, y, z - 0.1, 0);
 }
 
 /**

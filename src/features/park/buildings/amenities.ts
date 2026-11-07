@@ -7,6 +7,7 @@ import * as THREE from 'three';
 import { navGraph } from '@/domain/parkPeople';
 import { crossStreets, onPath, PARK_BUILDINGS, PATH_WIDTH, PLAZA_RADIUS, POIS, ROAD_RADIUS, SPORT_FIELDS, heightAt, inWater, parkPaths, residences, samplePath, seededRandom, type Poi } from '@/domain/park';
 import { Builder, type Kit } from '../kit';
+import { parkBin } from '../props';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
 export interface Seat {
@@ -56,6 +57,12 @@ export function amenities(kit: Kit): Amenities {
     b.add(wood, backrest, [x + Math.sin(back) * 0.26, y + 0.72, z + Math.cos(back) * 0.26], [0, face, 0]);
     for (const s of [-1, 1]) b.add(dark, new THREE.BoxGeometry(0.07, 0.45, 0.45), [x + Math.cos(face) * s * 0.8, y + 0.22, z - Math.sin(face) * s * 0.8], [0, face, 0]);
     seats.push({ x, y: y + 0.45, z, face });
+    // Lixeira ao lado de um banco a cada três (fora do caminho).
+    if (seats.length % 3 === 0) {
+      const bx = x + Math.cos(face) * 1.35;
+      const bz = z - Math.sin(face) * 1.35;
+      if (!onPath(bx, bz, 0.4)) parkBin(b, kit, bx, heightAt(bx, bz), bz, face);
+    }
   };
   /** Mesa de 0,75 m com dois bancos. */
   const table = (x: number, z: number, rot: number, umbrella: boolean) => {
@@ -229,6 +236,13 @@ export function amenities(kit: Kit): Amenities {
   return { group: b.build(), seats, viewpoints, spots };
 }
 
+/** Janela que de dia é vidro (reflete o céu) e à noite acende com luz quente de dentro. */
+function nightWindow(kit: Kit, glass: string): THREE.MeshStandardMaterial {
+  const m = kit.own(new THREE.MeshStandardMaterial({ color: glass, roughness: 0.18, metalness: 0.45, emissive: new THREE.Color('#FFD58A'), emissiveIntensity: 0 }));
+  kit.glowing.push(m);
+  return m;
+}
+
 /** Residências: casas variadas de 1 ou 2 pavimentos, com jardim e luz nas janelas à noite. */
 export function houses(kit: Kit): THREE.Group {
   const b = new Builder();
@@ -238,7 +252,7 @@ export function houses(kit: Kit): THREE.Group {
   const cladding = kit.mat('#9B6B47', { rough: 0.7 });
   const frame = kit.mat('#2F3338', { rough: 0.5, metal: 0.3 });
   const whiteTrim = kit.mat('#FAFAF7', { rough: 0.6 });
-  const win = kit.mat('#FFE2A8', { glow: true, rough: 0.4 });
+  const win = nightWindow(kit, '#7E9BB0');
   const doorMat = kit.mat('#6B4A33', { rough: 0.6 });
   const stone = kit.mat('#B9B3A8', { rough: 0.95 });
   const drive = kit.mat('#A7A39B', { rough: 0.95 });
@@ -507,7 +521,7 @@ export function neighborhood(kit: Kit): { group: THREE.Group; tick: (t: number) 
   const rnd = seededRandom(909);
   const facades = ['#E8E2D6', '#D9DEE5', '#EADCCB', '#CFD8DC', '#E4D5C3', '#DDE6E1', '#C9B8A6', '#B8C4CF'].map((c) => kit.mat(c, { rough: 0.85 }));
   const glassDay = kit.mat('#6F93AE', { rough: 0.15, metal: 0.5 });
-  const glassLit = kit.mat('#FFE2A8', { glow: true, rough: 0.35 });
+  const glassLit = nightWindow(kit, '#6F93AE');
   const curtain = kit.mat('#7FA4BF', { glass: true });
   const dark = kit.mat('#3A4250', { rough: 0.5, metal: 0.3 });
   const trim = kit.mat('#F4F5F7', { rough: 0.6 });

@@ -450,15 +450,16 @@ export function forest(kit: Kit, plants: Plant[]): Forest {
 
 /** Arbustos e flores (instâncias simples). */
 export function shrubs(kit: Kit, spots: Array<{ x: number; y?: number; z: number; s: number; color: string }>, kind: 'bush' | 'flower'): THREE.InstancedMesh {
-  const geo = kit.own(kind === 'bush' ? new THREE.IcosahedronGeometry(0.7, 0) : new THREE.IcosahedronGeometry(0.16, 0));
-  const mat = kit.own(new THREE.MeshStandardMaterial({ roughness: 0.85 }));
+  // Arbusto: cachos de folhas (mesma folhagem das árvores); flor: botão arredondado.
+  const geo = kit.own(kind === 'bush' ? blobCrown(5, 4, 0.42, 0.6, 0.85) : new THREE.IcosahedronGeometry(0.15, 1));
+  const mat = kit.own(kind === 'bush' ? new THREE.MeshStandardMaterial({ roughness: 0.85, map: kit.own(leafTexture()), alphaTest: 0.42, side: THREE.DoubleSide }) : new THREE.MeshStandardMaterial({ roughness: 0.85 }));
   const mesh = new THREE.InstancedMesh(geo, mat, spots.length);
   const m4 = new THREE.Matrix4();
   const col = new THREE.Color();
   spots.forEach((s, i) => {
     m4.compose(new THREE.Vector3(s.x, (s.y ?? 0) + (kind === 'bush' ? 0.45 * s.s : 0.25), s.z), new THREE.Quaternion().setFromEuler(new THREE.Euler(0, i * 1.7, 0)), new THREE.Vector3(s.s, s.s * (kind === 'bush' ? 0.8 : 1), s.s));
     mesh.setMatrixAt(i, m4);
-    mesh.setColorAt(i, col.set(s.color));
+    mesh.setColorAt(i, kind === 'bush' ? col.set(s.color).lerp(new THREE.Color('#ffffff'), 0.55) : col.set(s.color));
   });
   mesh.castShadow = kind === 'bush';
   mesh.receiveShadow = true;

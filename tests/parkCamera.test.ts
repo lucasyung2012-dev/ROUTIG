@@ -28,8 +28,8 @@ describe('parque V2.1: câmera e movimento', () => {
     run(1);
     const top = rig.body().speed;
     expect(early).toBeLessThan(top * 0.75);
-    expect(top).toBeGreaterThan(3.3);
-    expect(top).toBeLessThan(3.7);
+    expect(top).toBeGreaterThan(2.3);
+    expect(top).toBeLessThan(2.7);
     // yaw 0 = olhando para -z
     expect(camera.position.z).toBeLessThan(-2);
     rig.setMove(0, 0);
@@ -37,7 +37,7 @@ describe('parque V2.1: câmera e movimento', () => {
     expect(rig.body().speed).toBeLessThan(0.05);
   });
 
-  it('correr dobra a velocidade; velocidade ajustável nas opções', () => {
+  it('correr (7,5 m/s) é bem mais rápido que andar (2,5 m/s); velocidade ajustável nas opções', () => {
     const { rig, run } = setup();
     rig.setRun(true);
     rig.setMove(1, 0);

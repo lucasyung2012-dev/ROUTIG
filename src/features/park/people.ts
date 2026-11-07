@@ -6,8 +6,18 @@
  * todos os moradores visíveis custam ~16 desenhos por quadro, qualquer que seja a quantidade.
  */
 import * as THREE from 'three';
-import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { mergeGeometries, mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { Kit } from './kit';
+
+/** Sombreado liso: junta os vértices repetidos antes das normais (pele e roupa sem "degraus"). */
+function smooth(g: THREE.BufferGeometry): THREE.BufferGeometry {
+  g.deleteAttribute('normal');
+  g.deleteAttribute('uv');
+  const m = mergeVertices(g, 1e-4);
+  g.dispose();
+  m.computeVertexNormals();
+  return m;
+}
 
 export type Pose = 'stand' | 'walk' | 'sit' | 'read' | 'play' | 'wave' | 'exercise' | 'draw' | 'photo' | 'tennis' | 'kick' | 'cheer' | 'keeper' | 'run';
 export type Outfit = 'tee' | 'shirt' | 'jacket' | 'hoodie' | 'dress' | 'sport';
@@ -120,8 +130,7 @@ function headGeo(): THREE.BufferGeometry {
   const parts = [skull, jaw, nose, earL, earR, neck].map((g) => g.toNonIndexed());
   const m = mergeGeometries(parts)!;
   parts.forEach((p) => p.dispose());
-  m.computeVertexNormals();
-  return m;
+  return smooth(m);
 }
 
 function hairGeo(style = 0): THREE.BufferGeometry {
@@ -138,8 +147,10 @@ function hairGeo(style = 0): THREE.BufferGeometry {
     }
     return mergeGeometries(parts)!;
   }
-  const cap = new THREE.SphereGeometry(0.107, 18, 10, 0, Math.PI * 2, 0, Math.PI * 0.52);
+  // Linha do cabelo alta na testa e baixa na nuca (calota inclinada para trás).
+  const cap = new THREE.SphereGeometry(0.107, 18, 10, 0, Math.PI * 2, 0, Math.PI * 0.5);
   cap.scale(0.93, 1.12, 1.04);
+  cap.rotateX(-0.45);
   cap.translate(0, 0.012, -0.008);
   // Nuca: centrada atrás da cabeça (na esfera do three, phi = 1,5π aponta para -z).
   const back = new THREE.SphereGeometry(0.1, 14, 8, Math.PI * 1.1, Math.PI * 0.8, Math.PI * 0.35, Math.PI * 0.35);
@@ -232,8 +243,7 @@ function jacketGeo(): THREE.BufferGeometry {
     parts.push(lapel.toNonIndexed());
   }
   const m = mergeGeometries(parts)!;
-  m.computeVertexNormals();
-  return m;
+  return smooth(m);
 }
 /** Gola e botões da camisa social; listra da camiseta esportiva (mesma malha, cor de destaque). */
 function collarGeo(): THREE.BufferGeometry {
@@ -358,8 +368,7 @@ function handGeo(): THREE.BufferGeometry {
   parts.push(thumb);
   const m = mergeGeometries(parts.map((g) => g.toNonIndexed()))!;
   parts.forEach((g) => g.dispose());
-  m.computeVertexNormals();
-  return m;
+  return smooth(m);
 }
 
 function shoeGeo(): THREE.BufferGeometry {
@@ -376,8 +385,7 @@ function shoeGeo(): THREE.BufferGeometry {
   tongue.translate(0, 0.022, 0.05);
   const parts = [upper, collar, tongue].map((g) => g.toNonIndexed());
   const m = mergeGeometries(parts)!;
-  m.computeVertexNormals();
-  return m;
+  return smooth(m);
 }
 function soleGeo(): THREE.BufferGeometry {
   const sole = new THREE.CapsuleGeometry(0.048, 0.165, 4, 14);

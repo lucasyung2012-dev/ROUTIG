@@ -792,7 +792,10 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
         // Sombra do parque inteiro (senão aparece a borda da área de sombra como uma faixa).
         const sc = world.sun.shadow.camera;
         const box = [sc.left, sc.right, sc.top, sc.bottom, sc.far];
-        Object.assign(sc, { left: -half, right: half, top: half, bottom: -half, far: 900 });
+        const bias = [world.sun.shadow.bias, world.sun.shadow.normalBias];
+        Object.assign(sc, { left: -half * 1.6, right: half * 1.6, top: half * 1.6, bottom: -half * 1.6, far: 900 });
+        world.sun.shadow.bias = -0.004;
+        world.sun.shadow.normalBias = 1.2;
         sc.updateProjectionMatrix();
         renderer.setRenderTarget(rt);
         renderer.render(outside, cam);
@@ -801,6 +804,8 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
         renderer.setRenderTarget(null);
         rt.dispose();
         Object.assign(sc, { left: box[0], right: box[1], top: box[2], bottom: box[3], far: box[4] });
+        world.sun.shadow.bias = bias[0]!;
+        world.sun.shadow.normalBias = bias[1]!;
         sc.updateProjectionMatrix();
         outside.fog = fog;
         crowd.group.visible = crowdVis;
@@ -819,8 +824,26 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
         out.width = out.height = px;
         const o = out.getContext('2d');
         if (o) {
-          o.filter = 'contrast(1.3) saturate(1.35) brightness(0.88)';
+          o.filter = 'contrast(1.25) saturate(1.1) brightness(0.86)';
           o.drawImage(c, 0, 0);
+          o.filter = 'none';
+          // Copas das árvores vistas de cima (de longe, a folhagem 3D vira pontinhos).
+          const k = px / (half * 2);
+          for (const tr of world.treeSpots) {
+            if (Math.hypot(tr.x, tr.z) > half) continue;
+            const r = (tr.species === 'slender' ? 4.2 : tr.species === 'palm' ? 2.6 : 2.8) * tr.s * k;
+            const x = (tr.x + half) * k;
+            const y = (tr.z + half) * k;
+            const grd = o.createRadialGradient(x - r * 0.3, y - r * 0.3, r * 0.1, x, y, r);
+            const base = tr.species === 'blossom' ? [196, 120, 160] : tr.species === 'palm' ? [92, 140, 70] : [52, 105, 52];
+            grd.addColorStop(0, `rgba(${base[0] + 40},${base[1] + 45},${base[2] + 30},0.95)`);
+            grd.addColorStop(0.75, `rgba(${base[0]},${base[1]},${base[2]},0.92)`);
+            grd.addColorStop(1, `rgba(${base[0] - 25},${base[1] - 35},${base[2] - 25},0)`);
+            o.fillStyle = grd;
+            o.beginPath();
+            o.arc(x, y, r, 0, Math.PI * 2);
+            o.fill();
+          }
           return out.toDataURL('image/jpeg', 0.85);
         }
         return c.toDataURL('image/jpeg', 0.85);

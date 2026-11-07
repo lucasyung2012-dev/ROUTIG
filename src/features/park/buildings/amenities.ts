@@ -5,7 +5,7 @@
  */
 import * as THREE from 'three';
 import { navGraph } from '@/domain/parkPeople';
-import { crossStreets, onPath, PARK_BUILDINGS, PATH_WIDTH, PLAZA_RADIUS, POIS, ROAD_RADIUS, SPORT_FIELDS, heightAt, inWater, parkPaths, residences, samplePath, seededRandom, type Poi } from '@/domain/park';
+import { crossStreets, onPath, onStreet, PARK_BUILDINGS, PATH_WIDTH, PLAZA_RADIUS, POIS, ROAD_RADIUS, SPORT_FIELDS, heightAt, inWater, parkPaths, residences, samplePath, seededRandom, type Poi } from '@/domain/park';
 import { Builder, type Kit } from '../kit';
 import { parkBin } from '../props';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
@@ -692,6 +692,7 @@ export function streetTrees(): Array<{ x: number; z: number; s: number }> {
     for (const r of [ROAD_RADIUS + 7.6, ROAD_RADIUS - 7.6]) {
       const x = Math.cos(a) * r;
       const z = Math.sin(a) * r;
+      if (onStreet(x, z, 3)) continue; // nunca no meio de uma rua transversal
       if (houses.some((h) => Math.hypot(h.x - x, h.z - z) < 13)) continue;
       out.push({ x: Math.cos(a) * r, z: Math.sin(a) * r, s: 0.8 + ((k * 37) % 10) / 30 });
     }

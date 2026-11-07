@@ -678,7 +678,8 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
       const oz = bd ? p.z - bd.z : 1;
       const ol = Math.hypot(ox, oz) || 1;
       rig.setMode('orbit');
-      rig.glideTo(new THREE.Vector3(p.x + (ox / ol) * 18, y + 9, p.z + (oz / ol) * 18), new THREE.Vector3(p.x, y + 2, p.z), 900);
+      const up = bd ? 9 : 30;
+      rig.glideTo(new THREE.Vector3(p.x + (ox / ol) * 18, y + up, p.z + (oz / ol) * 18), new THREE.Vector3(p.x, y + 2, p.z), 900);
     }
   };
   if (/[?&]debug/.test(location.search)) document.addEventListener('park-debug', onDebug);

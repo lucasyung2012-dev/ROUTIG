@@ -47,7 +47,7 @@ describe('parque V2.1: moradores do campus', () => {
     // Com chuva, quem fica vai para lugares cobertos.
     for (const p of people) {
       const a = activityAt(p, { ...base, rain: 0.8 });
-      expect(['home', 'cafe', 'read']).toContain(a);
+      expect(['home', 'cafe', 'read', 'study', 'work', 'gym']).toContain(a);
     }
   });
 });

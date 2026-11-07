@@ -5,7 +5,7 @@
  * Tudo determinístico por dia e hora: a mesma hora mostra o mesmo campus. Sem missões.
  */
 import type { ModuleId } from '@/app/modules';
-import { COURTS, PARK_BUILDINGS, PARK_SCALE, SPORT_FIELDS, entranceOf, PLAZA_RADIUS, POIS, dist, inWater, parkPaths, residences, seededRandom, type Point } from './park';
+import { PARK_BUILDINGS, PARK_SCALE, SPORT_FIELDS, entranceOf, PLAZA_RADIUS, POIS, dist, inWater, parkPaths, residences, seededRandom, type Point } from './park';
 
 export type Activity = 'home' | 'cafe' | 'read' | 'study' | 'sport' | 'music' | 'view' | 'chat' | 'stroll' | 'picnic' | 'draw' | 'photo' | 'work' | 'gym';
 export type PersonPose = 'stand' | 'walk' | 'sit' | 'read' | 'play' | 'wave' | 'exercise' | 'draw' | 'photo' | 'tennis';

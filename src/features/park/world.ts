@@ -5,7 +5,8 @@
  */
 import * as THREE from 'three';
 import type { ModuleId } from '@/app/modules';
-import { LAKE, PARK_BUILDINGS, PARK_RADIUS, PLAZA_RADIUS, entranceOf, facingOf, heightAt, parkPaths, samplePath, seededRandom, treePositions, type ParkBuilding, type Point } from '@/domain/park';
+import { LAKE, PARK_BUILDINGS, PARK_RADIUS, PATH_WIDTH, PLAZA_RADIUS, PONDS, entranceOf, facingOf, heightAt, inWater, lakeRadiusAt, parkPaths, samplePath, seededRandom, treePositions, type ParkBuilding, type Point } from '@/domain/park';
+import { amenities, houses, type Seat, type Viewpoint } from './buildings/amenities';
 import { Builder, Kit, cloud, forest, setWaterNight, shrubs, sky, stars, water, type Plant, type TreeSpecies } from './kit';
 import { birds, drone, fountain, rain } from './life';
 import { dashboardBuilding, inboxBuilding, profileBuilding, settingsBuilding, type DetailedBuilding } from './buildings/central';
@@ -91,6 +92,9 @@ export interface World {
   buildings: Map<ModuleId, PlacedBuilding>;
   obstacles: Obstacle[];
   pickables: THREE.Object3D[];
+  seats: Seat[];
+  viewpoints: Viewpoint[];
+  spots: Array<{ id: string; x: number; z: number; kind: string }>;
   tick: (t: number, dt: number, focus: THREE.Vector3, cam: THREE.Vector3) => void;
   setLight: (l: Light) => void;
   setWeather: (w: Weather) => void;
@@ -102,31 +106,40 @@ export interface World {
 /* ---------- Terreno ---------- */
 
 function terrain(kit: Kit): THREE.Mesh {
-  const size = 760;
-  const seg = 150;
+  const size = 820;
+  const seg = 170;
   const g = new THREE.PlaneGeometry(size, size, seg, seg);
   g.rotateX(-Math.PI / 2);
   const pos = g.attributes.position!;
   const col = new Float32Array(pos.count * 3);
-  const base = { central: new THREE.Color('#7DB866'), north: new THREE.Color('#5F9A55'), east: new THREE.Color('#78B060'), south: new THREE.Color('#86BC62'), west: new THREE.Color('#6BB25E') };
+  // Norte: mata densa (verde escuro); Oeste: colinas tropicais; Leste: gramados abertos; Sul: jardins.
+  const base = { central: new THREE.Color('#7DB866'), north: new THREE.Color('#4F8E49'), east: new THREE.Color('#86BE68'), south: new THREE.Color('#7FBA64'), west: new THREE.Color('#5E9F50') };
   const c = new THREE.Color();
   const tmp = new THREE.Color();
   for (let i = 0; i < pos.count; i++) {
     const x = pos.getX(i);
     const z = pos.getZ(i);
     let y = heightAt(x, z);
+    // Margens do lago descendo até a água (forma orgânica) e lagos ornamentais.
+    const ang = Math.atan2(z - LAKE.z, x - LAKE.x);
+    const lr = lakeRadiusAt(ang);
     const dl = Math.hypot(x - LAKE.x, z - LAKE.z);
-    if (dl < LAKE.radius + 4) y -= 1.6 * (1 - THREE.MathUtils.smoothstep(dl, LAKE.radius - 6, LAKE.radius + 4));
+    if (dl < lr + 5) y -= 1.8 * (1 - THREE.MathUtils.smoothstep(dl, lr - 6, lr + 5));
+    let shore = dl > lr - 2 && dl < lr + 4;
+    for (const p of PONDS) {
+      const dp = Math.hypot(x - p.x, z - p.z);
+      if (dp < p.radius + 3) y -= 1.1 * (1 - THREE.MathUtils.smoothstep(dp, p.radius - 3, p.radius + 3));
+      if (dp > p.radius - 1 && dp < p.radius + 2.5) shore = true;
+    }
     pos.setY(i, y - 0.03);
-    // Cor por região (mistura suave pelo ângulo) + variação e areia na margem do lago.
     const a = Math.atan2(x, -z);
     const r = Math.hypot(x, z);
-    const pick = r < 45 ? base.central : Math.abs(a) < Math.PI / 4 ? base.north : a > 0 && a < (3 * Math.PI) / 4 ? base.east : a < 0 && a > (-3 * Math.PI) / 4 ? base.west : base.south;
+    const pick = r < 55 ? base.central : Math.abs(a) < Math.PI / 4 ? base.north : a > 0 && a < (3 * Math.PI) / 4 ? base.east : a < 0 && a > (-3 * Math.PI) / 4 ? base.west : base.south;
     c.copy(pick);
     const n = Math.sin(x * 0.21) * Math.cos(z * 0.17) * 0.5 + Math.sin(x * 0.05 + z * 0.07) * 0.5;
-    c.multiplyScalar(0.92 + n * 0.08);
-    if (dl < LAKE.radius + 5 && dl > LAKE.radius - 3) c.lerp(tmp.set('#D9C9A3'), 0.7);
-    if (r > PARK_RADIUS + 20) c.lerp(tmp.set('#557F4A'), 0.4);
+    c.multiplyScalar(0.9 + n * 0.1);
+    if (shore) c.lerp(tmp.set('#CDBB93'), 0.65);
+    if (r > PARK_RADIUS + 20) c.lerp(tmp.set('#557F4A'), 0.35);
     col[i * 3] = c.r;
     col[i * 3 + 1] = c.g;
     col[i * 3 + 2] = c.b;
@@ -166,16 +179,19 @@ function paths(kit: Kit): { group: THREE.Group; lamps: Point[] } {
   const b = new Builder();
   const edge = kit.mat('#B8AE98', { rough: 0.9 });
   const pave = kit.mat('#DCD3C0', { rough: 0.85 });
-  const all = parkPaths();
+  const trail = kit.mat('#C7B48E', { rough: 0.95 });
   const lamps: Point[] = [];
-  all.forEach((line, i) => {
-    // Avenidas (4) mais largas; ramais; volta do lago; anel de passeio.
-    const w = i < 4 ? 7 : i < 4 + PARK_BUILDINGS.length ? 4.2 : 3.6;
-    const v = line.map((p) => new THREE.Vector2(p.x, p.z));
-    b.add(edge, ribbonOn(v, w + 0.9, 0.04));
+  for (const line of parkPaths()) {
+    const w = PATH_WIDTH[line.kind];
+    const v = line.points.map((p) => new THREE.Vector2(p.x, p.z));
+    if (line.kind === 'trail') {
+      b.add(trail, ribbonOn(v, w, 0.05));
+      continue;
+    }
+    b.add(edge, ribbonOn(v, w + 0.8, 0.04));
     b.add(pave, ribbonOn(v, w, 0.07));
     // Postes a cada ~22 m, alternando os lados.
-    const s = samplePath(line, 22);
+    const s = samplePath(line.points, 22);
     s.forEach((p, k) => {
       if (k === 0 || Math.hypot(p.x, p.z) < PLAZA_RADIUS + 3) return;
       const q = s[Math.min(k + 1, s.length - 1)]!;
@@ -185,7 +201,7 @@ function paths(kit: Kit): { group: THREE.Group; lamps: Point[] } {
       const side = k % 2 ? 1 : -1;
       lamps.push({ x: p.x + (-dz / l) * (w / 2 + 1.2) * side, z: p.z + (dx / l) * (w / 2 + 1.2) * side });
     });
-  });
+  }
   return { group: b.build(false), lamps };
 }
 
@@ -246,47 +262,103 @@ function lampPosts(kit: Kit, spots: Point[]): THREE.Group {
 
 /* ---------- Lago, orla, píer e ponte ---------- */
 
-function lake(kit: Kit): { group: THREE.Group; water: ReturnType<typeof water> } {
+/** Superfície d'água com a forma da margem (UV de 0 a 1 para o shader das ondas). */
+function shapeWater(kit: Kit, color: string, radiusAt: (a: number) => number, maxR: number): ReturnType<typeof water> {
+  const w = water(kit, maxR, color);
+  const shape = new THREE.Shape();
+  for (let i = 0; i <= 96; i++) {
+    const a = (i / 96) * Math.PI * 2;
+    const r = radiusAt(a) - 0.6;
+    const px = Math.cos(a) * r;
+    const py = -Math.sin(a) * r;
+    if (i === 0) shape.moveTo(px, py);
+    else shape.lineTo(px, py);
+  }
+  const g = new THREE.ShapeGeometry(shape, 1);
+  const p = g.attributes.position!;
+  const uv = new Float32Array(p.count * 2);
+  for (let i = 0; i < p.count; i++) {
+    uv[i * 2] = p.getX(i) / (maxR * 2) + 0.5;
+    uv[i * 2 + 1] = p.getY(i) / (maxR * 2) + 0.5;
+  }
+  g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+  w.mesh.geometry.dispose();
+  w.mesh.geometry = kit.own(g);
+  return w;
+}
+
+function lake(kit: Kit): { group: THREE.Group; water: ReturnType<typeof water>; ponds: Array<ReturnType<typeof water>> } {
   const group = new THREE.Group();
-  const w = water(kit, LAKE.radius, '#2A86C4');
-  w.mesh.position.set(LAKE.x, -0.35, LAKE.z);
+  const w = shapeWater(kit, '#2A86C4', lakeRadiusAt, LAKE.radius + 14);
+  w.mesh.position.set(LAKE.x, -0.4, LAKE.z);
   const b = new Builder();
   const wood = kit.mat('#8B6545', { rough: 0.8 });
-  // Píer saindo da margem sul (lado do Music).
-  const a = Math.atan2(-40 - LAKE.x, 150 - LAKE.z);
-  const sx = LAKE.x + Math.sin(a) * (LAKE.radius - 9);
-  const sz = LAKE.z + Math.cos(a) * (LAKE.radius - 9);
-  b.add(wood, new THREE.BoxGeometry(3, 0.25, 16), [sx, 0.15, sz], [0, a, 0]);
-  for (let k = 0; k < 5; k++) for (const s of [-1, 1]) b.add(wood, new THREE.CylinderGeometry(0.15, 0.15, 1.6, 6), [sx + Math.sin(a) * (k * 3.6 - 7) + Math.cos(a) * s * 1.4, -0.4, sz + Math.cos(a) * (k * 3.6 - 7) - Math.sin(a) * s * 1.4]);
-  // Pedras na margem.
+  const rockMat = kit.mat('#9CA3AF', { rough: 0.9 });
+  // Píer entrando numa enseada (lado do Sul) e plataforma de observação.
+  const a = 0.9;
+  const r0 = lakeRadiusAt(a);
+  const sx = LAKE.x + Math.cos(a) * (r0 - 6);
+  const sz = LAKE.z + Math.sin(a) * (r0 - 6);
+  const ry = Math.atan2(Math.cos(a), Math.sin(a));
+  b.add(wood, new THREE.BoxGeometry(2.6, 0.25, 16), [sx, 0.15, sz], [0, ry, 0]);
+  b.add(wood, new THREE.BoxGeometry(6, 0.25, 4), [LAKE.x + Math.cos(a) * (r0 - 14), 0.15, LAKE.z + Math.sin(a) * (r0 - 14)], [0, ry, 0]);
+  // Pedras e margens naturais.
   const rnd = seededRandom(9);
-  for (let k = 0; k < 26; k++) {
+  for (let k = 0; k < 60; k++) {
     const t = rnd() * Math.PI * 2;
-    const r = LAKE.radius + 0.5 + rnd() * 2;
-    b.add(kit.mat('#9CA3AF', { rough: 0.9 }), new THREE.IcosahedronGeometry(0.5 + rnd() * 0.9, 0), [LAKE.x + Math.sin(t) * r, 0, LAKE.z + Math.cos(t) * r], [rnd(), rnd(), 0]);
+    const r = lakeRadiusAt(t) + 0.2 + rnd() * 2.2;
+    b.add(rockMat, new THREE.IcosahedronGeometry(0.4 + rnd() * 1.1, 0), [LAKE.x + Math.cos(t) * r, -0.2, LAKE.z + Math.sin(t) * r], [rnd(), rnd(), 0]);
   }
+  // Lagos ornamentais com borda de pedra e uma pequena cascata.
+  const ponds = PONDS.map((p, i) => {
+    const pw = water(kit, p.radius - 0.3, '#3896CF');
+    pw.mesh.position.set(p.x, heightAt(p.x, p.z) - 0.7, p.z);
+    group.add(pw.mesh);
+    for (let k = 0; k < 14; k++) {
+      const t = (k / 14) * Math.PI * 2;
+      b.add(rockMat, new THREE.IcosahedronGeometry(0.45 + (k % 3) * 0.2, 0), [p.x + Math.cos(t) * p.radius, heightAt(p.x, p.z) - 0.3, p.z + Math.sin(t) * p.radius], [k, k * 2, 0]);
+    }
+    const ca = i * 2 + 0.5;
+    const cx = p.x + Math.cos(ca) * (p.radius + 0.5);
+    const cz = p.z + Math.sin(ca) * (p.radius + 0.5);
+    const cy = heightAt(cx, cz);
+    for (let k = 0; k < 3; k++) b.add(rockMat, new THREE.BoxGeometry(2.4 - k * 0.5, 0.6, 1.4), [cx, cy - 0.3 + k * 0.6, cz], [0, -ca, 0]);
+    b.add(kit.mat('#BFE8FF', { glass: true }), new THREE.BoxGeometry(1.2, 1.6, 0.15), [cx - Math.cos(ca) * 0.7, cy - 0.2, cz - Math.sin(ca) * 0.7], [0, Math.PI / 2 - ca, 0]);
+    return pw;
+  });
   group.add(w.mesh, b.build());
   // Ninfeias.
   const pads: Array<{ x: number; y?: number; z: number; s: number; color: string }> = [];
-  for (let k = 0; k < 30; k++) {
+  for (let k = 0; k < 40; k++) {
     const t = rnd() * Math.PI * 2;
-    const r = LAKE.radius * (0.5 + rnd() * 0.42);
-    pads.push({ x: LAKE.x + Math.sin(t) * r, y: -0.5, z: LAKE.z + Math.cos(t) * r, s: 1.6, color: k % 5 === 0 ? '#F9A8D4' : '#4D9E57' });
+    const r = lakeRadiusAt(t) * (0.45 + rnd() * 0.45);
+    pads.push({ x: LAKE.x + Math.cos(t) * r, y: -0.55, z: LAKE.z + Math.sin(t) * r, s: 1.6, color: k % 5 === 0 ? '#F9A8D4' : '#4D9E57' });
   }
   group.add(shrubs(kit, pads, 'flower'));
-  return { group, water: w };
+  return { group, water: w, ponds };
 }
 
 /* ---------- Vegetação por região ---------- */
 
 function plants(): Plant[] {
-  const pts = treePositions(1100);
+  const pts = treePositions(1250);
   return pts.map((p, i) => {
     const a = Math.atan2(p.x, -p.z);
+    const r = Math.hypot(p.x, p.z);
+    const central = r < 60;
     const north = Math.abs(a) < Math.PI / 4;
+    const east = a > Math.PI / 4 && a < (3 * Math.PI) / 4;
     const west = a < -Math.PI / 4 && a > (-3 * Math.PI) / 4;
-    const pool: TreeSpecies[] = north ? ['conifer', 'conifer', 'slender', 'round'] : west ? ['blossom', 'round', 'round', 'slender'] : ['round', 'round', 'slender', 'blossom', 'conifer'];
-    return { x: p.x, y: heightAt(p.x, p.z), z: p.z, s: p.s * (Math.hypot(p.x, p.z) > PARK_RADIUS ? 1.3 : 1), species: pool[i % pool.length]! };
+    const pool: TreeSpecies[] = central
+      ? ['palm', 'round', 'palm', 'blossom']
+      : north
+        ? ['slender', 'round', 'round', 'palm', 'slender', 'conifer']
+        : west
+          ? ['palm', 'round', 'slender', 'round', 'blossom']
+          : east
+            ? ['round', 'blossom', 'slender']
+            : ['blossom', 'round', 'palm', 'round'];
+    return { x: p.x, y: heightAt(p.x, p.z), z: p.z, s: p.s * (r > PARK_RADIUS ? 1.3 : 1), species: pool[i % pool.length]! };
   });
 }
 
@@ -294,16 +366,16 @@ function meadows(kit: Kit): THREE.Object3D[] {
   const rnd = seededRandom(17);
   const flowers: Array<{ x: number; y?: number; z: number; s: number; color: string }> = [];
   const bushes: typeof flowers = [];
-  const pathPts = parkPaths().flatMap((p) => samplePath(p, 6));
+  const pathPts = parkPaths().flatMap((p) => samplePath(p.points, 6));
   const free = (x: number, z: number) =>
-    Math.hypot(x, z) > PLAZA_RADIUS + 3 && Math.hypot(x - LAKE.x, z - LAKE.z) > LAKE.radius + 3 && !PARK_BUILDINGS.some((b) => Math.hypot(x - b.x, z - b.z) < b.radius) && !pathPts.some((q) => Math.abs(q.x - x) < 3 && Math.abs(q.z - z) < 3);
+    Math.hypot(x, z) > PLAZA_RADIUS + 3 && !inWater(x, z, 3) && !PARK_BUILDINGS.some((b) => Math.hypot(x - b.x, z - b.z) < b.radius) && !pathPts.some((q) => Math.abs(q.x - x) < 3 && Math.abs(q.z - z) < 3);
   // Canteiros em manchas (mais no Oeste, o lado dos jardins).
   for (let k = 0; k < 70; k++) {
     const a = rnd() * Math.PI * 2;
     const r = 30 + rnd() * (PARK_RADIUS - 40);
     const cx = Math.sin(a) * r;
     const cz = Math.cos(a) * r;
-    const west = cx < -40;
+    const west = cz > 60; // Sul: jardins ornamentais com mais flores
     const palette = west ? ['#F472B6', '#FBBF24', '#FFFFFF', '#C084FC', '#F87171'] : ['#FBBF24', '#FFFFFF', '#60A5FA', '#F472B6'];
     for (let i = 0; i < (west ? 60 : 32); i++) {
       const x = cx + (rnd() - 0.5) * 9;
@@ -383,7 +455,8 @@ export function createWorld(kit: Kit): World {
     buildings.set(def.id, { def, group, top: top + group.position.y, detailed: !!make, entrance: entranceOf(def), facing });
     obstacles.push({ x: def.x, z: def.z, r: core, h: top });
   }
-  obstacles.push({ x: LAKE.x, z: LAKE.z, r: LAKE.radius - 1, h: -1 });
+  const am = amenities(kit);
+  root.add(am.group, houses(kit));
   root.add(walkway(kit, buildings.get('tasks')?.def, buildings.get('calendar')?.def));
 
   const trees = forest(kit, plants());
@@ -432,9 +505,13 @@ export function createWorld(kit: Kit): World {
     buildings,
     obstacles,
     pickables: [...buildings.values()].map((b) => b.group),
+    seats: am.seats,
+    viewpoints: am.viewpoints,
+    spots: am.spots,
     tick: (t, dt, focus, cam) => {
       f.tick(t);
       lk.water.tick(t * 0.6);
+      lk.ponds.forEach((p) => p.tick(t * 0.8));
       ticks.forEach((fn) => fn(t));
       trees.tick(t);
       bd.tick(t);

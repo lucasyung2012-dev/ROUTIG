@@ -26,6 +26,8 @@ export interface CameraWorld {
   ceiling: number;
   minDistance: number;
   maxDistance: number;
+  /** Pontos onde não se pisa (água); a primeira pessoa não entra. */
+  blocked?: (x: number, z: number) => boolean;
 }
 
 export interface CameraRig {
@@ -189,8 +191,10 @@ export function createCameraRig(camera: THREE.PerspectiveCamera, canvas: HTMLCan
       const speed = (run ? 9 : 4.5) * dt;
       const fwd = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
       const right = new THREE.Vector3(-fwd.z, 0, fwd.x);
+      const prev = camera.position.clone();
       camera.position.addScaledVector(fwd, fy * speed).addScaledVector(right, fx * speed);
       collide(camera.position, 0.5, true);
+      if (world.blocked?.(camera.position.x, camera.position.z)) camera.position.set(prev.x, camera.position.y, prev.z);
       camera.position.y = world.ground(camera.position.x, camera.position.z) + EYE;
       camera.rotation.set(pitch, yaw, 0, 'YXZ');
       focusPt.copy(camera.position).addScaledVector(fwd, 8);

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type MutableRefObject } from 'rea
 import { Minus, Plus } from 'lucide-react';
 import type { ModuleId } from '@/app/modules';
 import { useSettings } from '@/app/SettingsProvider';
-import { LAKE, PARK_BUILDINGS, PARK_RADIUS, PLAZA_RADIUS, parkPaths } from '@/domain/park';
+import { LAKE, PARK_BUILDINGS, PARK_RADIUS, PATH_WIDTH, PLAZA_RADIUS, PONDS, lakeRadiusAt, parkPaths } from '@/domain/park';
 import { IconButton } from '@/ui/IconButton';
 import type { Engine } from './engine';
 
@@ -19,7 +19,8 @@ export function Minimap({ engine, onPick }: { engine: MutableRefObject<Engine | 
   const [zoom, setZoom] = useState(0);
   const svg = useRef<SVGSVGElement>(null);
   const cam = useRef<SVGGElement>(null);
-  const paths = useMemo(() => parkPaths().map((p) => p.map((q) => `${q.x.toFixed(1)},${q.z.toFixed(1)}`).join(' ')), []);
+  const lake = useMemo(() => Array.from({ length: 48 }, (_, i) => { const a = (i / 48) * Math.PI * 2; const r = lakeRadiusAt(a); return `${(LAKE.x + Math.cos(a) * r).toFixed(1)},${(LAKE.z + Math.sin(a) * r).toFixed(1)}`; }).join(' '), []);
+  const paths = useMemo(() => parkPaths().map((p) => ({ w: PATH_WIDTH[p.kind] + 1.5, pts: p.points.map((q) => `${q.x.toFixed(1)},${q.z.toFixed(1)}`).join(' ') })), []);
 
   useEffect(() => {
     let raf = 0;
@@ -46,9 +47,12 @@ export function Minimap({ engine, onPick }: { engine: MutableRefObject<Engine | 
           <circle cx="0" cy="0" r={PARK_RADIUS + 12} fill="#5E9A55" />
           <circle cx="0" cy="0" r={PARK_RADIUS - 40} fill="#6DAA5E" />
           {paths.map((p, i) => (
-            <polyline key={i} points={p} fill="none" stroke="#E7E1D3" strokeWidth={i < 4 ? 6 : 4} strokeLinecap="round" strokeLinejoin="round" />
+            <polyline key={i} points={p.pts} fill="none" stroke="#E7E1D3" strokeWidth={p.w} strokeLinecap="round" strokeLinejoin="round" />
           ))}
-          <circle cx={LAKE.x} cy={LAKE.z} r={LAKE.radius} fill="#3E8FC9" />
+          <polygon points={lake} fill="#3E8FC9" />
+          {PONDS.map((p, i) => (
+            <circle key={i} cx={p.x} cy={p.z} r={p.radius} fill="#3E8FC9" />
+          ))}
           <circle cx="0" cy="0" r={PLAZA_RADIUS} fill="#EDE8DC" />
           <circle cx="0" cy="0" r={5} fill="#7B3FF6" />
           {PARK_BUILDINGS.map((b) => (

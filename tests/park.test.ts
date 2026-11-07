@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { NAV_MODULE_IDS } from '@/app/modules';
-import { LAKE, PLAZA_RADIUS, entranceOf, heightAt, layoutProblems, parkPaths, PARK_BUILDINGS, PARK_REGIONS, treePositions } from '@/domain/park';
+import { PLAZA_RADIUS, inWater, entranceOf, heightAt, layoutProblems, parkPaths, PARK_BUILDINGS, PARK_REGIONS, treePositions } from '@/domain/park';
 import { Vector3 } from 'three';
 import type { InboxItem } from '@/domain/inbox';
 import { receptionData } from '@/features/park/receptionData';
@@ -22,11 +22,11 @@ describe('parque 3D (V2, Etapa 0): planta', () => {
   });
 
   it('cada prédio tem entrada no próprio lote, fora do lago, ligada a um caminho; praça plana', () => {
-    const ends = parkPaths().map((p) => p[p.length - 1]!);
+    const ends = parkPaths().map((p) => p.points[p.points.length - 1]!);
     for (const b of PARK_BUILDINGS) {
       const e = entranceOf(b);
       expect(Math.hypot(e.x - b.x, e.z - b.z)).toBeLessThan(b.radius);
-      expect(Math.hypot(e.x - LAKE.x, e.z - LAKE.z)).toBeGreaterThan(LAKE.radius);
+      expect(inWater(e.x, e.z, 2)).toBe(false);
       expect(ends.some((p) => Math.hypot(p.x - e.x, p.z - e.z) < 0.01)).toBe(true);
     }
     expect(heightAt(0, 0)).toBe(0);

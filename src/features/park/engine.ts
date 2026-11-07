@@ -6,7 +6,7 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import type { ModuleId } from '@/app/modules';
-import { PARK_RADIUS, heightAt } from '@/domain/park';
+import { PARK_RADIUS, heightAt, inWater } from '@/domain/park';
 import { Kit } from './kit';
 import { createCameraRig, type CamMode } from './camera';
 import { TIMES, createWorld, type Light, type Quality, type Season, type TimeOfDay, type Weather } from './world';
@@ -78,7 +78,7 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
 
   const camera = new THREE.PerspectiveCamera(48, 1, 0.3, 1400);
   const rig = createCameraRig(camera, canvas, opts.reduceMotion);
-  const outsideWorld = () => rig.setWorld({ ground: heightAt, obstacles: world.obstacles, limit: { x: 0, z: 0, r: PARK_RADIUS + 30 }, ceiling: Infinity, minDistance: 4, maxDistance: 380 });
+  const outsideWorld = () => rig.setWorld({ ground: heightAt, obstacles: world.obstacles, limit: { x: 0, z: 0, r: PARK_RADIUS + 30 }, ceiling: Infinity, minDistance: 4, maxDistance: 380, blocked: (x, z) => inWater(x, z, 0.8) });
   outsideWorld();
 
   // Interior aberto (um por vez).

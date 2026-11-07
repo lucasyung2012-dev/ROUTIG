@@ -205,7 +205,7 @@ export function signTexture(kit: Kit, lines: string[], opts: { bg?: string; fg?:
 
 /* ---------- Vegetação em instâncias ---------- */
 
-export type TreeSpecies = 'round' | 'conifer' | 'slender' | 'blossom';
+export type TreeSpecies = 'round' | 'conifer' | 'slender' | 'blossom' | 'palm';
 
 export interface Plant {
   x: number;
@@ -241,11 +241,58 @@ export interface Forest {
   setSeason: (crownColors: Partial<Record<TreeSpecies, string>>) => void;
 }
 
+/** Copa irregular: vários volumes deslocados e achatados (nada de esfera ou cone perfeito). */
+function blobCrown(seed: number, blobs: number, spread: number, size: number, flat: number): THREE.BufferGeometry {
+  let s = seed;
+  const r = () => ((s = (s * 9301 + 49297) % 233280) / 233280);
+  const parts: THREE.BufferGeometry[] = [];
+  for (let i = 0; i < blobs; i++) {
+    const a = (i / blobs) * Math.PI * 2 + r();
+    const d = i === 0 ? 0 : spread * (0.55 + r() * 0.45);
+    const g = new THREE.IcosahedronGeometry(size * (0.7 + r() * 0.45), 1);
+    g.scale(1, flat * (0.8 + r() * 0.3), 1);
+    g.translate(Math.cos(a) * d, (r() - 0.4) * size * 0.6, Math.sin(a) * d);
+    parts.push(g.toNonIndexed());
+    g.dispose();
+  }
+  const m = mergeGeometries(parts)!;
+  parts.forEach((p) => p.dispose());
+  return m;
+}
+
+/** Copa de palmeira: folhas longas e arqueadas em volta do topo. */
+function palmCrown(): THREE.BufferGeometry {
+  const parts: THREE.BufferGeometry[] = [];
+  for (let i = 0; i < 9; i++) {
+    const a = (i / 9) * Math.PI * 2;
+    const g = new THREE.BoxGeometry(0.5, 0.06, 3.4, 1, 1, 4);
+    const pos = g.attributes.position!;
+    for (let k = 0; k < pos.count; k++) {
+      const z = pos.getZ(k) + 1.7;
+      pos.setY(k, pos.getY(k) - z * z * 0.12);
+      pos.setX(k, pos.getX(k) * (1 - z / 4));
+    }
+    g.translate(0, 0, 1.7);
+    g.rotateX(-0.25);
+    g.rotateY(a);
+    parts.push(g.toNonIndexed());
+    g.dispose();
+  }
+  const m = mergeGeometries(parts)!;
+  parts.forEach((p) => p.dispose());
+  return m;
+}
+
+/**
+ * Espécies (V2.1: vegetação tropical predominante): copa larga irregular, árvore emergente grande
+ * (10–20 m), conífera em camadas para o alto do Norte, ipê florido (decídua) e palmeira.
+ */
 const SPECIES: Record<TreeSpecies, { trunkH: number; crown: () => THREE.BufferGeometry; crownY: number; color: string }> = {
-  round: { trunkH: 2.2, crown: () => new THREE.IcosahedronGeometry(1.9, 1), crownY: 3.6, color: '#4C9A4F' },
-  conifer: { trunkH: 1.2, crown: () => new THREE.ConeGeometry(1.6, 4.8, 8, 3), crownY: 3.6, color: '#2F7A4A' },
-  slender: { trunkH: 2.8, crown: () => new THREE.CapsuleGeometry(0.9, 2.6, 3, 8), crownY: 4.6, color: '#6BAA4E' },
-  blossom: { trunkH: 2, crown: () => new THREE.IcosahedronGeometry(1.6, 1), crownY: 3.2, color: '#F2A7C5' },
+  round: { trunkH: 3, crown: () => blobCrown(3, 5, 1.8, 1.9, 0.75), crownY: 4.6, color: '#4C9A4F' },
+  conifer: { trunkH: 2, crown: () => blobCrown(7, 4, 0.9, 1.6, 1.6), crownY: 4.4, color: '#2F7A4A' },
+  slender: { trunkH: 9, crown: () => blobCrown(11, 7, 3.2, 2.4, 0.5), crownY: 10.5, color: '#5E9E4C' },
+  blossom: { trunkH: 2.6, crown: () => blobCrown(17, 5, 1.5, 1.5, 0.8), crownY: 4, color: '#F2A7C5' },
+  palm: { trunkH: 7, crown: palmCrown, crownY: 7.2, color: '#5DAF55' },
 };
 
 export function forest(kit: Kit, plants: Plant[]): Forest {

@@ -466,15 +466,15 @@ export function neighborhood(kit: Kit): { group: THREE.Group; tick: (t: number) 
     geo.computeVertexNormals();
     b.add(mat, geo);
   };
-  ring(ROAD_RADIUS, 7, asphalt, 0.06);
-  ring(ROAD_RADIUS - 5, 3, walk, 0.1);
-  ring(ROAD_RADIUS + 5, 3, walk, 0.1);
+  ring(ROAD_RADIUS, 7, asphalt, 0.12);
+  ring(ROAD_RADIUS - 5, 3, walk, 0.2);
+  ring(ROAD_RADIUS + 5, 3, walk, 0.2);
   // Faixa central tracejada e postes alternados.
   for (let i = 0; i < 160; i++) {
     const a = (i / 160) * Math.PI * 2;
     const x = Math.cos(a) * ROAD_RADIUS;
     const z = Math.sin(a) * ROAD_RADIUS;
-    b.add(stripe, new THREE.BoxGeometry(0.15, 0.02, 4), [x, heightAt(x, z) + 0.08, z], [0, -a, 0]);
+    b.add(stripe, new THREE.BoxGeometry(0.15, 0.02, 4), [x, heightAt(x, z) + 0.14, z], [0, -a, 0]);
     if (i % 4 === 0) {
       const rr = ROAD_RADIUS + (i % 8 === 0 ? -6.2 : 6.2);
       const lx = Math.cos(a) * rr;
@@ -513,7 +513,7 @@ export function neighborhood(kit: Kit): { group: THREE.Group; tick: (t: number) 
       const t = a + (k * 0.6) / ROAD_RADIUS;
       const x = Math.cos(t) * ROAD_RADIUS;
       const z = Math.sin(t) * ROAD_RADIUS;
-      b.add(stripe, new THREE.BoxGeometry(6.4, 0.02, 0.35), [x, heightAt(x, z) + 0.085, z], [0, -t, 0]);
+      b.add(stripe, new THREE.BoxGeometry(6.4, 0.02, 0.35), [x, heightAt(x, z) + 0.145, z], [0, -t, 0]);
     }
   }
   // Prédios do bairro: residenciais (varandas, janelas nos quatro lados, caixa-d'água) e

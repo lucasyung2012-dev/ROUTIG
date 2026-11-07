@@ -88,7 +88,7 @@ export function fleet(kit: Kit, n: number) {
     meshes: all,
     /** Carro i em (x, z), virado para `yaw` (0 = +z). */
     place: (i: number, x: number, z: number, yaw: number) => {
-      m4.compose(v.set(x, heightAt(x, z) + 0.06, z), q.setFromAxisAngle(up, yaw), one);
+      m4.compose(v.set(x, heightAt(x, z) + 0.12, z), q.setFromAxisAngle(up, yaw), one);
       for (const im of all) im.setMatrixAt(i, m4);
     },
     color: (i: number, c: string) => body.setColorAt(i, new THREE.Color(c)),
@@ -123,39 +123,54 @@ export function city(kit: Kit): City {
   const events: Array<{ x: number; z: number; kind: 'brake' | 'horn' }> = [];
 
   // Avenida externa: asfalto, guias, calçadas, faixa dupla amarela no meio e faixas brancas das pistas.
-  const N = 260;
-  const ring = (r: number, w: number, mat: THREE.Material, lift: number) => {
+  /** Faixa que acompanha o terreno: `at(u, l)` dá o ponto no comprimento u (0–1) e na largura l. */
+  const band = (n: number, cols: number[], at: (u: number, l: number) => { x: number; z: number }, mat: THREE.Material, lift: number) => {
     const pos: number[] = [];
     const idx: number[] = [];
-    for (let i = 0; i <= N; i++) {
-      const a = (i / N) * Math.PI * 2;
-      for (const rr of [r - w / 2, r + w / 2]) {
-        const x = Math.cos(a) * rr;
-        const z = Math.sin(a) * rr;
-        pos.push(x, heightAt(x, z) + lift, z);
+    const m = cols.length;
+    for (let i = 0; i <= n; i++) {
+      for (const l of cols) {
+        const p = at(i / n, l);
+        pos.push(p.x, heightAt(p.x, p.z) + lift, p.z);
       }
-      if (i > 0) {
-        const k = (i - 1) * 2;
-        idx.push(k, k + 1, k + 2, k + 1, k + 3, k + 2);
-      }
+      if (i > 0)
+        for (let j = 0; j < m - 1; j++) {
+          const k = (i - 1) * m + j;
+          idx.push(k, k + 1, k + m, k + 1, k + m + 1, k + m);
+        }
     }
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
     geo.setIndex(idx);
     geo.computeVertexNormals();
+    // A face de cima tem de olhar para o céu (a ordem dos vértices depende do sentido da faixa).
+    if ((geo.attributes.normal as THREE.BufferAttribute).getY(0) < 0) {
+      const ix = geo.index!.array as unknown as number[];
+      for (let t = 0; t < ix.length; t += 3) [ix[t + 1], ix[t + 2]] = [ix[t + 2]!, ix[t + 1]!];
+      geo.index!.needsUpdate = true;
+      geo.computeVertexNormals();
+    }
     b.add(mat, geo);
   };
-  ring(OUTER_ROAD, 9, asphalt, 0.06);
+  const ring = (r: number, w: number, mat: THREE.Material, lift: number) =>
+    band(900, [r - w / 2, r - w / 6, r + w / 6, r + w / 2], (u, rr) => polar(u * Math.PI * 2, rr), mat, lift);
+  /** Rua transversal no ângulo c, do raio r0 ao r1, entre as distâncias laterais l0 e l1. */
+  const strip = (c: number, ra: number, rb: number, l0: number, l1: number, mat: THREE.Material, lift: number) =>
+    band(Math.ceil((rb - ra) / 1.5), [l0, (l0 + l1) / 2, l1], (u, l) => {
+      const p = polar(c, ra + (rb - ra) * u);
+      return { x: p.x - Math.sin(c) * l, z: p.z + Math.cos(c) * l };
+    }, mat, lift);
+  ring(OUTER_ROAD, 9, asphalt, 0.12);
   for (const s of [-1, 1]) {
-    ring(OUTER_ROAD + s * 4.6, 0.3, curb, 0.16);
-    ring(OUTER_ROAD + s * 6.5, 3.6, walk, 0.13);
-    ring(OUTER_ROAD + s * 0.12, 0.1, kit.mat('#E8B33C', { rough: 0.6 }), 0.075);
+    ring(OUTER_ROAD + s * 4.6, 0.3, curb, 0.24);
+    ring(OUTER_ROAD + s * 6.5, 3.6, walk, 0.22);
+    ring(OUTER_ROAD + s * 0.12, 0.1, kit.mat('#E8B33C', { rough: 0.6 }), 0.135);
   }
   for (let i = 0; i < 220; i++) {
     const a = (i / 220) * Math.PI * 2;
     for (const s of [-1, 1]) {
       const p = polar(a, OUTER_ROAD + s * 2.2);
-      b.add(white, new THREE.BoxGeometry(0.12, 0.02, 3), [p.x, heightAt(p.x, p.z) + 0.08, p.z], [0, -a, 0]);
+      b.add(white, new THREE.BoxGeometry(0.12, 0.02, 3), [p.x, heightAt(p.x, p.z) + 0.14, p.z], [0, -a, 0]);
     }
     if (i % 5 === 0) {
       const p = polar(a + 0.01, OUTER_ROAD + 7.6);
@@ -172,28 +187,23 @@ export function city(kit: Kit): City {
   const r0 = ROAD_RADIUS + 3.6;
   const r1 = OUTER_ROAD - 4.6;
   cross.forEach((c, ci) => {
-    const steps = Math.ceil((r1 - r0) / 4);
-    for (let k = 0; k < steps; k++) {
-      const ra = r0 + ((k + 0.5) / steps) * (r1 - r0);
-      const len = (r1 - r0) / steps + 0.05;
+    // Faixas contínuas que acompanham o terreno a cada 1,5 m (o gramado não cobre a rua).
+    strip(c, r0, r1, -3.5, 3.5, asphalt, 0.12);
+    for (const s of [-1, 1]) {
+      strip(c, r0, r1, s * 3.45, s * 3.7, curb, 0.24);
+      strip(c, r0, r1, s * 3.7, s * 6.3, walk, 0.22);
+    }
+    const ry = Math.PI / 2 - c;
+    for (let ra = r0 + 3; ra < r1 - 3; ra += 5) {
       const p = polar(c, ra);
-      const y = heightAt(p.x, p.z);
-      const ry = Math.PI / 2 - c;
-      b.add(asphalt, new THREE.BoxGeometry(7, 0.1, len), [p.x, y + 0.04, p.z], [0, ry, 0]);
-      for (const s of [-1, 1]) {
-        const sp = { x: p.x - Math.sin(c) * s * 4.9, z: p.z + Math.cos(c) * s * 4.9 };
-        b.add(walk, new THREE.BoxGeometry(2.8, 0.16, len), [sp.x, heightAt(sp.x, sp.z) + 0.07, sp.z], [0, ry, 0]);
-        const cp = { x: p.x - Math.sin(c) * s * 3.55, z: p.z + Math.cos(c) * s * 3.55 };
-        b.add(curb, new THREE.BoxGeometry(0.25, 0.2, len), [cp.x, heightAt(cp.x, cp.z) + 0.09, cp.z], [0, ry, 0]);
-      }
-      if (k % 2 === 0) b.add(stripe, new THREE.BoxGeometry(0.14, 0.02, 2.2), [p.x, y + 0.1, p.z], [0, ry, 0]);
+      b.add(stripe, new THREE.BoxGeometry(0.14, 0.02, 2.2), [p.x, heightAt(p.x, p.z) + 0.15, p.z], [0, ry, 0]);
     }
     // Faixas de pedestre nas duas esquinas e placa com o nome da rua.
     for (const ra of [r0 + 1.6, r1 - 1.6]) {
       for (let k = -3; k <= 3; k++) {
         const p = polar(c, ra);
         const q = { x: p.x - Math.sin(c) * k * 0.95, z: p.z + Math.cos(c) * k * 0.95 };
-        b.add(white, new THREE.BoxGeometry(0.5, 0.02, 2.4), [q.x, heightAt(q.x, q.z) + 0.11, q.z], [0, Math.PI / 2 - c, 0]);
+        b.add(white, new THREE.BoxGeometry(0.5, 0.02, 2.4), [q.x, heightAt(q.x, q.z) + 0.15, q.z], [0, Math.PI / 2 - c, 0]);
       }
     }
     const corner = polar(c + 7 / (r0 + 4), r0 + 3);
@@ -383,7 +393,7 @@ export function city(kit: Kit): City {
     }
     busS.a += (busS.v * dt) / BUS_R;
     const bp = polar(busS.a, BUS_R);
-    busG.position.set(bp.x, heightAt(bp.x, bp.z) + 0.05, bp.z);
+    busG.position.set(bp.x, heightAt(bp.x, bp.z) + 0.12, bp.z);
     busG.rotation.y = -busS.a;
     // Carros.
     lanes.forEach((l, i) => {

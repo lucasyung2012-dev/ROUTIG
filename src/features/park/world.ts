@@ -685,6 +685,9 @@ export function createWorld(kit: Kit): World {
   ];
   const ticks: Array<(t: number) => void> = [];
   const lodItems: Array<{ obj: THREE.Object3D; x: number; z: number; far: number; base?: number; invert?: boolean }> = [];
+  // Lounges dos elevadores e as calçadas até eles: sem árvore nem moita em cima.
+  const clearZones: Array<{ x: number; z: number; r: number }> = [];
+  const liftWalk = new Builder();
   for (const def of PARK_BUILDINGS) {
     const make = DETAILED[def.id];
     let group: THREE.Group;
@@ -696,7 +699,20 @@ export function createWorld(kit: Kit): World {
       top = d.top;
       // Os andares de cima por fora, iguais aos de dentro (seção 10).
       const fc = facingOf(def);
-      const up = upperFloors(kit, def.id, FLOOR_PLANS[def.id]?.length ?? 0, d.top - 2, d.core, def.color, bodyRadius(d.group), (lx, lz) => !onPath(def.x + lx * Math.cos(fc) + lz * Math.sin(fc), def.z - lx * Math.sin(fc) + lz * Math.cos(fc), 0.6));
+      const toWorld = (lx: number, lz: number): Point => ({ x: def.x + lx * Math.cos(fc) + lz * Math.sin(fc), z: def.z - lx * Math.sin(fc) + lz * Math.cos(fc) });
+      const gy = heightAt(def.x, def.z);
+      const body = bodyRadius(d.group);
+      const levels = FLOOR_PLANS[def.id]?.length ?? 0;
+      // Torre do elevador e lounge no lado livre e mais plano do prédio, com calçada até o caminho.
+      const spot = liftSpot(def, Math.max(6, Math.min(d.core * 0.82, body)), toWorld);
+      if (levels > 0) liftAccess(spot, clearZones, liftWalk, kit.mat('#D8D1C3', { rough: 0.85 }));
+      const up = upperFloors(kit, def.id, levels, d.top - 2, d.core, def.color, body, (lx, lz) => !onPath(toWorld(lx, lz).x, toWorld(lx, lz).z, 0.6), {
+        angle: spot.angle,
+        ground: (lx, lz) => {
+          const p = toWorld(lx, lz);
+          return heightAt(p.x, p.z) - gy;
+        },
+      });
       d.group.add(up.group);
       // Fachada peça a peça de perto; de longe, o mesmo volume e as mesmas cores, mais leve.
       if (up.near && up.far) lodItems.push({ obj: up.near, x: def.x, z: def.z, far: 240, base: 240 }, { obj: up.far, x: def.x, z: def.z, far: 240, base: 240, invert: true });
@@ -726,6 +742,7 @@ export function createWorld(kit: Kit): World {
     obstacles.push(...footprint(group, heightAt));
     void core;
   }
+  root.add(liftWalk.build());
   const am = amenities(kit);
   const ww = walkway(kit, buildings.get('tasks')?.def, buildings.get('calendar')?.def);
   const fields = sportsFields(kit);
@@ -738,7 +755,7 @@ export function createWorld(kit: Kit): World {
   for (const l of p.lamps) obstacles.push({ x: l.x, z: l.z, r: 0.25, h: heightAt(l.x, l.z) + 4.2 });
 
   // Árvores do parque e as da calçada do bairro (copas redondas e esguias alternadas).
-  const plantList = [...plants().filter((p) => !onPath(p.x, p.z, 0.9 * p.s)), ...streetTrees().map((p, i) => ({ x: p.x, y: heightAt(p.x, p.z), z: p.z, s: p.s, species: (i % 3 ? 'round' : 'slender') as Plant['species'] }))];
+  const plantList = [...plants().filter((p) => !onPath(p.x, p.z, 0.9 * p.s) && !clearZones.some((c) => Math.hypot(c.x - p.x, c.z - p.z) < c.r + p.s)), ...streetTrees().map((p, i) => ({ x: p.x, y: heightAt(p.x, p.z), z: p.z, s: p.s, species: (i % 3 ? 'round' : 'slender') as Plant['species'] }))];
   const trees = forest(kit, plantList);
   for (const t of plantList) if (Math.hypot(t.x, t.z) < PARK_RADIUS + 30) obstacles.push({ x: t.x, z: t.z, r: 0.3 * t.s, h: (t.y ?? 0) + 3 });
   const meadow = meadows(kit);
@@ -971,6 +988,65 @@ function plazaSeats(): Seat[] {
  * Raio do corpo do prédio do térreo (paredes e volumes acima de 4,5 m, sem postes, plantas nem o
  * piso do lote): os andares de cima apoiam sobre ele em vez de virar uma marquise solta.
  */
+/**
+ * Lado do prédio para a torre do elevador: fora de caminho, água, outros prédios e mirantes, no
+ * chão mais plano; de preferência nos fundos. Devolve o ângulo (local do prédio, 0 = frente), o
+ * centro do lounge e a porta do pavilhão (no mundo).
+ */
+function liftSpot(def: ParkBuilding, r0: number, toWorld: (lx: number, lz: number) => Point): { angle: number; pad: Point; door: Point } {
+  const at = (a: number, rr: number, side: number) => toWorld(Math.sin(a) * rr + Math.cos(a) * side, Math.cos(a) * rr - Math.sin(a) * side);
+  let best = { angle: Math.PI, score: Infinity };
+  for (const da of [0, 0.35, -0.35, 0.7, -0.7, 1.05, -1.05, 1.4, -1.4, 1.75, -1.75]) {
+    const a = Math.PI + da;
+    let score = Math.abs(da) * 4;
+    const hs: number[] = [];
+    for (const rr of [r0 + 6.4, r0 + 3.4, r0 + 1, r0 - 3.5])
+      for (const side of [-5, -2.5, 0, 2.5, 5]) {
+        const p = at(a, rr, side);
+        hs.push(heightAt(p.x, p.z));
+        if (onPath(p.x, p.z, 1)) score += 40;
+        if (inWater(p.x, p.z, 3)) score += 100;
+        if (PARK_BUILDINGS.some((o) => o.id !== def.id && Math.hypot(o.x - p.x, o.z - p.z) < o.radius * 0.95 + 3)) score += 100;
+        if (POIS.some((q) => Math.hypot(q.x - p.x, q.z - p.z) < 9)) score += 30;
+        if (inField(p.x, p.z, 2)) score += 100;
+      }
+    score += (Math.max(...hs) - Math.min(...hs)) * 6;
+    if (score < best.score) best = { angle: a, score };
+  }
+  const a = best.angle;
+  return { angle: a, pad: at(a, r0 + 1, 0), door: at(a, r0 + 2.2, -4.8) };
+}
+
+/** Calçada de placas de pedra da porta do lounge até o caminho mais perto (sem passar por água). */
+function liftAccess(spot: { pad: Point; door: Point }, zones: Array<{ x: number; z: number; r: number }>, b: Builder, pave: THREE.Material) {
+  zones.push({ x: spot.pad.x, z: spot.pad.z, r: 8 });
+  let target: Point | null = null;
+  for (let r = 1; r < 45 && !target; r += 1)
+    for (let k = 0; k < 32; k++) {
+      const a = (k / 32) * Math.PI * 2;
+      const x = spot.door.x + Math.cos(a) * r;
+      const z = spot.door.z + Math.sin(a) * r;
+      if (onPath(x, z)) {
+        target = { x, z };
+        break;
+      }
+    }
+  if (!target) return;
+  const dx = target.x - spot.door.x;
+  const dz = target.z - spot.door.z;
+  const len = Math.hypot(dx, dz);
+  const n = Math.max(1, Math.floor(len / 1.3));
+  const ry = Math.atan2(dx, dz);
+  for (let i = 0; i <= n; i++) {
+    const t = i / n;
+    const x = spot.door.x + dx * t;
+    const z = spot.door.z + dz * t;
+    if (inWater(x, z, 0.5)) return;
+    zones.push({ x, z, r: 1.6 });
+    b.add(pave, new THREE.BoxGeometry(2.0, 0.12, 1.05), [x, heightAt(x, z) + 0.03, z], [0, ry, 0]);
+  }
+}
+
 function bodyRadius(g: THREE.Object3D): number {
   g.updateMatrixWorld(true);
   const rs: number[] = [];

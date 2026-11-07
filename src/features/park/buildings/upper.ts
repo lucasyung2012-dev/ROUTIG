@@ -14,7 +14,16 @@ import { FORMS, apothem, circle, facade, facadeMats, levelRot, levelScale, outli
 
 const STOREY = 4.4;
 
-export function upperFloors(kit: Kit, id: ModuleId, levels: number, base: number, core: number, accent: string, body = Infinity, clear: (lx: number, lz: number) => boolean = () => true): { group: THREE.Group; top: number; near: THREE.Object3D | null; far: THREE.Object3D | null } {
+/**
+ * Onde fica a torre do elevador: `angle` em volta do prédio (0 = frente; π = fundos) e o chão
+ * (altura local) em cada ponto, para o lounge ficar nivelado numa base de pedra, nunca enterrado.
+ */
+export interface LiftSpot {
+  angle: number;
+  ground: (lx: number, lz: number) => number;
+}
+
+export function upperFloors(kit: Kit, id: ModuleId, levels: number, base: number, core: number, accent: string, body = Infinity, clear: (lx: number, lz: number) => boolean = () => true, lift: LiftSpot = { angle: Math.PI, ground: () => 0 }): { group: THREE.Group; top: number; near: THREE.Object3D | null; far: THREE.Object3D | null } {
   const g = new THREE.Group();
   const b = new Builder();
   // Detalhe de perto (fachada peça a peça, guarda-corpos, floreiras, frisos) e versão de longe.
@@ -147,16 +156,32 @@ export function upperFloors(kit: Kit, id: ModuleId, levels: number, base: number
   }
   // Torre do elevador nos fundos, com as pontes de cada andar.
   const tz = -(r0 + 2.2);
-  b.add(glass, new THREE.CylinderGeometry(1.4, 1.4, top + 1, 24, 1, true), [0, (top + 1) / 2, tz]);
+  // Chão do lounge: nivelado pelo ponto mais alto (com base de pedra até o mais baixo).
+  const ry = lift.angle - Math.PI;
+  const groundAt = (x: number, z: number) => lift.ground(x * Math.cos(ry) + z * Math.sin(ry), -x * Math.sin(ry) + z * Math.cos(ry));
+  let gMax = -Infinity;
+  let gMin = Infinity;
+  for (const x of [-4.7, 0, 4.7])
+    for (const z of [tz - 4, tz + 1.2, tz + 6.2]) {
+      const gy = groundAt(x, z);
+      gMax = Math.max(gMax, gy);
+      gMin = Math.min(gMin, gy);
+    }
+  // Quanto o lounge sobe (o piso fica 15 cm acima do ponto mais alto do chão de lá).
+  const dy = Math.max(0.3, gMax + 0.15) - 0.3;
+  const eb = new Builder();
+  const lb = new Builder();
+  const towerBot = Math.min(0, gMin - 0.2);
+  eb.add(glass, new THREE.CylinderGeometry(1.4, 1.4, top + 1 - towerBot, 24, 1, true), [0, (top + 1 + towerBot) / 2, tz]);
   for (let k = 0; k < 6; k++) {
     const a = (k / 6) * Math.PI * 2 + Math.PI / 6;
-    b.add(metal, new THREE.BoxGeometry(0.12, top + 1, 0.12), [Math.sin(a) * 1.4, (top + 1) / 2, tz + Math.cos(a) * 1.4]);
+    eb.add(metal, new THREE.BoxGeometry(0.12, top + 1 - towerBot, 0.12), [Math.sin(a) * 1.4, (top + 1 + towerBot) / 2, tz + Math.cos(a) * 1.4]);
   }
-  b.add(slab, new THREE.CylinderGeometry(1.7, 1.7, 0.3, 24), [0, top + 1.15, tz]);
+  eb.add(slab, new THREE.CylinderGeometry(1.7, 1.7, 0.3, 24), [0, top + 1.15, tz]);
   for (let L = 1; L <= levels; L++) {
     const yy = base + (L - 1) * STOREY + 0.35;
     const back = apothem(form.sides, r0 * levelScale(form, L));
-    b.add(slab, new THREE.BoxGeometry(2.4, 0.3, -tz - back + 0.4), [0, yy - 0.15, -(back - tz) / 2]);
+    eb.add(slab, new THREE.BoxGeometry(2.4, 0.3, -tz - back + 0.4), [0, yy - 0.15, -(back - tz) / 2]);
   }
   // Lounge do elevador no chão: piso de pedra, pavilhão de vidro em volta da base da torre (porta
   // do lado, banco, plantas, luz), passagem coberta até o prédio e bancos com poste na entrada.
@@ -166,46 +191,58 @@ export function upperFloors(kit: Kit, id: ModuleId, levels: number, base: number
     const wood = kit.mat('#A0714F', { rough: 0.75 });
     const dark = kit.mat('#2B3442', { metal: 0.5, rough: 0.4 });
     const pz = tz + 1.2;
-    b.add(curb, new THREE.BoxGeometry(9.4, 0.3, 10.4), [0, 0.12, pz]);
-    b.add(pave, new THREE.BoxGeometry(9, 0.32, 10), [0, 0.14, pz]);
-    for (let k = -4; k <= 4; k++) b.add(curb, new THREE.BoxGeometry(0.04, 0.01, 10), [k, 0.305, pz]);
+    // Base de pedra do chão mais baixo até o piso (terreno em declive).
+    const pBot = gMin - 0.3 - dy;
+    const plinth = 0.02 - pBot;
+    if (plinth > 0.05) lb.add(curb, new THREE.BoxGeometry(9.6, plinth, 10.6), [0, (0.02 + pBot) / 2, pz]);
+    lb.add(curb, new THREE.BoxGeometry(9.4, 0.3, 10.4), [0, 0.12, pz]);
+    lb.add(pave, new THREE.BoxGeometry(9, 0.32, 10), [0, 0.14, pz]);
+    for (let k = -4; k <= 4; k++) lb.add(curb, new THREE.BoxGeometry(0.04, 0.01, 10), [k, 0.305, pz]);
     // Pavilhão 5 × 5 m: vidro com montantes, porta de 1,8 m no lado leste, laje e luz no teto.
     const H2 = 3.2;
     const gl = kit.mat('#CFE7F5', { glass: true });
-    b.add(gl, new THREE.BoxGeometry(5, H2, 0.06), [0, 0.3 + H2 / 2, tz - 2.5]);
-    b.add(gl, new THREE.BoxGeometry(0.06, H2, 5), [-2.5, 0.3 + H2 / 2, tz]);
-    b.add(gl, new THREE.BoxGeometry(0.06, H2, 1.6), [2.5, 0.3 + H2 / 2, tz - 1.7]);
-    b.add(gl, new THREE.BoxGeometry(0.06, H2, 1.6), [2.5, 0.3 + H2 / 2, tz + 1.7]);
-    b.add(gl, new THREE.BoxGeometry(0.06, H2 - 2.4, 1.8), [2.5, 0.3 + 2.4 + (H2 - 2.4) / 2, tz]);
-    for (const [x, z] of [[-2.5, -2.5], [2.5, -2.5], [-2.5, 2.5], [2.5, 2.5], [2.5, -0.9], [2.5, 0.9], [0, -2.5], [-2.5, 0]] as const) b.add(dark, new THREE.BoxGeometry(0.1, H2, 0.1), [x, 0.3 + H2 / 2, tz + z]);
-    b.add(slab, new THREE.BoxGeometry(5.6, 0.25, 5.6), [0, 0.3 + H2 + 0.12, tz]);
-    b.add(warm, new THREE.CylinderGeometry(0.5, 0.5, 0.03, 20), [1.6, 0.3 + H2 - 0.02, tz + 1.4]);
+    lb.add(gl, new THREE.BoxGeometry(5, H2, 0.06), [0, 0.3 + H2 / 2, tz - 2.5]);
+    lb.add(gl, new THREE.BoxGeometry(0.06, H2, 5), [-2.5, 0.3 + H2 / 2, tz]);
+    lb.add(gl, new THREE.BoxGeometry(0.06, H2, 1.6), [2.5, 0.3 + H2 / 2, tz - 1.7]);
+    lb.add(gl, new THREE.BoxGeometry(0.06, H2, 1.6), [2.5, 0.3 + H2 / 2, tz + 1.7]);
+    lb.add(gl, new THREE.BoxGeometry(0.06, H2 - 2.4, 1.8), [2.5, 0.3 + 2.4 + (H2 - 2.4) / 2, tz]);
+    for (const [x, z] of [[-2.5, -2.5], [2.5, -2.5], [-2.5, 2.5], [2.5, 2.5], [2.5, -0.9], [2.5, 0.9], [0, -2.5], [-2.5, 0]] as const) lb.add(dark, new THREE.BoxGeometry(0.1, H2, 0.1), [x, 0.3 + H2 / 2, tz + z]);
+    lb.add(slab, new THREE.BoxGeometry(5.6, 0.25, 5.6), [0, 0.3 + H2 + 0.12, tz]);
+    lb.add(warm, new THREE.CylinderGeometry(0.5, 0.5, 0.03, 20), [1.6, 0.3 + H2 - 0.02, tz + 1.4]);
     // Placa luminosa sobre a porta (setas de sobe e desce).
-    b.add(dark, new THREE.BoxGeometry(0.06, 0.5, 1.0), [2.56, 0.3 + 2.75, tz]);
-    b.add(glow, new THREE.ConeGeometry(0.12, 0.18, 3), [2.6, 0.3 + 2.86, tz], [0, 0, -Math.PI / 2]);
-    b.add(glow, new THREE.ConeGeometry(0.12, 0.18, 3), [2.6, 0.3 + 2.64, tz], [Math.PI, 0, -Math.PI / 2]);
+    lb.add(dark, new THREE.BoxGeometry(0.06, 0.5, 1.0), [2.56, 0.3 + 2.75, tz]);
+    lb.add(glow, new THREE.ConeGeometry(0.12, 0.18, 3), [2.6, 0.3 + 2.86, tz], [0, 0, -Math.PI / 2]);
+    lb.add(glow, new THREE.ConeGeometry(0.12, 0.18, 3), [2.6, 0.3 + 2.64, tz], [Math.PI, 0, -Math.PI / 2]);
     // Dentro: banco no fundo e duas plantas.
-    b.add(wood, new THREE.BoxGeometry(1.6, 0.08, 0.45), [-1.6, 0.75, tz - 1.9]);
-    b.add(dark, new THREE.BoxGeometry(1.4, 0.45, 0.35), [-1.6, 0.52, tz - 1.9]);
+    lb.add(wood, new THREE.BoxGeometry(1.6, 0.08, 0.45), [-1.6, 0.75, tz - 1.9]);
+    lb.add(dark, new THREE.BoxGeometry(1.4, 0.45, 0.35), [-1.6, 0.52, tz - 1.9]);
     for (const [x, z] of [[-1.9, 1.9], [1.9, -1.9]] as const) {
-      b.add(kit.mat('#D9CBB6', { rough: 0.8 }), new THREE.CylinderGeometry(0.3, 0.24, 0.55, 14), [x, 0.58, tz + z]);
-      b.add(leaf, new THREE.IcosahedronGeometry(0.45, 1), [x, 1.25, tz + z], undefined, [1, 1.4, 1]);
+      lb.add(kit.mat('#D9CBB6', { rough: 0.8 }), new THREE.CylinderGeometry(0.3, 0.24, 0.55, 14), [x, 0.58, tz + z]);
+      lb.add(leaf, new THREE.IcosahedronGeometry(0.45, 1), [x, 1.25, tz + z], undefined, [1, 1.4, 1]);
     }
     // Passagem coberta até o prédio: cobertura de vidro sobre pilares finos.
     const back = Math.max(r0 * 0.75, apothem(form.sides, r0 * levelScale(form, 1)) - 1);
     const len = -back - (tz + 2.5);
     if (len > 0.6) {
-      b.add(gl, new THREE.BoxGeometry(3, 0.06, len), [0, 0.3 + H2, (tz + 2.5 - back) / 2]);
-      for (const sx of [-1, 1]) b.add(dark, new THREE.BoxGeometry(0.1, H2, 0.1), [sx * 1.45, 0.3 + H2 / 2, (tz + 2.5 - back) / 2]);
+      lb.add(gl, new THREE.BoxGeometry(3, 0.06, len), [0, 0.3 + H2, (tz + 2.5 - back) / 2]);
+      for (const sx of [-1, 1]) lb.add(dark, new THREE.BoxGeometry(0.1, H2, 0.1), [sx * 1.45, 0.3 + H2 / 2, (tz + 2.5 - back) / 2]);
     }
     // Lado de fora: dois bancos virados para a porta e um poste de luz.
     for (const sz of [-1, 1]) {
-      b.add(wood, new THREE.BoxGeometry(0.45, 0.08, 1.6), [3.9, 0.75, tz + sz * 2.6]);
-      b.add(dark, new THREE.BoxGeometry(0.35, 0.45, 1.4), [3.9, 0.52, tz + sz * 2.6]);
+      lb.add(wood, new THREE.BoxGeometry(0.45, 0.08, 1.6), [3.9, 0.75, tz + sz * 2.6]);
+      lb.add(dark, new THREE.BoxGeometry(0.35, 0.45, 1.4), [3.9, 0.52, tz + sz * 2.6]);
     }
-    b.add(dark, new THREE.CylinderGeometry(0.06, 0.08, 3.6, 8), [4.1, 0.3 + 1.8, tz]);
-    b.add(warm, new THREE.SphereGeometry(0.2, 12, 8), [4.1, 0.3 + 3.7, tz]);
+    lb.add(dark, new THREE.CylinderGeometry(0.06, 0.08, 3.6, 8), [4.1, 0.3 + 1.8, tz]);
+    lb.add(warm, new THREE.SphereGeometry(0.2, 12, 8), [4.1, 0.3 + 3.7, tz]);
   }
+  // Torre e lounge giram para o lado livre do prédio; o lounge sobe ou desce até o chão de lá.
+  const eg = eb.build();
+  const lg = lb.build();
+  lg.position.y = dy;
+  const lift3 = new THREE.Group();
+  lift3.add(eg, lg);
+  lift3.rotation.y = ry;
+  g.add(lift3);
   // Elemento de cada prédio (prompt, seção 10).
   switch (id) {
     case 'dashboard': {

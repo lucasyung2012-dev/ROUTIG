@@ -646,7 +646,8 @@ function coreLevel(kit: Kit, b: Builder, root: THREE.Object3D, things: Thing[], 
   // Parede do núcleo com a abertura da escada na frente (ângulo 0).
   const gap = 0.7;
   b.add(stone, new THREE.CylinderGeometry(r, r, h, 40, 1, true, gap / 2, Math.PI * 2 - gap), [0, y + h / 2, 0]);
-  b.add(stone, new THREE.CylinderGeometry(r - 0.3, r - 0.3, h, 40, 1, true, gap / 2, Math.PI * 2 - gap), [0, y + h / 2, 0]);
+  // Face de dentro do núcleo (vista de quem sobe a escada): desenhada pelo lado de dentro.
+  b.add(kit.mat('#D2CBBE', { rough: 0.9, side: THREE.BackSide }), new THREE.CylinderGeometry(r - 0.3, r - 0.3, h, 40, 1, true, gap / 2, Math.PI * 2 - gap), [0, y + h / 2, 0]);
   b.add(stone, new THREE.CylinderGeometry(r, r, h - 2.4, 8, 1, true, -gap / 2, gap), [0, y + 2.4 + (h - 2.4) / 2, 0]);
   // Nichos com telas acesas em volta.
   for (let k = 1; k < 6; k++) {

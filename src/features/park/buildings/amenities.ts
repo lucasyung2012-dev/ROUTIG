@@ -4,7 +4,8 @@
  * Bancos e mirantes viram pontos de interação (sentar, observar).
  */
 import * as THREE from 'three';
-import { PARK_BUILDINGS, PATH_WIDTH, PLAZA_RADIUS, POIS, SPORT_FIELDS, heightAt, inWater, parkPaths, residences, samplePath, seededRandom, type Poi } from '@/domain/park';
+import { navGraph } from '@/domain/parkPeople';
+import { PARK_BUILDINGS, PATH_WIDTH, PLAZA_RADIUS, POIS, ROAD_RADIUS, SPORT_FIELDS, heightAt, inWater, parkPaths, residences, samplePath, seededRandom, type Poi } from '@/domain/park';
 import { Builder, type Kit } from '../kit';
 
 export interface Seat {
@@ -389,4 +390,119 @@ export function sportsFields(kit: Kit): THREE.Group {
     for (let k = 0; k < 3; k++) b.add(kit.mat('#CBD5E1', { rough: 0.7 }), new THREE.BoxGeometry(30, 0.45 * (k + 1), 1), [f.x, y + 0.225 * (k + 1), f.z - f.d / 2 - 1.5 - k]);
   }
   return b.build();
+}
+
+/**
+ * Bairro em volta do campus (V2.1, 13.8): rua com calçadas e postes contornando o parque,
+ * caminhos ligando os portões do parque à rua, e uma faixa de prédios residenciais e comerciais
+ * (4 a 8 andares, janelas que acendem à noite, varandas, térreo com lojas) atrás das casas.
+ */
+export function neighborhood(kit: Kit): THREE.Group {
+  const g = new THREE.Group();
+  const b = new Builder();
+  const asphalt = kit.mat('#4A4F57', { rough: 0.9 });
+  const walk = kit.mat('#C9C2B4', { rough: 0.9 });
+  const stripe = kit.mat('#F2E6B8', { rough: 0.7 });
+  const pole = kit.mat('#334155', { metal: 0.8, rough: 0.3 });
+  const light = kit.mat('#FFE7B0', { glow: true });
+  const N = 220;
+  const ring = (r: number, w: number, mat: THREE.Material, lift: number) => {
+    const pos: number[] = [];
+    const idx: number[] = [];
+    for (let i = 0; i <= N; i++) {
+      const a = (i / N) * Math.PI * 2;
+      for (const rr of [r - w / 2, r + w / 2]) {
+        const x = Math.cos(a) * rr;
+        const z = Math.sin(a) * rr;
+        pos.push(x, heightAt(x, z) + lift, z);
+      }
+      if (i > 0) {
+        const k = (i - 1) * 2;
+        idx.push(k, k + 1, k + 2, k + 1, k + 3, k + 2);
+      }
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    geo.setIndex(idx);
+    geo.computeVertexNormals();
+    b.add(mat, geo);
+  };
+  ring(ROAD_RADIUS, 7, asphalt, 0.06);
+  ring(ROAD_RADIUS - 5, 3, walk, 0.1);
+  ring(ROAD_RADIUS + 5, 3, walk, 0.1);
+  // Faixa central tracejada e postes alternados.
+  for (let i = 0; i < 160; i++) {
+    const a = (i / 160) * Math.PI * 2;
+    const x = Math.cos(a) * ROAD_RADIUS;
+    const z = Math.sin(a) * ROAD_RADIUS;
+    b.add(stripe, new THREE.BoxGeometry(0.15, 0.02, 4), [x, heightAt(x, z) + 0.08, z], [0, -a, 0]);
+    if (i % 4 === 0) {
+      const rr = ROAD_RADIUS + (i % 8 === 0 ? -6.2 : 6.2);
+      const lx = Math.cos(a) * rr;
+      const lz = Math.sin(a) * rr;
+      const ly = heightAt(lx, lz);
+      b.add(pole, new THREE.CylinderGeometry(0.08, 0.12, 6, 8), [lx, ly + 3, lz]);
+      b.add(pole, new THREE.BoxGeometry(0.1, 0.1, 1.4), [lx - Math.cos(a) * Math.sign(rr - ROAD_RADIUS) * 0.7, ly + 6, lz - Math.sin(a) * Math.sign(rr - ROAD_RADIUS) * 0.7], [0, -a + Math.PI / 2, 0]);
+      b.add(light, new THREE.BoxGeometry(0.4, 0.12, 0.25), [lx - Math.cos(a) * Math.sign(rr - ROAD_RADIUS) * 1.3, ly + 5.92, lz - Math.sin(a) * Math.sign(rr - ROAD_RADIUS) * 1.3]);
+    }
+  }
+  // Caminhos dos portões do parque até a calçada.
+  const pave = kit.mat('#DCD3C0', { rough: 0.85 });
+  for (const gi of navGraph().gates) {
+    const p = navGraph().nodes[gi]!;
+    const a = Math.atan2(p.z, p.x);
+    const r0 = Math.hypot(p.x, p.z);
+    const len = ROAD_RADIUS - 6.5 - r0;
+    if (len <= 0) continue;
+    const mx = Math.cos(a) * (r0 + len / 2);
+    const mz = Math.sin(a) * (r0 + len / 2);
+    const steps = Math.max(2, Math.ceil(len / 3));
+    for (let k = 0; k < steps; k++) {
+      const rr = r0 + ((k + 0.5) / steps) * len;
+      const x = Math.cos(a) * rr;
+      const z = Math.sin(a) * rr;
+      b.add(pave, new THREE.BoxGeometry(2.6, 0.12, len / steps + 0.05), [x, heightAt(x, z) + 0.05, z], [0, Math.PI / 2 - a, 0]);
+    }
+    void mx;
+    void mz;
+  }
+  // Prédios do bairro.
+  const rnd = seededRandom(909);
+  const facades = ['#E8E2D6', '#D9DEE5', '#EADCCB', '#CFD8DC', '#E4D5C3', '#DDE6E1'].map((c) => kit.mat(c, { rough: 0.85 }));
+  const glassW = kit.mat('#FFE2A8', { glow: true, rough: 0.35 });
+  const dark = kit.mat('#3A4250', { rough: 0.5, metal: 0.3 });
+  const shop = kit.mat('#9FD3E8', { glass: true });
+  for (let i = 0; i < 26; i++) {
+    const a = (i / 26) * Math.PI * 2 + (rnd() - 0.5) * 0.08;
+    const rr = ROAD_RADIUS + 70 + rnd() * 30;
+    const x = Math.cos(a) * rr;
+    const z = Math.sin(a) * rr;
+    const y = Math.min(heightAt(x - 8, z - 8), heightAt(x + 8, z + 8), heightAt(x, z));
+    const floors = 4 + Math.floor(rnd() * 5);
+    const fh = 3.1;
+    const w = 16 + rnd() * 10;
+    const d = 12 + rnd() * 6;
+    const rot = Math.PI / 2 - a + Math.PI;
+    const H = floors * fh + 4;
+    const P = (lx: number, ly: number, lz: number): [number, number, number] => [x + lx * Math.cos(rot) + lz * Math.sin(rot), y + ly, z - lx * Math.sin(rot) + lz * Math.cos(rot)];
+    const fac = facades[i % facades.length]!;
+    b.add(kit.mat('#B9B3A8', { rough: 0.95 }), new THREE.BoxGeometry(w + 2, 2, d + 2), P(0, -1, 0), [0, rot, 0]);
+    b.add(fac, new THREE.BoxGeometry(w, H, d), P(0, H / 2, 0), [0, rot, 0]);
+    // Térreo com lojas (vitrines) e toldo.
+    b.add(shop, new THREE.BoxGeometry(w * 0.9, 3, 0.1), P(0, 1.6, d / 2 + 0.02), [0, rot, 0]);
+    b.add(kit.mat(['#14B8A6', '#F59E0B', '#EF4444', '#6366F1'][i % 4]!, { rough: 0.6 }), new THREE.BoxGeometry(w * 0.9, 0.12, 1.4), P(0, 3.6, d / 2 + 0.7), [0, rot, 0]);
+    // Andares: faixa de janelas e varandas.
+    for (let f = 0; f < floors; f++) {
+      const fy = 4 + f * fh + 1.5;
+      for (let k = 0; k < Math.floor(w / 3); k++) {
+        const lx = -w / 2 + 1.6 + k * 3;
+        b.add(rnd() > 0.35 ? glassW : dark, new THREE.BoxGeometry(1.6, 1.5, 0.08), P(lx, fy, d / 2 + 0.03), [0, rot, 0]);
+      }
+      if (f % 2 === 0) b.add(kit.mat('#F4F5F7', { rough: 0.6 }), new THREE.BoxGeometry(w * 0.85, 0.15, 1.2), P(0, fy - 1.4, d / 2 + 0.6), [0, rot, 0]);
+    }
+    b.add(dark, new THREE.BoxGeometry(w + 0.4, 0.4, d + 0.4), P(0, H + 0.2, 0), [0, rot, 0]);
+    b.add(dark, new THREE.BoxGeometry(3, 2, 3), P(w * 0.25, H + 1.2, 0), [0, rot, 0]);
+  }
+  g.add(b.build());
+  return g;
 }

@@ -57,6 +57,9 @@ export const PARK_SCALE = 1.6;
 /** Raio médio do campus; o contorno real é irregular (parkEdgeAt). */
 export const PARK_RADIUS = 240 * PARK_SCALE;
 
+/** Rua que contorna o campus (com calçadas), entre o parque e o bairro. */
+export const ROAD_RADIUS = 240 * 1.6 + 22;
+
 /** Contorno do campus (raio por ângulo; hoje redondo). */
 export function parkEdgeAt(angle: number): number {
   // Contorno redondo (o campus é grande; o realismo vem do relevo, da mata e das casas).
@@ -344,7 +347,7 @@ export function residences(): Array<Point & { id: string; floors: 1 | 2; rot: nu
   const out: Array<Point & { id: string; floors: 1 | 2; rot: number; style: number }> = [];
   for (let i = 0; i < 52; i++) {
     const a = (i / 52) * Math.PI * 2 + (rnd() - 0.5) * 0.06;
-    const r = parkEdgeAt(a) + 30 + rnd() * 18;
+    const r = ROAD_RADIUS + 16 + rnd() * 12;
     out.push({ id: `casa-${i}`, x: Math.cos(a) * r, z: Math.sin(a) * r, floors: rnd() > 0.5 ? 2 : 1, rot: Math.atan2(-Math.cos(a), -Math.sin(a)), style: Math.floor(rnd() * 4) });
   }
   return out;
@@ -446,7 +449,7 @@ export function treePositions(count: number, seed = 7): Array<{ x: number; z: nu
   let guard = 0;
   while (out.length < count && guard++ < count * 80) {
     const a = rnd() * Math.PI * 2;
-    const r = Math.sqrt(rnd()) * (PARK_RADIUS * 1.2 + 60);
+    const r = Math.sqrt(rnd()) * (ROAD_RADIUS + 175);
     const p = { x: Math.cos(a) * r, z: Math.sin(a) * r };
     if (rnd() > treeDensity(p.x, p.z)) continue;
     if (dist(p, { x: 0, z: 0 }) < PLAZA_RADIUS + 8) continue;
@@ -456,7 +459,7 @@ export function treePositions(count: number, seed = 7): Array<{ x: number; z: nu
     if (Object.values(COURTS).some((q) => dist(p, q) < 10)) continue;
     if (inField(p.x, p.z, 6)) continue;
     const edge = parkEdgeAt(a);
-    if (r > edge + 18 && r < edge + 56) continue; // faixa das residências
+    if ((r > edge + 12 && r < ROAD_RADIUS + 42) || (r > ROAD_RADIUS + 58 && r < ROAD_RADIUS + 114)) continue; // rua, casas e prédios do bairro (árvores entre eles)
     if (near(pathGrid, p, 4.5) || near(grid, p, 4.2)) continue;
     const k = key(p.x, p.z);
     grid.set(k, [...(grid.get(k) ?? []), p]);

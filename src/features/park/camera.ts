@@ -202,7 +202,7 @@ export function createCameraRig(camera: THREE.PerspectiveCamera, canvas: HTMLCan
 
   const placeBody = (x: number, z: number, y: number) => {
     feet.set(x, 0, z);
-    collide(feet, 0.45, true);
+    collide(feet, Number.isFinite(world.ceiling) ? 0.3 : 0.45, true);
     feet.y = world.ground(feet.x, feet.z);
     yaw = y;
     pitch = 0;
@@ -318,7 +318,7 @@ export function createCameraRig(camera: THREE.PerspectiveCamera, canvas: HTMLCan
     const prevZ = feet.z;
     feet.x += vel.x * dt;
     feet.z += vel.y * dt;
-    collide(feet, 0.45, true);
+    collide(feet, Number.isFinite(world.ceiling) ? 0.3 : 0.45, true);
     if (world.blocked?.(feet.x, feet.z)) {
       feet.x = prevX;
       feet.z = prevZ;

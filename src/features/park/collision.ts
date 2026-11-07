@@ -6,13 +6,12 @@
 import * as THREE from 'three';
 import type { Obstacle } from './camera';
 
-const CELL = 0.8;
 
 /**
  * Células ocupadas por um objeto (já posicionado no mundo) entre `low` e `high` metros acima do
  * chão. `ground(x, z)` dá a altura do chão em cada ponto.
  */
-export function footprint(root: THREE.Object3D, ground: (x: number, z: number) => number, low = 0.25, high = 2.0): Obstacle[] {
+export function footprint(root: THREE.Object3D, ground: (x: number, z: number) => number, low = 0.25, high = 2.0, CELL = 0.8): Obstacle[] {
   root.updateMatrixWorld(true);
   const cells = new Map<string, { x: number; z: number; h: number }>();
   const a = new THREE.Vector3();
@@ -29,6 +28,12 @@ export function footprint(root: THREE.Object3D, ground: (x: number, z: number) =
   root.traverse((o) => {
     const mesh = o as THREE.Mesh;
     if (!mesh.isMesh || !mesh.visible || (o as THREE.InstancedMesh).isInstancedMesh || o.userData.noCollide) return;
+    // Áreas de toque invisíveis e materiais escondidos não são parede.
+    const mat = mesh.material as THREE.Material | THREE.Material[];
+    if ((Array.isArray(mat) ? mat : [mat]).every((m) => !m.visible || (m.transparent && m.opacity < 0.1))) return;
+    let hidden = false;
+    for (let p: THREE.Object3D | null = o; p; p = p.parent) if (!p.visible) hidden = true;
+    if (hidden) return;
     const pos = mesh.geometry.attributes.position as THREE.BufferAttribute | undefined;
     if (!pos) return;
     const idx = mesh.geometry.index;

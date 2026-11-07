@@ -336,7 +336,7 @@ export function withFloors(kit: Kit, scene: InteriorScene, id: ModuleId, label: 
   cabin.traverse((o) => (o.userData.noCollide = true));
   scene.scene.add(cabin);
   // Colisão de cada andar pelo desenho (móveis, floreiras, guarda-corpos).
-  levels.forEach((lv, n) => n > 0 && lv.obstacles.push(...footprint(scene.scene, () => lv.y)));
+  levels.forEach((lv, n) => n > 0 && lv.obstacles.push(...footprint(scene.scene, () => lv.y, 0.3, 1.45, 0.5)));
   scene.floors = { levels, zones, elevator: tower, seats, cabin, doors };
   return scene;
 }

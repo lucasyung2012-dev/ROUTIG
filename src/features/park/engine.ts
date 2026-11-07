@@ -383,7 +383,7 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
       const ikit = new Kit();
       const scene = factory(ikit);
       // Colisão do térreo pelo desenho (móveis, balcões, paredes), além dos obstáculos do próprio interior.
-      scene.obstacles.push(...footprint(scene.scene, () => 0));
+      scene.obstacles.push(...footprint(scene.scene, () => 0, 0.3, 1.45, 0.5));
       ikit.glowing.forEach((m) => (m.emissiveIntensity = 1));
       scene.scene.environment = QUALITY[quality].env ? envTex : null;
       scene.scene.environmentIntensity = 0.55;

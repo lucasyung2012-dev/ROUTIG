@@ -4575,6 +4575,7 @@ export const en: Messages = {
       photo: 'Photographing the buildings.',
     },
     places: 'Floors and rooms',
+    sheetSize: 'Change the panel size',
     elevatorTitle: 'Elevator',
     youAreHere: 'you are here',
     settings3d: {

@@ -16,7 +16,7 @@ export const FAB_MAX = 64;
 /**
  * Botão flutuante da Central de Módulos: toque abre; arrastar muda o lugar (fica onde a pessoa soltar).
  */
-export function FloatingCenterButton({ place, onMove, onOpen, label }: { place: FabPlace; onMove: (p: FabPlace) => void; onOpen: () => void; label: string }) {
+export function FloatingCenterButton({ place, onMove, onOpen, label, hidden }: { place: FabPlace; onMove: (p: FabPlace) => void; onOpen: () => void; label: string; hidden?: boolean }) {
   const drag = useRef<{ id: number; x: number; y: number; moved: boolean } | null>(null);
   const [live, setLive] = useState<{ x: number; y: number } | null>(null);
   const s = Math.min(FAB_MAX, Math.max(FAB_MIN, place.size));
@@ -56,7 +56,7 @@ export function FloatingCenterButton({ place, onMove, onOpen, label }: { place: 
       onPointerUp={up}
       onPointerCancel={() => ((drag.current = null), setLive(null))}
       onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onOpen()}
-      className="absolute z-20 flex items-center justify-center rounded-2xl bg-brand text-white shadow-glow ring-2 ring-white/30"
+      className={cn('absolute z-10 flex items-center justify-center rounded-2xl bg-brand text-white shadow-glow ring-2 ring-white/30', hidden && 'max-sm:hidden')}
       style={{ left: pos.x, top: pos.y, width: s, height: s, touchAction: 'none' }}
     >
       <LayoutGrid style={{ width: s * 0.45, height: s * 0.45 }} aria-hidden />

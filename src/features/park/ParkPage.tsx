@@ -195,6 +195,8 @@ export default function ParkPage() {
   const [floors, setFloors] = useState({ count: 1, current: 0 });
   const [zoneKey, setZoneKey] = useState<string | null>(null);
   const [elevator, setElevator] = useState(false);
+  // Painel no celular: só o título, meia tela ou tela cheia.
+  const [sheet, setSheet] = useState<'peek' | 'half' | 'full'>('half');
   const [riding, setRiding] = useState(false);
   const [talk, setTalk] = useState<{ name: string; activity: string; line: number; at: number } | null>(null);
   const reopened = useRef(false);
@@ -731,28 +733,32 @@ export default function ParkPage() {
       {inside && sector && (
         <section
           className={cn(
-            'absolute inset-x-3 bottom-3 mx-auto flex flex-col rounded-2xl bg-surface shadow-lift ring-1 ring-line safe-bottom',
-            wide ? 'max-h-[70vh] max-w-4xl md:inset-x-6 md:bottom-4 md:max-h-[calc(100%-10rem)]' : 'max-h-[50vh] max-w-lg sm:bottom-auto sm:left-auto sm:right-3 sm:top-[8.5rem] sm:mx-0 sm:max-h-[calc(100%-10rem)] sm:w-[26rem]',
+            'absolute inset-x-2 bottom-2 z-20 mx-auto flex flex-col rounded-2xl bg-surface shadow-lift ring-1 ring-line safe-bottom',
+            sheet === 'peek' ? 'max-h-[4.5rem]' : sheet === 'full' ? 'max-h-[85vh]' : 'max-h-[42vh]',
+            wide ? 'max-w-4xl md:inset-x-6 md:bottom-4 md:max-h-[calc(100%-10rem)]' : 'max-w-lg sm:bottom-auto sm:left-auto sm:right-3 sm:top-[4.5rem] sm:mx-0 sm:max-h-[calc(100%-6rem)] sm:w-[26rem]',
           )}
           aria-label={sectorName(inside, sector)}
         >
-          <header className="flex items-start gap-2 border-b border-line/70 p-4">
-            <div className="min-w-0 flex-1">
-              <h2 className="text-base font-semibold text-fg">{zoneKey ? t(`park.floorRooms.${inside}.${zoneKey}` as MessageKey) : sectorName(inside, sector)}</h2>
+          <header className="flex items-start gap-2 border-b border-line/70 px-4 py-3">
+            <button type="button" onClick={() => setSheet((x) => (x === 'peek' ? 'half' : x === 'half' ? 'full' : 'peek'))} aria-label={t('park.sheetSize')} className="min-w-0 flex-1 text-left">
+              <span className="mx-auto mb-1.5 block h-1 w-10 rounded-full bg-line sm:hidden" aria-hidden />
+              <h2 className="truncate text-base font-semibold text-fg">{zoneKey ? t(`park.floorRooms.${inside}.${zoneKey}` as MessageKey) : sectorName(inside, sector)}</h2>
               {zoneKey && <p className="text-xs text-muted">{t('park.zoneOpens', { name: sectorName(inside, sector) })}</p>}
-              {inside === 'inbox' && <p className="text-xs text-muted">{t(`park.inbox.hints.${sector}` as MessageKey)}</p>}
-            </div>
+              {inside === 'inbox' && sheet !== 'peek' && <p className="text-xs text-muted">{t(`park.inbox.hints.${sector}` as MessageKey)}</p>}
+            </button>
             <IconButton
               size="sm"
               label={t('common.close')}
               icon={<X className="h-4 w-4" />}
               onClick={() => {
                 setSector(null);
-                engine.current?.focusSector('entry');
+                // Só volta à vista da entrada na câmera livre e no térreo; andando, fica onde está.
+                if (camMode === 'orbit' && floors.current === 0 && !zoneKey) engine.current?.focusSector('entry');
+                setZoneKey(null);
               }}
             />
           </header>
-          <div className="min-h-0 flex-1 overflow-y-auto p-4" style={{ touchAction: 'pan-y' }}>
+          <div className={cn('min-h-0 flex-1 overflow-y-auto p-4', sheet === 'peek' && 'hidden sm:block')} style={{ touchAction: 'pan-y' }}>
             {inside === 'inbox' && <InboxPanel id={sector as InboxSector} items={live} data={inboxData} today={today} onError={(m) => toast.show(m, 'error')} onDone={(m) => toast.show(m, 'success')} />}
             {inside === 'dashboard' && <DashboardPanel id={sector as DashboardSector} />}
             {inside === 'profile' && <ProfilePanel id={sector as ProfileSector} />}
@@ -797,7 +803,7 @@ export default function ParkPage() {
       )}
       {talk && <TalkBubble key={talk.at} name={talk.name} text={`${t(`park.talk.hi${talk.line}` as MessageKey)} ${t(`park.talk.${talk.activity}` as MessageKey)}`} onDone={() => setTalk(null)} />}
       {/* Central de Módulos: botão flutuante (arraste para mudar de lugar) */}
-      <FloatingCenterButton place={fab} onMove={setFab} onOpen={() => setCenter(true)} label={t('park.center.open')} />
+      <FloatingCenterButton hidden={!!(inside && sector)} place={fab} onMove={setFab} onOpen={() => setCenter(true)} label={t('park.center.open')} />
       {center && <ModuleCenter inside={inside} onClose={() => setCenter(false)} onEnter={enterFromCenter} onOpen2D={open2D} />}
 
     </div>

@@ -4573,6 +4573,7 @@ export const pt = {
       photo: 'Fotografando os prédios.',
     },
     places: 'Andares e salas',
+    sheetSize: 'Mudar o tamanho do painel',
     elevatorTitle: 'Elevador',
     youAreHere: 'você está aqui',
     settings3d: {

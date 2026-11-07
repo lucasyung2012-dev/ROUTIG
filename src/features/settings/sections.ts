@@ -1,8 +1,9 @@
-import { Accessibility, ArrowLeftRight, Bell, DatabaseBackup, Globe, HardDrive, Info, Languages, LayoutGrid, LifeBuoy, Lock, Palette, PanelsTopLeft, ShieldCheck, Smartphone, Trees, UserRound, type LucideIcon } from 'lucide-react';
+import { Accessibility, Cloud, ArrowLeftRight, Bell, DatabaseBackup, Globe, HardDrive, Info, Languages, LayoutGrid, LifeBuoy, Lock, Palette, PanelsTopLeft, ShieldCheck, Smartphone, Trees, UserRound, type LucideIcon } from 'lucide-react';
 
 /** Seções de Settings com comportamento real (Parte 22). As que dependem de etapas futuras aparecem em Sobre. */
 export const SETTINGS_SECTIONS = [
   { id: 'profile', icon: UserRound },
+  { id: 'account', icon: Cloud },
   { id: 'appearance', icon: Palette },
   { id: 'language', icon: Languages },
   { id: 'region', icon: Globe },

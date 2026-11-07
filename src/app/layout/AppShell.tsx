@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import { readParkContext } from '@/features/park/parkContext';
+import { AutoSync } from '@/app/AutoSync';
 import { Menu, Monitor, Moon, Pause, Search, Sun, Timer, Trees, WifiOff } from 'lucide-react';
 import { useSettings } from '@/app/SettingsProvider';
 import type { ThemeSetting } from '@/domain/settings';
@@ -30,7 +31,10 @@ export function AppProviders({ children }: { children: ReactNode }) {
       <EventEditorProvider>
         <FocusProvider>
           <NotificationsProvider>
-            <QuickPrivacyProvider>{children}</QuickPrivacyProvider>
+            <QuickPrivacyProvider>
+              <AutoSync />
+              {children}
+            </QuickPrivacyProvider>
           </NotificationsProvider>
         </FocusProvider>
       </EventEditorProvider>

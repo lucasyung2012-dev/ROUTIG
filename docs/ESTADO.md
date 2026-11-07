@@ -4,6 +4,13 @@ Leia este arquivo no começo de toda conversa nova sobre o ROUTIG. A especifica�
 
 **Atualizado:** 2026-11-06 (**V2.1 publicada**; V1 concluída em 2026-11-05)
 
+## Estado da conversa (2026-11-06, V2.1)
+
+- **V2.1 publicada** (prompt mestre da V2.1, feito sem perguntas, a pedido do Lucas). Auditoria item a item em [V21-AUDITORIA.md](V21-AUDITORIA.md), com a planta geral.
+- **O que entrou:** campus novo (lago orgânico entre regiões, relevo, 3 níveis de caminho, convivência, 44 casas fora da área); câmeras 1ª pessoa (padrão), 3ª pessoa com avatar neutro de 1,70 m e livre; controles de toque (joystick, correr, pular, interagir) e teclado; 64 moradores com rotina por hora, clima e estação; luz contínua por hora (automática ou manual); clima combinável (nuvens, chuva, neblina, vento) com chão molhado e névoa no relevo; estações tropicais; som espacial por categoria; modos gráficos com Automático; Central de Módulos com volta ao mesmo lugar; interiores com os andares da seção 11 (átrio, terraços, elevador, 101 salas ligadas aos painéis reais).
+- **Não verificado:** nada foi testado em iPad ou iPhone reais; o som não foi ouvido; quadros por segundo não medidos (painel do navegador oculto).
+- **Próximo:** teste nos aparelhos; depois as pendências da auditoria (rosto/cabelo/mãos do personagem, exterior com os mesmos pavimentos, 6 salas sem tela própria, grama e flores com vento, LOD suave dos prédios distantes).
+
 ## Estado da conversa (2026-11-06, fim do dia)
 
 - **V2, parque: os 5 blocos estão publicados** (docs/V2-PARQUE-PLANO.md, seções 8 e 9): parque como tela inicial, os 18 prédios detalhados por fora e por dentro com painéis reais, câmera livre, primeira pessoa, minimapa, clima, estações, evento de fim de ano e sons.

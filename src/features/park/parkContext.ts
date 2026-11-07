@@ -14,6 +14,9 @@ export interface ParkSnapshot {
   inside: ModuleId | null;
   /** Andar dentro do prédio (0 = térreo). */
   level?: number;
+  /** Painel aberto (setor e sala do andar), para reabrir ao voltar. */
+  sector?: string | null;
+  zone?: string | null;
 }
 
 const CTX_KEY = 'routig.park.context';

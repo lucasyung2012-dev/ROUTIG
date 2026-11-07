@@ -1,11 +1,12 @@
 /**
  * Pessoas do parque (V2.1): figura humana neutra de 1,70 m (cabeça, tronco, braços e pernas)
  * desenhada em instâncias, uma malha por parte do corpo: o avatar e todos os moradores visíveis
- * custam 6 desenhos por quadro, qualquer que seja a quantidade.
+ * custam 10 desenhos por quadro, qualquer que seja a quantidade.
  * Poses: em pé, andando (pernas e braços balançam com o passo), sentado, lendo, tocando,
  * acenando e se exercitando.
  */
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { Kit } from './kit';
 
 export type Pose = 'stand' | 'walk' | 'sit' | 'read' | 'play' | 'wave' | 'exercise';
@@ -22,6 +23,7 @@ export interface Figure {
   shirt: string;
   pants: string;
   skin: string;
+  hair?: string;
   /** Escala (1 = 1,70 m). */
   scale: number;
 }
@@ -50,6 +52,21 @@ export function createCrowd(kit: Kit, capacity: number, shadows = true): Crowd {
   torso.scale(1.12, 1, 0.72);
   const head = kit.own(new THREE.SphereGeometry(0.115, 14, 10));
   head.scale(0.92, 1.05, 1);
+  // Cabelo: calota sobre a cabeça, um pouco mais longa atrás.
+  const hairGeo = kit.own(new THREE.SphereGeometry(0.122, 14, 8, 0, Math.PI * 2, 0, Math.PI * 0.55));
+  hairGeo.scale(0.95, 1.05, 1.05);
+  hairGeo.translate(0, 0.012, -0.01);
+  // Olhos (dois pontos escuros na frente do rosto) e mãos.
+  const eyeL = new THREE.SphereGeometry(0.014, 6, 4);
+  eyeL.translate(-0.04, 0.02, 0.1);
+  const eyeR = new THREE.SphereGeometry(0.014, 6, 4);
+  eyeR.translate(0.04, 0.02, 0.1);
+  const eyesGeo = kit.own(mergeGeometries([eyeL, eyeR])!);
+  eyeL.dispose();
+  eyeR.dispose();
+  const hand = kit.own(new THREE.SphereGeometry(0.05, 8, 6));
+  hand.scale(0.8, 1.2, 0.6);
+  hand.translate(0, -ARM_LEN + 0.02, 0);
 
   const mk = (g: THREE.BufferGeometry, m: THREE.Material) => {
     const im = new THREE.InstancedMesh(g, m, capacity);
@@ -67,7 +84,12 @@ export function createCrowd(kit: Kit, capacity: number, shadows = true): Crowd {
   const armR = mk(arm, mat);
   const body = mk(torso, mat);
   const heads = mk(head, skinMat);
-  const parts = [legL, legR, armL, armR, body, heads];
+  const hairs = mk(hairGeo, mat);
+  const eyes = mk(eyesGeo, kit.mat('#1F2937', { rough: 0.4 }));
+  eyes.castShadow = false;
+  const handL = mk(hand, skinMat);
+  const handR = mk(hand, skinMat);
+  const parts = [legL, legR, armL, armR, body, heads, hairs, eyes, handL, handR];
 
   const base = new THREE.Matrix4();
   const local = new THREE.Matrix4();
@@ -128,12 +150,20 @@ export function createCrowd(kit: Kit, capacity: number, shadows = true): Crowd {
       put(armR, i, 0.22, shoulder, 0, aR, aRz);
       put(body, i, 0, hip + 0.32, 0, -lean);
       put(heads, i, 0, hip + 0.71, -lean * 0.4, 0);
+      put(hairs, i, 0, hip + 0.71, -lean * 0.4, 0);
+      put(eyes, i, 0, hip + 0.71, -lean * 0.4, 0);
+      put(handL, i, -0.22, shoulder, 0, aL, aLz);
+      put(handR, i, 0.22, shoulder, 0, aR, aRz);
       legL.setColorAt(i, c.set(f.pants));
       legR.setColorAt(i, c);
       armL.setColorAt(i, c.set(f.shirt));
       armR.setColorAt(i, c);
       body.setColorAt(i, c);
       heads.setColorAt(i, c.set(f.skin));
+      handL.setColorAt(i, c);
+      handR.setColorAt(i, c);
+      hairs.setColorAt(i, c.set(f.hair ?? '#3B2A20'));
+      eyes.setColorAt(i, c.set('#1F2937'));
     }
     for (const im of parts) {
       im.count = n;
@@ -146,4 +176,4 @@ export function createCrowd(kit: Kit, capacity: number, shadows = true): Crowd {
 }
 
 /** Avatar universal do visitante: cores neutras, sem gênero nem idade definidos. */
-export const AVATAR_LOOK = { shirt: '#5B8DB8', pants: '#3F4756', skin: '#C9A27E' } as const;
+export const AVATAR_LOOK = { shirt: '#5B8DB8', pants: '#3F4756', skin: '#C9A27E', hair: '#2F2A26' } as const;

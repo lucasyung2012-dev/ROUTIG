@@ -190,6 +190,7 @@ export default function ParkPage() {
   const [center, setCenter] = useState(false);
   const [floors, setFloors] = useState({ count: 1, current: 0 });
   const [zoneKey, setZoneKey] = useState<string | null>(null);
+  const reopened = useRef(false);
   const navigate = useNavigate();
   const restore = useMemo(readParkContext, []);
   const [options, setOptions] = useState(false);
@@ -397,7 +398,7 @@ export default function ParkPage() {
   useEffect(() => audioRef.current?.setMix(mix), [mix]);
   // Interface 2D a partir do parque: guarda onde a pessoa está para retomar ao voltar.
   const open2D = (id: ModuleId) => {
-    if (engine.current) saveParkContext(engine.current.snapshot());
+    if (engine.current) saveParkContext({ ...engine.current.snapshot(), sector, zone: zoneKey });
     pushRecent(id);
     navigate(MODULES[id].path);
   };
@@ -410,6 +411,13 @@ export default function ParkPage() {
       window.setTimeout(() => engine.current?.enter(id), 700);
     } else engine.current?.enter(id);
   };
+  // Volta do 2D: reabre o painel que estava aberto no mesmo prédio.
+  useEffect(() => {
+    if (reopened.current || !restore?.inside || inside !== restore.inside || !restore.sector) return;
+    reopened.current = true;
+    setSector(restore.sector);
+    setZoneKey(restore.zone ?? null);
+  }, [inside]);
   const restoreDefaults = () => {
     setCamMode('walk');
     setMoveSet(DEFAULT_MOVE);

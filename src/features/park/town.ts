@@ -38,6 +38,7 @@ export interface Town {
 }
 
 const WALK = 1.35;
+const HAIRS = ['#2F2A26', '#5A3B24', '#8A5A2B', '#1B1B1B', '#C9A063', '#7A7A7A', '#3B2A20'];
 
 export function createTown(): Town {
   const people = campusPeople();
@@ -172,6 +173,7 @@ export function createTown(): Town {
           shirt: a.p.shirt,
           pants: a.p.pants,
           skin: a.p.skin,
+          hair: HAIRS[a.p.id % HAIRS.length],
           scale: a.p.scale,
         };
       });

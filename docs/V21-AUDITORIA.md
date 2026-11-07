@@ -139,13 +139,13 @@ O minimapa do parque desenha esta planta com os caminhos e o lago.
 | Central de Módulos: botão flutuante, no parque e nos interiores | Conforme | Botão à esquerda, sempre visível. |
 | Barra lateral com 18 módulos, cartões, busca, favoritos, recentes, atalhos | Conforme | `ModuleCenter.tsx`. Navegador: abriu, a busca "fina" achou Finanças, a estrela fixou a Library nos favoritos. Favoritos e recentes ficam neste aparelho. |
 | Abrir o 2D completo ou entrar no prédio | Conforme | Navegador: "Entrar no prédio" levou para dentro da Biblioteca; "Abrir em 2D" abriu `#/library`. |
-| Voltar ao contexto (posição, orientação, modo, prédio, interação) | Parcial | Navegador: "Voltar ao parque" no 2D voltou para dentro da Biblioteca, na 3ª pessoa. O andar não voltava (voltou no térreo); corrigido no commit seguinte, ainda não conferido no navegador. A interação aberta (setor ou painel) não volta. |
+| Voltar ao contexto (posição, orientação, modo, prédio, interação) | Parcial | Navegador: "Voltar ao parque" no 2D voltou para dentro da Biblioteca, na 3ª pessoa. O andar não voltava (voltou no térreo); corrigido no commit seguinte, ainda não conferido no navegador. O painel aberto (setor ou sala) também volta desde o último commit, ainda não conferido no navegador. Sentado ou observando não volta. |
 
 ## 13. Personagens e vida
 
 | Requisito | Classe | Evidência e observação |
 |---|---|---|
-| Modelo universal neutro de 1,70 m | Parcial | Figura neutra (cabeça, tronco, braços, pernas), sem divisão de gênero. **Sem rosto, cabelo e mãos detalhados**: é uma figura estilizada simples. |
+| Modelo universal neutro de 1,70 m | Parcial | Figura neutra (cabeça, cabelo, olhos, tronco, braços, mãos, pernas), sem divisão de gênero. **Rosto, cabelo e mãos são simples, não detalhados**: é uma figura estilizada. |
 | Primeira pessoa sem corpo; terceira com modelo completo | Conforme | Avatar só aparece na 3ª pessoa. |
 | População simulada de 50–80 | Conforme | 64 moradores (`tests/parkPeople.test.ts`). |
 | Visíveis: iPad 12–24, iPhone 6–12 | Conforme | `crowdCap` por tamanho de tela e modo gráfico. Não verificado em aparelho real. |
@@ -224,12 +224,12 @@ O minimapa do parque desenha esta planta com os caminhos e o lago.
 ## Pendências, em ordem
 
 1. **Teste em iPad e iPhone reais:** fluidez, toque nos controles, som, número de pessoas na tela.
-2. **Personagem:** rosto, cabelo e mãos (hoje figura simples).
+2. **Personagem:** rosto, cabelo e mãos detalhados (hoje simples).
 3. **Exterior com os mesmos pavimentos do interior** e interior visível pela janela.
 4. **Salas sem tela própria** (6): decidir se ganham tela nova ou saem da planta.
 5. **Grama e flores com vento; luzes acendendo uma a uma; contraste e escala da interface.**
 6. **LOD dos prédios distantes** com transição suave.
-7. **Voltar ao 2D e retomar também o painel aberto.**
+7. **Conferir no navegador a volta do 2D no mesmo andar e com o painel aberto.**
 
 ## Commits da V2.1
 
@@ -241,3 +241,5 @@ O minimapa do parque desenha esta planta com os caminhos e o lago.
 | `68e60cd` | Ambiente: luz contínua, clima combinável, chão molhado, névoa, estações, som espacial, modos gráficos |
 | `d60ff93` | Central de Módulos e volta ao parque no mesmo lugar; testes da câmera |
 | `de2f827` | Interiores com andares |
+| `bbc8ef9` | Borboletas, folhas caindo, ocultar controles; esta auditoria |
+| `e724bb5` | Volta do 2D no mesmo andar; chegada do elevador; câmera da 3ª pessoa sem atravessar o vidro; fonte não empurra a câmera |

@@ -43,6 +43,7 @@ import { useAcademyData } from '@/features/academy/useAcademyData';
 import { useLanguages } from '@/features/languages/useLanguages';
 import { receptionData } from './receptionData';
 import { ModuleCenter } from './ModuleCenter';
+import { withFloors } from './interiors/floors';
 import { clearParkContext, pushRecent, readParkContext, saveParkContext } from './parkContext';
 
 /** Preferências do parque neste aparelho (qualidade é do aparelho; o resto é gosto pessoal). */
@@ -187,6 +188,8 @@ export default function ParkPage() {
   const [near, setNear] = useState<ModuleId | null>(null);
   const [failed, setFailed] = useState(false);
   const [center, setCenter] = useState(false);
+  const [floors, setFloors] = useState({ count: 1, current: 0 });
+  const [zoneKey, setZoneKey] = useState<string | null>(null);
   const navigate = useNavigate();
   const restore = useMemo(readParkContext, []);
   const [options, setOptions] = useState(false);
@@ -220,7 +223,8 @@ export default function ParkPage() {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const sectorLabels = <T extends string>(prefix: string, ids: readonly T[]) => Object.fromEntries(ids.map((s) => [s, t(`${prefix}.${s}` as MessageKey)])) as Record<T, string>;
-    const interiors: Partial<Record<ModuleId, InteriorFactory>> = {
+    const interiors: Partial<Record<ModuleId, InteriorFactory>> = {};
+    const base: Partial<Record<ModuleId, InteriorFactory>> = {
       inbox: (kit) =>
         createInboxInterior(kit, {
           sectors: sectorLabels<InboxSector>('park.inbox.sectors', INBOX_SECTORS),
@@ -251,6 +255,9 @@ export default function ParkPage() {
       music: (kit) => createMusicInterior(kit, sectorLabels<MusicSector>('park.music.sectors', MUSIC_SECTORS)),
       sports: (kit) => createSportsInterior(kit, sectorLabels<SportsSector>('park.sports.sectors', SPORTS_SECTORS)),
     };
+    // Andares da V2.1 em cima de cada térreo (salas ligadas aos painéis reais).
+    for (const [id, make] of Object.entries(base) as Array<[ModuleId, InteriorFactory]>)
+      interiors[id] = (kit) => withFloors(kit, make(kit), id, (key) => t(`park.floorRooms.${id}.${key}` as MessageKey), t('park.terrace'), (n) => t(`park.floorNames.f${n}` as MessageKey));
     try {
       engine.current = createEngine(canvas, {
         quality,
@@ -258,10 +265,23 @@ export default function ParkPage() {
         interiors,
         onStats: setStats,
         onPick: setPicked,
-        onSector: setSector,
+        onSector: (s) => {
+          setSector(s);
+          setZoneKey(null);
+        },
         onInside: (id) => {
           setInside(id);
           setSector(null);
+          setZoneKey(null);
+        },
+        onFloors: (count, current) => setFloors({ count, current }),
+        onZone: (z) => {
+          if (z?.sector === '@options') {
+            setOptions(true);
+            return;
+          }
+          setZoneKey(z?.key ?? null);
+          setSector(z?.sector ?? null);
         },
         onNear: setNear,
         restore,
@@ -464,6 +484,7 @@ export default function ParkPage() {
   const sectorName = (b: ModuleId, s: string) => t((b === 'settings' ? `park.settings.rooms.${s}` : `park.${b}.sectors.${s}`) as MessageKey);
   const chooseSector = (s: string) => {
     setSector(s);
+    setZoneKey(null);
     engine.current?.focusSector(s);
   };
 
@@ -507,6 +528,21 @@ export default function ParkPage() {
             <IconButton label={t('park.options')} icon={<SlidersHorizontal className="h-5 w-5" />} active={options} onClick={() => setOptions((o) => !o)} className="bg-surface/90" />
           </div>
         </div>
+        {inside && floors.count > 1 && (
+          <nav aria-label={t('park.floorsNav')} className="flex gap-2 overflow-x-auto px-3 pb-2">
+            {Array.from({ length: floors.count }, (_, n) => (
+              <button
+                key={n}
+                type="button"
+                onClick={() => engine.current?.setFloor(n)}
+                aria-pressed={floors.current === n}
+                className={cn('h-9 shrink-0 rounded-full px-3 text-xs font-semibold shadow-soft', floors.current === n ? 'bg-fg text-bg' : 'bg-surface/90 text-fg')}
+              >
+                {t(`park.floorNames.f${n}` as MessageKey)}
+              </button>
+            ))}
+          </nav>
+        )}
         {inside && sectors.length > 0 && (
           <nav aria-label={t('park.sectorsNav')} className="flex gap-2 overflow-x-auto px-3 pb-2">
             {sectors.map((s) => (
@@ -648,7 +684,7 @@ export default function ParkPage() {
       {/* Andando (primeira e terceira pessoa): controle, botões de correr, pular e interagir, e dica */}
       {camMode !== 'orbit' && <Joystick onMove={(x, y) => engine.current?.setMove(x, y)} label={t('park.joystick')} size={stick.size} side={stick.side} />}
       {camMode !== 'orbit' && <ActionButtons side={stick.side === 'left' ? 'right' : 'left'} engine={engine} canInteract={!!hint || posture !== 'stand' || (!!near && !inside)} />}
-      {camMode !== 'orbit' && !inside && (hint || posture !== 'stand') && !near && (
+      {camMode !== 'orbit' && (hint || posture !== 'stand') && (!near || !!inside) && (
         <div className="pointer-events-none absolute inset-x-0 bottom-44 flex justify-center">
           <span className="rounded-full bg-black/60 px-3 py-1.5 text-xs font-medium text-white">
             {posture !== 'stand' ? t('park.standUp') : hint?.kind === 'person' ? t('park.hints.person', { name: hint.name, activity: t(`park.activities.${hint.activity}` as MessageKey) }) : hint ? t(`park.hints.${hint.kind}`) : ''} · E
@@ -705,7 +741,8 @@ export default function ParkPage() {
         >
           <header className="flex items-start gap-2 border-b border-line/70 p-4">
             <div className="min-w-0 flex-1">
-              <h2 className="text-base font-semibold text-fg">{sectorName(inside, sector)}</h2>
+              <h2 className="text-base font-semibold text-fg">{zoneKey ? t(`park.floorRooms.${inside}.${zoneKey}` as MessageKey) : sectorName(inside, sector)}</h2>
+              {zoneKey && <p className="text-xs text-muted">{t('park.zoneOpens', { name: sectorName(inside, sector) })}</p>}
               {inside === 'inbox' && <p className="text-xs text-muted">{t(`park.inbox.hints.${sector}` as MessageKey)}</p>}
             </div>
             <IconButton

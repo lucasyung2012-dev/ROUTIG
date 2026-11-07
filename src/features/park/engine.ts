@@ -41,12 +41,16 @@ export interface EngineOpts {
   /** O que dá para fazer aqui (sentar, observar) e a postura atual. */
   onHint: (h: Hint | null) => void;
   onPosture: (p: Posture) => void;
+  /** Interior: quantos andares tem o prédio e em qual a pessoa está. */
+  onFloors: (count: number, current: number) => void;
+  /** Sala de um andar escolhida (abre o painel real ligado a ela). */
+  onZone: (z: { key: string; sector: string | null } | null) => void;
   startMode: CamMode;
   /** Retomar de onde a pessoa estava (volta da interface 2D): sem abertura. */
   restore?: ParkSnapshot | null;
 }
 
-export type Hint = { kind: 'sit' } | { kind: 'view' } | { kind: 'tree' } | { kind: 'water' } | { kind: 'person'; name: string; activity: string };
+export type Hint = { kind: 'elevator' } | { kind: 'sit' } | { kind: 'view' } | { kind: 'tree' } | { kind: 'water' } | { kind: 'person'; name: string; activity: string };
 
 export interface Engine {
   setQuality: (q: Quality) => void;
@@ -78,6 +82,8 @@ export interface Engine {
   enter: (id: ModuleId) => void;
   exit: () => void;
   focusSector: (id: string) => void;
+  /** Interior: ir para um andar (0 = térreo). */
+  setFloor: (n: number) => void;
   setData: (id: ModuleId, data: unknown) => void;
   project: () => Array<{ id: ModuleId; x: number; y: number; visible: boolean }>;
   dispose: () => void;
@@ -173,6 +179,8 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
       opts.onPick((hit?.object.userData.building as ModuleId | undefined) ?? null);
     } else {
       const hit = ray.intersectObjects(inside.scene.pickables, true)[0];
+      const zone = hit?.object.userData.zone as number | undefined;
+      if (zone !== undefined) return focusZone(zone);
       const id = (hit?.object.userData.sector as string | undefined) ?? null;
       if (id) focusSector(id);
       opts.onSector(id);
@@ -203,6 +211,40 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
     if (!inside) return;
     const v = fit(inside.scene.view(id));
     rig.glideTo(v.cam, v.target, 1100);
+  };
+
+  /* ---------- Andares dos interiores ---------- */
+  let level = 0;
+  const levelWorld = (L: number) => {
+    const sc = inside!.scene;
+    const lv = sc.floors?.levels[L];
+    if (!lv || L === 0) return { ground: () => 0, obstacles: sc.obstacles, limit: { x: 0, z: 0, r: sc.room.radius - 1.2 }, ceiling: lv?.ceiling ?? sc.room.height, minDistance: 1.5, maxDistance: sc.room.radius * 1.7 };
+    return { ground: () => lv.y, obstacles: lv.obstacles, limit: { x: 0, z: 0, r: lv.walk }, ceiling: lv.ceiling, minDistance: 1.5, maxDistance: sc.room.radius * 1.7, blocked: (x: number, z: number) => Math.hypot(x, z) < lv.inner + 0.5 };
+  };
+  const setFloor = (L: number, move = true) => {
+    const levels = inside?.scene.floors?.levels;
+    if (!inside || !levels || L < 0 || L >= levels.length) return;
+    level = L;
+    rig.setWorld(levelWorld(L));
+    opts.onFloors(levels.length, L);
+    if (!move) return;
+    const lv = levels[L]!;
+    // Chega pelo elevador, nos fundos, olhando para dentro do prédio.
+    const z = -(lv.walk - 1.2);
+    if (rig.mode() !== 'orbit') rig.place(0, z, Math.PI);
+    else rig.glideTo(new THREE.Vector3(0, lv.y + 3.4, lv.walk - 1), new THREE.Vector3(0, lv.y + 1, -lv.inner), 900);
+  };
+  const focusZone = (i: number) => {
+    const z = inside?.scene.floors?.zones[i];
+    if (!z) return;
+    if (z.level !== level) setFloor(z.level, false);
+    const lv = inside!.scene.floors!.levels[z.level]!;
+    const r = Math.hypot(z.x, z.z) || 1;
+    const cx = -z.x / r;
+    const cz = -z.z / r;
+    if (rig.mode() !== 'orbit') rig.place(z.x + cx * 2.6, z.z + cz * 2.6, Math.atan2(cx, cz));
+    else rig.glideTo(new THREE.Vector3(z.x + cx * 5.5, lv.y + 2.8, z.z + cz * 5.5), new THREE.Vector3(z.x, lv.y + 1.4, z.z), 1000);
+    opts.onZone({ key: z.key, sector: z.sector });
   };
 
   const disposeInterior = () => {
@@ -236,7 +278,9 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
       const cached = dataCache.get(id);
       if (cached !== undefined) scene.setData(cached);
       inside = { id, kit: ikit, scene };
-      rig.setWorld({ ground: () => 0, obstacles: scene.obstacles, limit: { x: 0, z: 0, r: scene.room.radius - 1.2 }, ceiling: scene.room.height, minDistance: 1.5, maxDistance: scene.room.radius * 1.7 });
+      level = 0;
+      rig.setWorld(levelWorld(0));
+      opts.onFloors(scene.floors?.levels.length ?? 1, 0);
       const v = fit(scene.view('entry'));
       camera.position.copy(v.cam);
       rig.controls.target.copy(v.target);
@@ -256,6 +300,8 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
     opts.onSector(null);
     fadeSwap(() => {
       disposeInterior();
+      level = 0;
+      opts.onFloors(1, 0);
       outsideWorld();
       const b = world.buildings.get(id)!;
       const out = new THREE.Vector3(b.entrance.x - b.def.x, 0, b.entrance.z - b.def.z).normalize();
@@ -297,9 +343,21 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
     const all = [{ x: LAKE.x, z: LAKE.z }, ...PONDS];
     return all.reduce((m, o) => (Math.hypot(o.x - p.x, o.z - p.z) < Math.hypot(m.x - p.x, m.z - p.z) ? o : m), all[0]!);
   };
-  const findHint = (): Hint | null => {
-    if (rig.posture() !== 'stand' || inside) return null;
+  const elevatorNear = () => {
+    const lv = inside?.scene.floors?.levels[level];
+    if (!lv) return false;
     const p = rig.body().pos;
+    return Math.hypot(p.x, p.z + (level === 0 ? inside!.scene.room.radius - 1.2 : lv.walk - 1.2)) < 3.2;
+  };
+  const floorSeat = (p: { x: number; z: number }) => {
+    const lv = inside?.scene.floors?.levels[level];
+    return lv ? near2(inside!.scene.floors!.seats.filter((s) => Math.abs(s.y - 0.45 - lv.y) < 0.5), p, 1.8) : null;
+  };
+  const findHint = (): Hint | null => {
+    if (rig.posture() !== 'stand') return null;
+    const p = rig.body().pos;
+    if (inside) return elevatorNear() ? { kind: 'elevator' } : floorSeat(p) ? { kind: 'sit' } : null;
+
     if (near2(world.seats, p, 1.8)) return { kind: 'sit' };
     if (near2(world.viewpoints, p, 4)) return { kind: 'view' };
     const who = town.nearest(p, 2.6);
@@ -316,8 +374,14 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
       return;
     }
     if (near && !inside) return enter(near);
-    if (inside) return;
     const p = rig.body().pos;
+    if (inside) {
+      const levels = inside.scene.floors?.levels.length ?? 1;
+      if (elevatorNear() && levels > 1) return setFloor((level + 1) % levels);
+      const s = floorSeat(p);
+      if (s) rig.sit({ ...s, face: s.face + Math.PI });
+      return;
+    }
     const seat = near2(world.seats, p, 1.8);
     if (seat) return rig.sit({ ...seat, face: seat.face + Math.PI });
     const vp = near2(world.viewpoints, p, 4);
@@ -498,6 +562,14 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
       renderer.render(outside, camera);
     } else {
       inside.scene.tick(t, camera);
+      if (mode !== 'orbit' && ++hintFrame % 8 === 0) {
+        const h = findHint();
+        const key = h ? JSON.stringify(h) : null;
+        if (key !== hint) {
+          hint = key;
+          opts.onHint(h);
+        }
+      }
       renderer.render(inside.scene.scene, camera);
     }
     audio?.update({ listener: camera, inside: !!inside, hour: shownHour, sky: weather, steps: mode === 'orbit' || rig.gliding() ? 0 : body.airborne ? 0 : body.speed }, dt);
@@ -568,6 +640,7 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
     enter,
     exit,
     focusSector,
+    setFloor: (n) => setFloor(n),
     setData: (id, data) => {
       dataCache.set(id, data);
       if (inside?.id === id) inside.scene.setData(data);

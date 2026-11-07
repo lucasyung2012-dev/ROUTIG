@@ -8,6 +8,7 @@ import { seededRandom } from '@/domain/park';
 import { Builder, forest, sky, type Kit, type Plant, type TreeSpecies } from '../kit';
 import type { Obstacle } from '../camera';
 import type { Quality } from '../world';
+import type { Floors } from './floors';
 
 export interface InteriorScene {
   scene: THREE.Scene;
@@ -21,6 +22,8 @@ export interface InteriorScene {
   setData: (d: unknown) => void;
   tick: (t: number, camera: THREE.Camera) => void;
   setDetail: (q: Quality) => void;
+  /** Andares acima do térreo (V2.1, seção 11), quando o prédio tem. */
+  floors?: Floors;
 }
 
 export interface RoomOpts {

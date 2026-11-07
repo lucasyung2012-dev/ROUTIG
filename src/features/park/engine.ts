@@ -656,6 +656,16 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
     if (near2(world.treeSpots, p, 4)) return { kind: 'tree' };
     return null;
   };
+  // Diagnóstico (só com ?debug): comandos de teste disparados na página, como subir pela escada
+  // do andar atual (document.dispatchEvent(new CustomEvent('park-debug', { detail: 'stairs' }))).
+  const onDebug = (e: Event) => {
+    const th = inside?.scene.floors?.things.find((o) => o.kind === 'stairs' && o.level === level);
+    if ((e as CustomEvent<string>).detail === 'stairs' && th) {
+      rig.place(th.x, th.z + 0.4, Math.PI);
+      useThing(th);
+    }
+  };
+  if (/[?&]debug/.test(location.search)) document.addEventListener('park-debug', onDebug);
   /** Usar um objeto funcional dos interiores. */
   const useThing = (th: Thing) => {
     const fl = inside?.scene.floors;
@@ -1204,6 +1214,7 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
         }
       });
       world.stop();
+      document.removeEventListener('park-debug', onDebug);
       kit.dispose();
       envTex.dispose();
       renderer.dispose();

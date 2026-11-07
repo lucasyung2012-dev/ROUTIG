@@ -46,7 +46,7 @@ export function loadSyncState(): SyncState {
     /* começa do zero */
   }
   const env = (import.meta as unknown as { env?: Record<string, string | undefined> }).env?.VITE_GOOGLE_CLIENT_ID ?? '';
-  return { clientId: s.clientId || env, deviceId: s.deviceId || newId(), deviceName: s.deviceName || guessDeviceName(), email: s.email ?? '', name: s.name ?? '', key: s.key ?? '', lastSync: s.lastSync ?? '', lastChanged: s.lastChanged ?? 0, auto: s.auto ?? true };
+  return { clientId: s.clientId || env, deviceId: s.deviceId || newId('dev'), deviceName: s.deviceName || guessDeviceName(), email: s.email ?? '', name: s.name ?? '', key: s.key ?? '', lastSync: s.lastSync ?? '', lastChanged: s.lastChanged ?? 0, auto: s.auto ?? true };
 }
 
 export function saveSyncState(s: SyncState) {

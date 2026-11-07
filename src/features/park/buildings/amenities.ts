@@ -548,7 +548,8 @@ export function neighborhood(kit: Kit): { group: THREE.Group; tick: (t: number) 
       const fy = 4 + f * fh + 1.5;
       b.add(trim, new THREE.BoxGeometry(w + 0.16, 0.18, d + 0.16), P(0, fy - 1.55, 0), R);
       if (commercial) continue;
-      for (const side of [1, -1]) {
+      // Janelas na frente (para o parque) e nas laterais; os fundos nunca aparecem do parque.
+      for (const side of [1]) {
         for (let k = 0; k < Math.floor(w / 3); k++) {
           const lx = -w / 2 + 1.6 + k * 3;
           const lit = rnd() > 0.75;

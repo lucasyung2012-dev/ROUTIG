@@ -83,6 +83,8 @@ export interface Engine {
   /** Hora mostrada agora (durante a transição, a intermediária). */
   hour: () => number;
   census: () => { outside: number; total: number };
+  /** Foto do parque visto de cima (meio-dia, sem neblina nem pessoas), para o minimapa. `half` = metade do lado em metros. */
+  captureMap: (half: number, px: number) => string | null;
   /** Onde a pessoa está agora (para retomar depois). */
   snapshot: () => ParkSnapshot;
   flyTo: (id: ModuleId | 'plaza') => void;
@@ -769,6 +771,47 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
       hourSet = true;
     },
     census: () => town.census(),
+    captureMap: (half, px) => {
+      if (inside) return null;
+      try {
+        const cam = new THREE.OrthographicCamera(-half, half, half, -half, 1, 140);
+        cam.position.set(0, 66, 0);
+        cam.up.set(0, 0, -1);
+        cam.lookAt(0, 0, 0);
+        cam.updateMatrixWorld();
+        const rt = new THREE.WebGLRenderTarget(px, px);
+        rt.texture.colorSpace = THREE.SRGBColorSpace;
+        const fog = outside.fog;
+        const crowdVis = crowd.group.visible;
+        const avatarVis = avatar.group.visible;
+        outside.fog = null;
+        crowd.group.visible = false;
+        avatar.group.visible = false;
+        world.setLight(lightAt(12));
+        world.tick(0, 0, new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 60, 0));
+        renderer.setRenderTarget(rt);
+        renderer.render(outside, cam);
+        const buf = new Uint8Array(px * px * 4);
+        renderer.readRenderTargetPixels(rt, 0, 0, px, px, buf);
+        renderer.setRenderTarget(null);
+        rt.dispose();
+        outside.fog = fog;
+        crowd.group.visible = crowdVis;
+        avatar.group.visible = avatarVis;
+        applyLight();
+        const c = document.createElement('canvas');
+        c.width = c.height = px;
+        const g = c.getContext('2d');
+        if (!g) return null;
+        const img = g.createImageData(px, px);
+        // A leitura vem de baixo para cima: vira as linhas.
+        for (let y = 0; y < px; y++) img.data.set(buf.subarray((px - 1 - y) * px * 4, (px - y) * px * 4), y * px * 4);
+        g.putImageData(img, 0, 0);
+        return c.toDataURL('image/jpeg', 0.85);
+      } catch {
+        return null;
+      }
+    },
     snapshot: () => {
       const b = rig.body();
       return {

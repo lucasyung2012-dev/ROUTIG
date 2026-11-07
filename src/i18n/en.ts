@@ -4617,6 +4617,8 @@ export const en: Messages = {
       photo: 'Photographing the buildings.',
     },
     places: 'Floors and rooms',
+    mapBig: 'Enlarge the map',
+    mapSmall: 'Shrink the map',
     sheetSize: 'Change the panel size',
     elevatorTitle: 'Elevator',
     youAreHere: 'you are here',

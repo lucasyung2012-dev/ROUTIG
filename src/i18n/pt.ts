@@ -4615,6 +4615,8 @@ export const pt = {
       photo: 'Fotografando os prédios.',
     },
     places: 'Andares e salas',
+    mapBig: 'Aumentar o mapa',
+    mapSmall: 'Diminuir o mapa',
     sheetSize: 'Mudar o tamanho do painel',
     elevatorTitle: 'Elevador',
     youAreHere: 'você está aqui',

@@ -14,6 +14,7 @@ import type { Obstacle, Seat } from '../camera';
 import { sectorSign, type InteriorScene } from './common';
 import { footprint } from '../collision';
 import { decorate, furnish, roomType, type RoomType } from './furnish';
+import { enrichGround, enrichLevel } from './enrich';
 
 /** Sala de um andar: chave do nome, setor real que ela abre (null = sem tela própria), tipo de mobília. */
 export type RoomKind = 'desk' | 'shelf' | 'screen' | 'lounge' | 'studio';
@@ -293,9 +294,12 @@ export function withFloors(kit: Kit, scene: InteriorScene, id: ModuleId, label: 
       scene.scene.add(g);
       scene.pickables.push(g);
     });
+    enrichLevel(kit, b, seats, id, L, y, inner, ri, ro, y + STOREY - 0.35, accent, style.warm);
     levels.push({ y, outer, walk: below - 0.5, inner, ceiling: y + STOREY - 0.35, obstacles, doors, doorHalf });
   });
 
+  // Térreo: camada de detalhe em volta do salão (sem cobrir o que o prédio já tem).
+  enrichGround(kit, b, seats, scene.obstacles, R, H, accent, style.warm);
   // Torre do elevador: vidro, estrutura e uma cabine em cada andar; placa com o nome de cada andar.
   const topY = H + plan.length * STOREY;
   b.add(glass, new THREE.CylinderGeometry(1.4, 1.4, topY, 24, 1, true), [tower.x, topY / 2, tower.z]);

@@ -150,7 +150,7 @@ export function drone(kit: Kit, center: { x: number; z: number }): { group: THRE
   };
 }
 
-export function rain(kit: Kit): { lines: THREE.LineSegments; tick: (dt: number, center: THREE.Vector3) => void } {
+export function rain(kit: Kit): { lines: THREE.LineSegments; tick: (dt: number, center: THREE.Vector3, wind?: number) => void; setAmount: (f: number) => void } {
   const N = 1400;
   const pos = new Float32Array(N * 6);
   const rnd = seededRandom(5);
@@ -167,8 +167,11 @@ export function rain(kit: Kit): { lines: THREE.LineSegments; tick: (dt: number, 
   lines.visible = false;
   return {
     lines,
-    tick: (dt, center) => {
+    setAmount: (f) => g.setDrawRange(0, Math.max(2, Math.round(N * 2 * Math.min(1, f)))),
+    tick: (dt, center, wind = 0) => {
       lines.position.set(center.x, 0, center.z);
+      // Vento inclina a chuva.
+      lines.rotation.z = -wind * 0.45;
       const a = g.attributes.position as THREE.BufferAttribute;
       for (let i = 0; i < N; i++) {
         let y = a.getY(i * 2) - dt * 30;

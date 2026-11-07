@@ -444,7 +444,7 @@ export default function ParkPage() {
       {options && (
         <div className="absolute right-3 top-[4.25rem] z-10 flex max-h-[calc(100%-6rem)] w-72 flex-col gap-3 overflow-y-auto rounded-2xl bg-surface p-4 shadow-lift ring-1 ring-line safe-top" role="dialog" aria-label={t('park.options')}>
           <Segmented<CamMode> label={t('park.camMode')} value={camMode} onChange={setCamMode} options={CAM_ORDER.map((v) => ({ value: v, label: t(`park.camModes.${v}`) }))} className="w-full" />
-$1 value={time} onChange={setTime} options={(['day', 'dusk', 'night'] as const).map((v) => ({ value: v, label: t(`park.times.${v}`) }))} className="w-full" />
+          <Segmented<TimeOfDay> label={t('park.time')} value={time} onChange={setTime} options={(['day', 'dusk', 'night'] as const).map((v) => ({ value: v, label: t(`park.times.${v}`) }))} className="w-full" />
           <Segmented<Quality> label={t('park.quality')} value={quality} onChange={setQuality} options={(['low', 'medium', 'high'] as const).map((q) => ({ value: q, label: t(`park.q.${q}`) }))} className="w-full" />
           <Segmented<Weather> label={t('park.weather')} value={weather} onChange={setWeather} options={(['clear', 'cloudy', 'rain', 'fog'] as const).map((v) => ({ value: v, label: t(`park.weathers.${v}`) }))} className="w-full" />
           <label className="flex items-center justify-between gap-3 text-sm text-fg">

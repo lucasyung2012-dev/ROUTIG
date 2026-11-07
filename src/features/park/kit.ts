@@ -123,15 +123,22 @@ export function water(kit: Kit, radius: number, color = '#2E9BD6'): { mesh: THRE
   const mat = kit.own(
     new THREE.ShaderMaterial({
       transparent: true,
-      uniforms: { t: { value: 0 }, deep: { value: new THREE.Color(color) }, light: { value: new THREE.Color('#BFEFFF') }, night: { value: 0 } },
+      uniforms: { t: { value: 0 }, deep: { value: new THREE.Color(color) }, light: { value: new THREE.Color('#BFEFFF') }, night: { value: 0 }, rain: { value: 0 }, wind: { value: 0 } },
       vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
-      fragmentShader: `uniform float t; uniform vec3 deep; uniform vec3 light; uniform float night; varying vec2 vUv;
+      fragmentShader: `uniform float t; uniform vec3 deep; uniform vec3 light; uniform float night; uniform float rain; uniform float wind; varying vec2 vUv;
         void main(){
           vec2 p = (vUv - 0.5) * 2.0; float d = length(p);
           float w = sin(d * 28.0 - t * 2.2) * 0.5 + 0.5;
-          float w2 = sin((p.x + p.y) * 17.0 + t * 1.3) * 0.5 + 0.5;
-          float spark = pow(w * w2, 6.0);
+          float w2 = sin((p.x + p.y) * (17.0 + wind * 14.0) + t * (1.3 + wind * 2.5)) * 0.5 + 0.5;
+          float spark = pow(w * w2, 6.0 - wind * 3.0);
           vec3 c = mix(deep, light, 0.18 + spark * 0.55 + (1.0 - d) * 0.12);
+          // Chuva: anéis de gotas que nascem e se abrem pela superfície.
+          vec2 g = vUv * 70.0; vec2 id = floor(g); vec2 f = fract(g) - 0.5;
+          float hsh = fract(sin(dot(id, vec2(12.9898, 78.233))) * 43758.5453);
+          float ph = fract(t * 0.8 + hsh);
+          float ring = smoothstep(0.05, 0.0, abs(length(f) - ph * 0.45)) * (1.0 - ph) * step(hsh, rain);
+          c = mix(c, light, ring * 0.6);
+          c = mix(c, c * 0.82, rain * 0.4);
           c *= mix(1.0, 0.35, night);
           gl_FragColor = vec4(c, 0.88);
         }`,
@@ -143,9 +150,12 @@ export function water(kit: Kit, radius: number, color = '#2E9BD6'): { mesh: THRE
 }
 
 /** Ajusta o escurecimento noturno de todas as águas criadas por `water`. */
-export function setWaterNight(mesh: THREE.Mesh, night: number) {
+
+/** Chuva (gotas na superfície) e vento (ondulação) nas águas criadas por `water`. */
+export function setWaterWeather(mesh: THREE.Mesh, rain: number, wind: number) {
   const m = mesh.material as THREE.ShaderMaterial;
-  if (m.uniforms?.night) m.uniforms.night.value = night;
+  if (m.uniforms?.rain) m.uniforms.rain.value = rain;
+  if (m.uniforms?.wind) m.uniforms.wind.value = wind;
 }
 
 /* ---------- Caminhos curvos (faixa com meio-fio) ---------- */
@@ -235,8 +245,8 @@ function tintedCrown(g: THREE.BufferGeometry, base: string, seed: number): THREE
 
 export interface Forest {
   group: THREE.Group;
-  /** Balanço do vento nas copas (barato: só matrizes). */
-  tick: (t: number) => void;
+  /** Balanço do vento nas copas (barato: só matrizes); `wind` de 0 a 1. */
+  tick: (t: number, wind?: number) => void;
   setCount: (fraction: number) => void;
   setSeason: (crownColors: Partial<Record<TreeSpecies, string>>) => void;
 }
@@ -325,11 +335,11 @@ export function forest(kit: Kit, plants: Plant[]): Forest {
   const e = new THREE.Euler();
   const pos = new THREE.Vector3();
   const sc = new THREE.Vector3();
-  const tick = (t: number) => {
+  const tick = (t: number, wind = 0) => {
     for (const c of crowns) {
       c.list.forEach((p, i) => {
         if (i >= c.mesh.count) return;
-        const sway = Math.sin(t * 1.1 + p.x * 0.3 + p.z * 0.2) * 0.04;
+        const sway = Math.sin(t * (1.1 + wind * 1.8) + p.x * 0.3 + p.z * 0.2) * (0.04 + wind * 0.13) + wind * 0.05;
         e.set(sway, 0, sway * 0.7);
         q.setFromEuler(e);
         pos.set(p.x, (p.y ?? 0) + c.crownY * p.s, p.z);

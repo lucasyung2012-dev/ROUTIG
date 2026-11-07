@@ -6,7 +6,7 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import type { ModuleId } from '@/app/modules';
-import { LAKE, PARK_BUILDINGS, PARK_RADIUS, PLAZA_RADIUS, PONDS, heightAt, inWater, onPath } from '@/domain/park';
+import { LAKE, PARK_BUILDINGS, PARK_RADIUS, PLAYGROUND, PLAZA_RADIUS, PONDS, heightAt, inWater, onPath } from '@/domain/park';
 import { Kit } from './kit';
 import { createCameraRig, type CamMode, type MoveSettings, type Posture } from './camera';
 import { AVATAR_LOOK, createCrowd, type Figure } from './people';
@@ -659,10 +659,21 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
   // Diagnóstico (só com ?debug): comandos de teste disparados na página, como subir pela escada
   // do andar atual (document.dispatchEvent(new CustomEvent('park-debug', { detail: 'stairs' }))).
   const onDebug = (e: Event) => {
+    const cmd = (e as CustomEvent<string>).detail;
     const th = inside?.scene.floors?.things.find((o) => o.kind === 'stairs' && o.level === level);
-    if ((e as CustomEvent<string>).detail === 'stairs' && th) {
+    if (cmd === 'stairs' && th) {
       rig.place(th.x, th.z + 0.4, Math.PI);
       useThing(th);
+    }
+    // 'look:playground', 'look:<prédio>' (lounge do elevador) ou 'look:x,z': câmera livre olhando o ponto.
+    if (typeof cmd === 'string' && cmd.startsWith('look:') && !inside) {
+      const what = cmd.slice(5);
+      const xz = what.split(',').map(Number);
+      const p = what === 'playground' ? PLAYGROUND : world.lifts.find((l) => l.id === what) ?? (xz.length === 2 && xz.every(Number.isFinite) ? { x: xz[0]!, z: xz[1]! } : null);
+      if (!p) return;
+      const y = heightAt(p.x, p.z);
+      rig.setMode('orbit');
+      rig.glideTo(new THREE.Vector3(p.x + 14, y + 10, p.z + 14), new THREE.Vector3(p.x, y + 1.5, p.z), 900);
     }
   };
   if (/[?&]debug/.test(location.search)) document.addEventListener('park-debug', onDebug);

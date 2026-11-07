@@ -182,6 +182,8 @@ export interface World {
   cityEvents: () => Array<{ x: number; z: number; kind: 'brake' | 'horn' }>;
   /** Cancela o que ainda ia ser montado (ao fechar o parque). */
   stop: () => void;
+  /** Centro do lounge do elevador de cada prédio (diagnóstico). */
+  lifts: Array<{ id: ModuleId; x: number; z: number }>;
   viewpoints: Viewpoint[];
   /** Árvores (para observar de perto). */
   treeSpots: Plant[];
@@ -693,6 +695,7 @@ export function createWorld(kit: Kit): World {
   const lodItems: Array<{ obj: THREE.Object3D; x: number; z: number; far: number; base?: number; invert?: boolean }> = [];
   // Lounges dos elevadores e as calçadas até eles: sem árvore nem moita em cima.
   const clearZones: Array<{ x: number; z: number; r: number }> = [];
+  const lifts: Array<{ id: ModuleId; x: number; z: number }> = [];
   const liftWalk = new Builder();
   for (const def of PARK_BUILDINGS) {
     const make = DETAILED[def.id];
@@ -711,6 +714,7 @@ export function createWorld(kit: Kit): World {
       const levels = FLOOR_PLANS[def.id]?.length ?? 0;
       // Torre do elevador e lounge no lado livre e mais plano do prédio, com calçada até o caminho.
       const spot = liftSpot(def, Math.max(6, Math.min(d.core * 0.82, body)), toWorld);
+      if (levels > 0) lifts.push({ id: def.id, x: spot.pad.x, z: spot.pad.z });
       if (levels > 0) liftAccess(spot, clearZones, liftWalk, kit.mat('#D8D1C3', { rough: 0.85 }));
       const up = upperFloors(kit, def.id, levels, d.top - 2, d.core, def.color, body, (lx, lz) => !onPath(toWorld(lx, lz).x, toWorld(lx, lz).z, 0.6), {
         angle: spot.angle,
@@ -862,6 +866,7 @@ export function createWorld(kit: Kit): World {
     play: pg.tick,
     cityEvents: () => streets?.events() ?? [],
     stop: () => window.clearTimeout(edgeTimer),
+    lifts,
     treeSpots: plantList,
     viewpoints: am.viewpoints,
     spots: am.spots,

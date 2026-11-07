@@ -1,4 +1,5 @@
 import { NotificationsSection } from '@/features/notifications/NotificationsSection';
+import { ParkSettingsSection } from '@/features/park/ParkSettingsSection';
 import { PrivacySection } from './PrivacySection';
 import { SecuritySection } from '@/features/security/securityUi';
 import { TransferSection } from '@/features/transfer/TransferSection';
@@ -112,6 +113,8 @@ export function SectionBody({ id }: { id: SettingsSectionId }) {
       return <RegionSection />;
     case 'navigation':
       return <NavigationSection />;
+    case 'park':
+      return <ParkSettingsSection />;
     case 'accessibility':
       return <AccessibilitySection />;
     case 'storage':

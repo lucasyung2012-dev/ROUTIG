@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type MutableRefObject, type PointerEvent as RPointerEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Camera, ChevronsUp, FastForward, Footprints, Hand, Home, LayoutGrid, LogIn, LogOut, Monitor, Navigation, RotateCcw, SlidersHorizontal, UserRound, X } from 'lucide-react';
+import { Camera, ChevronsUp, FastForward, Footprints, Hand, Home, LogIn, LogOut, Monitor, Navigation, RotateCcw, SlidersHorizontal, UserRound, X } from 'lucide-react';
 import { MODULES, NAV_MODULE_IDS, type ModuleId } from '@/app/modules';
 import { useSettings } from '@/app/SettingsProvider';
 import type { MessageKey } from '@/i18n';
@@ -43,6 +43,7 @@ import { useAcademyData } from '@/features/academy/useAcademyData';
 import { useLanguages } from '@/features/languages/useLanguages';
 import { receptionData } from './receptionData';
 import { ModuleCenter } from './ModuleCenter';
+import { DEFAULT_FAB, FloatingCenterButton, PlacesMenu, type FabPlace } from './ParkUi';
 import { withFloors } from './interiors/floors';
 import { clearParkContext, pushRecent, readParkContext, saveParkContext } from './parkContext';
 
@@ -63,6 +64,7 @@ interface ParkPrefs {
   move?: MoveSettings;
   stick?: Stick;
   people?: People;
+  fab?: FabPlace;
 }
 type Stick = { size: 's' | 'm' | 'l'; side: 'left' | 'right'; hidden?: boolean };
 type People = 'off' | 'few' | 'normal';
@@ -181,7 +183,9 @@ export default function ParkPage() {
   const [posture, setPosture] = useState<Posture>('stand');
   const [census, setCensus] = useState<{ outside: number; total: number } | null>(null);
   const [stats, setStats] = useState<Stats | null>(null);
-  const [showStats, setShowStats] = useState(saved.stats ?? true);
+  // Desempenho e gráficos ficam em Configurações → Parque 3D.
+  const showStats = saved.stats ?? false;
+  const [fab, setFab] = useState<FabPlace>({ ...DEFAULT_FAB, ...saved.fab });
   const [picked, setPicked] = useState<ModuleId | null>(null);
   const [inside, setInside] = useState<ModuleId | null>(null);
   const [sector, setSector] = useState<string | null>(null);
@@ -354,7 +358,7 @@ export default function ParkPage() {
   }, [stats, graphics]);
   useEffect(() => engine.current?.setSeason(seasonMode === 'auto' ? seasonOf(new Date()) : seasonMode), [seasonMode]);
   useEffect(() => engine.current?.setFestive(festiveOn(new Date())), []);
-  useEffect(() => writePrefs({ graphics, labels, stats: showStats, clockAuto, hour: manualHour, skyAuto, sky: manualSky, season: seasonMode, sound: ambient, minimap, cam: camMode, move, stick, people, mix }), [graphics, labels, showStats, clockAuto, manualHour, skyAuto, manualSky, seasonMode, ambient, minimap, camMode, move, stick, people, mix]);
+  useEffect(() => writePrefs({ ...readPrefs(), graphics, labels, stats: showStats, fab, clockAuto, hour: manualHour, skyAuto, sky: manualSky, season: seasonMode, sound: ambient, minimap, cam: camMode, move, stick, people, mix }), [graphics, labels, showStats, fab, clockAuto, manualHour, skyAuto, manualSky, seasonMode, ambient, minimap, camMode, move, stick, people, mix]);
   useEffect(() => engine.current?.setMoveSettings(move), [move]);
   useEffect(() => engine.current?.setCrowd(crowdCap(people, quality)), [people, quality]);
   useEffect(() => {
@@ -518,6 +522,23 @@ export default function ParkPage() {
               {t('park.exit')}
             </Button>
           ) : null}
+          {inside && (
+            <PlacesMenu
+              title={t(`park.names.${inside}`)}
+              floors={Array.from({ length: floors.count }, (_, n) => ({
+                name: t(`park.floorNames.f${n}` as MessageKey),
+                current: floors.current === n,
+                onGo: () => engine.current?.setFloor(n),
+                rooms:
+                  n === 0
+                    ? sectors.map((s) => ({ id: s, label: sectorName(inside, s), active: !zoneKey && sector === s, onPick: () => (floors.current !== 0 && engine.current?.setFloor(0), chooseSector(s)) }))
+                    : (engine.current?.zones() ?? [])
+                        .map((z, i) => ({ ...z, i }))
+                        .filter((z) => z.level === n)
+                        .map((z) => ({ id: z.key, label: t(`park.floorRooms.${inside}.${z.key}` as MessageKey), active: zoneKey === z.key, onPick: () => engine.current?.focusZone(z.i) })),
+              }))}
+            />
+          )}
           <span className="hidden truncate rounded-xl bg-surface/80 px-3 py-2 text-xs font-semibold text-fg sm:inline">{inside ? t(`park.names.${inside}`) : t('park.title')}</span>
           <div className="ml-auto flex flex-wrap items-center gap-2">
             {!inside && (
@@ -536,36 +557,6 @@ export default function ParkPage() {
             <IconButton label={t('park.options')} icon={<SlidersHorizontal className="h-5 w-5" />} active={options} onClick={() => setOptions((o) => !o)} className="bg-surface/90" />
           </div>
         </div>
-        {inside && floors.count > 1 && (
-          <nav aria-label={t('park.floorsNav')} className="flex gap-2 overflow-x-auto px-3 pb-2">
-            {Array.from({ length: floors.count }, (_, n) => (
-              <button
-                key={n}
-                type="button"
-                onClick={() => engine.current?.setFloor(n)}
-                aria-pressed={floors.current === n}
-                className={cn('h-9 shrink-0 rounded-full px-3 text-xs font-semibold shadow-soft', floors.current === n ? 'bg-fg text-bg' : 'bg-surface/90 text-fg')}
-              >
-                {t(`park.floorNames.f${n}` as MessageKey)}
-              </button>
-            ))}
-          </nav>
-        )}
-        {inside && sectors.length > 0 && (
-          <nav aria-label={t('park.sectorsNav')} className="flex gap-2 overflow-x-auto px-3 pb-2">
-            {sectors.map((s) => (
-              <button
-                key={s}
-                type="button"
-                onClick={() => chooseSector(s)}
-                aria-pressed={sector === s}
-                className={cn('h-10 shrink-0 rounded-full px-4 text-sm font-medium shadow-soft', sector === s ? 'bg-accent text-accent-fg' : 'bg-surface/90 text-fg')}
-              >
-                {sectorName(inside, s)}
-              </button>
-            ))}
-          </nav>
-        )}
       </div>
 
       {/* Opções do ambiente */}
@@ -652,14 +643,10 @@ export default function ParkPage() {
               ))}
             </>
           )}
-          <h3 className="pt-1 text-xs font-semibold uppercase tracking-wide text-muted">{t('park.graphics')}</h3>
-          <Segmented<Quality | 'auto'> label={t('park.graphics')} value={graphics} onChange={setGraphics} options={(['auto', 'low', 'medium', 'high'] as const).map((v) => ({ value: v, label: t(`park.gfx.${v}`) }))} className="w-full" />
-          {graphics === 'auto' && <p className="-mt-2 text-xs text-muted">{t('park.gfxNow', { q: t(`park.gfx.${quality}`) })}</p>}
           <h3 className="pt-1 text-xs font-semibold uppercase tracking-wide text-muted">{t('park.display')}</h3>
           <Switch label={t('park.minimapToggle')}
  checked={minimap} onChange={setMinimap} />
           <Switch label={t('park.labels')} checked={labels} onChange={setLabels} />
-          <Switch label={t('park.showStats')} checked={showStats} onChange={setShowStats} />
           <Segmented<People> label={t('park.people')} value={people} onChange={setPeople} options={(['off', 'few', 'normal'] as const).map((v) => ({ value: v, label: t(`park.peopleLevels.${v}`) }))} className="w-full" />
           {census && people !== 'off' && <p className="-mt-2 text-xs text-muted">{t('park.peopleNow', { count: census.outside, total: census.total })}</p>}
           <h3 className="pt-1 text-xs font-semibold uppercase tracking-wide text-muted">{t('park.controls')}</h3>
@@ -793,15 +780,8 @@ export default function ParkPage() {
         </div>
       )}
 
-      {/* Central de Módulos: botão flutuante */}
-      <button
-        type="button"
-        onClick={() => setCenter(true)}
-        aria-label={t('park.center.open')}
-        className="absolute left-3 top-1/2 flex h-14 w-14 -translate-y-1/2 items-center justify-center rounded-2xl bg-brand text-white shadow-glow ring-2 ring-white/30"
-      >
-        <LayoutGrid className="h-6 w-6" aria-hidden />
-      </button>
+      {/* Central de Módulos: botão flutuante (arraste para mudar de lugar) */}
+      <FloatingCenterButton place={fab} onMove={setFab} onOpen={() => setCenter(true)} label={t('park.center.open')} />
       {center && <ModuleCenter inside={inside} onClose={() => setCenter(false)} onEnter={enterFromCenter} onOpen2D={open2D} />}
 
     </div>

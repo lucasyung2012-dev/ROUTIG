@@ -480,6 +480,7 @@ export const en: Messages = {
       language: 'Language',
       region: 'Region',
       navigation: 'Navigation',
+      park: '3D Park',
       modules: 'Modules',
       notifications: 'Notifications',
       privacy: 'Privacy',
@@ -4556,6 +4557,14 @@ export const en: Messages = {
     entryView: 'Entrance view',
     walk: 'First person',
     freeCam: 'Free camera',
+    places: 'Floors and rooms',
+    settings3d: {
+      intro: 'Park settings kept on this device. Time, weather, camera, sound and controls are in the options inside the park.',
+      stats: 'Show performance in the park',
+      statsHint: 'Frames per second, draw calls and triangles, in a corner of the screen.',
+      fabSize: 'Module Center button size',
+      fabReset: 'Move the Module Center button back to its default place',
+    },
     floorRooms: {
       dashboard: {
         indicators: 'Indicators gallery',

@@ -84,6 +84,9 @@ export interface Engine {
   focusSector: (id: string) => void;
   /** Interior: ir para um andar (0 = térreo). */
   setFloor: (n: number) => void;
+  /** Salas dos andares do prédio aberto (índice = posição na lista). */
+  zones: () => Array<{ level: number; key: string; sector: string | null }>;
+  focusZone: (i: number) => void;
   setData: (id: ModuleId, data: unknown) => void;
   project: () => Array<{ id: ModuleId; x: number; y: number; visible: boolean }>;
   dispose: () => void;
@@ -650,6 +653,8 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
     exit,
     focusSector,
     setFloor: (n) => setFloor(n),
+    zones: () => (inside?.scene.floors?.zones ?? []).map((z) => ({ level: z.level, key: z.key, sector: z.sector })),
+    focusZone: (i) => focusZone(i),
     setData: (id, data) => {
       dataCache.set(id, data);
       if (inside?.id === id) inside.scene.setData(data);

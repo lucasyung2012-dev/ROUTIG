@@ -478,6 +478,7 @@ export const pt = {
       language: 'Idioma',
       region: 'Região',
       navigation: 'Navegação',
+      park: 'Parque 3D',
       modules: 'Módulos',
       notifications: 'Notificações',
       privacy: 'Privacidade',
@@ -4554,6 +4555,14 @@ export const pt = {
     entryView: 'Vista da entrada',
     walk: 'Primeira pessoa',
     freeCam: 'Câmera livre',
+    places: 'Andares e salas',
+    settings3d: {
+      intro: 'Ajustes do parque que ficam neste aparelho. Hora, clima, câmera, som e controles estão nas opções dentro do parque.',
+      stats: 'Mostrar desempenho no parque',
+      statsHint: 'Quadros por segundo, desenhos e triângulos, num canto da tela.',
+      fabSize: 'Tamanho do botão da Central de Módulos',
+      fabReset: 'Voltar o botão da Central para o lugar padrão',
+    },
     floorRooms: {
       dashboard: {
         indicators: 'Galeria de indicadores',

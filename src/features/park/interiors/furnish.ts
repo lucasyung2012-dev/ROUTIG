@@ -277,3 +277,121 @@ export function furnish(kit: Kit, b: Builder, type: RoomType, w: number, d: numb
   }
   return seats;
 }
+
+/**
+ * Acabamento de toda sala (decoração comum) e objetos do assunto da sala, pela chave
+ * (V2.1, seção 11: "ambientes reais, mobiliário, equipamentos"). Coordenadas da sala.
+ */
+export function decorate(kit: Kit, b: Builder, key: string, w: number, d: number, accent: string, warm: boolean, seed: number) {
+  const back = -d / 2 + 0.12;
+  const wood = kit.mat(warm ? '#B07D55' : '#8E9AA8', { rough: 0.7 });
+  const art = ['#E07A5F', '#81B29A', '#F2CC8F', '#5B8DB8', '#C06C84', '#3D405B'];
+  // Parede de fundo com ripas de madeira (ou painel) e dois quadros.
+  for (let k = 0; k < Math.floor(w / 0.35); k++) b.add(wood, new THREE.BoxGeometry(0.22, 2.6, 0.06), [-w / 2 + 0.3 + k * 0.35, 1.5, back], [0, 0, 0]);
+  for (const s of [-1, 1]) {
+    const x = s * w * 0.32;
+    b.add(kit.mat('#2B2B2B', { rough: 0.5 }), new THREE.BoxGeometry(1.1, 0.8, 0.04), [x, 2.3, back + 0.06]);
+    b.add(kit.mat(art[(seed + (s > 0 ? 1 : 3)) % art.length]!, { rough: 0.8 }), new THREE.BoxGeometry(0.95, 0.65, 0.01), [x, 2.3, back + 0.09]);
+  }
+  // Tapete, luminária de piso, plantas nos cantos e pendente.
+  b.add(kit.mat(['#C8B8A6', '#9FB4C7', '#B9C9AE', '#D4B8C4'][seed % 4]!, { rough: 1 }), new THREE.BoxGeometry(w * 0.55, 0.012, d * 0.35), [0, 0.02, 0.2]);
+  const metal = kit.mat('#2F3338', { metal: 0.6, rough: 0.4 });
+  const glow = kit.mat(warm ? '#FFE7B0' : '#E8F4FF', { glow: true });
+  b.add(metal, new THREE.CylinderGeometry(0.02, 0.02, 1.6, 6), [w / 2 - 0.6, 0.8, back + 0.8]);
+  b.add(glow, new THREE.ConeGeometry(0.22, 0.3, 16, 1, true), [w / 2 - 0.6, 1.7, back + 0.8]);
+  for (const s of [-1, 1]) {
+    b.add(kit.mat('#D9CBB6', { rough: 0.8 }), new THREE.CylinderGeometry(0.25, 0.2, 0.45, 14), [s * (w / 2 - 0.5), 0.22, d / 2 - 0.9]);
+    b.add(kit.mat('#4C9A4F', { rough: 0.9 }), new THREE.IcosahedronGeometry(0.42, 1), [s * (w / 2 - 0.5), 0.85, d / 2 - 0.9], [0, seed, 0], [1, 1.4, 1]);
+  }
+  b.add(metal, new THREE.CylinderGeometry(0.01, 0.01, 0.8, 4), [0, 3.55, 0]);
+  b.add(glow, new THREE.SphereGeometry(0.22, 14, 10), [0, 3.1, 0]);
+  // Objetos do assunto.
+  const dark = kit.mat('#2B3442', { rough: 0.5 });
+  const white = kit.mat('#F4F5F7', { rough: 0.5 });
+  const acc = kit.mat(accent, { rough: 0.6 });
+  const side = w / 2 - 0.7;
+  switch (key) {
+    case 'humanities':
+    case 'culture':
+      b.add(dark, new THREE.CylinderGeometry(0.05, 0.12, 0.8, 8), [side, 0.4, 0]);
+      b.add(kit.mat('#3B82C4', { rough: 0.5 }), new THREE.SphereGeometry(0.32, 20, 14), [side, 1.1, 0]);
+      b.add(kit.mat('#F2E6C9', { rough: 0.9 }), new THREE.BoxGeometry(2.2, 1.3, 0.03), [-side + 0.6, 1.8, back + 0.12]);
+      break;
+    case 'science':
+    case 'labs':
+    case 'lab':
+      for (let k = 0; k < 2; k++) {
+        b.add(dark, new THREE.BoxGeometry(0.18, 0.04, 0.24), [side - k * 0.6, 0.92, 0.4]);
+        b.add(dark, new THREE.CylinderGeometry(0.03, 0.03, 0.3, 8), [side - k * 0.6, 1.08, 0.36], [0.3, 0, 0]);
+      }
+      break;
+    case 'math':
+    case 'exercises':
+      for (let k = 0; k < 10; k++) b.add(white, new THREE.BoxGeometry(0.15 + (k % 4) * 0.1, 0.03, 0.01), [-1.6 + (k % 5) * 0.75, 2.0 - Math.floor(k / 5) * 0.35, back + 0.14]);
+      b.add(acc, new THREE.TetrahedronGeometry(0.25), [side, 1.0, 0.6]);
+      b.add(acc, new THREE.OctahedronGeometry(0.22), [side - 0.5, 1.0, 0.6]);
+      break;
+    case 'grammar':
+    case 'pronunciation':
+    case 'listening':
+    case 'reading':
+    case 'writing':
+    case 'conversation':
+    case 'situations':
+      for (let k = 0; k < 5; k++) {
+        b.add(metal, new THREE.CylinderGeometry(0.01, 0.01, 0.9, 4), [-w / 2 + 1 + k * 0.45, 2.6, back + 0.3]);
+        b.add(kit.mat(['#009C3B', '#012169', '#DD0000', '#AA151B', '#DE2910'][k]!, { rough: 0.8, side: THREE.DoubleSide }), new THREE.PlaneGeometry(0.4, 0.26), [-w / 2 + 1.2 + k * 0.45, 2.9, back + 0.3]);
+      }
+      break;
+    case 'achievements':
+    case 'done':
+    case 'gallery':
+      b.add(wood, new THREE.BoxGeometry(2.4, 0.06, 0.4), [0, 1.4, back + 0.2]);
+      for (let k = 0; k < 5; k++) b.add(kit.mat('#E5C07B', { metal: 0.9, rough: 0.2 }), new THREE.CylinderGeometry(0.06, 0.1, 0.35, 10), [-0.9 + k * 0.45, 1.6, back + 0.2]);
+      break;
+    case 'recording':
+    case 'booths':
+    case 'editing':
+    case 'rehearsal':
+    case 'composing':
+      b.add(kit.mat('#B5713A', { rough: 0.45 }), new THREE.CylinderGeometry(0.17, 0.17, 0.08, 18), [side, 0.5, 0.5], [Math.PI / 2 - 0.3, 0, 0]);
+      b.add(dark, new THREE.BoxGeometry(0.6, 0.6, 0.3), [-side, 0.3, back + 0.6]);
+      b.add(kit.mat('#64748B', { metal: 0.5 }), new THREE.CircleGeometry(0.2, 16), [-side, 0.3, back + 0.76]);
+      break;
+    case 'monthly':
+    case 'weekly':
+    case 'daily':
+    case 'recurring':
+    case 'deadlines':
+    case 'planning':
+    case 'plan':
+      // Calendários na parede (grade de dias).
+      for (let r = 0; r < 4; r++) for (let c = 0; c < 7; c++) b.add((r + c + seed) % 5 === 0 ? acc : white, new THREE.BoxGeometry(0.2, 0.17, 0.01), [-0.75 + c * 0.25, 1.4 + r * 0.22, back + 0.13]);
+      break;
+    case 'investments':
+    case 'assets':
+    case 'evolution':
+    case 'longterm':
+    case 'goals':
+    case 'education':
+      // Gráfico de linha na parede.
+      for (let k = 0; k < 8; k++) b.add(acc, new THREE.BoxGeometry(0.32, 0.04, 0.01), [-1.2 + k * 0.3, 1.5 + Math.sin(k * 0.9 + seed) * 0.25 + k * 0.06, back + 0.13], [0, 0, Math.cos(k * 0.9 + seed) * 0.5]);
+      break;
+    case 'gym':
+    case 'mobility':
+    case 'stretching':
+    case 'guided':
+      b.add(kit.mat('#F43F5E', { rough: 0.6 }), new THREE.SphereGeometry(0.33, 16, 12), [side, 0.33, 0.8]);
+      b.add(kit.mat('#22C55E', { rough: 0.6 }), new THREE.SphereGeometry(0.25, 16, 12), [side - 0.7, 0.25, 1.2]);
+      break;
+    case 'observatory':
+    case 'integrated':
+    case 'trends':
+    case 'charts':
+      b.add(kit.mat('#0B1026', { rough: 0.4 }), new THREE.SphereGeometry(0.5, 20, 14), [side, 1.4, 0.2]);
+      b.add(glow, new THREE.TorusGeometry(0.62, 0.02, 6, 32), [side, 1.4, 0.2], [Math.PI / 2.4, 0, 0]);
+      break;
+    default:
+      break;
+  }
+}

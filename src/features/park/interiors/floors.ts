@@ -13,7 +13,7 @@ import { Builder, type Kit } from '../kit';
 import type { Obstacle, Seat } from '../camera';
 import { sectorSign, type InteriorScene } from './common';
 import { footprint } from '../collision';
-import { furnish, roomType, type RoomType } from './furnish';
+import { decorate, furnish, roomType, type RoomType } from './furnish';
 
 /** Sala de um andar: chave do nome, setor real que ela abre (null = sem tela própria), tipo de mobília. */
 export type RoomKind = 'desk' | 'shelf' | 'screen' | 'lounge' | 'studio';
@@ -278,6 +278,7 @@ export function withFloors(kit: Kit, scene: InteriorScene, id: ModuleId, label: 
       const w = mid * span * 0.9;
       const d = ro - ri - 0.3;
       const local = furnish(kit, fb, type, w, d, accent, k + L * 7);
+      decorate(kit, fb, key, w, d, accent, style.warm, k + L * 7);
       g.add(fb.build());
       const sign = sectorSign(kit, label(key), sector ? accent : '#94A3B8', 2.2);
       sign.position.set(0, 2.62, d / 2 + 0.25);

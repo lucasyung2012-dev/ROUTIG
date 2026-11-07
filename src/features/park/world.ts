@@ -500,7 +500,7 @@ function lake(kit: Kit): { group: THREE.Group; water: ReturnType<typeof water>; 
 /* ---------- Vegetação por região ---------- */
 
 function plants(): Plant[] {
-  const pts = treePositions(2000);
+  const pts = treePositions(2800);
   return pts.map((p, i) => {
     const a = Math.atan2(p.x, -p.z);
     const r = Math.hypot(p.x, p.z);

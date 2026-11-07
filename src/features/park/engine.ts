@@ -15,6 +15,7 @@ import type { Conditions } from '@/domain/parkPeople';
 import { CLEAR_SKY, createWorld, lightAt, type Quality, type Season, type Sky } from './world';
 import type { ParkAudio } from './audio';
 import type { ParkSnapshot } from './parkContext';
+import { footprint } from './collision';
 import type { InteriorScene } from './interiors/common';
 
 export interface Stats {
@@ -285,6 +286,8 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
     const swap = () => {
       const ikit = new Kit();
       const scene = factory(ikit);
+      // Colisão do térreo pelo desenho (móveis, balcões, paredes), além dos obstáculos do próprio interior.
+      scene.obstacles.push(...footprint(scene.scene, () => 0));
       ikit.glowing.forEach((m) => (m.emissiveIntensity = 1));
       scene.scene.environment = QUALITY[quality].env ? envTex : null;
       scene.scene.environmentIntensity = 0.55;

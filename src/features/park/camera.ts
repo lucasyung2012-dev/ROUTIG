@@ -7,6 +7,7 @@
  */
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { ObstacleGrid } from './collision';
 
 /** orbit = câmera livre; walk = primeira pessoa; third = terceira pessoa. */
 export type CamMode = 'orbit' | 'walk' | 'third';
@@ -96,6 +97,7 @@ export function createCameraRig(camera: THREE.PerspectiveCamera, canvas: HTMLCan
   controls.mouseButtons = { LEFT: THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE };
 
   let world: CameraWorld = { ground: () => 0, obstacles: [], limit: { x: 0, z: 0, r: 1e4 }, ceiling: Infinity, minDistance: 4, maxDistance: 320 };
+  let grid = new ObstacleGrid([]);
   let settings: MoveSettings = { sensitivity: 1, speed: 1, invertY: false };
   let mode: CamMode = 'orbit';
   let pending: CamMode | null = null;
@@ -181,7 +183,7 @@ export function createCameraRig(camera: THREE.PerspectiveCamera, canvas: HTMLCan
   };
 
   const collide = (p: THREE.Vector3, pad: number, solid: boolean) => {
-    for (const o of world.obstacles) {
+    for (const o of grid.near(p.x, p.z)) {
       if (!solid && p.y > o.h + 1) continue;
       const dx = p.x - o.x;
       const dz = p.z - o.z;
@@ -196,7 +198,7 @@ export function createCameraRig(camera: THREE.PerspectiveCamera, canvas: HTMLCan
     clampLimit(p);
   };
 
-  const solidAt = (x: number, z: number, y: number) => world.obstacles.some((o) => y < o.h + 0.3 && Math.hypot(x - o.x, z - o.z) < o.r + 0.2);
+  const solidAt = (x: number, z: number, y: number) => grid.near(x, z).some((o) => y < o.h + 0.3 && Math.hypot(x - o.x, z - o.z) < o.r + 0.2);
 
   const placeBody = (x: number, z: number, y: number) => {
     feet.set(x, 0, z);
@@ -422,6 +424,7 @@ export function createCameraRig(camera: THREE.PerspectiveCamera, canvas: HTMLCan
     setMode,
     setWorld: (w) => {
       world = w;
+      grid = new ObstacleGrid(w.obstacles);
     },
     setSettings: (s) => {
       settings = s;

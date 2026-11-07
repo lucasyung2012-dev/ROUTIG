@@ -15,6 +15,7 @@ import { calendarBuilding, financeBuilding, projectsBuilding, tasksBuilding } fr
 import { focusBuilding, goalsBuilding, habitsBuilding, musicBuilding, sportsBuilding } from './buildings/westsouth';
 import { prototypeBuilding } from './buildings/prototype';
 import type { Obstacle } from './camera';
+import { footprint } from './collision';
 
 export type Quality = 'low' | 'medium' | 'high';
 /** Clima combinável (V2.1, seção 15): cada componente de 0 a 1; chuva com vento e neblina, por exemplo. */
@@ -542,7 +543,8 @@ export function createWorld(kit: Kit): World {
 
   root.add(terrain(kit));
   const p = paths(kit);
-  root.add(p.group, lampPosts(kit, p.lamps), plaza(kit));
+  const plazaGroup = plaza(kit);
+  root.add(p.group, lampPosts(kit, p.lamps), plazaGroup);
   const f = fountain(kit);
   f.group.scale.setScalar(1.7);
   root.add(f.group);
@@ -588,14 +590,20 @@ export function createWorld(kit: Kit): World {
     group.traverse((o) => (o.userData.building = def.id));
     root.add(group);
     buildings.set(def.id, { def, group, top: top + group.position.y, detailed: !!make, entrance: entranceOf(def), facing });
-    obstacles.push({ x: def.x, z: def.z, r: core, h: top });
+    // Colisão pelo desenho do prédio (paredes, vidros, pilares), não por um círculo só.
+    obstacles.push(...footprint(group, heightAt));
+    void core;
   }
   const am = amenities(kit);
-  root.add(am.group, houses(kit));
-  root.add(walkway(kit, buildings.get('tasks')?.def, buildings.get('calendar')?.def));
+  const ww = walkway(kit, buildings.get('tasks')?.def, buildings.get('calendar')?.def);
+  root.add(am.group, houses(kit), ww);
+  // Barracas, quiosques, mesas, bancos, pérgolas, passarela, praça; postes e troncos das árvores.
+  obstacles.push(...footprint(am.group, heightAt), ...footprint(ww, heightAt), ...footprint(plazaGroup, heightAt));
+  for (const l of p.lamps) obstacles.push({ x: l.x, z: l.z, r: 0.25, h: heightAt(l.x, l.z) + 4.2 });
 
   const plantList = plants();
   const trees = forest(kit, plantList);
+  for (const t of plantList) if (Math.hypot(t.x, t.z) < PARK_RADIUS + 30) obstacles.push({ x: t.x, z: t.z, r: 0.3 * t.s, h: (t.y ?? 0) + 3 });
   const meadow = meadows(kit);
   root.add(trees.group, ...meadow);
   // Luzes de fim de ano em volta da praça (só aparecem no evento).

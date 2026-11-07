@@ -12,6 +12,7 @@ import { buildingById } from '@/domain/park';
 import { Builder, type Kit } from '../kit';
 import type { Obstacle, Seat } from '../camera';
 import { sectorSign, type InteriorScene } from './common';
+import { footprint } from '../collision';
 
 /** Sala de um andar: chave do nome, setor real que ela abre (null = sem tela própria), tipo de mobília. */
 export type RoomKind = 'desk' | 'shelf' | 'screen' | 'lounge' | 'studio';
@@ -271,6 +272,8 @@ export function withFloors(kit: Kit, scene: InteriorScene, id: ModuleId, label: 
     scene.scene.add(s);
   });
   scene.scene.add(b.build());
+  // Colisão de cada andar pelo desenho (móveis, floreiras, guarda-corpos).
+  levels.forEach((lv, n) => n > 0 && lv.obstacles.push(...footprint(scene.scene, () => lv.y)));
   scene.floors = { levels, zones, elevator: tower, seats };
   return scene;
 }

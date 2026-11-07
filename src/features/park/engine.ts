@@ -998,7 +998,7 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
         }
         const viewer = mode === 'orbit' ? rig.controls.target : body.pos;
         town.step(opts.reduceMotion ? dt * 0.5 : dt, conditions(), mode === 'orbit' ? { x: 1e5, z: 1e5 } : viewer, now);
-        extras.step(opts.reduceMotion ? dt * 0.5 : dt, shownHour, weather.rain, mode === 'orbit' ? { x: 1e5, z: 1e5 } : viewer, now, world.bus());
+        extras.step(opts.reduceMotion ? dt * 0.5 : dt, shownHour, weather.rain, viewer, now, world.bus());
         world.play(extras.play());
         // Moradores e gente de passagem juntos, os mais perto primeiro.
         const range = mode === 'orbit' ? 260 : 140;

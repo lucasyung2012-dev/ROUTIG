@@ -169,8 +169,19 @@ export function upperFloors(kit: Kit, id: ModuleId, levels: number, base: number
     }
   // Quanto o lounge sobe (o piso fica 15 cm acima do ponto mais alto do chão de lá).
   const dy = Math.max(0.3, gMax + 0.15) - 0.3;
-  const eb = new Builder();
-  const lb = new Builder();
+  // Peças da torre e do lounge: giradas para o lado escolhido (e o lounge na altura do chão de lá),
+  // juntas no mesmo desenho do prédio (sem chamadas de desenho a mais).
+  const placed = (rise: number) => ({
+    add: (m: THREE.Material, geo: THREE.BufferGeometry, pos: [number, number, number] = [0, 0, 0], rot?: [number, number, number], sc?: [number, number, number]) => {
+      if (sc) geo.scale(...sc);
+      if (rot) geo.applyQuaternion(new THREE.Quaternion().setFromEuler(new THREE.Euler(...rot)));
+      geo.translate(pos[0], pos[1] + rise, pos[2]);
+      geo.rotateY(ry);
+      b.add(m, geo);
+    },
+  });
+  const eb = placed(0);
+  const lb = placed(dy);
   const towerBot = Math.min(0, gMin - 0.2);
   eb.add(glass, new THREE.CylinderGeometry(1.4, 1.4, top + 1 - towerBot, 24, 1, true), [0, (top + 1 + towerBot) / 2, tz]);
   for (let k = 0; k < 6; k++) {
@@ -235,14 +246,6 @@ export function upperFloors(kit: Kit, id: ModuleId, levels: number, base: number
     lb.add(dark, new THREE.CylinderGeometry(0.06, 0.08, 3.6, 8), [4.1, 0.3 + 1.8, tz]);
     lb.add(warm, new THREE.SphereGeometry(0.2, 12, 8), [4.1, 0.3 + 3.7, tz]);
   }
-  // Torre e lounge giram para o lado livre do prédio; o lounge sobe ou desce até o chão de lá.
-  const eg = eb.build();
-  const lg = lb.build();
-  lg.position.y = dy;
-  const lift3 = new THREE.Group();
-  lift3.add(eg, lg);
-  lift3.rotation.y = ry;
-  g.add(lift3);
   // Elemento de cada prédio (prompt, seção 10).
   switch (id) {
     case 'dashboard': {

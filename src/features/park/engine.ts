@@ -864,6 +864,7 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
       world.tick(t, opts.reduceMotion ? 0 : dt, rig.focus(), camera.position);
       // Portas automáticas: abrem para o visitante e para quem está chegando a pé (com o som do trilho).
       for (const p of doors.tick(dt, [body.pos, ...town.walkers()])) if (Math.hypot(p.x - body.pos.x, p.z - body.pos.z) < 30) audio?.note(p.kind === 'slide' ? 40 : 52, p.kind === 'slide' ? 'door' : 'gate', 0, { x: p.x, y: 1.5, z: p.z });
+      for (const ev of world.cityEvents()) if (Math.hypot(ev.x - camera.position.x, ev.z - camera.position.z) < 120) audio?.note(ev.kind === 'brake' ? 40 : 64, ev.kind, 0, { x: ev.x, y: 1, z: ev.z });
       // Moradores: a rotina anda com a hora; só os mais próximos são desenhados.
       if (crowdMax > 0) {
         if (!settled) {

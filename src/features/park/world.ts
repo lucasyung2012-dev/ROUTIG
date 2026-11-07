@@ -7,6 +7,7 @@ import * as THREE from 'three';
 import type { ModuleId } from '@/app/modules';
 import { LAKE, onPath, plazaCarts, PARK_BUILDINGS, PARK_RADIUS, PARK_SCALE, PATH_WIDTH, PLAZA_RADIUS, POIS, PONDS, entranceOf, facingOf, heightAt, inWater, inField, isFreeGround, lakeRadiusAt, parkPaths, samplePath, seededRandom, treePositions, type ParkBuilding, type Point } from '@/domain/park';
 import { amenities, houses, neighborhood, sportsFields, streetTrees, type Seat, type Viewpoint } from './buildings/amenities';
+import { city } from './buildings/city';
 import { Builder, Kit, signTexture, cloud, forest, setWaterNight, setWaterSky, setWaterWeather, shrubs, sky, stars, water, type Plant, type TreeSpecies } from './kit';
 import { birds, butterflies, drone, fountain, leaves, rain } from './life';
 import { playground } from './playground';
@@ -176,6 +177,8 @@ export interface World {
   seats: Seat[];
   /** Anima o parquinho (balanços e gangorra). */
   play: (s: { swings: number[]; seesaw: number }) => void;
+  /** Sons da rua deste quadro (ônibus freando, buzina). */
+  cityEvents: () => Array<{ x: number; z: number; kind: 'brake' | 'horn' }>;
   viewpoints: Viewpoint[];
   /** Árvores (para observar de perto). */
   treeSpots: Plant[];
@@ -748,6 +751,10 @@ export function createWorld(kit: Kit): World {
   const fields = sportsFields(kit);
   const hood = neighborhood(kit);
   ticks.push(hood.tick);
+  // Ruas do bairro: avenida, transversais, semáforos, ônibus, bancas, carros.
+  const streets = city(kit);
+  ticks.push(streets.tick);
+  root.add(streets.group);
   root.add(am.group, houses(kit), ww, fields, hood.group);
   obstacles.push(...footprint(fields, heightAt));
   // Barracas, quiosques, mesas, bancos, pérgolas, passarela, praça; postes e troncos das árvores.
@@ -841,6 +848,7 @@ export function createWorld(kit: Kit): World {
     // Todos os bancos do parque servem para sentar (inclusive os da praça).
     seats: [...am.seats, ...plazaSeats(), ...pg.seats],
     play: pg.tick,
+    cityEvents: () => streets.events(),
     treeSpots: plantList,
     viewpoints: am.viewpoints,
     spots: am.spots,

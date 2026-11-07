@@ -5,7 +5,7 @@
  */
 import * as THREE from 'three';
 import { navGraph } from '@/domain/parkPeople';
-import { onPath, PARK_BUILDINGS, PATH_WIDTH, PLAZA_RADIUS, POIS, ROAD_RADIUS, SPORT_FIELDS, heightAt, inWater, parkPaths, residences, samplePath, seededRandom, type Poi } from '@/domain/park';
+import { crossStreets, onPath, PARK_BUILDINGS, PATH_WIDTH, PLAZA_RADIUS, POIS, ROAD_RADIUS, SPORT_FIELDS, heightAt, inWater, parkPaths, residences, samplePath, seededRandom, type Poi } from '@/domain/park';
 import { Builder, type Kit } from '../kit';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
@@ -518,16 +518,22 @@ export function neighborhood(kit: Kit): { group: THREE.Group; tick: (t: number) 
   const tankM = kit.mat('#E5E7EB', { rough: 0.5, metal: 0.2 });
   const awnings = ['#14B8A6', '#F59E0B', '#EF4444', '#6366F1', '#16A34A', '#DB2777'].map((c) => kit.mat(c, { rough: 0.6 }));
   for (let i = 0; i < 26; i++) {
-    const a = (i / 26) * Math.PI * 2 + (rnd() - 0.5) * 0.08;
+    let a = (i / 26) * Math.PI * 2 + (rnd() - 0.5) * 0.08;
     const rr = ROAD_RADIUS + 70 + rnd() * 30;
-    const x = Math.cos(a) * rr;
-    const z = Math.sin(a) * rr;
-    const y = Math.min(heightAt(x - 8, z - 8), heightAt(x + 8, z + 8), heightAt(x, z));
     const commercial = i % 5 === 2;
     const floors = commercial ? 3 + Math.floor(rnd() * 3) : 4 + Math.floor(rnd() * 5);
     const fh = 3.1;
     const w = 16 + rnd() * 10;
     const d = 12 + rnd() * 6;
+    // Nunca em cima de uma rua transversal: afasta para o lado.
+    for (const c of crossStreets()) {
+      const off = Math.atan2(Math.sin(a - c), Math.cos(a - c)) * rr;
+      const need = Math.hypot(w, d) / 2 + 8;
+      if (Math.abs(off) < need) a = c + ((Math.sign(off) || 1) * need) / rr;
+    }
+    const x = Math.cos(a) * rr;
+    const z = Math.sin(a) * rr;
+    const y = Math.min(heightAt(x - 8, z - 8), heightAt(x + 8, z + 8), heightAt(x, z));
     const rot = Math.PI / 2 - a + Math.PI;
     const H = floors * fh + 4;
     const P = (lx: number, ly: number, lz: number): [number, number, number] => [x + lx * Math.cos(rot) + lz * Math.sin(rot), y + ly, z - lx * Math.sin(rot) + lz * Math.cos(rot)];
@@ -606,8 +612,10 @@ export function neighborhood(kit: Kit): { group: THREE.Group; tick: (t: number) 
     gl.translate(0, 1.12, -0.2);
     return gl;
   })();
-  const parked = 70;
-  const moving = 10;
+  // Carros estacionados também ficam com as ruas (city.ts, modelo detalhado).
+  const parked = 0;
+  // Os carros andando ficam com as ruas (city.ts), que respeitam semáforo e ônibus.
+  const moving = 0;
   const cars = new THREE.InstancedMesh(kit.own(carGeo), kit.mat('#ffffff', { rough: 0.35, metal: 0.4 }), parked + moving);
   const windows = new THREE.InstancedMesh(kit.own(glassCar), kit.mat('#1F2A36', { rough: 0.1, metal: 0.6 }), parked + moving);
   cars.castShadow = true;
@@ -631,8 +639,9 @@ export function neighborhood(kit: Kit): { group: THREE.Group; tick: (t: number) 
   let pk = 0;
   for (let k = 0; k < 400 && pk < parked; k++) {
     const a = (k / 400) * Math.PI * 2;
-    if (rnd() > 0.35 || gates.some((gA) => Math.abs(Math.atan2(Math.sin(a - gA), Math.cos(a - gA))) < 0.03)) continue;
-    placeCar(pk, a, ROAD_RADIUS + 2.4, k % 2 ? 1 : -1);
+    // Estacionados do lado do parque (o ônibus e os carros passam do outro), longe dos portões e pontos.
+    if (rnd() > 0.35 || gates.some((gA) => Math.abs(Math.atan2(Math.sin(a - gA), Math.cos(a - gA))) < 0.03 || Math.abs(Math.atan2(Math.sin(a - gA - 0.05), Math.cos(a - gA - 0.05))) < 0.03)) continue;
+    placeCar(pk, a, ROAD_RADIUS - 2.6, -1);
     cars.setColorAt(pk++, col.set(carColors[Math.floor(rnd() * carColors.length)]!));
   }
   const lanes = Array.from({ length: moving }, (_, k) => ({ a: (k / moving) * Math.PI * 2, dir: k % 2 ? 1 : -1, speed: 7 + rnd() * 4 }));

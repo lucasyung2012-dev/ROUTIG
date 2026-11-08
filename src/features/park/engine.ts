@@ -26,6 +26,8 @@ export interface Stats {
   fps: number;
   calls: number;
   triangles: number;
+  /** Parado (câmera sem mexer): o parque desenha menos quadros para poupar o aparelho. */
+  idle?: boolean;
 }
 
 export type InteriorFactory = (kit: Kit) => InteriorScene;
@@ -951,15 +953,26 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
   let hintFrame = 0;
   let hint: string | null = null;
   const t0 = performance.now();
+  // Economia: com a câmera parada há 2,5 s, no máximo 20 quadros por segundo (as pessoas e a água
+  // seguem se mexendo); qualquer movimento volta ao normal no quadro seguinte. Poupa a placa de
+  // vídeo, a bateria e o ventilador do computador.
+  let movedAt = performance.now();
+  const camPrev = new THREE.Vector3();
+  const camQPrev = new THREE.Quaternion();
   const loop = (now: number) => {
     raf = requestAnimationFrame(loop);
-    if (document.hidden || now - last < 1000 / fpsCap - 1) return;
+    const idle = now - movedAt > 2500;
+    const cap = idle ? Math.min(fpsCap, 20) : fpsCap;
+    if (document.hidden || now - last < 1000 / cap - 1) return;
     const dt = Math.min(0.1, (now - (last || now)) / 1000);
     last = now;
     frames++;
     stepEnv(dt);
     const riding = stepRide(now) || stepClimb(now);
     if (!riding) rig.update(dt, now);
+    if (riding || rig.gliding() || camera.position.distanceToSquared(camPrev) > 1e-6 || camera.quaternion.angleTo(camQPrev) > 5e-4) movedAt = now;
+    camPrev.copy(camera.position);
+    camQPrev.copy(camera.quaternion);
     // Parou de olhar pela luneta: o céu da luneta some.
     if (skyShow && rig.posture() !== 'observe') hideSky();
     const mode = rig.mode();
@@ -1131,7 +1144,7 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
     }
     audio?.update({ listener: camera, inside: !!inside, hour: shownHour, sky: weather, steps: mode === 'orbit' || rig.gliding() ? 0 : body.airborne ? 0 : body.speed, trees: treeNear, season, skaters: inside ? [] : extras.skaters() }, dt);
     if (now - statsAt >= 1000) {
-      opts.onStats({ fps: Math.round((frames * 1000) / (now - statsAt)), calls: renderer.info.render.calls, triangles: renderer.info.render.triangles });
+      opts.onStats({ fps: Math.round((frames * 1000) / (now - statsAt)), calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, idle: now - movedAt > 2500 });
       frames = 0;
       statsAt = now;
     }

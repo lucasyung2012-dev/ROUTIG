@@ -356,7 +356,8 @@ export default function ParkPage() {
   // Gráficos automáticos: baixa um nível se ficar lento por alguns segundos; sobe se sobrar folga por bastante tempo.
   const perf = useRef({ slow: 0, fast: 0, hold: 0 });
   useEffect(() => {
-    if (graphics !== 'auto' || !stats) return;
+    // Parado o parque desenha menos de propósito: isso não conta como lentidão.
+    if (graphics !== 'auto' || !stats || stats.idle) return;
     const p = perf.current;
     p.slow = stats.fps < 38 ? p.slow + 1 : 0;
     p.fast = stats.fps >= 57 ? p.fast + 1 : 0;

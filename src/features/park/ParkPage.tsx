@@ -310,6 +310,9 @@ export default function ParkPage() {
       clearParkContext();
       engine.current.setHour(clockAuto ? hourNow() : manualHour);
       engine.current.setWeather(skyAuto ? autoSky(new Date()) : manualSky);
+      // Som ligado antes de o motor existir: entrega agora (senão ele nunca sabe onde a pessoa está
+      // e o som fica igual no parque inteiro).
+      if (audioRef.current) engine.current.setAudio(audioRef.current);
     } catch {
       setFailed(true);
     }
@@ -404,14 +407,22 @@ export default function ParkPage() {
     // O iPad só libera som depois de um toque: qualquer toque no parque serve.
     const wake = () => sound.unlock();
     window.addEventListener('pointerdown', wake);
+    // Parque fora da tela (outra aba, outro app, tela apagada): silêncio total até voltar. Antes o
+    // som seguia tocando em segundo plano — inclusive de uma segunda janela do ROUTIG esquecida aberta.
+    const vis = () => a?.setMix(document.hidden ? { ...mixRef.current, muted: true } : mixRef.current);
+    document.addEventListener('visibilitychange', vis);
+    vis();
     return () => {
+      document.removeEventListener('visibilitychange', vis);
       window.removeEventListener('pointerdown', wake);
       engine.current?.setAudio(null);
       a?.dispose();
       audioRef.current = null;
     };
   }, [ambient, focusRunning]);
-  useEffect(() => audioRef.current?.setMix(mix), [mix]);
+  const mixRef = useRef(mix);
+  mixRef.current = mix;
+  useEffect(() => audioRef.current?.setMix(document.hidden ? { ...mix, muted: true } : mix), [mix]);
   // Interface 2D a partir do parque: guarda onde a pessoa está para retomar ao voltar.
   const open2D = (id: ModuleId) => {
     if (engine.current) saveParkContext({ ...engine.current.snapshot(), sector, zone: zoneKey });

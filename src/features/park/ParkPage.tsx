@@ -17,6 +17,7 @@ import { Select } from '@/ui/Field';
 import { Segmented } from '@/ui/Segmented';
 import { Switch } from '@/ui/Switch';
 import { useFocus } from '@/features/focus/FocusProvider';
+import { formatClock, phaseElapsed, phaseRemaining } from '@/domain/focus';
 import { sound } from '@/features/focus/sound';
 import { Minimap } from './Minimap';
 import { useToast } from '@/ui/toast';
@@ -819,6 +820,7 @@ export default function ParkPage() {
           onClose={() => setElevator(false)}
         />
       )}
+      {focus.timer && <FocusParkPill onOpen={() => open2D('focus')} />}
       {talk && <TalkBubble key={talk.at} name={talk.name} text={`${t(`park.talk.hi${talk.line}` as MessageKey)} ${t(`park.talk.${talk.activity}` as MessageKey)}`} onDone={() => setTalk(null)} />}
       {/* Central de Módulos: botão flutuante (arraste para mudar de lugar) */}
       <FloatingCenterButton hidden={!!(inside && sector)} place={fab} onMove={setFab} onOpen={() => setCenter(true)} label={t('park.center.open')} />
@@ -1140,6 +1142,35 @@ function NoWebgl() {
           </ul>
         </nav>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Focus em andamento visível no parque: o som do parque fica desligado durante o Focus e o som do
+ * Focus (ruído, chuva, ondas) toca no parque inteiro; aqui dá para pausar, desligar esse som ou abrir o Focus.
+ */
+function FocusParkPill({ onOpen }: { onOpen: () => void }) {
+  const { t } = useSettings();
+  const { timer, now, pause, resume, setSound } = useFocus();
+  if (!timer) return null;
+  const remaining = phaseRemaining(timer, now);
+  const clock = formatClock(timer.waiting ? (timer.phaseMs ?? 0) : (remaining ?? phaseElapsed(timer, now)));
+  const paused = timer.runningSince === null;
+  return (
+    <div className="absolute left-3 top-[4.5rem] z-10 flex max-w-[calc(100%-13rem)] flex-wrap items-center gap-1 rounded-2xl bg-surface/95 p-1.5 pl-3 text-sm shadow-lg ring-1 ring-line safe-top" role="status">
+      <button type="button" onClick={onOpen} className="font-semibold tabular text-accent" aria-label={t('park.focusOpen')}>
+        {t('modules.focus')} {clock}
+      </button>
+      {timer.sound !== 'none' && <span className="hidden text-xs text-muted sm:inline">· {t(`focus.sounds.${timer.sound}` as MessageKey)}</span>}
+      <Button size="sm" variant="secondary" onClick={() => (paused ? resume() : pause())}>
+        {paused ? t('focus.resume') : t('focus.pause')}
+      </Button>
+      {timer.sound !== 'none' && (
+        <Button size="sm" variant="ghost" onClick={() => setSound('none')}>
+          {t('park.focusMute')}
+        </Button>
+      )}
     </div>
   );
 }

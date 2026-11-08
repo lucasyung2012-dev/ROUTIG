@@ -4792,6 +4792,8 @@ export const pt = {
     floorNames: { f0: 'Térreo', f1: '1º andar', f2: '2º andar', f3: '3º andar' },
     floorsNav: 'Andares',
     terrace: 'Terraço',
+    focusOpen: 'Abrir o Focus',
+    focusMute: 'Tirar o som do Focus',
     elevators: 'Elevadores',
     use: {
       piano: 'Tocar o piano',

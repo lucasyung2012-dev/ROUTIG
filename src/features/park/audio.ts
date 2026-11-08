@@ -111,14 +111,71 @@ export function createParkAudio(mix: AudioMix): ParkAudio | null {
   const pondGs = PONDS.map((p) => loop(pink, panner(p.x, 0.5, p.z, 4, cat.water), (f) => ((f.type = 'bandpass'), (f.frequency.value = 1400), (f.Q.value = 0.6))));
   const fountainG = loop(white, panner(0, 2, 0, 5, cat.water), (f) => ((f.type = 'bandpass'), (f.frequency.value = 2400), (f.Q.value = 0.4)));
   // Clima em volta: vento (ruído grave que oscila), folhas farfalhando nas árvores e chuva.
-  const windG = loop(brown, cat.weather, (f) => ((f.type = 'lowpass'), (f.frequency.value = 380)));
-  const leavesG = loop(pink, cat.nature, (f) => ((f.type = 'bandpass'), (f.frequency.value = 3400), (f.Q.value = 0.7)));
+  // Vento: só quando venta de verdade, sem o ronco grave (que lembrava avião).
+  const windHp = keep(ctx.createBiquadFilter());
+  windHp.type = 'highpass';
+  windHp.frequency.value = 160;
+  windHp.connect(cat.weather);
+  const windG = loop(brown, windHp, (f) => ((f.type = 'lowpass'), (f.frequency.value = 700)));
+  let rustleAt = 0;
   const rainG = loop(white, cat.weather, (f) => ((f.type = 'highpass'), (f.frequency.value = 900)));
   // Trânsito da rua do bairro: ronco grave vindo do trecho da rua mais perto de quem ouve.
   const roadP = panner(ROAD_RADIUS, 0.5, 0, 25, cat.weather);
-  const roadG = loop(brown, roadP, (f) => ((f.type = 'lowpass'), (f.frequency.value = 170)));
+  const roadG = loop(brown, roadP, (f) => ((f.type = 'lowpass'), (f.frequency.value = 220)));
   // Cigarras nas tardes de verão (chiado agudo que cresce e some).
-  const cicadaG = loop(white, cat.nature, (f) => ((f.type = 'bandpass'), (f.frequency.value = 5600), (f.Q.value = 9)));
+  // Cigarras: zumbido (tom agudo pulsando rápido), não chiado de ruído (que parecia água).
+  const cicada = keep(ctx.createOscillator());
+  cicada.type = 'sawtooth';
+  cicada.frequency.value = 4100;
+  const cicBp = keep(ctx.createBiquadFilter());
+  cicBp.type = 'bandpass';
+  cicBp.frequency.value = 4300;
+  cicBp.Q.value = 5;
+  const cicPulse = keep(ctx.createGain());
+  cicPulse.gain.value = 0.5;
+  const cicLfo = keep(ctx.createOscillator());
+  cicLfo.type = 'square';
+  cicLfo.frequency.value = 42;
+  const cicDepth = keep(ctx.createGain());
+  cicDepth.gain.value = 0.5;
+  cicLfo.connect(cicDepth).connect(cicPulse.gain);
+  const cicadaG = keep(ctx.createGain());
+  cicadaG.gain.value = 0;
+  cicada.connect(cicBp).connect(cicPulse).connect(cicadaG).connect(cat.nature);
+  cicada.start();
+  cicLfo.start();
+
+  /**
+   * Folhas: farfalhar em rajadas curtas, de copas em volta de quem ouve (com o tremor rápido das
+   * folhas), e não um chiado contínuo (que soava como água correndo).
+   */
+  const rustle = (x: number, z: number, vol: number) => {
+    const t0 = now();
+    const len = 0.6 + Math.random() * 1.1;
+    const p = panner(x, 5, z, 6, cat.nature, false);
+    const src = ctx.createBufferSource();
+    src.buffer = pink;
+    const bp = ctx.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.frequency.value = 1700 + Math.random() * 1500;
+    bp.Q.value = 1.1;
+    const env = ctx.createGain();
+    env.gain.setValueAtTime(0.0001, t0);
+    env.gain.exponentialRampToValueAtTime(vol, t0 + len * 0.3);
+    env.gain.exponentialRampToValueAtTime(0.0001, t0 + len);
+    const flutter = ctx.createGain();
+    flutter.gain.value = 0.55;
+    const lfo = ctx.createOscillator();
+    lfo.frequency.value = 11 + Math.random() * 12;
+    const depth = ctx.createGain();
+    depth.gain.value = 0.45;
+    lfo.connect(depth).connect(flutter.gain);
+    src.connect(bp).connect(env).connect(flutter).connect(p);
+    src.start(t0, Math.random() * 3, len + 0.1);
+    lfo.start(t0);
+    lfo.stop(t0 + len + 0.1);
+    window.setTimeout(() => p.disconnect(), (len + 0.5) * 1000);
+  };
   // Skate: rodinhas no piso (ruído grave) saindo de onde está o skatista mais perto.
   const skateP = panner(0, 0.2, 0, 3, cat.nature);
   const skateG = loop(brown, skateP, (f) => ((f.type = 'bandpass'), (f.frequency.value = 320), (f.Q.value = 0.9)));
@@ -553,14 +610,20 @@ export function createParkAudio(mix: AudioMix): ParkAudio | null {
     pondGs.forEach((g) => ramp(g.gain, 0.25));
     ramp(fountainG.gain, 0.22);
     const gust = Math.sin(performance.now() / 1300) * 0.5 + Math.sin(performance.now() / 3100) * 0.5;
-    ramp(windG.gain, 0.05 + sky.wind * 0.9 + gust * sky.wind * 0.2);
-    ramp(leavesG.gain, trees * (0.03 + sky.wind * 0.35 + Math.max(0, gust) * (0.04 + sky.wind * 0.25)), 0.6);
+    ramp(windG.gain, Math.max(0, sky.wind - 0.3) * 0.7 * (0.75 + gust * 0.25));
+    // Farfalhar: mais rajadas onde há árvores e quando venta; quase nada em dia parado.
+    if (!info.inside && trees > 0.1 && performance.now() > rustleAt) {
+      rustleAt = performance.now() + (2500 + Math.random() * 4000) / (0.4 + sky.wind * 2.5) / (0.5 + trees);
+      const ang = Math.random() * Math.PI * 2;
+      const dist = 6 + Math.random() * 16;
+      rustle(c.x + Math.cos(ang) * dist, c.z + Math.sin(ang) * dist, 0.05 + sky.wind * 0.18);
+    }
     ramp(rainG.gain, sky.rain * 0.5);
     // Rua: mais movimento de manhã e no fim da tarde, quase nada de madrugada.
     const rush = h < 5 ? 0.15 : (h > 7 && h < 9.5) || (h > 17 && h < 19.5) ? 1 : h > 22 ? 0.35 : 0.65;
-    ramp(roadG.gain, 0.5 * rush, 1);
+    ramp(roadG.gain, toRoad < 150 ? 0.28 * rush : 0, 1);
     ramp(crickG.gain, night && sky.rain < 0.2 ? 0.012 : 0, 1.5);
-    ramp(cicadaG.gain, info.season === 'summer' && h > 12 && h < 17.5 && sky.rain < 0.1 && !info.inside ? 0.02 + Math.max(0, Math.sin(performance.now() / 4000)) * 0.05 : 0, 1.2);
+    ramp(cicadaG.gain, info.season === 'summer' && h > 12 && h < 17.5 && sky.rain < 0.1 && !info.inside ? Math.max(0, Math.sin(performance.now() / 5000)) * 0.012 : 0, 1.5);
     // Skate: as rodinhas soam enquanto há skatista perto.
     const sk = info.skaters?.reduce<{ x: number; z: number; d: number } | null>((m, s) => {
       const d = Math.hypot(s.x - c.x, s.z - c.z);
@@ -582,7 +645,7 @@ export function createParkAudio(mix: AudioMix): ParkAudio | null {
       const sweep = Math.random() < 0.5 ? 1 : -1;
       const p = panner(Math.cos(ra - sweep * 0.06) * ROAD_RADIUS, 0.6, Math.sin(ra - sweep * 0.06) * ROAD_RADIUS, 10, cat.weather, false);
       const t0 = now();
-      burst(p, t0, brown, 'lowpass', 140, 0.7, 0.5, 2.6, 380);
+      burst(p, t0, brown, 'lowpass', 160, 0.7, 0.3, 2.6, 420);
       burst(p, t0 + 0.4, pink, 'bandpass', 700, 1, 0.12, 1.8, 400);
       // O carro passa: o som anda pela rua até o outro lado.
       const steps = 12;

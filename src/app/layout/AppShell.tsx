@@ -54,6 +54,9 @@ function Shell() {
   const { settings, update, t } = useSettings();
   const toast = useToast();
   const [menuOpen, setMenuOpen] = useState(false);
+  // Lido depois da montagem: o parque grava o lugar ao desmontar, e isso acontece depois deste render.
+  const [fromPark, setFromPark] = useState(() => !!readParkContext());
+  useEffect(() => setFromPark(!!readParkContext()), []);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [online, setOnline] = useState(() => (typeof navigator === 'undefined' ? true : navigator.onLine));
   const location = useLocation();
@@ -102,7 +105,7 @@ function Shell() {
           <Link to="/" className="hidden items-center gap-2 sm:flex md:hidden" aria-label={t('park.title')}>
             <Logo size={28} className="h-7 w-7" />
           </Link>
-          {readParkContext() && (
+          {fromPark && (
             <Link to="/" className="flex h-10 shrink-0 items-center gap-2 rounded-xl bg-brand px-3 text-sm font-semibold text-white shadow-glow">
               <Trees className="h-4 w-4" aria-hidden />
               <span className="hidden sm:inline">{t('park.center.back')}</span>

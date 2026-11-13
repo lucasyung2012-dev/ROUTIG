@@ -1,6 +1,11 @@
 import { z } from 'zod';
 import type { BaseEntity } from './entity';
 import { addDays, toDateKey, type DateKey } from './dates';
+import type { FocusSession } from './focus';
+import type { Goal } from './goals';
+import type { Habit, HabitLog } from './habits';
+import type { Instrument, Song } from './music';
+import type { Sport, SportActivity } from './sports';
 
 /* ---------- Interesses (Parte 21.2–21.4) ---------- */
 
@@ -154,4 +159,40 @@ export function countByWeek(dates: DateKey[], today: DateKey, weeks: number): We
     if (i !== undefined) buckets[i]!.count++;
   }
   return buckets;
+}
+
+/* ---------- Minha evolução: os outros módulos ---------- */
+
+export const EVOLUTION_MODULES = ['habits', 'focus', 'goals', 'music', 'sports'] as const;
+export type EvolutionModule = (typeof EVOLUTION_MODULES)[number];
+
+export interface EvolutionModuleData {
+  habits: Array<Pick<Habit, 'id' | 'deletedAt'>>;
+  habitLogs: Array<Pick<HabitLog, 'habitId' | 'deletedAt'>>;
+  focus: Array<Pick<FocusSession, 'actualMin' | 'deletedAt'>>;
+  goals: Array<Pick<Goal, 'status' | 'deletedAt'>>;
+  instruments: Array<Pick<Instrument, 'id' | 'deletedAt'>>;
+  songs: Array<Pick<Song, 'instrumentId' | 'status' | 'deletedAt'>>;
+  sports: Array<Pick<Sport, 'id' | 'deletedAt'>>;
+  activities: Array<Pick<SportActivity, 'sportId' | 'deletedAt'>>;
+}
+
+/**
+ * Um número por módulo, contado agora a partir dos registros (nada fora da Lixeira): registros de hábitos,
+ * minutos de foco, objetivos concluídos, músicas dominadas e atividades de esporte. Só entra o módulo que tem
+ * algum registro (um hábito, uma sessão, um objetivo, um instrumento ou um esporte).
+ */
+export function moduleEvolution(d: EvolutionModuleData): Array<{ module: EvolutionModule; value: number }> {
+  const habitIds = new Set(d.habits.filter((h) => !h.deletedAt).map((h) => h.id));
+  const focus = d.focus.filter((s) => !s.deletedAt);
+  const goals = d.goals.filter((g) => !g.deletedAt);
+  const instrumentIds = new Set(d.instruments.filter((i) => !i.deletedAt).map((i) => i.id));
+  const sportIds = new Set(d.sports.filter((s) => !s.deletedAt).map((s) => s.id));
+  const out: Array<{ module: EvolutionModule; value: number }> = [];
+  if (habitIds.size) out.push({ module: 'habits', value: d.habitLogs.filter((l) => !l.deletedAt && habitIds.has(l.habitId)).length });
+  if (focus.length) out.push({ module: 'focus', value: focus.reduce((a, s) => a + s.actualMin, 0) });
+  if (goals.length) out.push({ module: 'goals', value: goals.filter((g) => g.status === 'done').length });
+  if (instrumentIds.size) out.push({ module: 'music', value: d.songs.filter((s) => !s.deletedAt && instrumentIds.has(s.instrumentId) && s.status === 'mastered').length });
+  if (sportIds.size) out.push({ module: 'sports', value: d.activities.filter((a) => !a.deletedAt && sportIds.has(a.sportId)).length });
+  return out;
 }

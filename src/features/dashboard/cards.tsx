@@ -10,12 +10,12 @@ import { loadPrivacy } from '@/data/privacyRepo';
 import type { PrivacyModule } from '@/domain/privacy';
 import { addDays, formatDateKey, toDateKey, todayKey } from '@/domain/dates';
 import { fromMinutes } from '@/domain/events';
-import type { KpiMetric, LiveCard } from '@/domain/dashboard';
+import { isActiveProject, isPendingInboxItem, type KpiMetric, type LiveCard } from '@/domain/dashboard';
 import { notePreview } from '@/domain/notes';
-import { isClosedProject } from '@/domain/projects';
 import { compareTasks, completionTimes, isClosedKind, statusKind } from '@/domain/tasks';
 import { visibleModules } from '@/domain/settings';
 import { useEventEditor } from '@/features/calendar/EventEditor';
+import { useFinanceLocked } from '@/features/finance/FinanceLock';
 import { toneLook, useCalendarData } from '@/features/calendar/useCalendarData';
 import { useAcademyData } from '@/features/academy/useAcademyData';
 import { useLanguages } from '@/features/languages/useLanguages';
@@ -70,8 +70,8 @@ const isDoneStatus = (data: ReturnType<typeof useTasksData>) => (statusId: strin
 export function TodayCard() {
   const { t } = useSettings();
   const cal = useCalendarData();
-  const inbox = useLiveQuery(() => getDb().inbox.filter((i) => !i.deletedAt && i.status === 'open').count(), []);
   const today = todayKey();
+  const inbox = useLiveQuery(() => getDb().inbox.filter((i) => isPendingInboxItem(i, today)).count(), [today]);
   if (cal.loading || inbox === undefined) return <CardShell title={t('dashboard.cards.today')} icon={<Sun className="h-5 w-5" />}><LoadingState label={t('common.loading')} lines={2} /></CardShell>;
   const items = cal.itemsInRange(today, today, { showTasks: false, categoryId: null });
   const events = items.filter((i) => i.kind === 'event').length;
@@ -181,7 +181,7 @@ export function TasksCard() {
 export function ProjectsCard() {
   const { t } = useSettings();
   const data = useProjectsData();
-  const active = data.projects.filter((p) => !isClosedProject(p.status) && p.status !== 'idea').slice(0, 5);
+  const active = data.projects.filter(isActiveProject).slice(0, 5);
   return (
     <CardShell title={t('dashboard.cards.projects')} icon={<FolderKanban className="h-5 w-5" />} tone="amber" link={{ to: '/projects', label: t('dashboard.seeAllProjects') }}>
       {data.loading ? (
@@ -280,7 +280,7 @@ export function NotesCard() {
 export function InboxCard() {
   const { t } = useSettings();
   const today = todayKey();
-  const count = useLiveQuery(() => getDb().inbox.filter((i) => !i.deletedAt && i.status === 'open' && (!i.snoozedUntil || i.snoozedUntil <= today)).count(), [today]);
+  const count = useLiveQuery(() => getDb().inbox.filter((i) => isPendingInboxItem(i, today)).count(), [today]);
   return (
     <CardShell title={t('dashboard.cards.inbox')} icon={<Inbox className="h-5 w-5" />} tone="neutral" link={{ to: '/inbox', label: t('common.open') }}>
       {count === undefined ? <LoadingState label={t('common.loading')} lines={1} /> : <p className="text-sm text-muted">{count === 0 ? t('inbox.empty.open') : t('dashboard.inboxCount', { count })}</p>}
@@ -422,9 +422,9 @@ export function KpiCard({ metric }: { metric: KpiMetric }) {
       case 'tasksDoneWeek':
         return (await db.tasks.filter((x) => !x.deletedAt).toArray()).flatMap((x) => completionTimes(x)).filter((c) => toDateKey(new Date(c)) >= weekAgo).length;
       case 'projectsActive':
-        return db.projects.filter((p) => !p.deletedAt && p.status === 'active').count();
+        return db.projects.filter(isActiveProject).count();
       case 'inboxOpen':
-        return db.inbox.filter((i) => !i.deletedAt && i.status === 'open').count();
+        return db.inbox.filter((i) => isPendingInboxItem(i, today)).count();
       case 'notesTotal':
         return db.notes.filter((n) => !n.deletedAt).count();
       case 'eventsWeek':
@@ -752,10 +752,14 @@ export function FinanceCard() {
     const terms = await db.finTerms.filter((x) => !x.deletedAt && isDue(x.srs, today)).count();
     return { assets, toReview, terms };
   }, [today]);
+  // Com o PIN de Finanças e Finanças trancado nesta sessão, o cartão não mostra nenhum número.
+  const locked = useFinanceLocked();
   return (
     <CardShell title={t('dashboard.cards.finance')} icon={<Wallet className="h-5 w-5" />} tone="blue" link={{ to: '/finance', label: t('common.open') }}>
-      {!counts ? (
+      {locked === undefined || (!locked && !counts) ? (
         <LoadingState label={t('common.loading')} lines={2} />
+      ) : locked || !counts ? (
+        <p className="text-sm text-muted">{t('dashboard.financeLockedCard')}</p>
       ) : (
         <ul className="flex flex-col gap-1 text-sm">
           <li className="text-fg">{t('dashboard.financeAssets', { count: counts.assets })}</li>

@@ -101,7 +101,7 @@ export function CalendarPage({ initialView }: { initialView?: CalendarView } = {
     onOpen: (i: CalendarItem) => {
       if (i.kind === 'task' && i.task) tasks.openTask(i.task.id);
       else if (i.kind === 'milestone' && i.projectId) navigate(`/projects/${i.projectId}`);
-      else if (i.kind === 'assessment' && i.subjectId) navigate(`/academy/subjects/${i.subjectId}`);
+      else if (i.kind === 'assessment' && i.assessmentId) navigate(`/academy/assessments/${i.assessmentId}`);
       else if (i.kind === 'study') navigate('/academy/plan');
       else if (i.kind === 'habit' && i.habitId) navigate(`/habits/${i.habitId}`);
       else if (i.kind === 'goal' && i.goalId) navigate(`/goals/${i.goalId}`);

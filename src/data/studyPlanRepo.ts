@@ -1,4 +1,4 @@
-import { getDb } from './db';
+import { getDb, touchById } from './db';
 import { newId, nowIso } from '@/domain/ids';
 import type { ChangeEntry } from '@/domain/entity';
 import { studySessionInputSchema, type StudySession, type StudySessionInput } from '@/domain/academy';
@@ -86,7 +86,7 @@ export async function setSessionStatus(id: string, status: StudySession['status'
 async function setDeleted(id: string, deletedAt: string | null, action: 'delete' | 'restore') {
   const db = getDb();
   await db.transaction('rw', db.studySessions, db.changelog, async () => {
-    await db.studySessions.update(id, { deletedAt, updatedAt: nowIso() });
+    await touchById(db.studySessions, id, { deletedAt });
     await log({ entityType: 'studySession', entityId: id, action });
   });
 }

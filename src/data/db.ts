@@ -1,4 +1,5 @@
-import Dexie, { type EntityTable } from 'dexie';
+import Dexie, { type EntityTable, type IndexableType, type Table } from 'dexie';
+import { nowIso } from '@/domain/ids';
 import type { ChangeEntry, Link } from '@/domain/entity';
 import type { Task, TaskList } from '@/domain/tasks';
 import type { CalendarEvent } from '@/domain/events';
@@ -232,4 +233,37 @@ export function getDb(): RoutigDB {
 /** Só para testes: troca o banco por um novo, isolado. */
 export function setDbForTests(db: RoutigDB | null): void {
   instance = db;
+}
+
+/** Campos que todo registro sincronizável tem (ver BaseEntity). */
+interface Revisioned {
+  rev: number;
+  updatedAt: string;
+}
+
+/**
+ * Grava `changes` no registro `id` marcando a alteração: `rev` + 1 e `updatedAt`. Toda escrita que
+ * muda um registro (inclusive excluir, restaurar, arquivar e reordenar) passa por aqui ou soma `rev`
+ * à mão, porque a sincronização fica com a versão de `rev` maior (src/domain/sync.ts). Devolve
+ * quantos registros mudaram (0 se o id não existe), como `Table.update`.
+ */
+export async function touchById<T extends Revisioned, K extends IndexableType, I>(
+  table: Table<T, K, I>,
+  id: K,
+  changes: NoInfer<Partial<T>>,
+  at: string = nowIso(),
+): Promise<number> {
+  return table
+    .where(':id')
+    .equals(id)
+    .modify((row: T) => {
+      Object.assign(row, changes);
+      touch(row, at);
+    });
+}
+
+/** Marca a alteração de um registro dentro de `Collection.modify` (rev + 1 e updatedAt). */
+export function touch(row: Revisioned, at: string = nowIso()): void {
+  row.updatedAt = at;
+  row.rev = (typeof row.rev === 'number' ? row.rev : 0) + 1;
 }

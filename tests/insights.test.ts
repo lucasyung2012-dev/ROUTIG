@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { academyInsights, focusInsights, previousRange, rangeFor, series, sportsInsights, tasksInsights } from '@/domain/insights';
+import { academyInsights, focusInsights, musicInsights, previousRange, rangeFor, series, sportsInsights, tasksInsights } from '@/domain/insights';
 
 const base = { createdAt: '2026-11-01T10:00:00.000Z', updatedAt: '', deletedAt: null, rev: 1 };
 
@@ -46,5 +46,26 @@ describe('insights (Parte 19)', () => {
     const pts = series(s.points, r, 1);
     expect(pts).toHaveLength(7);
     expect(pts.map((p) => p.value)).toEqual([2, 0, 0, 1, 0, 0, 0]);
+  });
+});
+
+describe('insights ignoram o que está na Lixeira', () => {
+  const del = '2026-11-03T10:00:00.000Z';
+
+  it('música na Lixeira não conta como dominada (nem no período, nem no repertório)', () => {
+    const r = { from: '2026-11-02', to: '2026-11-08' };
+    const ins = { ...base, id: 'i' } as never;
+    const song = (id: string, deletedAt: string | null, instrumentId = 'i') => ({ ...base, id, instrumentId, status: 'mastered', deletedAt }) as never;
+    const change = (entityId: string) => ({ entityType: 'song', entityId, action: 'update', note: 'status:mastered', at: '2026-11-04T12:00:00.000Z' }) as never;
+    const out = musicInsights([ins], [], [song('ok', null), song('lixo', del), song('orfa', null, 'apagado')], [change('ok'), change('lixo'), change('orfa')], r);
+    expect(out.masteredInPeriod).toBe(1);
+    expect(out.repertoire).toMatchObject({ total: 1, mastered: 1 });
+  });
+
+  it('atividades de um esporte na Lixeira não contam', () => {
+    const r = { from: '2026-11-02', to: '2026-11-08' };
+    const act = (sportId: string) => ({ ...base, id: sportId, sportId, date: '2026-11-03', type: 'training', durationMin: 30, outcome: null }) as never;
+    const s = sportsInsights([{ ...base, id: 'x' } as never, { ...base, id: 'y', deletedAt: del } as never], [act('x'), act('y')], r);
+    expect(s).toMatchObject({ activities: 1, minutes: 30 });
   });
 });

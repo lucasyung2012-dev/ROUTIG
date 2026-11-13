@@ -1,4 +1,4 @@
-import { getDb } from './db';
+import { getDb, touch } from './db';
 import { newId, nowIso } from '@/domain/ids';
 import type { ChangeEntry } from '@/domain/entity';
 import {
@@ -97,8 +97,12 @@ export async function updateYear(id: string, patch: Partial<Pick<AcademicYear, '
 export async function setCurrentYear(id: string): Promise<void> {
   const db = getDb();
   await db.transaction('rw', db.academicYears, async () => {
+    const at = nowIso();
     await db.academicYears.toCollection().modify((y) => {
-      y.current = y.id === id;
+      const current = y.id === id;
+      if (y.current === current) return;
+      y.current = current;
+      touch(y, at);
     });
   });
 }
@@ -136,7 +140,11 @@ export async function updateTeacher(id: string, patch: Partial<Pick<Teacher, 'na
 export async function deleteTeacher(id: string): Promise<void> {
   const db = getDb();
   await db.transaction('rw', db.teachers, db.subjects, db.changelog, async () => {
-    await db.subjects.filter((s) => s.teacherId === id).modify({ teacherId: null });
+    const at = nowIso();
+    await db.subjects.filter((s) => s.teacherId === id).modify((s) => {
+      s.teacherId = null;
+      touch(s, at);
+    });
     await db.teachers.delete(id);
     await log({ entityType: 'teacher', entityId: id, action: 'purge' });
   });
@@ -189,7 +197,7 @@ async function setSubjectDeleted(id: string, deletedAt: string | null, action: '
   await db.transaction('rw', db.subjects, db.changelog, async () => {
     const s = await db.subjects.get(id);
     if (!s) return;
-    await db.subjects.put({ ...s, deletedAt, updatedAt: nowIso() });
+    await db.subjects.put({ ...s, deletedAt, updatedAt: nowIso(), rev: s.rev + 1 });
     await log({ entityType: 'subject', entityId: id, action });
   });
 }
@@ -260,7 +268,7 @@ async function setAssessmentDeleted(id: string, deletedAt: string | null, action
   await db.transaction('rw', db.assessments, db.changelog, async () => {
     const a = await db.assessments.get(id);
     if (!a) return;
-    await db.assessments.put({ ...a, deletedAt, updatedAt: nowIso() });
+    await db.assessments.put({ ...a, deletedAt, updatedAt: nowIso(), rev: a.rev + 1 });
     await log({ entityType: 'assessment', entityId: id, action });
   });
 }

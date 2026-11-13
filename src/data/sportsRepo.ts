@@ -1,4 +1,4 @@
-import { getDb } from './db';
+import { getDb, touchById } from './db';
 import { newId, nowIso } from '@/domain/ids';
 import type { ChangeEntry } from '@/domain/entity';
 import { activityInputSchema, sportInputSchema, sportItemInputSchema, type ActivityInput, type Sport, type SportActivity, type SportInput, type SportItem, type SportItemInput } from '@/domain/sports';
@@ -67,7 +67,7 @@ export async function updateSport(id: string, input: SportInput): Promise<Sport>
 async function setDeleted(table: 'sports' | 'sportActivities' | 'sportItems', entityType: string, id: string, deletedAt: string | null) {
   const db = getDb();
   await db.transaction('rw', db.table(table), db.changelog, async () => {
-    await db.table(table).update(id, { deletedAt, updatedAt: nowIso() });
+    await touchById(db.table(table), id, { deletedAt });
     await log({ entityType, entityId: id, action: deletedAt ? 'delete' : 'restore' });
   });
 }

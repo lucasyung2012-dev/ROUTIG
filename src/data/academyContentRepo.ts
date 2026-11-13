@@ -1,4 +1,4 @@
-import { getDb } from './db';
+import { getDb, touchById } from './db';
 import { newId, nowIso } from '@/domain/ids';
 import type { ChangeEntry } from '@/domain/entity';
 import { lessonInputSchema, type Content, type Doubt, type Lesson, type LessonInput } from '@/domain/academy';
@@ -55,8 +55,8 @@ export async function moveContent(id: string, delta: -1 | 1): Promise<void> {
     if (!other) return;
     // Troca as posições (se forem iguais, separa).
     const mine = c.order === other.order ? other.order + delta : other.order;
-    await db.contents.update(c.id, { order: mine });
-    await db.contents.update(other.id, { order: c.order });
+    await touchById(db.contents, c.id, { order: mine });
+    await touchById(db.contents, other.id, { order: c.order });
   });
 }
 
@@ -72,7 +72,7 @@ export async function reparentContent(id: string, parentId: string | null): Prom
       p = (await db.contents.get(p))?.parentId ?? null;
     }
     const sibs = await db.contents.where('subjectId').equals(c.subjectId).filter((x) => !x.deletedAt && x.parentId === parentId).toArray();
-    await db.contents.update(id, { parentId, order: sibs.reduce((m, x) => Math.max(m, x.order), 0) + 1, updatedAt: nowIso() });
+    await touchById(db.contents, id, { parentId, order: sibs.reduce((m, x) => Math.max(m, x.order), 0) + 1 });
   });
 }
 
@@ -86,7 +86,7 @@ export async function softDeleteContent(id: string): Promise<string[]> {
     const ids = [id];
     for (let i = 0; i < ids.length; i++) for (const x of all) if (x.parentId === ids[i] && !x.deletedAt) ids.push(x.id);
     const at = nowIso();
-    for (const x of ids) await db.contents.update(x, { deletedAt: at, updatedAt: at });
+    for (const x of ids) await touchById(db.contents, x, { deletedAt: at }, at);
     await log({ entityType: 'content', entityId: id, action: 'delete', note: String(ids.length) });
     return ids;
   });
@@ -95,7 +95,7 @@ export async function softDeleteContent(id: string): Promise<string[]> {
 export async function restoreContents(ids: string[]): Promise<void> {
   const db = getDb();
   await db.transaction('rw', db.contents, db.changelog, async () => {
-    for (const x of ids) await db.contents.update(x, { deletedAt: null, updatedAt: nowIso() });
+    for (const x of ids) await touchById(db.contents, x, { deletedAt: null });
     if (ids[0]) await log({ entityType: 'content', entityId: ids[0], action: 'restore' });
   });
 }
@@ -126,7 +126,7 @@ export async function saveLesson(id: string | null, input: LessonInput): Promise
 async function setLessonDeleted(id: string, deletedAt: string | null, action: 'delete' | 'restore') {
   const db = getDb();
   await db.transaction('rw', db.lessons, db.changelog, async () => {
-    await db.lessons.update(id, { deletedAt, updatedAt: nowIso() });
+    await touchById(db.lessons, id, { deletedAt });
     await log({ entityType: 'lesson', entityId: id, action });
   });
 }
@@ -163,7 +163,7 @@ export async function updateDoubt(id: string, patch: Partial<Pick<Doubt, 'questi
 async function setDoubtDeleted(id: string, deletedAt: string | null, action: 'delete' | 'restore') {
   const db = getDb();
   await db.transaction('rw', db.doubts, db.changelog, async () => {
-    await db.doubts.update(id, { deletedAt, updatedAt: nowIso() });
+    await touchById(db.doubts, id, { deletedAt });
     await log({ entityType: 'doubt', entityId: id, action });
   });
 }

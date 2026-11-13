@@ -37,7 +37,7 @@ export function Onboarding() {
   const skip = () => save((s) => ({ ...s, onboarding: { completed: true, step } }));
 
   return (
-    <div className="ambient flex min-h-full items-center justify-center px-4 py-10 safe-top safe-bottom">
+    <div className="ambient flex min-h-full items-center justify-center px-4 pb-[max(2.5rem,env(safe-area-inset-bottom))] pt-[max(2.5rem,env(safe-area-inset-top))]">
       <div className="w-full max-w-xl">
         {current !== 'welcome' && (
           <div className="mb-6 flex items-center justify-between">

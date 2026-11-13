@@ -9,6 +9,9 @@ import { Input } from '@/ui/Field';
 import { cn } from '@/ui/cn';
 import { readFavorites, readRecents, writeFavorites } from './parkContext';
 
+/** Só foca a busca sozinho com mouse e sem toque: no iPad o foco abre o teclado por cima da Central. */
+const keyboardFirst = () => typeof window !== 'undefined' && !!window.matchMedia?.('(pointer: fine)').matches && (navigator.maxTouchPoints ?? 0) === 0;
+
 const ALL: ModuleId[] = PARK_REGIONS.flatMap((r) => PARK_BUILDINGS.filter((b) => b.region === r).map((b) => b.id));
 const SHORTCUTS: Array<{ id: ModuleId; icon: typeof Inbox }> = [
   { id: 'inbox', icon: Inbox },
@@ -29,6 +32,7 @@ export function ModuleCenter({ inside, onClose, onEnter, onOpen2D }: { inside: M
   const [favorites, setFavorites] = useState<ModuleId[]>(readFavorites);
   const recents = useMemo(readRecents, []);
   const search = useRef<HTMLInputElement>(null);
+  const autoFocus = useMemo(keyboardFirst, []);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
@@ -120,7 +124,7 @@ export function ModuleCenter({ inside, onClose, onEnter, onOpen2D }: { inside: M
             <h1 className="hidden shrink-0 text-base font-semibold text-fg sm:block">{t('park.center.title')}</h1>
             <label className="relative flex-1">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-subtle" aria-hidden />
-              <Input ref={search} autoFocus value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t('park.center.search')} aria-label={t('park.center.search')} className="pl-9" />
+              <Input ref={search} autoFocus={autoFocus} value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t('park.center.search')} aria-label={t('park.center.search')} className="pl-9" />
             </label>
             <IconButton label={t('common.close')} icon={<X className="h-5 w-5" />} onClick={onClose} />
           </header>

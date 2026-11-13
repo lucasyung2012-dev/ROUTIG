@@ -84,7 +84,7 @@ async function setDeleted(id: string, deletedAt: string | null, action: 'delete'
   await db.transaction('rw', db.interests, db.changelog, async () => {
     const i = await db.interests.get(id);
     if (!i) return;
-    await db.interests.put({ ...i, deletedAt, updatedAt: nowIso() });
+    await db.interests.put({ ...i, deletedAt, updatedAt: nowIso(), rev: i.rev + 1 });
     await log({ entityType: ENTITY, entityId: id, action });
   });
 }
@@ -160,7 +160,7 @@ export async function deleteHistoryEntry(id: string): Promise<void> {
   await db.transaction('rw', db.historyEntries, db.changelog, async () => {
     const e = await db.historyEntries.get(id);
     if (!e) return;
-    await db.historyEntries.put({ ...e, deletedAt: nowIso(), updatedAt: nowIso() });
+    await db.historyEntries.put({ ...e, deletedAt: nowIso(), updatedAt: nowIso(), rev: e.rev + 1 });
     await log({ entityType: 'history', entityId: id, action: 'delete' });
   });
 }

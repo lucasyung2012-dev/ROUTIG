@@ -19,7 +19,8 @@ import { SETTINGS_SECTIONS } from '@/features/settings/sections';
 import { cn } from '@/ui/cn';
 import { loadPrivacy } from '@/data/privacyRepo';
 import { searchModules } from '@/data/searchRepo';
-import { SEARCH_GROUPS, type SearchGroup, type SearchHit } from '@/domain/search';
+import { DEFAULT_SEARCH_HIDDEN, SEARCH_GROUPS, searchHiddenNow, type SearchGroup, type SearchHit } from '@/domain/search';
+import { useFinanceLocked } from '@/features/finance/FinanceLock';
 
 interface Result {
   key: string;
@@ -52,7 +53,9 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
   const [active, setActive] = useState(0);
   const input = useRef<HTMLInputElement>(null);
   const privacy = useLiveQuery(() => loadPrivacy(), []);
-  const hidden = privacy?.searchHidden ?? ['finance'];
+  // Com Finanças trancado pelo PIN, nada de Finanças aparece na busca (nem enquanto o PIN é lido).
+  const financeLocked = useFinanceLocked();
+  const hidden = searchHiddenNow(privacy?.searchHidden ?? DEFAULT_SEARCH_HIDDEN, financeLocked !== false);
   const [debounced, setDebounced] = useState('');
   useEffect(() => {
     const id = window.setTimeout(() => setDebounced(query), 180);

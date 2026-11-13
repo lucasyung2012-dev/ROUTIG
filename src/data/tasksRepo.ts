@@ -1,4 +1,4 @@
-import { getDb } from './db';
+import { getDb, touch, touchById } from './db';
 import { newId, nowIso } from '@/domain/ids';
 import type { ChangeEntry } from '@/domain/entity';
 import {
@@ -118,7 +118,14 @@ export async function updateList(id: string, patch: Partial<Pick<TaskList, 'name
 export async function deleteList(id: string): Promise<number> {
   const db = getDb();
   return db.transaction('rw', db.taskLists, db.tasks, db.changelog, async () => {
-    const affected = await db.tasks.where('listId').equals(id).modify({ listId: null, updatedAt: nowIso() });
+    const at = nowIso();
+    const affected = await db.tasks
+      .where('listId')
+      .equals(id)
+      .modify((t) => {
+        t.listId = null;
+        touch(t, at);
+      });
     await db.taskLists.delete(id);
     await log({ entityType: 'taskList', entityId: id, action: 'purge', note: String(affected) });
     return affected;
@@ -262,7 +269,7 @@ export async function softDeleteTask(id: string): Promise<number> {
     const at = nowIso();
     const ids = await withDescendants(id);
     for (const tid of ids) {
-      await db.tasks.update(tid, { deletedAt: at, updatedAt: at });
+      await touchById(db.tasks, tid, { deletedAt: at }, at);
       await log({ entityType: ENTITY, entityId: tid, action: 'delete' });
     }
     return ids.length;
@@ -280,14 +287,14 @@ export async function restoreTask(id: string): Promise<void> {
     for (const tid of await withDescendants(id)) {
       const t = await db.tasks.get(tid);
       if (t?.deletedAt === stamp) {
-        await db.tasks.update(tid, { deletedAt: null, updatedAt: at });
+        await touchById(db.tasks, tid, { deletedAt: null }, at);
         await log({ entityType: ENTITY, entityId: tid, action: 'restore' });
       }
     }
     // Se a mãe continua na Lixeira, a subtarefa restaurada vira tarefa solta.
     if (task.parentId) {
       const parent = await db.tasks.get(task.parentId);
-      if (!parent || parent.deletedAt) await db.tasks.update(id, { parentId: null });
+      if (!parent || parent.deletedAt) await touchById(db.tasks, id, { parentId: null });
     }
   });
 }
@@ -300,7 +307,7 @@ export async function purgeTask(id: string): Promise<void> {
     const gone = new Set(ids);
     await db.tasks.bulkDelete(ids);
     const dependents = await db.tasks.filter((t) => t.dependsOn.some((d) => gone.has(d))).toArray();
-    for (const t of dependents) await db.tasks.update(t.id, { dependsOn: t.dependsOn.filter((d) => !gone.has(d)) });
+    for (const t of dependents) await touchById(db.tasks, t.id, { dependsOn: t.dependsOn.filter((d) => !gone.has(d)) });
     for (const tid of ids) await log({ entityType: ENTITY, entityId: tid, action: 'purge' });
   });
 }

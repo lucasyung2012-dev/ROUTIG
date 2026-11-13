@@ -196,6 +196,9 @@ export default function ParkPage() {
   const [center, setCenter] = useState(false);
   const [floors, setFloors] = useState({ count: 1, current: 0 });
   const [zoneKey, setZoneKey] = useState<string | null>(null);
+  // Painel aberto agora, lido na saída do parque (o efeito do motor só roda uma vez).
+  const openPanel = useRef<{ sector: string | null; zone: string | null }>({ sector: null, zone: null });
+  openPanel.current = { sector, zone: zoneKey };
   const [elevator, setElevator] = useState(false);
   const [instrument, setInstrument] = useState<'piano' | 'drums' | null>(null);
   // Painel no celular: só o título, meia tela ou tela cheia.
@@ -332,6 +335,15 @@ export default function ParkPage() {
     raf = requestAnimationFrame(tick);
     return () => {
       cancelAnimationFrame(raf);
+      // Qualquer saída do parque para o 2D (open2D, links e navigate() dentro dos painéis, voltar do
+      // navegador) guarda o mesmo contexto do open2D: o 2D mostra "Voltar ao parque" e o parque retoma dali.
+      if (engine.current) {
+        try {
+          saveParkContext({ ...engine.current.snapshot(), ...openPanel.current });
+        } catch {
+          /* motor já desmontado: só não lembra */
+        }
+      }
       engine.current?.dispose();
       engine.current = null;
     };
@@ -523,6 +535,33 @@ export default function ParkPage() {
     setZoneKey(null);
     engine.current?.focusSector(s);
   };
+  const closeSector = () => {
+    setSector(null);
+    // Só volta à vista da entrada na câmera livre e no térreo; andando, fica onde está.
+    if (camMode === 'orbit' && floors.current === 0 && !zoneKey) engine.current?.focusSector('entry');
+    setZoneKey(null);
+  };
+  // Esc fecha o que estiver por cima: elevador, opções, depois o painel do setor. A Central, a lista
+  // de lugares e o instrumento tratam o próprio Esc.
+  const onEscape = useRef<(e: KeyboardEvent) => void>(() => {});
+  onEscape.current = (e) => {
+    // Janela modal aberta (Central, diálogo de um painel): o Esc é dela.
+    if (e.key !== 'Escape' || e.defaultPrevented || center || document.querySelector('[role="dialog"][aria-modal="true"]')) return;
+    const el = e.target as HTMLElement | null;
+    // Num campo de texto, o primeiro Esc só sai do campo (não perde o que está sendo digitado).
+    if (el && (el.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName))) {
+      el.blur();
+      return;
+    }
+    if (elevator) setElevator(false);
+    else if (options) setOptions(false);
+    else if (inside && sector) closeSector();
+  };
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => onEscape.current(e);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   if (failed) return <NoWebgl />;
 
@@ -586,6 +625,10 @@ export default function ParkPage() {
       {/* Opções do ambiente */}
       {options && (
         <div className="absolute right-3 top-[4.25rem] z-10 flex max-h-[calc(100%-6rem)] w-72 flex-col gap-3 overflow-y-auto rounded-2xl bg-surface p-4 shadow-lift ring-1 ring-line safe-top" role="dialog" aria-label={t('park.options')}>
+          <div className="-mb-1 flex items-center justify-between gap-2">
+            <h2 className="text-sm font-semibold text-fg">{t('park.options')}</h2>
+            <IconButton size="sm" label={t('common.close')} icon={<X className="h-4 w-4" />} onClick={() => setOptions(false)} />
+          </div>
           <Segmented<CamMode> label={t('park.camMode')} value={camMode} onChange={setCamMode} options={CAM_ORDER.map((v) => ({ value: v, label: t(`park.camModes.${v}`) }))} className="w-full" />
           <h3 className="pt-1 text-xs font-semibold uppercase tracking-wide text-muted">{t('park.env')}</h3>
           <Switch label={t('park.clockAuto')} checked={clockAuto} onChange={setClockAuto} />
@@ -780,12 +823,7 @@ export default function ParkPage() {
               size="sm"
               label={t('common.close')}
               icon={<X className="h-4 w-4" />}
-              onClick={() => {
-                setSector(null);
-                // Só volta à vista da entrada na câmera livre e no térreo; andando, fica onde está.
-                if (camMode === 'orbit' && floors.current === 0 && !zoneKey) engine.current?.focusSector('entry');
-                setZoneKey(null);
-              }}
+              onClick={closeSector}
             />
           </header>
           <div className={cn('min-h-0 flex-1 overflow-y-auto p-4', sheet === 'peek' && 'hidden sm:block')} style={{ touchAction: 'pan-y' }}>
@@ -1000,10 +1038,16 @@ const HINT_ICON = { use: Hand, sit: Armchair, view: Mountain, tree: TreePine, wa
 /** Teclas do computador para o piano (Z…M = 1ª oitava, Q…U = 2ª, I = Dó agudo) e para os pads. */
 const PIANO_KEYMAP = 'zsxdcvgbhnjmq2w3er5t6y7ui';
 const DRUM_KEYMAP = 'asdf';
+/** Nome da nota para o leitor de tela (60 = Dó central, C4). */
+const NOTE_NAMES = {
+  'pt-BR': ['Dó', 'Dó♯', 'Ré', 'Ré♯', 'Mi', 'Fá', 'Fá♯', 'Sol', 'Sol♯', 'Lá', 'Lá♯', 'Si'],
+  en: ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'],
+} as const;
+const noteName = (midi: number, locale: keyof typeof NOTE_NAMES) => `${NOTE_NAMES[locale][midi % 12] ?? ''}${Math.floor(midi / 12) - 1}`;
 
 /** Piano (duas oitavas) ou bateria (quatro pads) na tela: cada toque soa e mexe a tecla/peça no 3D. */
 function InstrumentPanel({ kind, onPlay, onClose }: { kind: 'piano' | 'drums'; onPlay: (i: number) => void; onClose: () => void }) {
-  const { t } = useSettings();
+  const { t, settings } = useSettings();
   const [down, setDown] = useState<number | null>(null);
   const hit = (i: number) => {
     onPlay(i);
@@ -1046,7 +1090,7 @@ function InstrumentPanel({ kind, onPlay, onClose }: { kind: 'piano' | 'drums'; o
               <button
                 key={k.i}
                 type="button"
-                aria-label={`${k.midi}`}
+                aria-label={noteName(k.midi, settings.locale)}
                 onPointerDown={(e) => {
                   e.preventDefault();
                   hit(k.i);
@@ -1063,7 +1107,7 @@ function InstrumentPanel({ kind, onPlay, onClose }: { kind: 'piano' | 'drums'; o
               <button
                 key={i}
                 type="button"
-                aria-label={`${k.midi}`}
+                aria-label={noteName(k.midi, settings.locale)}
                 onPointerDown={(e) => {
                   e.preventDefault();
                   hit(i);

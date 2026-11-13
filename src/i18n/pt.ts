@@ -350,6 +350,7 @@ export const pt = {
     financeReview: '{count} decisões do diário para rever',
     financeReview_one: '1 decisão do diário para rever',
     financePrivacy: 'Valores não aparecem aqui, por privacidade.',
+    financeLockedCard: 'Finanças está trancado pelo PIN. Abra Finanças para ver.',
     insightsWeek: 'Esta semana, pelo que você registrou',
     academyEmpty: 'Nenhuma avaliação nos próximos 14 dias.',
     createProfile: 'Criar perfil',
@@ -599,7 +600,7 @@ export const pt = {
       ],
       dataTitle: 'Seus dados em cada aparelho',
       dataNotes: [
-        'Os dados ficam só no aparelho onde foram criados. Ainda não há sincronização entre aparelhos (planejada para a V2, pelo Google Drive).',
+        'Sem sincronização, os dados ficam só no aparelho onde foram criados. Para ter os mesmos dados no iPad, no iPhone e no computador, ligue a sincronização em Settings, Conta e sincronização.',
         'No iPad e no iPhone, o app instalado e a aba do Safari guardam dados separados. Escolha um dos dois e use sempre ele.',
         'Não use aba anônima e não apague os dados de sites do Safari: isso apaga o ROUTIG também.',
         'Para levar os dados de um aparelho para outro, exporte um backup em Settings, Backup, e restaure no outro aparelho.',
@@ -614,7 +615,7 @@ export const pt = {
       keyEsc: 'Fechar janelas e a busca',
       howTitle: 'Como o ROUTIG funciona',
       how: [
-        'Tudo fica guardado neste aparelho. Nada vai para a internet e não precisa de conta.',
+        'Tudo fica guardado neste aparelho e funciona sem conta. A sincronização pelo Google Drive é opcional e vai criptografada.',
         'Excluir manda para a Lixeira, e o aviso embaixo tem Desfazer por 5 segundos. Apagar de vez só pela Lixeira, com confirmação.',
         'Os módulos se ligam sem copiar nada: a tarefa de um projeto é a mesma tarefa em Tasks e no Calendar.',
         'Os números do Dashboard e de Minha evolução são contados a partir dos seus registros. Nada é estimado.',
@@ -638,7 +639,7 @@ export const pt = {
     },
     storage: {
       where: 'Onde ficam seus dados',
-      whereBody: 'Neste aparelho, no banco local do navegador (IndexedDB). Nada é enviado para a internet.',
+      whereBody: 'Neste aparelho, no banco local do navegador (IndexedDB). Só sai daqui se você ligar a sincronização, e vai criptografado.',
       usage: 'Espaço usado',
       quota: 'Espaço disponível para o app',
       persisted: 'Proteção contra limpeza automática',
@@ -666,7 +667,6 @@ export const pt = {
       upcoming: 'Próximas configurações',
       upcomingBody: 'Ainda não existem e por isso não aparecem como controles:',
       upcomingItems: [
-        'Sincronização pelo Google Drive (V2)',
         'Integrações (futuro)',
         'IA (futuro)',
       ],
@@ -1587,6 +1587,13 @@ export const pt = {
       projectsActive: 'Projetos ativos',
       notesCreated: 'Notas',
       interestsCount: 'Interesses',
+      modules: {
+        habits: 'Registros de hábitos',
+        focus: 'Minutos de foco',
+        goals: 'Objetivos concluídos',
+        music: 'Músicas dominadas',
+        sports: 'Atividades de esporte',
+      },
       chartTasks: 'Tarefas concluídas por semana',
       chartNotes: 'Notas criadas por semana',
       weekOf: 'Semana de {date}: {count}',
@@ -3454,6 +3461,7 @@ export const pt = {
     feelingHint: 'Como você se sentiu jogando (1 a 5).',
     evolutionPlaceholder: 'O que melhorou?',
     evolutionLabel: 'Evolução: {text}',
+    feelingLabel: 'Como se sentiu: {n} de 5',
     difficultiesLabel: 'Dificuldades: {text}',
     recent: 'Atividades recentes',
     stats: {
@@ -4461,6 +4469,7 @@ export const pt = {
       hint: 'Arquivos que outros apps abrem (Excel, Numbers, Google Agenda, Calendário do iPad, editores de Markdown). Para guardar o ROUTIG inteiro, use o Backup.',
       button: 'Exportar',
       backupNote: 'Os itens da lixeira não entram. Exportar não muda nada no ROUTIG.',
+      financeLocked: 'Trancado pelo PIN de Finanças. Abra Finanças com o PIN para exportar.',
       kinds: {
         tasks: 'Tarefas',
         events: 'Eventos do Calendar',
@@ -4912,7 +4921,7 @@ export const pt = {
     open: 'Abrir {name}',
     comingSoon: 'Prédio provisório: a versão detalhada, com interior, chega no bloco da região.',
     gestures: 'Um dedo desloca · pinça aproxima · dois dedos giram e inclinam · toque num prédio para escolher.',
-    gesturesInside: 'Um dedo desloca · pinça aproxima · dois dedos giram · toque num setor ou use a barra de setores.',
+    gesturesInside: 'Um dedo desloca · pinça aproxima · dois dedos giram · toque num setor ou escolha andar e sala no menu do alto, à esquerda.',
     names: {
       inbox: 'Central de Recepção',
       dashboard: 'Observatório Central',

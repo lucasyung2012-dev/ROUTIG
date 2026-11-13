@@ -16,7 +16,7 @@ import {
   updateInterest,
 } from '@/data/interestsRepo';
 import { createProject, updateProject, projectInputOf } from '@/data/projectsRepo';
-import { buildTimeline, countByWeek, emptyInterestInput, weekStart } from '@/domain/interests';
+import { buildTimeline, countByWeek, emptyInterestInput, moduleEvolution, weekStart } from '@/domain/interests';
 import { emptyProjectInput } from '@/domain/projects';
 
 beforeEach(() => setDbForTests(new RoutigDB(`test-interests-${Math.random().toString(36).slice(2)}`)));
@@ -100,5 +100,43 @@ describe('Minha evolução (Parte 21.5)', () => {
       { start: '2026-10-26', count: 1 },
       { start: '2026-11-02', count: 2 },
     ]);
+  });
+});
+
+describe('Minha evolução: hábitos, Focus, Goals, Music e Sports', () => {
+  const del = '2026-11-10T10:00:00.000Z';
+  const empty = { habits: [], habitLogs: [], focus: [], goals: [], instruments: [], songs: [], sports: [], activities: [] };
+
+  it('sem registros nesses módulos, nada aparece (nada inventado)', () => {
+    expect(moduleEvolution(empty)).toEqual([]);
+  });
+
+  it('conta só o que está fora da Lixeira, inclusive o que é de um registro pai na Lixeira', () => {
+    const out = moduleEvolution({
+      habits: [{ id: 'h', deletedAt: null }, { id: 'hx', deletedAt: del }],
+      habitLogs: [{ habitId: 'h', deletedAt: null }, { habitId: 'h', deletedAt: null }, { habitId: 'h', deletedAt: del }, { habitId: 'hx', deletedAt: null }],
+      focus: [{ actualMin: 25, deletedAt: null }, { actualMin: 50, deletedAt: null }, { actualMin: 90, deletedAt: del }],
+      goals: [{ status: 'done', deletedAt: null }, { status: 'active', deletedAt: null }, { status: 'done', deletedAt: del }],
+      instruments: [{ id: 'i', deletedAt: null }, { id: 'ix', deletedAt: del }],
+      songs: [
+        { instrumentId: 'i', status: 'mastered', deletedAt: null },
+        { instrumentId: 'i', status: 'mastered', deletedAt: del },
+        { instrumentId: 'i', status: 'learning', deletedAt: null },
+        { instrumentId: 'ix', status: 'mastered', deletedAt: null },
+      ],
+      sports: [{ id: 's', deletedAt: null }],
+      activities: [{ sportId: 's', deletedAt: null }, { sportId: 's', deletedAt: del }, { sportId: 'outro', deletedAt: null }],
+    });
+    expect(out).toEqual([
+      { module: 'habits', value: 2 },
+      { module: 'focus', value: 75 },
+      { module: 'goals', value: 1 },
+      { module: 'music', value: 1 },
+      { module: 'sports', value: 1 },
+    ]);
+  });
+
+  it('módulo só com registros na Lixeira não aparece', () => {
+    expect(moduleEvolution({ ...empty, sports: [{ id: 's', deletedAt: del }], activities: [{ sportId: 's', deletedAt: null }] })).toEqual([]);
   });
 });

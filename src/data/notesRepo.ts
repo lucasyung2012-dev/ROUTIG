@@ -1,4 +1,4 @@
-import { getDb } from './db';
+import { getDb, touch } from './db';
 import { newId, nowIso } from '@/domain/ids';
 import type { ChangeEntry, EntityRef } from '@/domain/entity';
 import { MAX_FILE_BYTES, sha256Hex, type StoredFile } from '@/domain/inbox';
@@ -101,7 +101,7 @@ export async function softDeleteNote(id: string): Promise<void> {
   await db.transaction('rw', db.notes, db.changelog, async () => {
     const n = await db.notes.get(id);
     if (!n) return;
-    await db.notes.put({ ...n, deletedAt: nowIso(), updatedAt: nowIso() });
+    await db.notes.put({ ...n, deletedAt: nowIso(), updatedAt: nowIso(), rev: n.rev + 1 });
     await log({ entityType: ENTITY, entityId: id, action: 'delete' });
   });
 }
@@ -111,7 +111,7 @@ export async function restoreNote(id: string): Promise<void> {
   await db.transaction('rw', db.notes, db.changelog, async () => {
     const n = await db.notes.get(id);
     if (!n) return;
-    await db.notes.put({ ...n, deletedAt: null, updatedAt: nowIso() });
+    await db.notes.put({ ...n, deletedAt: null, updatedAt: nowIso(), rev: n.rev + 1 });
     await log({ entityType: ENTITY, entityId: id, action: 'restore' });
   });
 }
@@ -190,7 +190,14 @@ export async function updateNotebook(id: string, patch: { name?: string; color?:
 export async function deleteNotebook(id: string): Promise<number> {
   const db = getDb();
   return db.transaction('rw', db.notebooks, db.notes, db.changelog, async () => {
-    const moved = await db.notes.where('notebookId').equals(id).modify({ notebookId: null });
+    const at = nowIso();
+    const moved = await db.notes
+      .where('notebookId')
+      .equals(id)
+      .modify((n) => {
+        n.notebookId = null;
+        touch(n, at);
+      });
     await db.notebooks.delete(id);
     await log({ entityType: 'notebook', entityId: id, action: 'purge', note: String(moved) });
     return moved;
@@ -212,6 +219,7 @@ export async function deleteCollection(id: string): Promise<void> {
   await db.transaction('rw', db.noteCollections, db.notes, db.changelog, async () => {
     await db.notes.where('collectionIds').equals(id).modify((n) => {
       n.collectionIds = n.collectionIds.filter((c) => c !== id);
+      touch(n);
     });
     await db.noteCollections.delete(id);
     await log({ entityType: 'noteCollection', entityId: id, action: 'purge' });

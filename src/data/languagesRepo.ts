@@ -1,4 +1,4 @@
-import { getDb } from './db';
+import { getDb, touchById } from './db';
 import { newId, nowIso } from '@/domain/ids';
 import type { ChangeEntry } from '@/domain/entity';
 import {
@@ -102,7 +102,7 @@ export async function updateLanguage(id: string, input: LanguageInput): Promise<
 async function setDeleted(id: string, deletedAt: string | null, action: 'delete' | 'restore') {
   const db = getDb();
   await db.transaction('rw', db.languages, db.changelog, async () => {
-    await db.languages.update(id, { deletedAt, updatedAt: nowIso() });
+    await touchById(db.languages, id, { deletedAt });
     await log({ entityType: 'language', entityId: id, action });
   });
 }
@@ -117,8 +117,8 @@ export async function moveLanguage(id: string, delta: -1 | 1): Promise<void> {
     const other = list[i + delta];
     const me = list[i];
     if (!other || !me) return;
-    await db.languages.update(me.id, { order: other.order });
-    await db.languages.update(other.id, { order: me.order === other.order ? other.order + delta : me.order });
+    await touchById(db.languages, me.id, { order: other.order });
+    await touchById(db.languages, other.id, { order: me.order === other.order ? other.order + delta : me.order });
   });
 }
 
@@ -152,7 +152,7 @@ export async function saveLanguageSession(id: string | null, input: LanguageSess
 async function setSessionDeleted(id: string, deletedAt: string | null, action: 'delete' | 'restore') {
   const db = getDb();
   await db.transaction('rw', db.languageSessions, db.changelog, async () => {
-    await db.languageSessions.update(id, { deletedAt, updatedAt: nowIso() });
+    await touchById(db.languageSessions, id, { deletedAt });
     await log({ entityType: 'languageSession', entityId: id, action });
   });
 }
@@ -206,7 +206,7 @@ export async function updateVocab(id: string, input: VocabInput): Promise<VocabE
 async function setVocabDeleted(id: string, deletedAt: string | null, action: 'delete' | 'restore') {
   const db = getDb();
   await db.transaction('rw', db.vocab, db.changelog, async () => {
-    await db.vocab.update(id, { deletedAt, updatedAt: nowIso() });
+    await touchById(db.vocab, id, { deletedAt });
     await log({ entityType: 'vocab', entityId: id, action });
   });
 }
@@ -215,7 +215,7 @@ export const restoreVocab = (id: string) => setVocabDeleted(id, null, 'restore')
 
 /** Recomeça o aprendizado da palavra (o histórico de revisões fica guardado). */
 export async function resetVocab(id: string): Promise<void> {
-  await getDb().vocab.update(id, { srs: newSrsState(), updatedAt: nowIso() });
+  await touchById(getDb().vocab, id, { srs: newSrsState() });
 }
 
 /** Resposta numa revisão de vocabulário (mesmo motor e mesmo histórico dos flashcards). */
@@ -227,7 +227,7 @@ export async function answerVocab(id: string, rating: Rating, manual = false, to
     const at = nowIso();
     const next = manual ? v.srs : review(v.srs, rating, today, at);
     await db.cardReviews.add({ id: newId('rev'), cardId: id, at, rating, intervalBefore: v.srs.interval, intervalAfter: next.interval, manual });
-    const out: VocabEntry = { ...v, srs: next, updatedAt: at };
+    const out: VocabEntry = { ...v, srs: next, updatedAt: at, rev: v.rev + 1 };
     await db.vocab.put(out);
     return out;
   });

@@ -1,4 +1,4 @@
-import { getDb } from './db';
+import { getDb, touchById } from './db';
 import { newId, nowIso } from '@/domain/ids';
 import type { ChangeEntry } from '@/domain/entity';
 import {
@@ -72,7 +72,7 @@ export async function updateInstrument(id: string, input: InstrumentInput): Prom
 async function setDeleted(table: 'instruments' | 'musicItems' | 'songs' | 'practiceSessions', entityType: string, id: string, deletedAt: string | null) {
   const db = getDb();
   await db.transaction('rw', db.table(table), db.changelog, async () => {
-    await db.table(table).update(id, { deletedAt, updatedAt: nowIso() });
+    await touchById(db.table(table), id, { deletedAt });
     await log({ entityType, entityId: id, action: deletedAt ? 'delete' : 'restore' });
   });
 }

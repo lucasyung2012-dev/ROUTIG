@@ -132,19 +132,26 @@ export function createCameraRig(camera: THREE.PerspectiveCamera, canvas: HTMLCan
   };
 
   /* ---------- Teclado e arrastar para olhar ---------- */
+  // Mesma regra do E/V (ParkPage): só campos de texto seguram o teclado. Com o foco num botão, WASD
+  // continua andando; só o Espaço fica com o botão (é ele que o aciona).
   const typing = (e: KeyboardEvent) => {
     const el = e.target as HTMLElement | null;
-    return !!el && (el.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(el.tagName));
+    return !!el && (el.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName));
   };
   const onKey = (e: KeyboardEvent) => {
+    // Soltar a tecla sempre vale: senão o boneco segue andando se o foco mudou no meio.
+    if (e.type !== 'keydown') {
+      keys.delete(e.code);
+      return;
+    }
     if (typing(e)) return;
-    if (e.type === 'keydown') {
-      keys.add(e.code);
-      if (e.code === 'Space' && mode !== 'orbit') {
-        wantJump = true;
-        e.preventDefault();
-      }
-    } else keys.delete(e.code);
+    const onButton = (e.target as HTMLElement | null)?.tagName === 'BUTTON';
+    if (e.code === 'Space' && onButton) return;
+    keys.add(e.code);
+    if (e.code === 'Space' && mode !== 'orbit') {
+      wantJump = true;
+      e.preventDefault();
+    }
   };
   window.addEventListener('keydown', onKey);
   window.addEventListener('keyup', onKey);

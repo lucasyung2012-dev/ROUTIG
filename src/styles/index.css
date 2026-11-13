@@ -134,8 +134,13 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-.safe-top { padding-top: env(safe-area-inset-top, 0px); }
-.safe-bottom { padding-bottom: env(safe-area-inset-bottom, 0px); }
+/* Área segura (notch e barra do iPhone/iPad). Na camada components: um padding do Tailwind no mesmo
+   elemento (p-4, py-2...) vence, em vez de ser zerado no computador. Onde o padding e a área segura
+   precisam valer juntos, use max(): pb-[max(1rem,env(safe-area-inset-bottom))]. */
+@layer components {
+  .safe-top { padding-top: env(safe-area-inset-top, 0px); }
+  .safe-bottom { padding-bottom: env(safe-area-inset-bottom, 0px); }
+}
 
 /* Movimento reduzido: pelo sistema ou pela configuração do app. */
 @media (prefers-reduced-motion: reduce) {

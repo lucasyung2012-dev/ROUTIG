@@ -113,7 +113,7 @@ export function DrawingBlock(props: DrawingProps) {
       <DrawingSurface {...props} fullscreen={false} onToggleFullscreen={() => setFullscreen(true)} />
       {fullscreen &&
         createPortal(
-          <div className="fixed inset-0 z-[80] flex flex-col bg-surface p-3 safe-top safe-bottom sm:p-4" style={{ overscrollBehavior: 'none' }}>
+          <div className="fixed inset-0 z-[80] flex flex-col bg-surface p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-[max(0.75rem,env(safe-area-inset-top))] sm:p-4 sm:pb-[max(1rem,env(safe-area-inset-bottom))] sm:pt-[max(1rem,env(safe-area-inset-top))]" style={{ overscrollBehavior: 'none' }}>
             <DrawingSurface {...props} fullscreen onToggleFullscreen={() => setFullscreen(false)} />
           </div>,
           document.body,

@@ -31,8 +31,10 @@ export interface CalendarItem {
   task?: Task;
   /** Marco de projeto: abre o projeto. */
   projectId?: string;
-  /** Avaliação da Academy: abre a disciplina. */
+  /** Disciplina da Academy (sessão de estudo e avaliação). */
   subjectId?: string;
+  /** Avaliação da Academy: abre a própria avaliação. */
+  assessmentId?: string;
   /** Hábito: abre o hábito. */
   habitId?: string;
   /** Prazo ou marco de objetivo: abre o objetivo. */
@@ -94,7 +96,8 @@ export function useCalendarData(): CalendarData {
           });
         }
       }
-      if (opts.showTasks && !opts.categoryId) {
+      // O filtro de categoria vale só para eventos: os itens dos outros módulos não têm categoria e continuam visíveis.
+      if (opts.showTasks) {
         for (const t of tasks.active) {
           if (!t.dueDate || t.dueDate < from || t.dueDate > to) continue;
           const start = t.dueTime ? toMinutes(t.dueTime) : null;
@@ -117,7 +120,7 @@ export function useCalendarData(): CalendarData {
         }
       }
       // Marcos de projetos (dia inteiro), lidos do próprio projeto, sem cópia.
-      if (!opts.categoryId) {
+      {
         for (const p of projects ?? []) {
           for (const m of p.milestones) {
             if (!m.date || m.date < from || m.date > to) continue;
@@ -161,6 +164,7 @@ export function useCalendarData(): CalendarData {
             categoryId: null,
             done: a.score !== null,
             subjectId: s.id,
+            assessmentId: a.id,
             conflictWith: [],
           });
         }

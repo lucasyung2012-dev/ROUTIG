@@ -139,6 +139,7 @@ function ActivityRow({ a, sport, data, onOpen }: { a: SportActivity; sport: Spor
           {a.outcome && <Badge tone={a.outcome === 'win' ? 'success' : a.outcome === 'loss' ? 'danger' : 'neutral'}>{t(`sports.outcomes.${a.outcome}`)}</Badge>}
           {a.score && <span className="text-sm font-medium tabular text-fg">{a.score}</span>}
           {a.durationMin && <span className="text-sm text-muted">{a.durationMin} min</span>}
+          {typeof a.feeling === 'number' &&<span className="text-sm text-muted">{t('sports.feelingLabel', { n: a.feeling })}</span>}
         </div>
         {(a.title || a.opponent || a.location) && <span className="text-sm text-fg">{[a.title, a.opponent && t('sports.vs', { name: a.opponent }), a.location].filter(Boolean).join(' · ')}</span>}
         {(a.itemIds.length > 0 || a.positionId) && (

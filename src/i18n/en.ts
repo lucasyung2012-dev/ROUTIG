@@ -352,6 +352,7 @@ export const en: Messages = {
     financeReview: '{count} journal decisions to review',
     financeReview_one: '1 journal decision to review',
     financePrivacy: 'Amounts are not shown here, for privacy.',
+    financeLockedCard: 'Finance is locked by its PIN. Open Finance to see it.',
     insightsWeek: 'This week, from what you logged',
     academyEmpty: 'No assessments in the next 14 days.',
     createProfile: 'Create profile',
@@ -601,7 +602,7 @@ export const en: Messages = {
       ],
       dataTitle: 'Your data on each device',
       dataNotes: [
-        'Data stays only on the device where it was created. There is no sync between devices yet (planned for V2, through Google Drive).',
+        'Without sync, data stays only on the device where it was created. To have the same data on iPad, iPhone and computer, turn on sync in Settings, Account and sync.',
         'On iPad and iPhone, the installed app and the Safari tab keep separate data. Pick one and always use it.',
         'Do not use private tabs and do not clear Safari website data: that deletes ROUTIG too.',
         'To move data to another device, export a backup in Settings, Backup, and restore it on the other device.',
@@ -616,7 +617,7 @@ export const en: Messages = {
       keyEsc: 'Close dialogs and search',
       howTitle: 'How ROUTIG works',
       how: [
-        'Everything is stored on this device. Nothing goes to the internet and no account is needed.',
+        'Everything is stored on this device and works without an account. Google Drive sync is optional and encrypted.',
         'Deleting moves things to the Trash, and the message at the bottom has Undo for 5 seconds. Deleting forever only happens in the Trash, with confirmation.',
         'Modules connect without copying: a project task is the same task in Tasks and in Calendar.',
         'Numbers on the Dashboard and in My progress are counted from your records. Nothing is estimated.',
@@ -640,7 +641,7 @@ export const en: Messages = {
     },
     storage: {
       where: 'Where your data lives',
-      whereBody: 'On this device, in the browser local database (IndexedDB). Nothing is sent to the internet.',
+      whereBody: 'On this device, in the browser local database (IndexedDB). It only leaves this device if you turn on sync, and it goes encrypted.',
       usage: 'Space used',
       quota: 'Space available to the app',
       persisted: 'Protection against automatic cleanup',
@@ -668,7 +669,6 @@ export const en: Messages = {
       upcoming: 'Upcoming settings',
       upcomingBody: 'These do not exist yet, so they do not appear as controls:',
       upcomingItems: [
-        'Google Drive sync (V2)',
         'Integrations (future)',
         'AI (future)',
       ],
@@ -1589,6 +1589,13 @@ export const en: Messages = {
       projectsActive: 'Active projects',
       notesCreated: 'Notes',
       interestsCount: 'Interests',
+      modules: {
+        habits: 'Habit check-ins',
+        focus: 'Focus minutes',
+        goals: 'Goals achieved',
+        music: 'Songs mastered',
+        sports: 'Sport activities',
+      },
       chartTasks: 'Tasks done per week',
       chartNotes: 'Notes created per week',
       weekOf: 'Week of {date}: {count}',
@@ -3456,6 +3463,7 @@ export const en: Messages = {
     feelingHint: 'How you felt playing (1 to 5).',
     evolutionPlaceholder: 'What got better?',
     evolutionLabel: 'Progress: {text}',
+    feelingLabel: 'How you felt: {n} of 5',
     difficultiesLabel: 'Difficulties: {text}',
     recent: 'Recent activities',
     stats: {
@@ -4463,6 +4471,7 @@ export const en: Messages = {
       hint: 'Files other apps open (Excel, Numbers, Google Calendar, iPad Calendar, Markdown editors). To keep all of ROUTIG, use Backup.',
       button: 'Export',
       backupNote: 'Items in the trash are left out. Exporting changes nothing in ROUTIG.',
+      financeLocked: 'Locked by the Finance PIN. Open Finance with the PIN to export.',
       kinds: {
         tasks: 'Tasks',
         events: 'Calendar events',
@@ -4914,7 +4923,7 @@ export const en: Messages = {
     open: 'Open {name}',
     comingSoon: 'Temporary building: the detailed version, with an interior, arrives in the region’s block.',
     gestures: 'One finger moves · pinch zooms · two fingers rotate and tilt · tap a building to pick it.',
-    gesturesInside: 'One finger moves · pinch zooms · two fingers rotate · tap a sector or use the sector bar.',
+    gesturesInside: 'One finger moves · pinch zooms · two fingers rotate · tap a sector or pick a floor and room in the menu at the top left.',
     names: {
       inbox: 'Reception Center',
       dashboard: 'Central Observatory',

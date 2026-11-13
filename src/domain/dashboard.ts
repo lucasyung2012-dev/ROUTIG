@@ -1,5 +1,8 @@
 import { z } from 'zod';
 import type { ModuleId } from '@/app/modules';
+import type { DateKey } from './dates';
+import type { InboxItem } from './inbox';
+import type { Project } from './projects';
 
 /* ---------- Cartões ---------- */
 
@@ -190,4 +193,19 @@ export function addCard(cards: CardSlot[], id: CardId): CardSlot[] {
 
 export function removeCard(cards: CardSlot[], id: CardId): CardSlot[] {
   return cards.filter((c) => c.id !== id);
+}
+
+/* ---------- Contagens com uma definição só ---------- */
+
+/**
+ * Item do Inbox que ainda espera organização: aberto, fora da Lixeira e não adiado para depois de hoje
+ * (a mesma regra da aba "Abertos" do Inbox). Usada no resumo do dia, no cartão e no indicador.
+ */
+export function isPendingInboxItem(i: Pick<InboxItem, 'deletedAt' | 'status' | 'snoozedUntil'>, today: DateKey): boolean {
+  return !i.deletedAt && i.status === 'open' && (!i.snoozedUntil || i.snoozedUntil <= today);
+}
+
+/** Projeto ativo: status "Ativo" e fora da Lixeira. Usada no cartão de projetos e no indicador "Projetos ativos". */
+export function isActiveProject(p: Pick<Project, 'deletedAt' | 'status'>): boolean {
+  return !p.deletedAt && p.status === 'active';
 }

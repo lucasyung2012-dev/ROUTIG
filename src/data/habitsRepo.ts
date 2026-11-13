@@ -1,4 +1,4 @@
-import { getDb } from './db';
+import { getDb, touchById } from './db';
 import { newId, nowIso } from '@/domain/ids';
 import type { ChangeEntry } from '@/domain/entity';
 import { addDays, todayKey, type DateKey } from '@/domain/dates';
@@ -128,7 +128,7 @@ export async function setHabitArchived(id: string, archived: boolean): Promise<v
 async function setDeleted(id: string, deletedAt: string | null, action: 'delete' | 'restore') {
   const db = getDb();
   await db.transaction('rw', db.habits, db.changelog, async () => {
-    await db.habits.update(id, { deletedAt, updatedAt: nowIso() });
+    await touchById(db.habits, id, { deletedAt });
     await log({ entityType: 'habit', entityId: id, action });
   });
 }
@@ -143,8 +143,8 @@ export async function moveHabit(id: string, dir: -1 | 1): Promise<void> {
     const other = list[i + dir];
     const cur = list[i];
     if (!cur || !other) return;
-    await db.habits.update(cur.id, { order: other.order });
-    await db.habits.update(other.id, { order: cur.order });
+    await touchById(db.habits, cur.id, { order: other.order });
+    await touchById(db.habits, other.id, { order: cur.order });
   });
 }
 
@@ -174,10 +174,10 @@ export async function setHabitLog(habitId: string, date: DateKey, value: number,
 }
 
 export async function softDeleteHabitLog(id: string): Promise<void> {
-  await getDb().habitLogs.update(id, { deletedAt: nowIso(), updatedAt: nowIso() });
+  await touchById(getDb().habitLogs, id, { deletedAt: nowIso() });
 }
 export async function restoreHabitLog(id: string): Promise<void> {
-  await getDb().habitLogs.update(id, { deletedAt: null, updatedAt: nowIso() });
+  await touchById(getDb().habitLogs, id, { deletedAt: null });
 }
 
 /** Mudanças do hábito (criação, frequência, pausas, arquivamento), da mais nova para a mais antiga. */

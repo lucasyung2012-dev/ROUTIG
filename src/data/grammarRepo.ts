@@ -1,4 +1,4 @@
-import { getDb } from './db';
+import { getDb, touchById } from './db';
 import { newId, nowIso } from '@/domain/ids';
 import type { ChangeEntry } from '@/domain/entity';
 import { todayKey } from '@/domain/dates';
@@ -56,7 +56,7 @@ export async function updateGrammar(id: string, input: GrammarInput): Promise<Gr
 async function setDeleted(id: string, deletedAt: string | null, action: 'delete' | 'restore') {
   const db = getDb();
   await db.transaction('rw', db.grammarRules, db.changelog, async () => {
-    await db.grammarRules.update(id, { deletedAt, updatedAt: nowIso() });
+    await touchById(db.grammarRules, id, { deletedAt });
     await log({ entityType: 'grammar', entityId: id, action });
   });
 }
@@ -71,7 +71,7 @@ export async function answerGrammar(id: string, rating: Rating, manual = false, 
     const at = nowIso();
     const next = manual ? g.srs : review(g.srs, rating, today, at);
     await db.cardReviews.add({ id: newId('rev'), cardId: id, at, rating, intervalBefore: g.srs.interval, intervalAfter: next.interval, manual });
-    const out: GrammarRule = { ...g, srs: next, updatedAt: at };
+    const out: GrammarRule = { ...g, srs: next, updatedAt: at, rev: g.rev + 1 };
     await db.grammarRules.put(out);
     return out;
   });

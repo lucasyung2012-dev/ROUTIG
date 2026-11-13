@@ -90,7 +90,7 @@ export function Dialog({ open, onClose, title, description, children, footer, cl
           <IconButton label={closeLabel} icon={<X className="h-5 w-5" />} size="sm" onClick={onClose} />
         </div>
         {children && <div className="overflow-y-auto px-6 py-4">{children}</div>}
-        {footer && <div className="flex flex-wrap justify-end gap-2 border-t border-line/70 px-6 py-4 safe-bottom">{footer}</div>}
+        {footer && <div className="flex flex-wrap justify-end gap-2 border-t border-line/70 px-6 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4">{footer}</div>}
       </div>
     </div>,
     document.body,

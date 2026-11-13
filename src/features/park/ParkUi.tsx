@@ -82,8 +82,18 @@ export function PlacesMenu({ title, floors }: { title: string; floors: PlaceFloo
   useEffect(() => {
     if (!open) return;
     const close = (e: PointerEvent) => !box.current?.contains(e.target as Node) && setOpen(false);
+    // Esc fecha só esta lista (antes de o parque fechar o painel do setor).
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      e.stopImmediatePropagation();
+      setOpen(false);
+    };
     window.addEventListener('pointerdown', close);
-    return () => window.removeEventListener('pointerdown', close);
+    window.addEventListener('keydown', onKey, true);
+    return () => {
+      window.removeEventListener('pointerdown', close);
+      window.removeEventListener('keydown', onKey, true);
+    };
   }, [open]);
   const cur = floors.find((f) => f.current);
   return (

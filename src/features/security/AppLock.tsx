@@ -153,7 +153,7 @@ function LockScreen({ onUnlock }: { onUnlock: () => void }) {
   };
 
   return (
-    <div role="dialog" aria-modal="true" aria-labelledby="lock-title" className="ambient fixed inset-0 z-[90] flex items-center justify-center overflow-y-auto bg-bg p-4 safe-top">
+    <div role="dialog" aria-modal="true" aria-labelledby="lock-title" className="ambient fixed inset-0 z-[90] flex items-center justify-center overflow-y-auto bg-bg p-4 pt-[max(1rem,env(safe-area-inset-top))]">
       <Surface className="flex w-full max-w-sm flex-col items-center gap-4 py-8 text-center">
         {forgot ? (
           <>

@@ -1,4 +1,4 @@
-import { getDb } from './db';
+import { getDb, touchById } from './db';
 import { newId, nowIso } from '@/domain/ids';
 import type { ChangeEntry, EntityRef } from '@/domain/entity';
 import { todayKey, type DateKey } from '@/domain/dates';
@@ -127,7 +127,7 @@ export async function unlinkGoal(id: string, ref: EntityRef): Promise<void> {
 async function setDeleted(id: string, deletedAt: string | null, action: 'delete' | 'restore') {
   const db = getDb();
   await db.transaction('rw', db.goals, db.changelog, async () => {
-    await db.goals.update(id, { deletedAt, updatedAt: nowIso() });
+    await touchById(db.goals, id, { deletedAt });
     await log({ entityType: 'goal', entityId: id, action });
   });
 }
@@ -167,8 +167,8 @@ export async function addCheckin(goalId: string, input: CheckinInput, today = to
 }
 
 export async function softDeleteCheckin(id: string): Promise<void> {
-  await getDb().goalCheckins.update(id, { deletedAt: nowIso(), updatedAt: nowIso() });
+  await touchById(getDb().goalCheckins, id, { deletedAt: nowIso() });
 }
 export async function restoreCheckin(id: string): Promise<void> {
-  await getDb().goalCheckins.update(id, { deletedAt: null, updatedAt: nowIso() });
+  await touchById(getDb().goalCheckins, id, { deletedAt: null });
 }

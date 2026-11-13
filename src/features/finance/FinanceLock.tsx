@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Lock } from 'lucide-react';
+import { useLiveQuery } from 'dexie-react-hooks';
 import { useSettings } from '@/app/SettingsProvider';
 import { checkFinancePin, hasFinancePin, removeFinancePin, setFinancePin, tryFinanceUnlock } from '@/data/financePlanRepo';
 import { Button } from '@/ui/Button';
@@ -16,6 +17,16 @@ let unlocked = false;
 /** Finanças está aberto nesta sessão? (o Insights só mostra Finanças com o PIN digitado) */
 export function isFinanceUnlocked(): boolean {
   return unlocked;
+}
+
+/**
+ * Finanças está trancado agora? (tem PIN e ainda não foi aberto nesta sessão). `undefined` enquanto lê o PIN:
+ * quem usa trata como trancado, para nada vazar. Usado na busca global, no Dashboard e na exportação.
+ */
+export function useFinanceLocked(): boolean | undefined {
+  const hasPin = useLiveQuery(() => hasFinancePin(), []);
+  if (unlocked) return false;
+  return hasPin;
 }
 
 /** Controle de acesso de Finanças (Parte 16.8): um PIN opcional, só deste aparelho. */

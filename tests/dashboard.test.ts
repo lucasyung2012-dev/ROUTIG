@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { RoutigDB, setDbForTests } from '@/data/db';
 import { loadDashboardConfig, saveDashboardConfig } from '@/data/dashboardRepo';
-import { addCard, builtinProfiles, cycleSize, defaultDashboardConfig, isValidCardId, migrateDashboardConfig, moveCard, removeCard } from '@/domain/dashboard';
+import { addCard, builtinProfiles, cycleSize, defaultDashboardConfig, isActiveProject, isPendingInboxItem, isValidCardId, migrateDashboardConfig, moveCard, removeCard } from '@/domain/dashboard';
 
 beforeEach(() => setDbForTests(new RoutigDB(`test-dashboard-${Math.random().toString(36).slice(2)}`)));
 
@@ -56,5 +56,25 @@ describe('edição do painel', () => {
     const back = await loadDashboardConfig();
     expect(back.activeId).toBe('projects');
     expect(back.profiles[2]!.cards.some((x) => x.id === 'activity')).toBe(false);
+  });
+});
+
+describe('contagens do Dashboard com uma definição só', () => {
+  it('Inbox: só itens abertos, fora da Lixeira e não adiados para depois de hoje', () => {
+    const today = '2026-11-13';
+    const item = (over: Partial<{ deletedAt: string | null; status: 'open' | 'processed' | 'archived'; snoozedUntil: string | null }>) => ({ deletedAt: null, status: 'open' as const, snoozedUntil: null, ...over });
+    expect(isPendingInboxItem(item({}), today)).toBe(true);
+    expect(isPendingInboxItem(item({ snoozedUntil: '2026-11-13' }), today)).toBe(true);
+    expect(isPendingInboxItem(item({ snoozedUntil: '2026-11-14' }), today)).toBe(false);
+    expect(isPendingInboxItem(item({ status: 'processed' }), today)).toBe(false);
+    expect(isPendingInboxItem(item({ deletedAt: '2026-11-10T10:00:00.000Z' }), today)).toBe(false);
+  });
+
+  it('projeto ativo: status "Ativo" e fora da Lixeira', () => {
+    expect(isActiveProject({ deletedAt: null, status: 'active' })).toBe(true);
+    expect(isActiveProject({ deletedAt: null, status: 'planned' })).toBe(false);
+    expect(isActiveProject({ deletedAt: null, status: 'paused' })).toBe(false);
+    expect(isActiveProject({ deletedAt: null, status: 'idea' })).toBe(false);
+    expect(isActiveProject({ deletedAt: '2026-11-10T10:00:00.000Z', status: 'active' })).toBe(false);
   });
 });

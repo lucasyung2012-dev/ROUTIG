@@ -73,7 +73,9 @@ export function focusInsights(sessions: FocusSession[], r: Range) {
 
 export function habitsInsights(habits: Habit[], logs: HabitLog[], r: Range, today: DateKey, weekStartsOn: 0 | 1) {
   const live = habits.filter((h) => !h.deletedAt);
-  const liveLogs = logs.filter((l) => !l.deletedAt);
+  // Registros de hábito na Lixeira não contam (o hábito some, então os registros também).
+  const liveIds = new Set(live.map((h) => h.id));
+  const liveLogs = logs.filter((l) => !l.deletedAt && liveIds.has(l.habitId));
   const end = r.to < today ? r.to : today;
   const rows = live.map((h) => {
     const mine = liveLogs.filter((l) => l.habitId === h.id);
@@ -102,8 +104,9 @@ export function projectsInsights(projects: Project[], r: Range) {
 
 export function goalsInsights(goals: Goal[], checkins: GoalCheckin[], r: Range) {
   const all = goals.filter((g) => !g.deletedAt);
+  const liveIds = new Set(all.map((g) => g.id));
   const done = all.filter((g) => g.status === 'done' && inRange(isoDay(g.doneAt), r));
-  const ck = checkins.filter((c) => !c.deletedAt && inRange(c.date, r));
+  const ck = checkins.filter((c) => !c.deletedAt && liveIds.has(c.goalId) && inRange(c.date, r));
   const milestones = all.flatMap((g) => g.milestones.filter((m) => m.done && inRange(isoDay(m.doneAt), r)));
   return { has: all.length > 0, done, checkins: ck.length, milestones: milestones.length };
 }
@@ -114,7 +117,9 @@ export function goalsInsights(goals: Goal[], checkins: GoalCheckin[], r: Range) 
 export function academyInsights(subjects: Subject[], years: AcademicYear[], assessments: Assessment[], contents: Content[], sessions: StudySession[], r: Range) {
   const liveSubjects = subjects.filter((s) => !s.deletedAt);
   const scaleOf = (s: Subject) => (s.model ?? years.find((y) => y.id === s.yearId)?.model)?.scale ?? 10;
-  const graded = assessments.filter((a) => !a.deletedAt && a.score !== null && a.maxScore > 0 && inRange(a.date, r));
+  // Só avaliações e sessões de disciplinas fora da Lixeira.
+  const liveSubjectIds = new Set(liveSubjects.map((s) => s.id));
+  const graded = assessments.filter((a) => !a.deletedAt && liveSubjectIds.has(a.subjectId) && a.score !== null && a.maxScore > 0 && inRange(a.date, r));
   const bySubject = liveSubjects
     .map((s) => {
       const mine = graded.filter((a) => a.subjectId === s.id);
@@ -131,7 +136,7 @@ export function academyInsights(subjects: Subject[], years: AcademicYear[], asse
       };
     })
     .filter((x) => x.grades.length || x.contents);
-  const study = sessions.filter((s) => !s.deletedAt && s.status === 'done' && inRange(s.date, r));
+  const study = sessions.filter((s) => !s.deletedAt && liveSubjectIds.has(s.subjectId) && s.status === 'done' && inRange(s.date, r));
   return {
     has: liveSubjects.length > 0,
     assessments: graded.length,
@@ -146,8 +151,10 @@ export function academyInsights(subjects: Subject[], years: AcademicYear[], asse
 
 export function languagesInsights(langs: Language[], sessions: LanguageSession[], vocab: VocabEntry[], grammar: GrammarRule[], reviews: CardReview[], r: Range) {
   const live = langs.filter((l) => !l.deletedAt);
-  const inR = sessions.filter((s) => !s.deletedAt && inRange(s.date, r));
-  const ids = new Set([...vocab, ...grammar].filter((x) => !x.deletedAt).map((x) => x.id));
+  // Só o que é de idiomas fora da Lixeira.
+  const liveIds = new Set(live.map((l) => l.id));
+  const inR = sessions.filter((s) => !s.deletedAt && liveIds.has(s.languageId) && inRange(s.date, r));
+  const ids = new Set([...vocab, ...grammar].filter((x) => !x.deletedAt && liveIds.has(x.languageId)).map((x) => x.id));
   const rev = reviews.filter((x) => ids.has(x.cardId) && inRange(isoDay(x.at), r));
   const rows = live.map((l) => ({
     language: l,
@@ -163,10 +170,12 @@ export function languagesInsights(langs: Language[], sessions: LanguageSession[]
 
 export function musicInsights(instruments: Instrument[], practice: PracticeSession[], songs: Song[], changes: ChangeEntry[], r: Range) {
   const live = instruments.filter((i) => !i.deletedAt);
-  const inR = practice.filter((p) => !p.deletedAt && inRange(p.date, r));
-  const songIds = new Set(songs.map((s) => s.id));
+  const liveIds = new Set(live.map((i) => i.id));
+  const inR = practice.filter((p) => !p.deletedAt && liveIds.has(p.instrumentId) && inRange(p.date, r));
+  // Música na Lixeira (ou de instrumento na Lixeira) não conta como dominada nem no repertório.
+  const liveSongs = songs.filter((s) => !s.deletedAt && liveIds.has(s.instrumentId));
+  const songIds = new Set(liveSongs.map((s) => s.id));
   const masteredInR = changes.filter((c) => c.entityType === 'song' && songIds.has(c.entityId) && c.note === 'status:mastered' && inRange(isoDay(c.at), r)).length;
-  const liveSongs = songs.filter((s) => !s.deletedAt);
   return {
     has: live.length > 0,
     minutes: inR.reduce((a, p) => a + p.durationMin, 0),
@@ -181,7 +190,8 @@ export function musicInsights(instruments: Instrument[], practice: PracticeSessi
 
 export function sportsInsights(sports: Sport[], acts: SportActivity[], r: Range) {
   const live = sports.filter((s) => !s.deletedAt);
-  const inR = acts.filter((a) => !a.deletedAt && inRange(a.date, r));
+  const liveIds = new Set(live.map((s) => s.id));
+  const inR = acts.filter((a) => !a.deletedAt && liveIds.has(a.sportId) && inRange(a.date, r));
   const record = { win: 0, loss: 0, draw: 0 };
   for (const a of inR) if (a.outcome) record[a.outcome]++;
   return {
@@ -201,7 +211,8 @@ export function sportsInsights(sports: Sport[], acts: SportActivity[], r: Range)
 /** Patrimônio só com valores informados, por moeda (sem converter câmbio); rendimentos registrados no período. */
 export function financeInsights(assets: FinAsset[], txs: FinTransaction[], quotes: FinQuote[], r: Range) {
   const live = assets.filter((a) => !a.deletedAt);
-  const liveTx = txs.filter((t) => !t.deletedAt);
+  const liveAssetIds = new Set(live.map((a) => a.id));
+  const liveTx = txs.filter((t) => !t.deletedAt && liveAssetIds.has(t.assetId));
   const liveQ = quotes.filter((q) => !q.deletedAt);
   const byCur = new Map<Currency, { invested: number; value: number; quoted: number; held: number; income: number }>();
   for (const a of live) {

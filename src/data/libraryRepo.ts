@@ -1,4 +1,4 @@
-import { getDb } from './db';
+import { getDb, touchById } from './db';
 import { newId, nowIso } from '@/domain/ids';
 import type { ChangeEntry, EntityRef } from '@/domain/entity';
 import { MAX_FILE_BYTES, sha256Hex, type StoredFile } from '@/domain/inbox';
@@ -148,7 +148,7 @@ export async function updateItem(id: string, meta: ItemMeta): Promise<LibraryIte
 export async function toggleFavorite(id: string): Promise<void> {
   const db = getDb();
   const cur = await db.libraryItems.get(id);
-  if (cur) await db.libraryItems.update(id, { favorite: !cur.favorite, updatedAt: nowIso() });
+  if (cur) await touchById(db.libraryItems, id, { favorite: !cur.favorite });
 }
 
 /* ---------- Relacionamentos (Parte 18.4) ---------- */
@@ -179,7 +179,7 @@ export async function unlinkItem(id: string, ref: EntityRef): Promise<void> {
 export async function softDeleteItem(id: string): Promise<void> {
   const db = getDb();
   await db.transaction('rw', db.libraryItems, db.changelog, async () => {
-    await db.libraryItems.update(id, { deletedAt: nowIso(), updatedAt: nowIso() });
+    await touchById(db.libraryItems, id, { deletedAt: nowIso() });
     await log({ entityType: 'library', entityId: id, action: 'delete' });
   });
 }
@@ -187,7 +187,7 @@ export async function softDeleteItem(id: string): Promise<void> {
 export async function restoreItem(id: string): Promise<void> {
   const db = getDb();
   await db.transaction('rw', db.libraryItems, db.changelog, async () => {
-    await db.libraryItems.update(id, { deletedAt: null, updatedAt: nowIso() });
+    await touchById(db.libraryItems, id, { deletedAt: null });
     await log({ entityType: 'library', entityId: id, action: 'restore' });
   });
 }
@@ -249,9 +249,9 @@ export async function saveCollection(id: string | null, name: string, color: str
 export async function deleteCollection(id: string): Promise<void> {
   const db = getDb();
   await db.transaction('rw', db.libraryCollections, db.libraryItems, async () => {
-    await db.libraryCollections.update(id, { deletedAt: nowIso(), updatedAt: nowIso() });
+    await touchById(db.libraryCollections, id, { deletedAt: nowIso() });
     // Os materiais continuam; só saem da coleção.
-    for (const i of await db.libraryItems.where('collectionIds').equals(id).toArray()) await db.libraryItems.update(i.id, { collectionIds: i.collectionIds.filter((c) => c !== id) });
+    for (const i of await db.libraryItems.where('collectionIds').equals(id).toArray()) await touchById(db.libraryItems, i.id, { collectionIds: i.collectionIds.filter((c) => c !== id) });
   });
 }
 

@@ -1,4 +1,4 @@
-import { getDb } from './db';
+import { getDb, touchById } from './db';
 import { newId, nowIso } from '@/domain/ids';
 import type { ChangeEntry } from '@/domain/entity';
 import { journalInputSchema, type BudgetCategory, type BudgetEntry, type JournalEntry, type JournalInput } from '@/domain/finance';
@@ -18,7 +18,7 @@ const base = () => {
 async function setDeleted(table: 'finJournal' | 'budgetCategories' | 'budgetEntries', entityType: string, id: string, deletedAt: string | null) {
   const db = getDb();
   await db.transaction('rw', db.table(table), db.changelog, async () => {
-    await db.table(table).update(id, { deletedAt, updatedAt: nowIso() });
+    await touchById(db.table(table), id, { deletedAt });
     await log({ entityType, entityId: id, action: deletedAt ? 'delete' : 'restore' });
   });
 }

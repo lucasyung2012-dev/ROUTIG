@@ -9,7 +9,7 @@ import { createAsset } from '@/data/financeRepo';
 import { emptyAssetInput } from '@/domain/finance';
 import { emptyGoalInput } from '@/domain/goals';
 import { emptyHabitInput } from '@/domain/habits';
-import { matchesAll, rankHits, snippetFor } from '@/domain/search';
+import { matchesAll, rankHits, searchHiddenNow, snippetFor } from '@/domain/search';
 
 beforeEach(() => setDbForTests(new RoutigDB(`test-search-${Math.random().toString(36).slice(2)}`)));
 
@@ -42,5 +42,16 @@ describe('busca global (Parte 4.3)', () => {
     await savePrivacy({ ...prefs, searchHidden: [] });
     expect((await searchModules('selic', (await loadPrivacy()).searchHidden))[0]).toMatchObject({ group: 'finance', type: 'asset' });
     expect((await getDb().libraryItems.toArray()).find((i) => i.fileName === 'resumo.txt')?.textContent).toContain('mitocôndria');
+  });
+});
+
+describe('busca com Finanças trancado pelo PIN', () => {
+  it('Finanças sai da busca enquanto está trancado, mesmo liberado na privacidade', () => {
+    expect(searchHiddenNow([], true)).toEqual(['finance']);
+    expect(searchHiddenNow(['notes'], true)).toEqual(['notes', 'finance']);
+    expect(searchHiddenNow(['finance'], true)).toEqual(['finance']);
+    // Aberto com o PIN: vale só a privacidade.
+    expect(searchHiddenNow([], false)).toEqual([]);
+    expect(searchHiddenNow(['finance'], false)).toEqual(['finance']);
   });
 });

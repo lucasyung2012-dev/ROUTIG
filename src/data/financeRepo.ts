@@ -1,4 +1,4 @@
-import { getDb } from './db';
+import { getDb, touchById } from './db';
 import { newId, nowIso } from '@/domain/ids';
 import type { ChangeEntry } from '@/domain/entity';
 import { todayKey } from '@/domain/dates';
@@ -59,7 +59,7 @@ export async function updateAsset(id: string, input: AssetInput): Promise<FinAss
 export async function setAssetArchived(id: string, archived: boolean): Promise<void> {
   const db = getDb();
   await db.transaction('rw', db.finAssets, db.changelog, async () => {
-    await db.finAssets.update(id, { archived, updatedAt: nowIso() });
+    await touchById(db.finAssets, id, { archived });
     await log({ entityType: 'finAsset', entityId: id, action: 'update', note: archived ? 'archive' : 'unarchive' });
   });
 }
@@ -67,7 +67,7 @@ export async function setAssetArchived(id: string, archived: boolean): Promise<v
 async function setDeleted(table: 'finAssets' | 'finTransactions' | 'finQuotes', entityType: string, id: string, deletedAt: string | null) {
   const db = getDb();
   await db.transaction('rw', db.table(table), db.changelog, async () => {
-    await db.table(table).update(id, { deletedAt, updatedAt: nowIso() });
+    await touchById(db.table(table), id, { deletedAt });
     await log({ entityType, entityId: id, action: deletedAt ? 'delete' : 'restore' });
   });
 }

@@ -1,4 +1,4 @@
-import { getDb } from './db';
+import { getDb, touch } from './db';
 import { newId, nowIso } from '@/domain/ids';
 import type { ChangeEntry } from '@/domain/entity';
 import { normalizeTags } from '@/domain/tasks';
@@ -80,7 +80,7 @@ export async function softDeleteProject(id: string): Promise<void> {
   await db.transaction('rw', db.projects, db.changelog, async () => {
     const p = await db.projects.get(id);
     if (!p) return;
-    await db.projects.put({ ...p, deletedAt: nowIso(), updatedAt: nowIso() });
+    await db.projects.put({ ...p, deletedAt: nowIso(), updatedAt: nowIso(), rev: p.rev + 1 });
     await log({ entityType: ENTITY, entityId: id, action: 'delete' });
   });
 }
@@ -90,7 +90,7 @@ export async function restoreProject(id: string): Promise<void> {
   await db.transaction('rw', db.projects, db.changelog, async () => {
     const p = await db.projects.get(id);
     if (!p) return;
-    await db.projects.put({ ...p, deletedAt: null, updatedAt: nowIso() });
+    await db.projects.put({ ...p, deletedAt: null, updatedAt: nowIso(), rev: p.rev + 1 });
     await log({ entityType: ENTITY, entityId: id, action: 'restore' });
   });
 }
@@ -102,9 +102,17 @@ export async function restoreProject(id: string): Promise<void> {
 export async function purgeProject(id: string): Promise<number> {
   const db = getDb();
   return db.transaction('rw', [db.projects, db.tasks, db.notes, db.changelog], async () => {
-    const freed = await db.tasks.where('projectId').equals(id).modify({ projectId: null, updatedAt: nowIso() });
+    const at = nowIso();
+    const freed = await db.tasks
+      .where('projectId')
+      .equals(id)
+      .modify((t) => {
+        t.projectId = null;
+        touch(t, at);
+      });
     await db.notes.filter((n) => n.links.some((l) => l.type === 'project' && l.id === id)).modify((n) => {
       n.links = n.links.filter((l) => !(l.type === 'project' && l.id === id));
+      touch(n, at);
     });
     await db.projects.delete(id);
     await log({ entityType: ENTITY, entityId: id, action: 'purge', note: String(freed) });

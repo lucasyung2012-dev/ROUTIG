@@ -20,6 +20,7 @@ import {
 } from '@/data/transferRepo';
 import type { IcsEventRow, NoteImportRow, TaskImportRow } from '@/domain/transfer';
 import { useCategoryName } from '@/features/calendar/useCalendarData';
+import { useFinanceLocked } from '@/features/finance/FinanceLock';
 import { saveFile } from '@/features/files/saveFile';
 import { useStatusName } from '@/features/tasks/useTasksData';
 import { Badge } from '@/ui/Badge';
@@ -71,7 +72,11 @@ export function TransferSection() {
     md: { image: t('transfer.md.image'), file: t('transfer.md.file'), drawing: t('transfer.md.drawing'), untitled: t('notes.untitled') },
   };
 
+  // Finanças trancado pelo PIN (ou o PIN ainda sendo lido): nada de Finanças sai daqui até abrir Finanças com o PIN.
+  const financeLocked = useFinanceLocked() !== false;
+
   const doExport = async (kind: ExportKind) => {
+    if (kind === 'finance' && financeLocked) return;
     setBusy(kind);
     try {
       const f = await buildExport(kind, labels);
@@ -123,19 +128,31 @@ export function TransferSection() {
           <p className="text-sm text-muted">{t('transfer.export.hint')}</p>
         </div>
         <ul className="flex flex-col divide-y divide-line/70">
-          {EXPORT_KINDS.map((k) => (
-            <li key={k} className="flex flex-wrap items-center gap-3 py-2.5">
-              <div className="min-w-0 flex-1 basis-52">
-                <div className="text-sm font-medium text-fg">{t(`transfer.export.kinds.${k}`)}</div>
-                <div className="text-xs text-muted">
-                  {t(`transfer.export.formats.${k}`)} · {counts ? t('transfer.records', { count: counts[k] }) : '…'}
+          {EXPORT_KINDS.map((k) => {
+            const locked = k === 'finance' && financeLocked;
+            return (
+              <li key={k} className="flex flex-wrap items-center gap-3 py-2.5">
+                <div className="min-w-0 flex-1 basis-52">
+                  <div className="text-sm font-medium text-fg">{t(`transfer.export.kinds.${k}`)}</div>
+                  <div className="text-xs text-muted">
+                    {t(`transfer.export.formats.${k}`)} ·{' '}
+                    {locked ? (
+                      <Link to="/finance" className="text-accent hover:underline">
+                        {t('transfer.export.financeLocked')}
+                      </Link>
+                    ) : counts ? (
+                      t('transfer.records', { count: counts[k] })
+                    ) : (
+                      '…'
+                    )}
+                  </div>
                 </div>
-              </div>
-              <Button size="sm" variant="secondary" icon={<Download className="h-4 w-4" />} loading={busy === k} disabled={!counts || counts[k] === 0} onClick={() => (k === 'finance' ? setFinanceAsk(true) : void doExport(k))}>
-                {t('transfer.export.button')}
-              </Button>
-            </li>
-          ))}
+                <Button size="sm" variant="secondary" icon={<Download className="h-4 w-4" />} loading={busy === k} disabled={locked || !counts || counts[k] === 0} onClick={() => (k === 'finance' ? setFinanceAsk(true) : void doExport(k))}>
+                  {t('transfer.export.button')}
+                </Button>
+              </li>
+            );
+          })}
         </ul>
         <p className="text-xs text-muted">{t('transfer.export.backupNote')}</p>
       </Surface>

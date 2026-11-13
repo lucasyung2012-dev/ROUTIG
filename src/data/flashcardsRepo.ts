@@ -1,4 +1,4 @@
-import { getDb } from './db';
+import { getDb, touchById } from './db';
 import { newId, nowIso } from '@/domain/ids';
 import type { ChangeEntry } from '@/domain/entity';
 import type { Card, CardReview, Deck } from '@/domain/academy';
@@ -59,7 +59,7 @@ export async function updateDeck(id: string, input: DeckInput): Promise<void> {
 async function setDeckDeleted(id: string, deletedAt: string | null, action: 'delete' | 'restore') {
   const db = getDb();
   await db.transaction('rw', db.decks, db.changelog, async () => {
-    await db.decks.update(id, { deletedAt, updatedAt: nowIso() });
+    await touchById(db.decks, id, { deletedAt });
     await log({ entityType: 'deck', entityId: id, action });
   });
 }
@@ -127,14 +127,14 @@ export async function updateCard(id: string, input: CardInput): Promise<void> {
 /** Recomeçar o aprendizado do cartão (o histórico de revisões continua guardado). */
 export async function resetCard(id: string): Promise<void> {
   const db = getDb();
-  await db.cards.update(id, { srs: newSrsState(), updatedAt: nowIso() });
+  await touchById(db.cards, id, { srs: newSrsState() });
   await log({ entityType: 'card', entityId: id, action: 'update', fields: ['srs'], note: 'reset' });
 }
 
 async function setCardDeleted(id: string, deletedAt: string | null, action: 'delete' | 'restore') {
   const db = getDb();
   await db.transaction('rw', db.cards, db.changelog, async () => {
-    await db.cards.update(id, { deletedAt, updatedAt: nowIso() });
+    await touchById(db.cards, id, { deletedAt });
     await log({ entityType: 'card', entityId: id, action });
   });
 }
@@ -156,7 +156,7 @@ export async function answerCard(id: string, rating: Rating, manual = false, tod
     const next = manual ? c.srs : review(c.srs, rating, today, at);
     const entry: CardReview = { id: newId('rev'), cardId: id, at, rating, intervalBefore: c.srs.interval, intervalAfter: next.interval, manual };
     await db.cardReviews.add(entry);
-    const card: Card = { ...c, srs: next, updatedAt: at };
+    const card: Card = { ...c, srs: next, updatedAt: at, rev: c.rev + 1 };
     await db.cards.put(card);
     return card;
   });

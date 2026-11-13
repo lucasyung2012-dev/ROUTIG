@@ -1,4 +1,4 @@
-import { getDb } from './db';
+import { getDb, touchById } from './db';
 import { newId, nowIso } from '@/domain/ids';
 import type { ChangeEntry } from '@/domain/entity';
 import { todayKey } from '@/domain/dates';
@@ -18,7 +18,7 @@ const base = () => {
 async function setDeleted(table: 'finLearning' | 'finTerms' | 'marketEntries', entityType: string, id: string, deletedAt: string | null) {
   const db = getDb();
   await db.transaction('rw', db.table(table), db.changelog, async () => {
-    await db.table(table).update(id, { deletedAt, updatedAt: nowIso() });
+    await touchById(db.table(table), id, { deletedAt });
     await log({ entityType, entityId: id, action: deletedAt ? 'delete' : 'restore' });
   });
 }
@@ -82,7 +82,7 @@ export async function answerTerm(id: string, rating: Rating, today = todayKey())
     const at = nowIso();
     const next = review(x.srs, rating, today, at);
     await db.cardReviews.add({ id: newId('rev'), cardId: id, at, rating, intervalBefore: x.srs.interval, intervalAfter: next.interval, manual: false });
-    const out: FinTerm = { ...x, srs: next, updatedAt: at };
+    const out: FinTerm = { ...x, srs: next, updatedAt: at, rev: x.rev + 1 };
     await db.finTerms.put(out);
     return out;
   });

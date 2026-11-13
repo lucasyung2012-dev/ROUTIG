@@ -1,4 +1,4 @@
-import { getDb } from './db';
+import { getDb, touch } from './db';
 import { newId, nowIso } from '@/domain/ids';
 import type { ChangeEntry } from '@/domain/entity';
 import { addDays, diffDays, type DateKey } from '@/domain/dates';
@@ -64,13 +64,20 @@ export async function removeEventCategory(id: string): Promise<number> {
   const config = await loadCalendarConfig();
   const cat = config.categories.find((c) => c.id === id);
   if (!cat || cat.builtin) throw new EventRuleError('invalid');
-  const moved = await db.events.where('categoryId').equals(id).modify({ categoryId: 'other', updatedAt: nowIso() });
+  const at = nowIso();
+  const moved = await db.events
+    .where('categoryId')
+    .equals(id)
+    .modify((e) => {
+      e.categoryId = 'other';
+      touch(e, at);
+    });
   // Ocorrências que mudaram de categoria só naquela data também vão para "Outro".
   await db.events
     .filter((e) => Object.values(e.overrides ?? {}).some((o) => o.categoryId === id))
     .modify((e) => {
       for (const o of Object.values(e.overrides)) if (o.categoryId === id) o.categoryId = 'other';
-      e.updatedAt = nowIso();
+      touch(e, at);
     });
   await saveCalendarConfig({ categories: config.categories.filter((c) => c.id !== id) });
   return moved;
@@ -227,7 +234,7 @@ export async function deleteFollowing(id: string, seriesDate: DateKey): Promise<
 
 async function softDelete(e: CalendarEvent): Promise<void> {
   const at = nowIso();
-  await getDb().events.put({ ...e, deletedAt: at, updatedAt: at });
+  await getDb().events.put({ ...e, deletedAt: at, updatedAt: at, rev: e.rev + 1 });
   await log({ entityType: ENTITY, entityId: e.id, action: 'delete' });
 }
 
@@ -241,7 +248,7 @@ export async function restoreEvent(id: string): Promise<void> {
   const db = getDb();
   await db.transaction('rw', db.events, db.changelog, async () => {
     const e = await getOrFail(id);
-    await db.events.put({ ...e, deletedAt: null, updatedAt: nowIso() });
+    await db.events.put({ ...e, deletedAt: null, updatedAt: nowIso(), rev: e.rev + 1 });
     await log({ entityType: ENTITY, entityId: id, action: 'restore' });
   });
 }

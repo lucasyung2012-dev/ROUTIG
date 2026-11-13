@@ -18,7 +18,7 @@ import {
 } from '@/data/interestsRepo';
 import { storeNoteFile } from '@/data/notesRepo';
 import { formatDateKey, toDateKey, todayKey } from '@/domain/dates';
-import { countByWeek, emptyInterestInput, INTEREST_STATUSES, type Interest, type InterestStatus, type TimelineItem, type WeekBucket } from '@/domain/interests';
+import { countByWeek, emptyInterestInput, INTEREST_STATUSES, moduleEvolution, type Interest, type InterestStatus, type TimelineItem, type WeekBucket } from '@/domain/interests';
 import { completionTimes } from '@/domain/tasks';
 import { useObjectUrl } from '@/features/files/useObjectUrl';
 import { useTasksData } from '@/features/tasks/useTasksData';
@@ -370,9 +370,22 @@ export function EvolutionTab() {
   const extra = useLiveQuery(async () => {
     const db = getDb();
     const [notes, projects, interests] = await Promise.all([db.notes.filter((n) => !n.deletedAt).toArray(), db.projects.filter((p) => !p.deletedAt).toArray(), db.interests.filter((i) => !i.deletedAt).toArray()]);
-    return { notes, projects, interests };
+    // Hábitos, Focus, Goals, Music e Sports: lidos agora, sem cópia (cada número só aparece se o módulo tem registros).
+    const [habits, habitLogs, focus, goals, instruments, songs, sports, activities] = await Promise.all([
+      db.habits.toArray(),
+      db.habitLogs.toArray(),
+      db.focusSessions.toArray(),
+      db.goals.toArray(),
+      db.instruments.toArray(),
+      db.songs.toArray(),
+      db.sports.toArray(),
+      db.sportActivities.toArray(),
+    ]);
+    return { notes, projects, interests, modules: moduleEvolution({ habits, habitLogs, focus, goals, instruments, songs, sports, activities }) };
   }, []);
   if (tasks.loading || !extra) return <LoadingState label={t('common.loading')} lines={4} />;
+  // Módulos escondidos do menu não entram aqui.
+  const moduleStats = extra.modules.filter((m) => !(settings.nav.hidden as readonly string[]).includes(m.module));
 
   const today = todayKey();
   const doneDates = tasks.active.flatMap((x) => completionTimes(x)).map((c) => toDateKey(new Date(c)));
@@ -382,7 +395,7 @@ export function EvolutionTab() {
     today,
     8,
   );
-  const nothing = doneDates.length === 0 && extra.notes.length === 0 && extra.projects.length === 0 && extra.interests.length === 0;
+  const nothing = doneDates.length === 0 && extra.notes.length === 0 && extra.projects.length === 0 && extra.interests.length === 0 && moduleStats.length === 0;
   if (nothing)
     return (
       <Surface tone="flat">
@@ -397,6 +410,7 @@ export function EvolutionTab() {
     { label: t('profile.evolution.projectsActive'), value: extra.projects.filter((p) => p.status === 'active').length },
     { label: t('profile.evolution.notesCreated'), value: extra.notes.length },
     { label: t('profile.evolution.interestsCount'), value: extra.interests.length },
+    ...moduleStats.map((m) => ({ label: t(`profile.evolution.modules.${m.module}`), value: m.value })),
   ];
 
   return (

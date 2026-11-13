@@ -1,4 +1,4 @@
-import { getDb } from './db';
+import { getDb, touchById } from './db';
 import { newId, nowIso } from '@/domain/ids';
 import type { ChangeEntry } from '@/domain/entity';
 import { focusConfigSchema, focusSessionSchema, migrateFocusConfig, type FocusConfig, type FocusSession, type FocusSessionInput, type FocusTimer } from '@/domain/focus';
@@ -70,8 +70,8 @@ export async function updateFocusSession(id: string, patch: Partial<Pick<FocusSe
 }
 
 export async function softDeleteFocusSession(id: string): Promise<void> {
-  await getDb().focusSessions.update(id, { deletedAt: nowIso(), updatedAt: nowIso() });
+  await touchById(getDb().focusSessions, id, { deletedAt: nowIso() });
 }
 export async function restoreFocusSession(id: string): Promise<void> {
-  await getDb().focusSessions.update(id, { deletedAt: null, updatedAt: nowIso() });
+  await touchById(getDb().focusSessions, id, { deletedAt: null });
 }

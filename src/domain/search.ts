@@ -26,6 +26,11 @@ export const SEARCHABLE_MODULES = ['tasks', 'events', 'notes', 'projects', 'goal
 export type SearchableModule = (typeof SEARCHABLE_MODULES)[number];
 export const DEFAULT_SEARCH_HIDDEN: SearchableModule[] = ['finance'];
 
+/** Módulos fora da busca agora: os escondidos pela privacidade e, com Finanças trancado pelo PIN, também Finanças. */
+export function searchHiddenNow(hidden: readonly SearchableModule[], financeLocked: boolean): SearchableModule[] {
+  return financeLocked && !hidden.includes('finance') ? [...hidden, 'finance'] : [...hidden];
+}
+
 export interface SearchHit {
   key: string;
   group: SearchGroup;

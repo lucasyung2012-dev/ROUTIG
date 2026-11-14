@@ -9,11 +9,12 @@ import { isOpenGoal } from '@/domain/goals';
 import { findConflicts, occurrencesInRange, toMinutes, type CalendarEvent, type EventCategory, type EventOccurrence, type EventTone } from '@/domain/events';
 import { isClosedKind, statusKind, type Task } from '@/domain/tasks';
 import { useTasksData, type TasksData } from '@/features/tasks/useTasksData';
+import { focusCalendarItems, languageCalendarItems, sportCalendarItems } from './moduleItems';
 
 /** Um item no calendário: ocorrência de evento ou tarefa com prazo (o registro original, nunca uma cópia). */
 export interface CalendarItem {
   key: string;
-  kind: 'event' | 'task' | 'milestone' | 'assessment' | 'study' | 'habit' | 'goal';
+  kind: 'event' | 'task' | 'milestone' | 'assessment' | 'study' | 'habit' | 'goal' | 'sport' | 'language' | 'focus';
   date: DateKey;
   endDate: DateKey;
   allDay: boolean;
@@ -39,6 +40,10 @@ export interface CalendarItem {
   habitId?: string;
   /** Prazo ou marco de objetivo: abre o objetivo. */
   goalId?: string;
+  /** Atividade esportiva: abre o esporte. */
+  sportId?: string;
+  /** Sessão de idioma: abre o idioma. */
+  languageId?: string;
   conflictWith: string[];
 }
 
@@ -53,7 +58,28 @@ export interface CalendarData {
 
 const TASK_DURATION = 30;
 
-export function useCalendarData(): CalendarData {
+/**
+ * `range`: período visível. Só com ele entram Esportes, Idiomas e Focus, lidos apenas desse período
+ * (os outros usos do calendário, como o Dashboard, seguem como antes).
+ */
+export function useCalendarData(range?: { from: DateKey; to: DateKey }): CalendarData {
+  const { t } = useSettings();
+  const rangeFrom = range?.from ?? null;
+  const rangeTo = range?.to ?? null;
+  const sports = useLiveQuery(async () => (rangeFrom ? getDb().sports.filter((s) => !s.deletedAt).toArray() : []), [rangeFrom]);
+  const sportActs = useLiveQuery(
+    async () => (rangeFrom && rangeTo ? getDb().sportActivities.where('date').between(rangeFrom, rangeTo, true, true).filter((a) => !a.deletedAt).toArray() : []),
+    [rangeFrom, rangeTo],
+  );
+  const languages = useLiveQuery(async () => (rangeFrom ? getDb().languages.filter((l) => !l.deletedAt).toArray() : []), [rangeFrom]);
+  const langSessions = useLiveQuery(
+    async () => (rangeFrom && rangeTo ? getDb().languageSessions.where('date').between(rangeFrom, rangeTo, true, true).filter((s) => !s.deletedAt).toArray() : []),
+    [rangeFrom, rangeTo],
+  );
+  const focusSessions = useLiveQuery(
+    async () => (rangeFrom && rangeTo ? getDb().focusSessions.where('date').between(rangeFrom, rangeTo, true, true).filter((s) => !s.deletedAt).toArray() : []),
+    [rangeFrom, rangeTo],
+  );
   const all = useLiveQuery(() => getDb().events.toArray(), []);
   const config = useLiveQuery(() => loadCalendarConfig(), []);
   const projects = useLiveQuery(() => getDb().projects.filter((p) => !p.deletedAt).toArray(), []);
@@ -229,6 +255,15 @@ export function useCalendarData(): CalendarData {
             items.push({ key: d.key, kind: 'goal', date: d.date, endDate: d.date, allDay: true, start: null, end: null, title: d.title, location: '', tone: 'amber', categoryId: null, done: d.done, goalId: g.id, conflictWith: [] });
           }
         }
+        // Esportes, Idiomas e Focus: só leitura, do próprio registro (fora da lixeira e de pai apagado).
+        items.push(
+          ...sportCalendarItems(sports ?? [], sportActs ?? [], from, to, {
+            type: (x) => t(`sports.types.${x}`),
+            outcome: (x) => t(`sports.outcomes.${x}`),
+          }),
+          ...languageCalendarItems(languages ?? [], langSessions ?? [], from, to, (x) => t(`languages.activities.${x}`)),
+          ...focusCalendarItems(focusSessions ?? [], from, to, (kind, min) => `${t('modules.focus')}: ${t(`focus.kinds.${kind}`)} · ${min} min`),
+        );
       }
       // Conflitos: só entre eventos com horário (tarefas não ocupam agenda).
       const slots = items
@@ -250,7 +285,7 @@ export function useCalendarData(): CalendarData {
       tasks,
       itemsInRange,
     };
-  }, [all, config, tasks, projects, assessments, subjects, sessions, habits, habitLogs, goals]);
+  }, [all, config, tasks, projects, assessments, subjects, sessions, habits, habitLogs, goals, sports, sportActs, languages, langSessions, focusSessions, t]);
 }
 
 export function useCategoryName() {

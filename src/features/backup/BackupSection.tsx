@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { ArchiveRestore, Download, FileUp, ShieldCheck, Trash2, TriangleAlert } from 'lucide-react';
+import { ArchiveRestore, Download, FileUp, Lock, ShieldCheck, Trash2, TriangleAlert } from 'lucide-react';
 import { useSettings } from '@/app/SettingsProvider';
 import {
   currentCounts,
@@ -22,6 +22,7 @@ import {
   daysSince,
   hasUserData,
   isBackupStale,
+  isEncryptedBackup,
   KEEP_AUTO_OPTIONS,
   MAIN_TABLES,
   oldAutoCopies,
@@ -47,7 +48,7 @@ import { Surface } from '@/ui/Surface';
 import { Switch } from '@/ui/Switch';
 import { useToast } from '@/ui/toast';
 import { cn } from '@/ui/cn';
-import { exportBackup, exportExisting } from './exportFile';
+import { ExportBackupDialog, UnlockBackupDialog, type ExportSource } from './BackupPasswordDialogs';
 
 /** Settings → Backup (Parte 25): exportar, cópias internas, restaurar, histórico e avisos. */
 export function BackupSection() {
@@ -57,8 +58,10 @@ export function BackupSection() {
   const snapshots = useLiveQuery(() => listSnapshots(), []);
   const exports = useLiveQuery(() => listExports(), []);
   const counts = useLiveQuery(() => currentCounts(), []);
-  const [busy, setBusy] = useState<'export' | 'snapshot' | 'read' | null>(null);
-  const [preview, setPreview] = useState<{ backup: BackupFile; source: string; ignored: string[] } | null>(null);
+  const [busy, setBusy] = useState<'snapshot' | 'read' | null>(null);
+  const [preview, setPreview] = useState<{ backup: BackupFile; source: string; ignored: string[]; encrypted: boolean } | null>(null);
+  const [exporting, setExporting] = useState<ExportSource | null>(null);
+  const [locked, setLocked] = useState<{ text: string; source: string } | null>(null);
   const [deleting, setDeleting] = useState<SnapshotInfo | null>(null);
   const [pruning, setPruning] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
@@ -76,18 +79,6 @@ export function BackupSection() {
   };
   const setPrefs = (p: Partial<BackupPrefs>) => void saveBackupPrefs({ ...prefs, ...p });
 
-  const doExport = async () => {
-    setBusy('export');
-    try {
-      const r = await exportBackup();
-      if (r === 'saved') toast.show(t('backup.exported'));
-    } catch {
-      toast.show(t('backup.exportFailed'), 'error');
-    } finally {
-      setBusy(null);
-    }
-  };
-
   const doSnapshot = async () => {
     setBusy('snapshot');
     try {
@@ -100,11 +91,16 @@ export function BackupSection() {
     }
   };
 
-  const openPreview = async (text: string, source: string) => {
+  // Arquivo protegido por senha: primeiro pede a senha; o texto aberto segue o caminho de sempre (checksum incluso).
+  const openPreview = async (text: string, source: string, encrypted = false) => {
+    if (!encrypted && isEncryptedBackup(text)) {
+      setLocked({ text, source });
+      return;
+    }
     setBusy('read');
     try {
       const r = await readBackup(text);
-      if (r.ok) setPreview({ backup: r.backup, source, ignored: r.ignoredTables });
+      if (r.ok) setPreview({ backup: r.backup, source, ignored: r.ignoredTables, encrypted });
       else toast.show(t(`backup.problems.${r.problem}`), 'error');
     } finally {
       setBusy(null);
@@ -127,7 +123,7 @@ export function BackupSection() {
         </div>
         <p className="text-sm leading-relaxed text-muted">{t('backup.exportHint')}</p>
         <div className="flex flex-wrap gap-2">
-          <Button variant="primary" icon={<Download className="h-4 w-4" />} loading={busy === 'export'} onClick={() => void doExport()}>
+          <Button variant="primary" icon={<Download className="h-4 w-4" />} onClick={() => setExporting({ kind: 'now' })}>
             {t('backup.export')}
           </Button>
           <Button variant="secondary" loading={busy === 'snapshot'} onClick={() => void doSnapshot()}>
@@ -234,8 +230,8 @@ export function BackupSection() {
                   label={t('backup.exportThis')}
                   icon={<Download className="h-4 w-4" />}
                   onClick={() =>
-                    void snapshotText(s.id).then(async (text) => {
-                      if (text && (await exportExisting(text, s.createdAt, s.checksum)) === 'saved') toast.show(t('backup.exported'));
+                    void snapshotText(s.id).then((text) => {
+                      if (text) setExporting({ kind: 'snapshot', text, createdAt: s.createdAt, checksum: s.checksum });
                     })
                   }
                 />
@@ -264,6 +260,19 @@ export function BackupSection() {
         )}
       </Surface>
 
+      {exporting && <ExportBackupDialog source={exporting} onClose={() => setExporting(null)} />}
+      {locked && (
+        <UnlockBackupDialog
+          text={locked.text}
+          source={locked.source}
+          onClose={() => setLocked(null)}
+          onUnlocked={(plain) => {
+            const src = locked.source;
+            setLocked(null);
+            void openPreview(plain, src, true);
+          }}
+        />
+      )}
       {pruning && <PruneDialog snapshots={snapshots} onClose={() => setPruning(false)} />}
       {preview && <RestorePreview {...preview} current={counts} onClose={() => setPreview(null)} />}
       <ConfirmDialog
@@ -289,7 +298,7 @@ function summary(counts: Record<string, number>, t: Translate): string {
   return (['tasks', 'notes', 'events', 'projects'] as const).map((k) => `${t(`backup.tables.${k}`)}: ${counts[k] ?? 0}`).join(' · ');
 }
 
-function RestorePreview({ backup, source, ignored, current, onClose }: { backup: BackupFile; source: string; ignored: string[]; current: Record<string, number>; onClose: () => void }) {
+function RestorePreview({ backup, source, ignored, encrypted, current, onClose }: { backup: BackupFile; source: string; ignored: string[]; encrypted: boolean; current: Record<string, number>; onClose: () => void }) {
   const { t, settings } = useSettings();
   const toast = useToast();
   const [mode, setMode] = useState<'recover' | 'replace'>('recover');
@@ -367,6 +376,11 @@ function RestorePreview({ backup, source, ignored, current, onClose }: { backup:
           <Badge tone="success" icon={<ShieldCheck className="h-3.5 w-3.5" />}>
             {t('backup.integrityOk')}
           </Badge>
+          {encrypted && (
+            <Badge tone="accent" icon={<Lock className="h-3.5 w-3.5" />}>
+              {t('backup.unlock.protectedBadge')}
+            </Badge>
+          )}
           <span className="text-muted">{t('backup.previewMeta', { date: created, version: backup.appVersion, source })}</span>
         </div>
         <Segmented<'recover' | 'replace'>

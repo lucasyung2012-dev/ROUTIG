@@ -6,14 +6,12 @@ import { useSettings } from '@/app/SettingsProvider';
 import { currentCounts, listExports, loadBackupPrefs, saveBackupPrefs } from '@/data/backupRepo';
 import { daysSince, hasUserData, isBackupStale } from '@/domain/backup';
 import { Button } from '@/ui/Button';
-import { useToast } from '@/ui/toast';
-import { exportBackup } from './exportFile';
+import { ExportBackupDialog } from './BackupPasswordDialogs';
 
 /** Aviso de backup desatualizado (Parte 25.7). Some quando o backup é exportado ou adiado. */
 export function BackupReminder() {
   const { t } = useSettings();
-  const toast = useToast();
-  const [busy, setBusy] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const state = useLiveQuery(async () => {
     const [prefs, exports, counts] = await Promise.all([loadBackupPrefs(), listExports(), currentCounts()]);
     return { prefs, lastExport: exports[0]?.at ?? null, hasData: hasUserData(counts) };
@@ -45,21 +43,12 @@ export function BackupReminder() {
           size="sm"
           variant="primary"
           icon={<Download className="h-4 w-4" />}
-          loading={busy}
-          onClick={async () => {
-            setBusy(true);
-            try {
-              if ((await exportBackup()) === 'saved') toast.show(t('backup.exported'));
-            } catch {
-              toast.show(t('backup.exportFailed'), 'error');
-            } finally {
-              setBusy(false);
-            }
-          }}
+          onClick={() => setExporting(true)}
         >
           {t('backup.export')}
         </Button>
       </div>
+      {exporting && <ExportBackupDialog source={{ kind: 'now' }} onClose={() => setExporting(false)} />}
     </div>
   );
 }

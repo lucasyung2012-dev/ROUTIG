@@ -74,7 +74,6 @@ function step(view: ViewId, anchor: DateKey, dir: 1 | -1): DateKey {
 /** `initialView`: abre numa visão (salas do Observatório Temporal no parque). */
 export function CalendarPage({ initialView }: { initialView?: CalendarView } = {}) {
   const { t, settings } = useSettings();
-  const cal = useCalendarData();
   const events = useEventEditor();
   const tasks = useTaskEditor();
   const categoryName = useCategoryName();
@@ -85,6 +84,8 @@ export function CalendarPage({ initialView }: { initialView?: CalendarView } = {
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [trashOpen, setTrashOpen] = useState(false);
   const [configOpen, setConfigOpen] = useState(false);
+  const range = rangeFor(view, anchor, settings.weekStartsOn);
+  const cal = useCalendarData(range);
 
   useEffect(() => {
     try {
@@ -94,7 +95,6 @@ export function CalendarPage({ initialView }: { initialView?: CalendarView } = {
     }
   }, [view]);
 
-  const range = rangeFor(view, anchor, settings.weekStartsOn);
   const items = useMemo(() => cal.itemsInRange(range.from, range.to, { showTasks, categoryId }), [cal, range.from, range.to, showTasks, categoryId]);
 
   const handlers: ViewHandlers = {
@@ -105,6 +105,9 @@ export function CalendarPage({ initialView }: { initialView?: CalendarView } = {
       else if (i.kind === 'study') navigate('/academy/plan');
       else if (i.kind === 'habit' && i.habitId) navigate(`/habits/${i.habitId}`);
       else if (i.kind === 'goal' && i.goalId) navigate(`/goals/${i.goalId}`);
+      else if (i.kind === 'sport' && i.sportId) navigate(`/sports/${i.sportId}`);
+      else if (i.kind === 'language' && i.languageId) navigate(`/languages/${i.languageId}`);
+      else if (i.kind === 'focus') navigate('/focus');
       else if (i.occurrence) events.openEvent(i.occurrence.event.id, i.occurrence.seriesDate);
     },
     onNew: (date, startMin) => events.newEvent({ start: date, endDate: date, startTime: fromMinutes(startMin ?? 9 * 60) }),

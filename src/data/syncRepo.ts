@@ -8,9 +8,9 @@
  * do app). Chave, criptografia, código de recuperação e a regra de juntar são os mesmos nos dois.
  */
 import { getDb, DB_SCHEMA_VERSION } from './db';
-import { collectTables } from './backupRepo';
-import { mergeRemote, syncable, normalizeRecoveryCode } from '@/domain/sync';
+import { LOCAL_ONLY_TABLES, mergeRemote, syncable, normalizeRecoveryCode } from '@/domain/sync';
 import type { BackupTables } from '@/domain/backup';
+import type { StoredFile } from '@/domain/inbox';
 import { newId, nowIso } from '@/domain/ids';
 import { decryptText, encryptText, exportKey, importKey, newDataKey, newRecoveryCode, unwrapDataKey, wrapDataKey } from '@/services/syncCrypto';
 import { getToken, listAppFiles, readAppFile, signOutGoogle, whoAmI, writeAppFile } from '@/services/google';
@@ -35,11 +35,17 @@ export interface SyncState {
   lastSync: string;
   lastChanged: number;
   auto: boolean;
+  /** Versão de cada arquivo dos outros aparelhos já juntada aqui (não baixa de novo o que não mudou). */
+  seen: Record<string, string>;
+  /** Última alteração local (changelog) já enviada (não envia de novo sem mudança). */
+  sentSeq: number;
 }
 
 const KEY = 'routig.sync';
 const KEY_FILE = 'routig-key.json';
 const deviceFile = (id: string) => `routig-device-${id}.json`;
+const FILE_PREFIX = 'routig-file-';
+const blobFile = (id: string) => `${FILE_PREFIX}${id}.bin`;
 
 function guessDeviceName(): string {
   const ua = navigator.userAgent;
@@ -74,6 +80,8 @@ export function loadSyncState(): SyncState {
     lastSync: s.lastSync ?? '',
     lastChanged: s.lastChanged ?? 0,
     auto: s.auto ?? true,
+    seen: s.seen ?? {},
+    sentSeq: s.sentSeq ?? 0,
   };
 }
 
@@ -91,11 +99,18 @@ export function syncReady(s: SyncState): boolean {
   return s.provider === 'google' ? !!s.clientId : !!s.dbxKey && !!s.dbxRefresh;
 }
 
+interface RemoteFile {
+  name: string;
+  id?: string;
+  /** Versão do arquivo na nuvem (vazia se o provedor não informar). */
+  ver: string;
+}
+
 /** Operações na pasta do app, iguais para os dois provedores. */
 interface Remote {
-  list(): Promise<Array<{ name: string; id?: string }>>;
-  read(f: { name: string; id?: string }): Promise<string>;
-  write(name: string, text: string, existing?: { name: string; id?: string }): Promise<void>;
+  list(): Promise<RemoteFile[]>;
+  read(f: RemoteFile): Promise<string>;
+  write(name: string, text: string, existing?: RemoteFile): Promise<void>;
 }
 
 async function remote(s: SyncState, interactive: boolean): Promise<Remote> {
@@ -103,7 +118,7 @@ async function remote(s: SyncState, interactive: boolean): Promise<Remote> {
     if (!s.clientId) throw new Error('no-client-id');
     const access = await getToken(s.clientId, interactive);
     return {
-      list: () => listAppFiles(access),
+      list: async () => (await listAppFiles(access)).map((f) => ({ name: f.name, id: f.id, ver: f.modifiedTime ?? '' })),
       read: (f) => readAppFile(access, f.id ?? ''),
       write: async (name, text, existing) => {
         await writeAppFile(access, name, text, existing?.id);
@@ -156,7 +171,7 @@ export async function createSyncKey(s: SyncState): Promise<{ state: SyncState; c
   const key = await newDataKey();
   const code = newRecoveryCode();
   await r.write(KEY_FILE, await wrapDataKey(key, code));
-  const state = { ...s, key: await exportKey(key) };
+  const state = { ...s, key: await exportKey(key), seen: {}, sentSeq: 0 };
   saveSyncState(state);
   return { state, code };
 }
@@ -174,9 +189,79 @@ export async function joinWithCode(s: SyncState, input: string): Promise<SyncSta
   } catch {
     throw new Error('wrong-code');
   }
-  const state = { ...s, key: await exportKey(key) };
+  const state = { ...s, key: await exportKey(key), seen: {}, sentSeq: 0 };
   saveSyncState(state);
   return state;
+}
+
+/** Número da última alteração local registrada (o changelog só recebe o que foi feito neste aparelho). */
+export async function lastLocalSeq(): Promise<number> {
+  return (await getDb().changelog.orderBy('seq').last())?.seq ?? 0;
+}
+
+/** Só o que viaja, sem ler os arquivos binários (que vão separados, em syncFiles). */
+async function collectSyncTables(): Promise<BackupTables> {
+  const db = getDb();
+  const out: BackupTables = {};
+  for (const t of db.tables) if (!LOCAL_ONLY_TABLES.has(t.name)) out[t.name] = (await t.toArray()) as Array<Record<string, unknown>>;
+  return syncable(out);
+}
+
+function toBase64(bytes: Uint8Array): string {
+  let bin = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(bin);
+}
+
+function fromBase64(b64: string): Uint8Array {
+  const bin = atob(b64);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+
+interface FilePayload extends Omit<StoredFile, 'blob'> {
+  data: string;
+}
+
+/**
+ * Arquivos binários viajam separados dos dados, um arquivo criptografado por anexo, com o mesmo id
+ * em todos os aparelhos (os registros apontam para ele). Envia o que a nuvem ainda não tem; baixa
+ * só o que algum registro deste aparelho usa e ainda falta aqui. Um arquivo com problema não
+ * interrompe os outros nem a sincronização dos dados.
+ */
+async function syncFiles(r: Remote, key: CryptoKey, remoteFiles: RemoteFile[]): Promise<void> {
+  const db = getDb();
+  const inCloud = new Map(remoteFiles.filter((f) => f.name.startsWith(FILE_PREFIX)).map((f) => [f.name, f]));
+  const localIds = new Set((await db.files.toCollection().primaryKeys()) as string[]);
+
+  for (const id of localIds) {
+    if (inCloud.has(blobFile(id))) continue;
+    try {
+      const f = await db.files.get(id);
+      if (!f) continue;
+      const { blob, ...meta } = f;
+      const data = toBase64(new Uint8Array(await new Response(blob).arrayBuffer()));
+      await r.write(blobFile(id), await encryptText(JSON.stringify({ ...meta, data } satisfies FilePayload), key));
+    } catch {
+      /* tenta de novo na próxima sincronização */
+    }
+  }
+
+  const missing = [...inCloud.keys()].map((n) => n.slice(FILE_PREFIX.length, -'.bin'.length)).filter((id) => id && !localIds.has(id));
+  if (!missing.length) return;
+  // Ids são longos e aleatórios: aparecer no texto dos dados é estar em uso.
+  const used = JSON.stringify(await collectSyncTables());
+  for (const id of missing) {
+    if (!used.includes(id)) continue;
+    try {
+      const p = JSON.parse(await decryptText(await r.read(inCloud.get(blobFile(id))!), key)) as FilePayload;
+      const { data, ...meta } = p;
+      await db.files.put({ ...meta, id, blob: new Blob([fromBase64(data)], { type: meta.mime }) });
+    } catch {
+      /* tenta de novo na próxima sincronização */
+    }
+  }
 }
 
 async function applyIncoming(incoming: Record<string, Array<Record<string, unknown>>>) {
@@ -203,23 +288,36 @@ export async function syncNow(s: SyncState, interactive = false): Promise<SyncRe
   const mine = files.find((f) => f.name === deviceFile(s.deviceId));
   const others = files.filter((f) => f.name.startsWith('routig-device-') && f !== mine);
   const remotes: BackupTables[] = [];
+  const seen: Record<string, string> = {};
   for (const f of others) {
+    // Arquivo que não mudou desde a última junção: os dados dele já estão aqui.
+    if (f.ver && s.seen[f.name] === f.ver) {
+      seen[f.name] = f.ver;
+      continue;
+    }
     try {
       const payload = JSON.parse(await decryptText(await r.read(f), key)) as { schema: number; tables: BackupTables };
       // Cópia de uma versão mais nova do app: espera este aparelho atualizar antes de juntar.
       if (payload.schema > DB_SCHEMA_VERSION) continue;
       remotes.push(payload.tables);
+      if (f.ver) seen[f.name] = f.ver;
     } catch {
       /* cópia ilegível (chave antiga ou arquivo corrompido): ignora esta */
     }
   }
-  const local = await collectTables();
+  const local = await collectSyncTables();
   const { incoming, changed } = mergeRemote(local, remotes);
   await applyIncoming(incoming);
-  const tables = changed ? syncable(await collectTables()) : syncable(local);
-  const text = JSON.stringify({ deviceId: s.deviceId, deviceName: s.deviceName, at: nowIso(), schema: DB_SCHEMA_VERSION, tables });
-  await r.write(deviceFile(s.deviceId), await encryptText(text, key), mine);
-  const state = { ...s, lastSync: nowIso(), lastChanged: changed };
+  // Arquivos (PDFs, imagens, anexos) antes da cópia dos dados: quem ler a cópia já encontra os arquivos.
+  await syncFiles(r, key, files);
+  // Envia a cópia deste aparelho só se algo mudou aqui (alteração local ou dados recebidos agora).
+  const seq = await lastLocalSeq();
+  if (interactive || !mine || changed || seq !== s.sentSeq) {
+    const tables = changed ? await collectSyncTables() : local;
+    const text = JSON.stringify({ deviceId: s.deviceId, deviceName: s.deviceName, at: nowIso(), schema: DB_SCHEMA_VERSION, tables });
+    await r.write(deviceFile(s.deviceId), await encryptText(text, key), mine);
+  }
+  const state = { ...s, lastSync: nowIso(), lastChanged: changed, seen, sentSeq: seq };
   saveSyncState(state);
   return { changed, devices: others.length + 1, state };
 }
@@ -228,7 +326,7 @@ export async function syncNow(s: SyncState, interactive = false): Promise<SyncRe
 export async function disconnect(s: SyncState): Promise<SyncState> {
   if (s.provider === 'google') signOutGoogle();
   else if (s.dbxKey && s.dbxRefresh) await dropboxSignOut(s.dbxKey, s.dbxRefresh);
-  const state: SyncState = { ...s, email: '', name: '', key: '', lastSync: '', dbxRefresh: '' };
+  const state: SyncState = { ...s, email: '', name: '', key: '', lastSync: '', dbxRefresh: '', seen: {}, sentSeq: 0 };
   saveSyncState(state);
   return state;
 }

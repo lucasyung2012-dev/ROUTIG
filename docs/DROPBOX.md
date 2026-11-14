@@ -36,7 +36,7 @@ O app fica em "Development" no Dropbox; isso basta para uso próprio (até 500 c
    **Criar a chave** → guarde o **código de recuperação** (papel ou gerenciador de senhas) → **Sincronizar agora**.
 2. Em **cada outro aparelho** (pelo app instalado na tela inicial): cole a mesma chave do app →
    Entrar com o Dropbox (mesma conta) → digite o código de recuperação → **Ligar este aparelho** → **Sincronizar agora**.
-3. A partir daí, "Sincronizar sozinho" junta os dados ao abrir o app, a cada 5 minutos e ao sair dele, sem pedir login de novo.
+3. A partir daí, "Sincronizar sozinho" junta os dados poucos segundos depois de cada mudança, ao abrir e ao voltar para o app, a cada minuto com o app na tela e ao sair dele, sem pedir login de novo.
 
 **Se o login não voltar sozinho para o app** (pode acontecer no app instalado no iPhone/iPad):
 use **Entrar com código**. O Dropbox abre em outra janela e mostra um código; copie, volte ao ROUTIG,

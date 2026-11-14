@@ -255,3 +255,121 @@ export function backupFileName(createdAt: Date): string {
   const p = (n: number) => String(n).padStart(2, '0');
   return `routig-backup-${createdAt.getFullYear()}-${p(createdAt.getMonth() + 1)}-${p(createdAt.getDate())}-${p(createdAt.getHours())}${p(createdAt.getMinutes())}.json`;
 }
+
+/* ---------- Backup exportado protegido por senha ---------- */
+
+/**
+ * O arquivo exportado sai do aparelho, então pode ir protegido por uma senha
+ * escolhida na hora: PBKDF2 (SHA-256, 600 mil voltas, sal aleatório) deriva a
+ * chave e AES-256-GCM cifra o backup inteiro. O envelope guarda só o necessário
+ * para abrir; dentro dele está o backup normal, com o checksum de sempre.
+ * As cópias internas (que nunca saem do aparelho) continuam como estão.
+ */
+export const ENCRYPTED_BACKUP_FORMAT = 'routig-backup-encrypted';
+export const ENCRYPTED_BACKUP_VERSION = 1;
+export const BACKUP_KDF_ITERATIONS = 600_000;
+export const MIN_BACKUP_PASSWORD = 8;
+/** Teto para um arquivo adulterado não travar o app derivando a chave. */
+const MAX_KDF_ITERATIONS = 10_000_000;
+
+export interface EncryptedBackupEnvelope {
+  format: typeof ENCRYPTED_BACKUP_FORMAT;
+  v: number;
+  kdf: { name: 'PBKDF2'; hash: 'SHA-256'; iterations: number };
+  cipher: 'AES-GCM';
+  salt: string;
+  iv: string;
+  data: string;
+}
+
+export type DecryptProblem = 'wrong_password' | 'bad_envelope' | 'newer_format';
+export type DecryptedBackup = { ok: true; text: string } | { ok: false; problem: DecryptProblem };
+
+function subtleOf(subtle?: SubtleCrypto): SubtleCrypto {
+  const s = subtle ?? (typeof crypto !== 'undefined' ? crypto.subtle : undefined);
+  if (!s) throw new Error('crypto indisponível');
+  return s;
+}
+
+const b64ToBuf = (s: string) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+
+async function deriveBackupKey(password: string, salt: Uint8Array, iterations: number, subtle: SubtleCrypto): Promise<CryptoKey> {
+  // NFC: a mesma senha digitada em teclados diferentes vira os mesmos bytes.
+  const base = await subtle.importKey('raw', new TextEncoder().encode(password.normalize('NFC')), 'PBKDF2', false, ['deriveKey']);
+  return subtle.deriveKey({ name: 'PBKDF2', salt, iterations, hash: 'SHA-256' }, base, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+}
+
+/** O arquivo é um backup protegido por senha? (olha só o começo, sem ler o arquivo inteiro) */
+export function isEncryptedBackup(text: string): boolean {
+  return /^\s*\{\s*"format"\s*:\s*"routig-backup-encrypted"/.test(text.slice(0, 256));
+}
+
+/** Cifra o texto de um backup com a senha; devolve o envelope como texto. */
+export async function encryptBackupText(text: string, password: string, opts: { iterations?: number; subtle?: SubtleCrypto } = {}): Promise<string> {
+  if (!password) throw new Error('senha vazia');
+  const subtle = subtleOf(opts.subtle);
+  const iterations = opts.iterations ?? BACKUP_KDF_ITERATIONS;
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const key = await deriveBackupKey(password, salt, iterations, subtle);
+  const data = new Uint8Array(await subtle.encrypt({ name: 'AES-GCM', iv }, key, new TextEncoder().encode(text)));
+  const envelope: EncryptedBackupEnvelope = {
+    format: ENCRYPTED_BACKUP_FORMAT,
+    v: ENCRYPTED_BACKUP_VERSION,
+    kdf: { name: 'PBKDF2', hash: 'SHA-256', iterations },
+    cipher: 'AES-GCM',
+    salt: bytesToBase64(salt),
+    iv: bytesToBase64(iv),
+    data: bytesToBase64(data),
+  };
+  return JSON.stringify(envelope);
+}
+
+/**
+ * Abre um backup protegido. Senha errada (ou arquivo alterado: o GCM não deixa
+ * distinguir) dá `wrong_password` e nada é devolvido. O texto devolvido ainda
+ * passa por `parseBackup`, que confere o checksum.
+ */
+export async function decryptBackupText(text: string, password: string, subtle?: SubtleCrypto): Promise<DecryptedBackup> {
+  let raw: unknown;
+  try {
+    raw = JSON.parse(text);
+  } catch {
+    return { ok: false, problem: 'bad_envelope' };
+  }
+  const e = (raw && typeof raw === 'object' ? raw : {}) as Partial<EncryptedBackupEnvelope>;
+  if (e.format !== ENCRYPTED_BACKUP_FORMAT) return { ok: false, problem: 'bad_envelope' };
+  if (typeof e.v !== 'number' || e.v > ENCRYPTED_BACKUP_VERSION) return { ok: false, problem: 'newer_format' };
+  const it = e.kdf?.iterations;
+  if (e.kdf?.name !== 'PBKDF2' || e.kdf.hash !== 'SHA-256' || e.cipher !== 'AES-GCM') return { ok: false, problem: 'bad_envelope' };
+  if (typeof it !== 'number' || !Number.isInteger(it) || it < 1 || it > MAX_KDF_ITERATIONS) return { ok: false, problem: 'bad_envelope' };
+  const { salt: saltB64, iv: ivB64, data: dataB64 } = e;
+  if (typeof saltB64 !== 'string' || typeof ivB64 !== 'string' || typeof dataB64 !== 'string') return { ok: false, problem: 'bad_envelope' };
+  const bufs = (() => {
+    try {
+      return { salt: b64ToBuf(saltB64), iv: b64ToBuf(ivB64), data: b64ToBuf(dataB64) };
+    } catch {
+      return null;
+    }
+  })();
+  if (!bufs || bufs.iv.length !== 12) return { ok: false, problem: 'bad_envelope' };
+  const { salt, iv, data } = bufs;
+  if (!password) return { ok: false, problem: 'wrong_password' };
+  const s = subtleOf(subtle);
+  try {
+    const key = await deriveBackupKey(password, salt, it, s);
+    const plain = await s.decrypt({ name: 'AES-GCM', iv }, key, data);
+    return { ok: true, text: new TextDecoder().decode(plain) };
+  } catch {
+    return { ok: false, problem: 'wrong_password' };
+  }
+}
+
+export type BackupPasswordProblem = 'too_short' | 'mismatch';
+
+/** Senha nova para exportar: mínimo de caracteres e confirmação igual. */
+export function checkBackupPassword(password: string, confirm: string): BackupPasswordProblem | null {
+  if ([...password].length < MIN_BACKUP_PASSWORD) return 'too_short';
+  if (password !== confirm) return 'mismatch';
+  return null;
+}

@@ -5,7 +5,7 @@ import { AlertTriangle, Download, Lock, Trash2 } from 'lucide-react';
 import { useSettings } from '@/app/SettingsProvider';
 import { PinError, eraseAllData, loadSecurity, removeAppPin, setAppPin, setLockAfter } from '@/data/securityRepo';
 import { LOCK_AFTER, isValidPin, type LockAfter } from '@/domain/security';
-import { exportBackup } from '@/features/backup/exportFile';
+import { ExportBackupDialog } from '@/features/backup/BackupPasswordDialogs';
 import { Button } from '@/ui/Button';
 import { Dialog } from '@/ui/Dialog';
 import { Field, Input, Select } from '@/ui/Field';
@@ -166,6 +166,8 @@ export function EraseForm({ allowExport }: { allowExport: boolean }) {
   const { t } = useSettings();
   const toast = useToast();
   const [understood, setUnderstood] = useState(false);
+  // Exportar antes de apagar: mesma janela do backup (protegido por senha por padrão).
+  const [exporting, setExporting] = useState(false);
   const [word, setWord] = useState('');
   const [busy, setBusy] = useState(false);
   const ready = understood && word.trim().toUpperCase() === t('security.erase.word');
@@ -194,11 +196,12 @@ export function EraseForm({ allowExport }: { allowExport: boolean }) {
           variant="secondary"
           className="w-fit"
           icon={<Download className="h-4 w-4" />}
-          onClick={() => void exportBackup().then((o) => o === 'saved' && toast.show(t('security.erase.exported'), 'success'), () => toast.show(t('security.erase.exportFailed'), 'error'))}
+          onClick={() => setExporting(true)}
         >
           {t('security.erase.exportFirst')}
         </Button>
       )}
+      {exporting && <ExportBackupDialog source={{ kind: 'now' }} onClose={() => setExporting(false)} />}
       <label className="flex items-start gap-3 text-fg">
         <input type="checkbox" checked={understood} onChange={(e) => setUnderstood(e.target.checked)} className="mt-0.5 h-4 w-4 accent-[rgb(var(--danger))]" />
         {t('security.erase.understand')}

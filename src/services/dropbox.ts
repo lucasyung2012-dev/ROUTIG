@@ -161,16 +161,19 @@ export async function dropboxWhoAmI(token: string): Promise<{ email: string; nam
 
 export interface DropboxFile {
   name: string;
+  /** Versão do arquivo no Dropbox (muda a cada gravação). */
+  ver: string;
 }
 
 /** Arquivos da pasta do app (Aplicativos/ROUTIG). */
 export async function dropboxList(token: string): Promise<DropboxFile[]> {
-  type Page = { entries: Array<{ '.tag': string; name: string }>; cursor: string; has_more: boolean };
+  type Page = { entries: Array<{ '.tag': string; name: string; rev?: string }>; cursor: string; has_more: boolean };
+  const files = (p: Page) => p.entries.filter((e) => e['.tag'] === 'file').map((e) => ({ name: e.name, ver: e.rev ?? '' }));
   let page = await api<Page>(token, '/files/list_folder', { path: '', limit: 2000 });
-  const out = page.entries.filter((e) => e['.tag'] === 'file').map((e) => ({ name: e.name }));
+  const out = files(page);
   while (page.has_more) {
     page = await api<Page>(token, '/files/list_folder/continue', { cursor: page.cursor });
-    out.push(...page.entries.filter((e) => e['.tag'] === 'file').map((e) => ({ name: e.name })));
+    out.push(...files(page));
   }
   return out;
 }

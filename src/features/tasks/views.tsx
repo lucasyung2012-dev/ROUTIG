@@ -9,6 +9,7 @@ import { DUE_BUCKETS, dueBucket, PRIORITIES, PRIORITY_RANK, type Task } from '@/
 import { Button } from '@/ui/Button';
 import { IconButton } from '@/ui/IconButton';
 import { cn } from '@/ui/cn';
+import { usePointerDrag } from '@/ui/usePointerDrag';
 import { PRIORITY_CLASS, TaskRow } from './TaskRow';
 import { useStatusName, type TasksData } from './useTasksData';
 
@@ -96,8 +97,6 @@ export function useGroups(tasks: Task[], data: TasksData) {
 export function BoardView({ tasks, data, onOpen, onToggle, onNew, showClosed }: ViewProps & { showClosed: boolean }) {
   const { t } = useSettings();
   const statusName = useStatusName();
-  const [dragId, setDragId] = useState<string | null>(null);
-  const [over, setOver] = useState<string | null>(null);
   const columns = data.config.statuses.filter((s) => showClosed || (s.kind !== 'archived' && s.kind !== 'cancelled'));
 
   const move = (taskId: string, statusId: string) => {
@@ -106,10 +105,11 @@ export function BoardView({ tasks, data, onOpen, onToggle, onNew, showClosed }: 
     if (data.config.statuses.find((s) => s.id === statusId)?.kind === 'done') onToggle(task);
     else void updateTask(taskId, { statusId });
   };
+  const drag = usePointerDrag({ onDrop: move });
 
   return (
     <div className="flex flex-col gap-3">
-      <p className="text-xs text-subtle">{t('tasks.dragHint')}</p>
+      <p className="text-xs text-subtle">{t('tasks.dragHintPointer')}</p>
       <div className="-mx-4 flex snap-x gap-4 overflow-x-auto px-4 pb-4 sm:mx-0 sm:px-0">
         {columns.map((col) => {
           const items = tasks.filter((x) => x.statusId === col.id);
@@ -117,19 +117,8 @@ export function BoardView({ tasks, data, onOpen, onToggle, onNew, showClosed }: 
             <section
               key={col.id}
               aria-label={statusName(col)}
-              onDragOver={(e) => {
-                e.preventDefault();
-                setOver(col.id);
-              }}
-              onDragLeave={() => setOver((o) => (o === col.id ? null : o))}
-              onDrop={(e) => {
-                e.preventDefault();
-                const id = e.dataTransfer.getData('text/plain') || dragId;
-                if (id) move(id, col.id);
-                setDragId(null);
-                setOver(null);
-              }}
-              className={cn('flex w-[280px] shrink-0 snap-start flex-col rounded-2xl bg-surface-2/60 p-2 ring-1 transition', over === col.id ? 'ring-accent/60' : 'ring-line/60')}
+              {...drag.targetProps(col.id)}
+              className={cn('flex w-[280px] shrink-0 snap-start flex-col rounded-2xl bg-surface-2/60 p-2 ring-1 transition', drag.overId === col.id ? 'ring-accent/60' : 'ring-line/60')}
             >
               <header className="flex items-center justify-between px-2 py-1.5">
                 <h3 className="text-sm font-semibold text-fg">
@@ -141,12 +130,8 @@ export function BoardView({ tasks, data, onOpen, onToggle, onNew, showClosed }: 
                 {items.map((task) => (
                   <li
                     key={task.id}
-                    draggable
-                    onDragStart={(e) => {
-                      setDragId(task.id);
-                      e.dataTransfer.setData('text/plain', task.id);
-                    }}
-                    className="rounded-xl bg-surface shadow-soft ring-1 ring-line/70"
+                    {...drag.itemProps(task.id)}
+                    className={cn('rounded-xl bg-surface shadow-soft ring-1 ring-line/70', drag.draggingId === task.id && 'relative z-20 cursor-grabbing opacity-90 shadow-lift ring-accent/60')}
                   >
                     <TaskRow task={task} data={data} onOpen={onOpen} onToggle={onToggle} compact />
                     <div className="border-t border-line/50 px-3 py-1.5">

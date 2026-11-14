@@ -18,6 +18,7 @@ import { Switch } from '@/ui/Switch';
 import { useToast } from '@/ui/toast';
 import { ColorPicker as AppColorPicker } from '@/ui/ColorPicker';
 import { cn } from '@/ui/cn';
+import { usePointerDrag } from '@/ui/usePointerDrag';
 import { useProjectsData, type ProjectsData } from './useProjectsData';
 
 const VIEWS = [
@@ -209,11 +210,17 @@ function ProjectCard({ project: p, data }: { project: Project; data: ProjectsDat
 function ProjectsKanban({ data }: { data: ProjectsData }) {
   const { t } = useSettings();
   const toast = useToast();
-  const [over, setOver] = useState<ProjectStatus | null>(null);
   const move = (p: Project, status: ProjectStatus) => {
     if (p.status === status) return;
     void updateProject(p.id, { ...projectInputOf(p), status }).catch(() => toast.show(t('errors.saveFailed'), 'error'));
   };
+  const drag = usePointerDrag({
+    onDrop: (id, target) => {
+      const p = data.byId.get(id);
+      const status = PROJECT_STATUSES.find((x) => x === target);
+      if (p && status) move(p, status);
+    },
+  });
   return (
     <div className="-mx-4 flex snap-x gap-4 overflow-x-auto px-4 pb-4 sm:mx-0 sm:px-0">
       {PROJECT_STATUSES.map((s) => {
@@ -222,27 +229,21 @@ function ProjectsKanban({ data }: { data: ProjectsData }) {
           <section
             key={s}
             aria-label={t(`projects.status.${s}`)}
-            onDragOver={(e) => {
-              e.preventDefault();
-              setOver(s);
-            }}
-            onDragLeave={() => setOver((o) => (o === s ? null : o))}
-            onDrop={(e) => {
-              e.preventDefault();
-              const p = data.byId.get(e.dataTransfer.getData('text/plain'));
-              if (p) move(p, s);
-              setOver(null);
-            }}
-            className={cn('flex w-[260px] shrink-0 snap-start flex-col rounded-2xl bg-surface-2/60 p-2 ring-1 transition', over === s ? 'ring-accent/60' : 'ring-line/60')}
+            {...drag.targetProps(s)}
+            className={cn('flex w-[260px] shrink-0 snap-start flex-col rounded-2xl bg-surface-2/60 p-2 ring-1 transition', drag.overId === s ? 'ring-accent/60' : 'ring-line/60')}
           >
             <h3 className="px-2 py-1.5 text-sm font-semibold text-fg">
               {t(`projects.status.${s}`)} <span className="ml-1 text-xs font-normal tabular text-subtle">{items.length}</span>
             </h3>
             <ul className="flex min-h-[3rem] flex-col gap-2">
               {items.map((p) => (
-                <li key={p.id} draggable onDragStart={(e) => e.dataTransfer.setData('text/plain', p.id)} className="overflow-hidden rounded-xl bg-surface shadow-soft ring-1 ring-line/70">
+                <li
+                  key={p.id}
+                  {...drag.itemProps(p.id)}
+                  className={cn('overflow-hidden rounded-xl bg-surface shadow-soft ring-1 ring-line/70', drag.draggingId === p.id && 'relative z-20 cursor-grabbing opacity-90 shadow-lift ring-accent/60')}
+                >
                   <span className="block h-1.5" style={{ background: p.color }} aria-hidden />
-                  <Link to={`/projects/${p.id}`} className="block px-3 pb-1 pt-2 font-medium text-fg hover:text-accent">
+                  <Link to={`/projects/${p.id}`} draggable={false} className="block px-3 pb-1 pt-2 font-medium text-fg hover:text-accent">
                     {p.name}
                   </Link>
                   <label className="flex items-center gap-2 px-3 pb-2 text-xs text-subtle">

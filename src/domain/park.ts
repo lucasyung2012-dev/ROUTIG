@@ -391,7 +391,11 @@ export function parkPaths(): ParkPath[] {
     if (!seen.has(key)) {
       seen.add(key);
       const hub = REGION_HUB[p.region];
-      if (dist(hub, court) > 8) out.push({ kind: 'secondary', points: [hub, mid(hub, court, 0.1), court] });
+      if (dist(hub, court) > 8) {
+        // Curva para o lado que não passa pela água (a curva do desenho, não a linha reta).
+        const bend = samplePath([hub, mid(hub, court, 0.1), court], 2).some((q) => inWater(q.x, q.z, PATH_WIDTH.secondary / 2 + 0.8)) ? -0.1 : 0.1;
+        out.push({ kind: 'secondary', points: [hub, mid(hub, court, bend), court] });
+      }
     }
     out.push({ kind: 'secondary', points: [court, mid(court, e, 0.12), e] });
   }

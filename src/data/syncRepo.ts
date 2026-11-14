@@ -13,8 +13,8 @@ import type { BackupTables } from '@/domain/backup';
 import type { StoredFile } from '@/domain/inbox';
 import { newId, nowIso } from '@/domain/ids';
 import { decryptText, encryptText, exportKey, importKey, newDataKey, newRecoveryCode, unwrapDataKey, wrapDataKey } from '@/services/syncCrypto';
-import { getToken, listAppFiles, readAppFile, signOutGoogle, whoAmI, writeAppFile } from '@/services/google';
-import { dropboxAccess, dropboxList, dropboxRead, dropboxSignOut, dropboxWhoAmI, dropboxWrite, finishDropboxLogin } from '@/services/dropbox';
+import { deleteAppFile, getToken, listAppFiles, readAppFile, signOutGoogle, whoAmI, writeAppFile } from '@/services/google';
+import { dropboxAccess, dropboxDelete, dropboxList, dropboxRead, dropboxSignOut, dropboxWhoAmI, dropboxWrite, finishDropboxLogin } from '@/services/dropbox';
 
 export type SyncProvider = 'dropbox' | 'google';
 
@@ -111,6 +111,7 @@ interface Remote {
   list(): Promise<RemoteFile[]>;
   read(f: RemoteFile): Promise<string>;
   write(name: string, text: string, existing?: RemoteFile): Promise<void>;
+  remove(f: RemoteFile): Promise<void>;
 }
 
 async function remote(s: SyncState, interactive: boolean): Promise<Remote> {
@@ -123,6 +124,7 @@ async function remote(s: SyncState, interactive: boolean): Promise<Remote> {
       write: async (name, text, existing) => {
         await writeAppFile(access, name, text, existing?.id);
       },
+      remove: (f) => deleteAppFile(access, f.id ?? ''),
     };
   }
   if (!s.dbxKey) throw new Error('no-app-key');
@@ -132,6 +134,7 @@ async function remote(s: SyncState, interactive: boolean): Promise<Remote> {
     list: () => dropboxList(access),
     read: (f) => dropboxRead(access, f.name),
     write: (name, text) => dropboxWrite(access, name, text),
+    remove: (f) => dropboxDelete(access, f.name),
   };
 }
 
@@ -320,6 +323,52 @@ export async function syncNow(s: SyncState, interactive = false): Promise<SyncRe
   const state = { ...s, lastSync: nowIso(), lastChanged: changed, seen, sentSeq: seq };
   saveSyncState(state);
   return { changed, devices: others.length + 1, state };
+}
+
+export interface SyncDevice {
+  id: string;
+  name: string;
+  /** Última vez que esse aparelho enviou a cópia dele (vazio se não deu para ler). */
+  at: string;
+  current: boolean;
+  /** A cópia não abre com a chave deste aparelho (de outra chave ou corrompida). */
+  unreadable: boolean;
+}
+
+/** Aparelhos ligados nesta conta: um arquivo de cópia por aparelho na nuvem. */
+export async function listDevices(s: SyncState): Promise<SyncDevice[]> {
+  if (!syncReady(s)) throw new Error('not-ready');
+  const r = await remote(s, false);
+  const key = await importKey(s.key);
+  const out: SyncDevice[] = [];
+  for (const f of (await r.list()).filter((x) => x.name.startsWith('routig-device-') && x.name.endsWith('.json'))) {
+    const id = f.name.slice('routig-device-'.length, -'.json'.length);
+    const current = id === s.deviceId;
+    try {
+      const p = JSON.parse(await decryptText(await r.read(f), key)) as { deviceName?: string; at?: string };
+      out.push({ id, name: current ? s.deviceName : (p.deviceName ?? ''), at: p.at ?? '', current, unreadable: false });
+    } catch {
+      out.push({ id, name: current ? s.deviceName : '', at: '', current, unreadable: true });
+    }
+  }
+  return out.sort((a, b) => Number(b.current) - Number(a.current) || b.at.localeCompare(a.at));
+}
+
+/**
+ * Tira um aparelho da conta: apaga a cópia dele na nuvem. Os dados que ele já enviou continuam nos
+ * aparelhos que sincronizaram depois. Se esse aparelho ainda estiver em uso, ele volta a aparecer
+ * na próxima sincronização dele (para cortar de vez, use "Desligar neste aparelho" nele).
+ */
+export async function removeDevice(s: SyncState, deviceId: string): Promise<SyncState> {
+  if (deviceId === s.deviceId) throw new Error('is-current');
+  const r = await remote(s, false);
+  const f = (await r.list()).find((x) => x.name === deviceFile(deviceId));
+  if (f) await r.remove(f);
+  const seen = { ...s.seen };
+  delete seen[deviceFile(deviceId)];
+  const next = { ...s, seen };
+  saveSyncState(next);
+  return next;
 }
 
 /** Desliga a sincronização neste aparelho (os dados locais ficam; a cópia na nuvem também). */

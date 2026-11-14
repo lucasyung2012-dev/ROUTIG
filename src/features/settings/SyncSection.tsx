@@ -1,13 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
-import { Check, Cloud, Copy, ExternalLink, LogIn, LogOut, RefreshCw } from 'lucide-react';
+import { Check, Cloud, Copy, ExternalLink, LogIn, LogOut, MonitorSmartphone, RefreshCw, Trash2 } from 'lucide-react';
 import { useSettings } from '@/app/SettingsProvider';
+import { Badge } from '@/ui/Badge';
 import { Button } from '@/ui/Button';
+import { ConfirmDialog } from '@/ui/ConfirmDialog';
 import { Input } from '@/ui/Field';
 import { Segmented } from '@/ui/Segmented';
 import { Surface } from '@/ui/Surface';
 import { Switch } from '@/ui/Switch';
 import { useToast } from '@/ui/toast';
-import { connectDropbox, connectGoogle, createSyncKey, disconnect, joinWithCode, loadSyncState, saveSyncState, syncNow, type SyncProvider, type SyncState } from '@/data/syncRepo';
+import { connectDropbox, connectGoogle, createSyncKey, disconnect, joinWithCode, listDevices, loadSyncState, removeDevice, saveSyncState, syncNow, type SyncDevice, type SyncProvider, type SyncState } from '@/data/syncRepo';
 import { dropboxRedirectUri, startDropboxLogin, takeDropboxReturn } from '@/services/dropbox';
 
 const KNOWN_ERRORS = ['no-client-id', 'no-app-key', 'key-exists', 'bad-code', 'wrong-code', 'no-key', 'popup_closed', 'popup_failed_to_open', 'dbx-state', 'dbx-expired', 'dbx-denied'];
@@ -28,6 +30,9 @@ export function SyncSection() {
   const [appKeyInput, setAppKeyInput] = useState(s.dbxKey);
   const [pasteMode, setPasteMode] = useState(false);
   const [dbxCode, setDbxCode] = useState('');
+  const [devices, setDevices] = useState<SyncDevice[] | null>(null);
+  const [removing, setRemoving] = useState<SyncDevice | null>(null);
+  const loadDevices = () => run(async () => setDevices(await listDevices(s)));
 
   const fail = (e: unknown) => {
     const m = e instanceof Error ? e.message : '';
@@ -288,6 +293,63 @@ export function SyncSection() {
           <p className="text-xs text-subtle">{t('settings.sync.limits')}</p>
         </Surface>
       )}
+
+      {/* Aparelhos nesta conta: ver quais estão ligados e tirar os que não existem mais. */}
+      {s.key && (
+        <Surface className="flex flex-col gap-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="flex items-center gap-2 text-[0.9375rem] font-semibold text-fg">
+              <MonitorSmartphone className="h-4 w-4 text-accent" aria-hidden />
+              {t('settings.sync.devices.title')}
+            </h2>
+            <Button variant="secondary" size="sm" icon={<RefreshCw className="h-4 w-4" />} disabled={busy} onClick={() => void loadDevices()}>
+              {devices ? t('settings.sync.devices.refresh') : t('settings.sync.devices.show')}
+            </Button>
+          </div>
+          <p className="text-sm text-muted">{t('settings.sync.devices.hint')}</p>
+          {devices && (
+            <ul className="flex flex-col divide-y divide-line rounded-xl ring-1 ring-line">
+              {devices.map((d) => (
+                <li key={d.id} className="flex flex-wrap items-center gap-3 px-3 py-2.5">
+                  <div className="min-w-0 flex-1">
+                    <p className="flex flex-wrap items-center gap-2 text-sm font-medium text-fg">
+                      {d.name || t('settings.sync.devices.unnamed')}
+                      {d.current && <Badge tone="accent">{t('settings.sync.devices.current')}</Badge>}
+                    </p>
+                    <p className="text-xs text-muted">{d.unreadable ? t('settings.sync.devices.unreadable') : t('settings.sync.devices.last', { when: fmt(d.current ? s.lastSync || d.at : d.at) })}</p>
+                  </div>
+                  {!d.current && (
+                    <Button variant="ghost" size="sm" icon={<Trash2 className="h-4 w-4" />} disabled={busy} onClick={() => setRemoving(d)}>
+                      {t('settings.sync.devices.remove')}
+                    </Button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </Surface>
+      )}
+
+      <ConfirmDialog
+        open={!!removing}
+        title={t('settings.sync.devices.confirmTitle', { name: removing?.name || t('settings.sync.devices.unnamed') })}
+        body={t('settings.sync.devices.confirmBody')}
+        confirmLabel={t('settings.sync.devices.remove')}
+        cancelLabel={t('common.cancel')}
+        danger
+        onCancel={() => setRemoving(null)}
+        onConfirm={() => {
+          const d = removing;
+          setRemoving(null);
+          if (!d) return;
+          void run(async () => {
+            const next = await removeDevice(s, d.id);
+            setS(next);
+            setDevices(await listDevices(next));
+            toast.show(t('settings.sync.devices.removed'), 'success');
+          });
+        }}
+      />
     </div>
   );
 }

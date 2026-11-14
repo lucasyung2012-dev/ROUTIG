@@ -194,6 +194,13 @@ export async function dropboxWrite(token: string, name: string, text: string): P
   if (!r.ok) throw new Error(`dbx write ${r.status}`);
 }
 
+/** Apaga um arquivo da pasta do app (ex.: a cópia de um aparelho que não existe mais). */
+export async function dropboxDelete(token: string, name: string): Promise<void> {
+  const r = await fetch(`${API}/files/delete_v2`, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ path: `/${name}` }) });
+  // 409 = já não existe: o resultado é o mesmo.
+  if (!r.ok && r.status !== 409) throw new Error(`dbx delete ${r.status}`);
+}
+
 /** Sai do Dropbox neste aparelho (invalida o token no Dropbox; os arquivos ficam). */
 export async function dropboxSignOut(appKey: string, refresh: string): Promise<void> {
   try {

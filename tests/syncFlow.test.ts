@@ -3,7 +3,7 @@ import { webcrypto } from 'node:crypto';
 import { DB_SCHEMA_VERSION, getDb, RoutigDB, setDbForTests } from '@/data/db';
 import { createTask } from '@/data/tasksRepo';
 import { emptyTaskInput } from '@/domain/tasks';
-import { loadSyncState, syncNow, type SyncState } from '@/data/syncRepo';
+import { listDevices, loadSyncState, removeDevice, syncNow, type SyncState } from '@/data/syncRepo';
 import { encryptText, exportKey, newDataKey } from '@/services/syncCrypto';
 
 if (!globalThis.crypto?.subtle) Object.defineProperty(globalThis, 'crypto', { value: webcrypto, configurable: true });
@@ -15,6 +15,10 @@ function fakeDropbox() {
   const fetchMock = vi.fn(async (url: string, init: { headers?: Record<string, string>; body?: unknown }) => {
     const json = (v: unknown) => new Response(JSON.stringify(v), { status: 200 });
     if (url.endsWith('/oauth2/token')) return json({ access_token: 'acc', expires_in: 14400 });
+    if (url.endsWith('/files/delete_v2')) {
+      store.delete((JSON.parse(String(init.body)) as { path: string }).path);
+      return json({});
+    }
     if (url.endsWith('/files/list_folder')) return json({ entries: [...store].map(([name, f]) => ({ '.tag': 'file', name: name.slice(1), rev: `r${f.rev}` })), cursor: '', has_more: false });
     const arg = JSON.parse(init.headers?.['Dropbox-API-Arg'] ?? '{}') as { path: string };
     if (url.endsWith('/files/download')) {
@@ -96,5 +100,24 @@ describe('sincronização: só baixa e envia o que mudou', () => {
     expect(got?.mime).toBe('text/plain');
     // (O banco de teste em memória não guarda o conteúdo do Blob; no aparelho, o IndexedDB guarda.)
     expect(await db.files.get('file_solto')).toBeUndefined();
+  });
+
+  it('lista os aparelhos da conta e remove a cópia de um aparelho que não existe mais', async () => {
+    const dbx = fakeDropbox();
+    vi.stubGlobal('fetch', dbx.fetchMock);
+    const key = await newDataKey();
+    const copy = (id: string, name: string, at: string) => encryptText(JSON.stringify({ deviceId: id, deviceName: name, at, schema: DB_SCHEMA_VERSION, tables: {} }), key);
+    dbx.store.set('/routig-device-velho.json', { text: await copy('velho', 'iPhone', '2026-11-10T10:00:00.000Z'), rev: 1 });
+    dbx.store.set('/routig-device-ipad.json', { text: await copy('ipad', 'iPad', '2026-11-13T10:00:00.000Z'), rev: 1 });
+    let s: SyncState = { ...loadSyncState(), provider: 'dropbox', dbxKey: 'appkey', dbxRefresh: 'refresh-dev', deviceId: 'novo', deviceName: 'iPhone', key: await exportKey(key) };
+    s = (await syncNow(s)).state;
+
+    const list = await listDevices(s);
+    expect(list.map((d) => `${d.id}:${d.name}:${d.current}`)).toEqual(['novo:iPhone:true', 'ipad:iPad:false', 'velho:iPhone:false']);
+
+    s = await removeDevice(s, 'velho');
+    expect(dbx.store.has('/routig-device-velho.json')).toBe(false);
+    expect((await listDevices(s)).map((d) => d.id)).toEqual(['novo', 'ipad']);
+    await expect(removeDevice(s, 'novo')).rejects.toThrow('is-current');
   });
 });

@@ -104,6 +104,12 @@ export async function readAppFile(access: string, id: string): Promise<string> {
   return r.text();
 }
 
+/** Apaga um arquivo da pasta oculta do app. */
+export async function deleteAppFile(access: string, id: string): Promise<void> {
+  const r = await fetch(`https://www.googleapis.com/drive/v3/files/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${access}` } });
+  if (!r.ok && r.status !== 404) throw new Error(`delete ${r.status}`);
+}
+
 /** Cria ou atualiza um arquivo de texto na pasta oculta do app. */
 export async function writeAppFile(access: string, name: string, text: string, existingId?: string): Promise<string> {
   const meta = existingId ? {} : { name, parents: ['appDataFolder'] };

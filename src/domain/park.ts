@@ -210,7 +210,7 @@ function rawHeight(xm: number, zm: number): number {
   // Morros e depressões pontuais.
   const features =
     bump(x, z, -205, -40, 48, 11) + // Morro do Mirante (Oeste)
-    bump(x, z, -150, 95, 40, 6) + // colina do lago (Oeste)
+    bump(x, z, -205, 98, 30, 5) + // colina da borda Oeste (longe do lago)
     bump(x, z, -170, -150, 38, 7) + // colina da mata (Noroeste)
     bump(x, z, 30, -205, 34, 5) + // colina da leitura (Norte)
     bump(x, z, 150, -160, 36, 6) + // colina do Leste
@@ -246,14 +246,14 @@ export function inField(x: number, z: number, pad = 0): boolean {
 /** Centro do palco ao ar livre (o mesmo do ponto "palco-musica" em POIS). */
 const STAGE_AT = { x: -140, z: -170 };
 
-function naturalHeight(x: number, z: number): number {
+function shapedHeight(x: number, z: number): number {
   let h = rawHeight(x, z);
   // Lago e lagos ornamentais em terreno baixo: o relevo em volta desce até a margem
   // (sem morro cobrindo metade da água).
   {
     const dl = Math.hypot(x - LAKE.x, z - LAKE.z);
     const lr = lakeRadiusAt(Math.atan2(z - LAKE.z, x - LAKE.x));
-    if (dl < lr + 40) h *= smooth(lr + 4, lr + 40, dl);
+    if (dl < lr + 60) h *= smooth(lr + 4, lr + 60, dl);
     for (const p of PONDS) {
       const dp = Math.hypot(x - p.x, z - p.z);
       if (dp < p.radius + 22) h *= smooth(p.radius + 2, p.radius + 22, dp);
@@ -284,13 +284,23 @@ function naturalHeight(x: number, z: number): number {
     const k = 1 - smooth(15, 30, dS);
     h = h * (1 - k) + rawHeight(STAGE_AT.x, STAGE_AT.z) * k;
   }
+  return h;
+}
+
+const flatTarget = new Map<string, number>();
+function naturalHeight(x: number, z: number): number {
+  let h = shapedHeight(x, z);
   // Chão plano sob o que tem piso próprio (praças, cafés, quiosques, pérgola, mirantes, parquinhos e
   // os marcos das áreas): nada fica meio enterrado nem flutuando numa encosta.
   for (const f of flatSpots()) {
     const d = Math.hypot(x - f.x, z - f.z);
     if (d < f.r + 12) {
       const k = 1 - smooth(f.r, f.r + 12, d);
-      h = h * (1 - k) + rawHeight(f.x, f.z) * k;
+      // Na altura que o lugar já tem (depois das rampas dos lotes): emenda sem degrau.
+      const key = `${f.x},${f.z}`;
+      let t = flatTarget.get(key);
+      if (t === undefined) flatTarget.set(key, (t = shapedHeight(f.x, f.z)));
+      h = h * (1 - k) + t * k;
     }
   }
   return h;

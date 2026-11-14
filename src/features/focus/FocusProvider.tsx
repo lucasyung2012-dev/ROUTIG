@@ -66,14 +66,20 @@ export function FocusProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
+    // Saiu da tela antes de o banco responder (troca rápida de tela, fim de teste): não mexe mais.
+    let alive = true;
     void Promise.all([loadActiveTimer(), loadFocusConfig()])
       .then(([t, c]) => {
+        if (!alive) return;
         timerRef.current = t;
         setTimerState(t);
         setConfigState(c);
       })
       .catch(() => undefined)
-      .finally(() => setReady(true));
+      .finally(() => alive && setReady(true));
+    return () => {
+      alive = false;
+    };
   }, []);
 
   const running = !!timer && timer.runningSince !== null;

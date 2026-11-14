@@ -2,7 +2,17 @@
 
 Leia este arquivo no começo de toda conversa nova sobre o ROUTIG. A especificação completa é o "ROUTIG — Prompt Master" (35 partes), fornecido pelo dono do produto. Decisões em [DECISOES.md](DECISOES.md), arquitetura em [ARQUITETURA.md](ARQUITETURA.md).
 
-**Atualizado:** 2026-11-07 (parque vivo: som, gente, bichos, bairro e entradas; login e sincronização prontos, aguardando o ID do cliente Google)
+**Atualizado:** 2026-11-14 (Campus temático: áreas por tema, relevo novo, chão de pisar igual ao desenhado)
+
+## Estado da conversa (2026-11-14: Campus temático, relevo e terreno)
+
+- **Áreas temáticas (substituem as regiões Norte/Sul/Leste/Oeste):** Centro (Observatório Central, Perfil, Configurações), Conhecimento e aprendizagem ao Norte (Academy, Library, Notes, Idiomas), Planejamento e organização a Leste (Inbox, Calendar, Projects, Tasks), Gestão financeira a Sudeste (Finanças), Desenvolvimento pessoal ao Sul (Habits, Goals, Insights), Atividades e concentração a Oeste (Esportes, Focus, Música com o palco). Mudaram de lugar: Idiomas, Inbox, Calendar, Tasks, Finanças, Focus, Música (e o palco), Configurações. `PARK_REGIONS`, `REGION_HUB` e `COURTS` em `domain/park.ts`.
+- **Identidade de cada área (sem muro nem placa):** cor do gramado, densidade e espécies de árvore, piso dos caminhos (pedra, tijolo, granito, saibro, terracota, pedra escura), cor das flores, e um marco por área (`features/park/landmarks.ts`): Pórtico do Saber, Relógio de Sol entre sebes, Árvore em Flor, Pórtico das Atividades, Obelisco no espelho d'água. A transição entre áreas é gradual (`themeWeights`).
+- **Relevo novo:** ondulações em todo o parque, Morro do Mirante (cerca de 18 m), colinas nas Atividades e no Conhecimento, planaltos no Planejamento, vale e depressões no Sul (até cerca de -4 m); praça plana; rampas de 28 m em volta dos lotes.
+- **Terreno e colisão:** o chão de pisar (`heightAt`) é a própria malha desenhada (mesma grade de 289×289 pontos e o mesmo corte dos triângulos); antes o desenho ficava até 8 cm acima do cálculo e o pé entrava no morro. Os pés das pessoas e do avatar acompanham a encosta (`slopeLift` em `people.ts`). Subir fica mais lento conforme a inclinação; acima de cerca de 35° não sobe (`MAX_GRADE` em `camera.ts`).
+- **Testes automáticos novos:** chão igual à malha, relevo variado, nenhum caminho com trecho acima de cerca de 31°, cada prédio na sua área.
+- **Testado no navegador (computador):** medição em 13 pontos do mapa (desenho = chão − 3 cm em todos); vistas das áreas, marcos de Planejamento e Finanças, pórtico do Conhecimento, arco das Atividades; caminhar, correr e andar de lado na encosta do Mirante em 3ª pessoa (pés no chão); "Ir para" e entrar no Calendar no lugar novo.
+- **Não verificado:** iPad/iPhone; todos os marcos de perto; pessoas andando nas encostas de perto; desempenho real (o painel do navegador limita os quadros). Vista de cima de todo o parque: cerca de 1,58 mi triângulos, de 310 a 520 chamadas de desenho.
 
 ## Estado da conversa (2026-11-07, noite: palco, parquinhos, ônibus, luneta, documentação)
 

@@ -389,7 +389,7 @@ const THEME_PAVE: Record<ParkRegion, [string, string]> = {
 
 function paths(kit: Kit): { group: THREE.Group; lamps: Point[] } {
   const b = new Builder();
-  const mats = Object.fromEntries(PARK_REGIONS.map((t) => [t, { pave: kit.mat(THEME_PAVE[t][0], { rough: t === 'finance' ? 0.55 : 0.85 }), edge: kit.mat(THEME_PAVE[t][1], { rough: 0.9 }) }])) as Record<ParkRegion, { pave: THREE.Material; edge: THREE.Material }>;
+  const mats = Object.fromEntries(PARK_REGIONS.map((t) => [t, { pave: kit.mat(THEME_PAVE[t][0], { rough: t === 'finance' ? 0.55 : 0.85 }), edge: kit.mat(THEME_PAVE[t][1], { rough: 0.9 }) }])) as Record<ParkRegion, { pave: THREE.MeshStandardMaterial; edge: THREE.MeshStandardMaterial }>;
   const trail = kit.mat('#C7B48E', { rough: 0.95 });
   const lamps: Point[] = [];
   for (const line of parkPaths()) {

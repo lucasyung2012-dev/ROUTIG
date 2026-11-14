@@ -13,7 +13,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'prompt',
-      includeAssets: ['brand/routig-logo-original.png'],
+      includeAssets: ['brand/routig-logo-original.png', 'brand/apple-touch-icon.png', 'brand/icon-192.png', 'brand/icon-512.png'],
       manifest: {
         name: 'ROUTIG',
         short_name: 'ROUTIG',
@@ -25,8 +25,13 @@ export default defineConfig({
         orientation: 'any',
         background_color: '#080B1C',
         theme_color: '#080B1C',
-        // Ícone = PNG original aprovado. A versão vetorial só entra depois da aprovação.
-        icons: [{ src: 'brand/routig-logo-original.png', sizes: '1024x1024', type: 'image/png', purpose: 'any' }],
+        // Ícone = PNG original aprovado, nos tamanhos que os aparelhos pedem (gerados no CI por scripts/icons.mjs).
+        icons: [
+          { src: 'brand/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+          { src: 'brand/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+          { src: 'brand/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+          { src: 'brand/routig-logo-original.png', sizes: '1024x1024', type: 'image/png', purpose: 'any' },
+        ],
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],

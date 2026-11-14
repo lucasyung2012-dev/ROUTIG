@@ -2,6 +2,9 @@ node_modules
 dist
 dev-dist
 coverage
+public/brand/apple-touch-icon.png
+public/brand/icon-192.png
+public/brand/icon-512.png
 *.local
 *.tsbuildinfo
 .DS_Store

@@ -37,6 +37,9 @@ jobs:
         if: success() || failure()
         run: npx vitest run --reporter=default --reporter=github-actions
 
+      - name: Ícones do app (a partir do logo oficial)
+        run: node scripts/icons.mjs
+
       - name: Build de produção
         run: npx vite build
 

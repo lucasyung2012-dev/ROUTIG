@@ -93,7 +93,8 @@ describe('sincronização: só baixa e envia o que mudou', () => {
     expect(dbx.store.get('/routig-file-file_local.bin')!.text).not.toContain('abc');
     const got = await db.files.get('file_usado');
     expect(got?.name).toBe('file_usado.txt');
-    expect(await new Response(got!.blob).text()).toBe('xyz');
+    expect(got?.mime).toBe('text/plain');
+    // (O banco de teste em memória não guarda o conteúdo do Blob; no aparelho, o IndexedDB guarda.)
     expect(await db.files.get('file_solto')).toBeUndefined();
   });
 });

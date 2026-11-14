@@ -484,17 +484,47 @@ export function seededRandom(seed: number): () => number {
 }
 
 /** Pontos ao longo de uma linha de caminho (para afastar árvores e para os passeios das pessoas). */
+/**
+ * Ponto da curva suave que passa pelos pontos do caminho (Catmull-Rom uniforme, a mesma curva de
+ * THREE.SplineCurve com que o caminho é desenhado). `t` de 0 a 1.
+ */
+function splinePoint(pts: Point[], t: number): Point {
+  const p = (pts.length - 1) * t;
+  const i = Math.floor(p);
+  const w = p - i;
+  const n = pts.length;
+  const p0 = pts[i === 0 ? i : i - 1]!;
+  const p1 = pts[i]!;
+  const p2 = pts[i > n - 2 ? n - 1 : i + 1]!;
+  const p3 = pts[i > n - 3 ? n - 1 : i + 2]!;
+  const cr = (a: number, b: number, c: number, d: number) => {
+    const v0 = (c - a) * 0.5;
+    const v1 = (d - b) * 0.5;
+    const w2 = w * w;
+    return (2 * b - 2 * c + v0 + v1) * w2 * w + (-3 * b + 3 * c - 2 * v0 - v1) * w2 + v0 * w + b;
+  };
+  return { x: cr(p0.x, p1.x, p2.x, p3.x), z: cr(p0.z, p1.z, p2.z, p3.z) };
+}
+
+/**
+ * Pontos ao longo do caminho, a cada `step` metros (aprox.), sobre a mesma curva suave do desenho (não
+ * sobre a linha reta entre os pontos: nas curvas, a diferença punha árvore e moita em cima do piso).
+ */
 export function samplePath(path: Point[], step = 4): Point[] {
+  if (path.length < 2) return path.slice();
+  let len = 0;
+  for (let i = 0; i < path.length - 1; i++) len += dist(path[i]!, path[i + 1]!);
+  const n = Math.max(1, Math.ceil(len / step));
   const out: Point[] = [];
-  for (let i = 0; i < path.length - 1; i++) {
-    const a = path[i]!;
-    const c = path[i + 1]!;
-    const n = Math.max(1, Math.ceil(dist(a, c) / step));
-    for (let k = 0; k < n; k++) out.push({ x: a.x + ((c.x - a.x) * k) / n, z: a.z + ((c.z - a.z) * k) / n });
-  }
-  out.push(path[path.length - 1]!);
+  for (let k = 0; k <= n; k++) out.push(k === n ? path[path.length - 1]! : splinePoint(path, k / n));
   return out;
 }
+
+/** Metade da largura ocupada por um caminho: o piso e, fora as trilhas, a borda de 0,4 m de cada lado. */
+const pathHalf = (kind: PathKind) => PATH_WIDTH[kind] / 2 + (kind === 'trail' ? 0 : 0.4);
+
+/** Folga em volta de cada ponto de convivência: o palco (anfiteatro de uns 14 m) e as praças pedem mais. */
+const poiClear = (kind: PoiKind) => (kind === 'stage' ? 17 : kind === 'plaza' ? 15 : 10);
 
 let pathCache: Array<{ x: number; z: number; half: number }> | null = null;
 let pathGrid: Map<string, Array<{ x: number; z: number; half: number }>> | null = null;
@@ -504,7 +534,7 @@ let pathGrid: Map<string, Array<{ x: number; z: number; half: number }>> | null 
  */
 export function isFreeGround(x: number, z: number, pad = 0.5): boolean {
   if (!pathCache) {
-    pathCache = parkPaths().flatMap((p) => samplePath(p.points, 1.5).map((q) => ({ ...q, half: PATH_WIDTH[p.kind] / 2 })));
+    pathCache = parkPaths().flatMap((p) => samplePath(p.points, 1.2).map((q) => ({ ...q, half: pathHalf(p.kind) })));
     pathGrid = new Map();
     for (const q of pathCache) {
       const k = `${Math.floor(q.x / 6)},${Math.floor(q.z / 6)}`;
@@ -516,8 +546,9 @@ export function isFreeGround(x: number, z: number, pad = 0.5): boolean {
   const r = Math.hypot(x, z);
   if (r < PLAZA_RADIUS + 2 + pad || r > PARK_RADIUS + 20) return false;
   if (inWater(x, z, 1 + pad) || inField(x, z, 2 + pad)) return false;
-  if (PARK_BUILDINGS.some((b) => Math.hypot(x - b.x, z - b.z) < b.radius * 0.92 + pad)) return false;
-  if (POIS.some((p) => Math.hypot(x - p.x, z - p.z) < 10 + pad)) return false;
+  // O piso de cada lote cobre o raio inteiro (com meio-fio): nada nasce em cima dele.
+  if (PARK_BUILDINGS.some((b) => Math.hypot(x - b.x, z - b.z) < b.radius + 0.4 + pad)) return false;
+  if (POIS.some((p) => Math.hypot(x - p.x, z - p.z) < poiClear(p.kind) + pad)) return false;
   if (playSpots.some((p) => Math.hypot(x - p.x, z - p.z) < 12 + pad)) return false;
   const gx = Math.floor(x / 6);
   const gz = Math.floor(z / 6);
@@ -597,8 +628,8 @@ export function treePositions(count: number, seed = 7): Array<{ x: number; z: nu
     if (rnd() > treeDensity(p.x, p.z)) continue;
     if (dist(p, { x: 0, z: 0 }) < PLAZA_RADIUS + 8) continue;
     if (inWater(p.x, p.z, 6)) continue;
-    if (PARK_BUILDINGS.some((q) => dist(p, q) < q.radius * 0.85)) continue;
-    if (POIS.some((q) => dist(p, q) < 9)) continue;
+    if (PARK_BUILDINGS.some((q) => dist(p, q) < q.radius + 1.5)) continue;
+    if (POIS.some((q) => dist(p, q) < poiClear(q.kind))) continue;
     if (Object.values(COURTS).some((q) => dist(p, q) < 10)) continue;
     if (inField(p.x, p.z, 6)) continue;
     if (PLAYGROUNDS.some((g) => Math.hypot(p.x - g.x, p.z - g.z) < 16) || onStreet(p.x, p.z, 3)) continue;
@@ -625,7 +656,7 @@ export function onPath(x: number, z: number, r = 0): boolean {
       for (const s of samplePath(p.points, 1.2)) {
         const k = `${Math.floor(s.x / 4)},${Math.floor(s.z / 4)}`;
         const list = walkGrid.get(k) ?? [];
-        list.push({ x: s.x, z: s.z, h: PATH_WIDTH[p.kind] / 2 });
+        list.push({ x: s.x, z: s.z, h: pathHalf(p.kind) });
         walkGrid.set(k, list);
       }
   }

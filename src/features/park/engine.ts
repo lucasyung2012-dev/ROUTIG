@@ -722,7 +722,8 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
       document.documentElement.dataset.audit = JSON.stringify({
         checked: { trees: world.treeSpots.length, bushes: world.bushSpots.length, flowers: world.flowerSpots.length },
         problems: { trees: count('árvore'), bushes: count('arbusto'), flowers: count('flor') },
-        sample: found.slice(0, 40),
+        byHit: found.reduce<Record<string, number>>((m, f) => ((m[f.hit] = (m[f.hit] ?? 0) + 1), m), {}),
+        sample: [...found.filter((f) => f.kind === "árvore").slice(0, 15), ...found.filter((f) => f.kind === "arbusto").slice(0, 15), ...found.filter((f) => f.kind === "flor").slice(0, 15)],
       });
     }
     // 'cam:x,y,z,tx,ty,tz': câmera livre exatamente nesse ponto, olhando para o alvo.

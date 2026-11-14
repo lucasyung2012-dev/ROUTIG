@@ -684,14 +684,15 @@ function meadows(kit: Kit, free: (x: number, z: number, r: number) => boolean): 
       if (Math.abs(a) < 0.22) continue;
       const ang = face + a;
       for (let row = 0; row < 2; row++) {
-        const rr = b.radius * 0.94 + 0.6 + row * 0.9;
+        // Fora do piso do lote (que vai até o raio, com meio-fio): os canteiros contornam a borda.
+        const rr = b.radius + 0.9 + row * 0.9;
         put(flowers, b.x + Math.sin(ang) * rr, b.z + Math.cos(ang) * rr, 1.1, pal[(row + Math.floor(a * 10)) % pal.length]!, 0.2);
       }
     }
     for (let a = -1.3; a <= 1.3; a += 0.13) {
       if (Math.abs(a) < 0.26) continue;
       const ang = face + a;
-      const rr = b.radius * 0.94 + 3.2;
+      const rr = b.radius + 3.4;
       put(bushes, b.x + Math.sin(ang) * rr, b.z + Math.cos(ang) * rr, 0.75 + rnd() * 0.3, rnd() > 0.5 ? '#3E8E4A' : '#4F9F55', 0.3);
     }
   });
@@ -861,7 +862,7 @@ export function createWorld(kit: Kit): World {
   const free = (x: number, z: number, r: number) =>
     !onPath(x, z, r + 0.3) &&
     !clearZones.some((c) => Math.hypot(c.x - x, c.z - z) < c.r + r) &&
-    !PARK_BUILDINGS.some((bd) => Math.hypot(bd.x - x, bd.z - z) < bd.radius * 0.88 + r) &&
+    !PARK_BUILDINGS.some((bd) => Math.hypot(bd.x - x, bd.z - z) < bd.radius + 0.4 + r) &&
     !solid.near(x, z).some((o) => Math.hypot(o.x - x, o.z - z) < o.r + r + 0.2);
   const plantList = [...plants().filter((p) => !onPath(p.x, p.z, 0.9 * p.s) && free(p.x, p.z, 0.45 * p.s)), ...streetTrees().map((p, i) => ({ x: p.x, y: heightAt(p.x, p.z), z: p.z, s: p.s, species: (i % 3 ? 'round' : 'slender') as Plant['species'] }))];
   const trees = forest(kit, plantList);
@@ -1164,7 +1165,8 @@ function liftSpot(def: ParkBuilding, r0: number, toWorld: (lx: number, lz: numbe
 
 /** Calçada de placas de pedra da porta do lounge até o caminho mais perto (sem passar por água). */
 function liftAccess(spot: { pad: Point; door: Point }, zones: Array<{ x: number; z: number; r: number }>, b: Builder, pave: THREE.Material) {
-  zones.push({ x: spot.pad.x, z: spot.pad.z, r: 8 });
+  // O lounge com a cobertura e a torre ocupa mais que o piso: folga de 11 m sem árvore nem moita.
+  zones.push({ x: spot.pad.x, z: spot.pad.z, r: 11 });
   let target: Point | null = null;
   for (let r = 1; r < 45 && !target; r += 1)
     for (let k = 0; k < 32; k++) {

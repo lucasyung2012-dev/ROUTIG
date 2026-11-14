@@ -1,17 +1,17 @@
 import { useEffect } from 'react';
-import { loadSyncState, syncNow } from '@/data/syncRepo';
+import { loadSyncState, syncNow, syncReady } from '@/data/syncRepo';
 
 /**
  * Sincronização automática: ao abrir, a cada 5 minutos e ao sair do app (aba escondida), se a
  * conta estiver ligada neste aparelho. Sem janela do Google: se a sessão expirou, espera o
- * próximo "Sincronizar agora" em Configurações. Erros não interrompem nada.
+ * próximo "Sincronizar agora" em Configurações (no Dropbox o login não expira). Erros não interrompem nada.
  */
 export function AutoSync() {
   useEffect(() => {
     let running = false;
     const go = () => {
       const s = loadSyncState();
-      if (running || !s.auto || !s.key || !s.clientId || !navigator.onLine) return;
+      if (running || !s.auto || !syncReady(s) || !navigator.onLine) return;
       running = true;
       void syncNow(s, false)
         .catch(() => undefined)

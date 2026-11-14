@@ -1,16 +1,20 @@
-import { useState } from 'react';
-import { Check, Cloud, Copy, LogIn, LogOut, RefreshCw } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Check, Cloud, Copy, ExternalLink, LogIn, LogOut, RefreshCw } from 'lucide-react';
 import { useSettings } from '@/app/SettingsProvider';
 import { Button } from '@/ui/Button';
 import { Input } from '@/ui/Field';
+import { Segmented } from '@/ui/Segmented';
 import { Surface } from '@/ui/Surface';
 import { Switch } from '@/ui/Switch';
 import { useToast } from '@/ui/toast';
-import { connectGoogle, createSyncKey, disconnect, joinWithCode, loadSyncState, saveSyncState, syncNow, type SyncState } from '@/data/syncRepo';
+import { connectDropbox, connectGoogle, createSyncKey, disconnect, joinWithCode, loadSyncState, saveSyncState, syncNow, type SyncProvider, type SyncState } from '@/data/syncRepo';
+import { dropboxRedirectUri, startDropboxLogin, takeDropboxReturn } from '@/services/dropbox';
+
+const KNOWN_ERRORS = ['no-client-id', 'no-app-key', 'key-exists', 'bad-code', 'wrong-code', 'no-key', 'popup_closed', 'popup_failed_to_open', 'dbx-state', 'dbx-expired', 'dbx-denied'];
 
 /**
- * Configurações → Conta e sincronização: entrar com o Google e manter os dados iguais entre
- * iPad, iPhone e computador. Os dados vão criptografados para a pasta oculta do app no Drive.
+ * Configurações → Conta e sincronização: manter os dados iguais entre iPad, iPhone e computador.
+ * Os dados vão criptografados para a pasta do app no Dropbox (principal) ou no Google Drive.
  */
 export function SyncSection() {
   const { t, settings } = useSettings();
@@ -21,10 +25,13 @@ export function SyncSection() {
   const [shownCode, setShownCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [clientInput, setClientInput] = useState(s.clientId);
+  const [appKeyInput, setAppKeyInput] = useState(s.dbxKey);
+  const [pasteMode, setPasteMode] = useState(false);
+  const [dbxCode, setDbxCode] = useState('');
 
   const fail = (e: unknown) => {
     const m = e instanceof Error ? e.message : '';
-    const key = ['no-client-id', 'key-exists', 'bad-code', 'wrong-code', 'no-key', 'popup_closed', 'popup_failed_to_open'].includes(m) ? m : 'generic';
+    const key = KNOWN_ERRORS.includes(m) ? m : 'generic';
     toast.show(t(`settings.sync.errors.${key}` as 'settings.sync.errors.generic'), 'error');
   };
   const run = async (fn: () => Promise<void>) => {
@@ -41,8 +48,28 @@ export function SyncSection() {
     saveSyncState(next);
     setS(next);
   };
+  const finishDropbox = (c: string) =>
+    run(async () => {
+      const r = await connectDropbox(s, c);
+      setS(r.state);
+      setHasKey(r.hasKey);
+      setPasteMode(false);
+      setDbxCode('');
+    });
+
+  // Volta do login do Dropbox: termina sozinho com o código que veio no endereço (só ao abrir a tela).
+  const returned = useRef(false);
+  useEffect(() => {
+    if (returned.current) return;
+    returned.current = true;
+    const back = takeDropboxReturn();
+    if (back?.code) void finishDropbox(back.code);
+    else if (back?.error) fail(new Error('dbx-denied'));
+  }, []);
 
   const fmt = (iso: string) => (iso ? new Intl.DateTimeFormat(settings.locale, { dateStyle: 'short', timeStyle: 'short' }).format(new Date(iso)) : t('settings.sync.never'));
+  const connected = !!s.email;
+  const dropbox = s.provider === 'dropbox';
 
   return (
     <div className="flex max-w-2xl flex-col gap-5">
@@ -51,49 +78,130 @@ export function SyncSection() {
           <Cloud className="mt-0.5 h-5 w-5 shrink-0 text-accent" aria-hidden />
           <div className="text-sm leading-relaxed text-muted">
             <p>{t('settings.sync.intro')}</p>
-            <p className="mt-2">{t('settings.sync.privacy')}</p>
+            <p className="mt-2">{t(dropbox ? 'settings.sync.privacyDropbox' : 'settings.sync.privacy')}</p>
           </div>
         </div>
       </Surface>
 
-      {/* 1. ID do cliente do Google Cloud (criado pelo dono) */}
-      <Surface className="flex flex-col gap-3">
-        <h2 className="text-[0.9375rem] font-semibold text-fg">{t('settings.sync.step1')}</h2>
-        <p className="text-sm text-muted">{t('settings.sync.clientHint')}</p>
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <Input value={clientInput} onChange={(e) => setClientInput(e.target.value.trim())} placeholder="xxxxxxxx.apps.googleusercontent.com" aria-label={t('settings.sync.clientId')} />
-          <Button variant="secondary" disabled={!clientInput.endsWith('.apps.googleusercontent.com')} onClick={() => update({ ...s, clientId: clientInput })}>
-            {t('common.save')}
-          </Button>
-        </div>
-      </Surface>
+      {/* Onde guardar: só antes de conectar (cada provedor tem a sua chave e os seus arquivos). */}
+      {!connected && (
+        <Surface className="flex flex-col gap-3">
+          <h2 className="text-[0.9375rem] font-semibold text-fg">{t('settings.sync.providerTitle')}</h2>
+          <Segmented<SyncProvider>
+            label={t('settings.sync.providerTitle')}
+            value={s.provider}
+            onChange={(p) => update({ ...s, provider: p })}
+            options={[
+              { value: 'dropbox', label: t('settings.sync.providers.dropbox') },
+              { value: 'google', label: t('settings.sync.providers.google') },
+            ]}
+            className="w-full sm:w-auto"
+          />
+          <p className="text-sm text-muted">{t(dropbox ? 'settings.sync.providerDropboxHint' : 'settings.sync.providerGoogleHint')}</p>
+        </Surface>
+      )}
 
-      {/* 2. Entrar com o Google */}
-      <Surface className="flex flex-col gap-3">
-        <h2 className="text-[0.9375rem] font-semibold text-fg">{t('settings.sync.step2')}</h2>
-        {s.email ? (
-          <p className="text-sm text-fg">{t('settings.sync.signedAs', { email: s.email })}</p>
-        ) : (
-          <Button
-            variant="primary"
-            icon={<LogIn className="h-4 w-4" />}
-            disabled={!s.clientId || busy}
-            onClick={() =>
-              run(async () => {
-                const r = await connectGoogle(s);
-                setS(r.state);
-                setHasKey(r.hasKey);
-              })
-            }
-            className="self-start"
-          >
-            {t('settings.sync.signIn')}
-          </Button>
-        )}
-      </Surface>
+      {dropbox ? (
+        <>
+          {/* 1. Chave do app no Dropbox (criada pelo dono) */}
+          {!connected && (
+            <Surface className="flex flex-col gap-3">
+              <h2 className="text-[0.9375rem] font-semibold text-fg">{t('settings.sync.dbxStep1')}</h2>
+              <p className="text-sm text-muted">{t('settings.sync.dbxKeyHint')}</p>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <Input value={appKeyInput} onChange={(e) => setAppKeyInput(e.target.value.trim())} placeholder="abc123def456ghi" aria-label={t('settings.sync.dbxKey')} autoComplete="off" />
+                <Button variant="secondary" disabled={!/^[a-z0-9]{8,}$/i.test(appKeyInput)} onClick={() => update({ ...s, dbxKey: appKeyInput })}>
+                  {t('common.save')}
+                </Button>
+              </div>
+              <p className="text-xs text-subtle">
+                {t('settings.sync.dbxRedirect')} <code className="select-all break-all rounded bg-surface-2 px-1.5 py-0.5 text-fg">{dropboxRedirectUri()}</code>
+              </p>
+            </Surface>
+          )}
+
+          {/* 2. Entrar com o Dropbox */}
+          <Surface className="flex flex-col gap-3">
+            <h2 className="text-[0.9375rem] font-semibold text-fg">{t('settings.sync.dbxStep2')}</h2>
+            {connected ? (
+              <p className="text-sm text-fg">{t('settings.sync.signedAs', { email: s.email })}</p>
+            ) : (
+              <>
+                <div className="flex flex-wrap gap-2">
+                  <Button variant="primary" icon={<LogIn className="h-4 w-4" />} disabled={!s.dbxKey || busy} onClick={() => run(() => startDropboxLogin(s.dbxKey, 'redirect'))}>
+                    {t('settings.sync.dbxSignIn')}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    icon={<ExternalLink className="h-4 w-4" />}
+                    disabled={!s.dbxKey || busy}
+                    onClick={() =>
+                      run(async () => {
+                        await startDropboxLogin(s.dbxKey, 'code');
+                        setPasteMode(true);
+                      })
+                    }
+                  >
+                    {t('settings.sync.dbxWithCode')}
+                  </Button>
+                </div>
+                <p className="text-xs text-subtle">{t('settings.sync.dbxSignInHint')}</p>
+                {pasteMode && (
+                  <div className="flex flex-col gap-2 sm:flex-row">
+                    <Input value={dbxCode} onChange={(e) => setDbxCode(e.target.value.trim())} placeholder={t('settings.sync.dbxCodePlaceholder')} aria-label={t('settings.sync.dbxCodePlaceholder')} autoComplete="off" />
+                    <Button variant="primary" disabled={busy || dbxCode.length < 10} onClick={() => void finishDropbox(dbxCode)}>
+                      {t('settings.sync.dbxConfirm')}
+                    </Button>
+                  </div>
+                )}
+              </>
+            )}
+          </Surface>
+        </>
+      ) : (
+        <>
+          {/* 1. ID do cliente do Google Cloud (criado pelo dono) */}
+          {!connected && (
+            <Surface className="flex flex-col gap-3">
+              <h2 className="text-[0.9375rem] font-semibold text-fg">{t('settings.sync.step1')}</h2>
+              <p className="text-sm text-muted">{t('settings.sync.clientHint')}</p>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <Input value={clientInput} onChange={(e) => setClientInput(e.target.value.trim())} placeholder="xxxxxxxx.apps.googleusercontent.com" aria-label={t('settings.sync.clientId')} />
+                <Button variant="secondary" disabled={!clientInput.endsWith('.apps.googleusercontent.com')} onClick={() => update({ ...s, clientId: clientInput })}>
+                  {t('common.save')}
+                </Button>
+              </div>
+            </Surface>
+          )}
+
+          {/* 2. Entrar com o Google */}
+          <Surface className="flex flex-col gap-3">
+            <h2 className="text-[0.9375rem] font-semibold text-fg">{t('settings.sync.step2')}</h2>
+            {connected ? (
+              <p className="text-sm text-fg">{t('settings.sync.signedAs', { email: s.email })}</p>
+            ) : (
+              <Button
+                variant="primary"
+                icon={<LogIn className="h-4 w-4" />}
+                disabled={!s.clientId || busy}
+                onClick={() =>
+                  run(async () => {
+                    const r = await connectGoogle(s);
+                    setS(r.state);
+                    setHasKey(r.hasKey);
+                  })
+                }
+                className="self-start"
+              >
+                {t('settings.sync.signIn')}
+              </Button>
+            )}
+          </Surface>
+        </>
+      )}
 
       {/* 3. Chave: criar (primeiro aparelho) ou entrar com o código (os outros) */}
-      {s.email && !s.key && (
+      {connected && !s.key && (
         <Surface className="flex flex-col gap-3">
           <h2 className="text-[0.9375rem] font-semibold text-fg">{t('settings.sync.step3')}</h2>
           {hasKey !== true && (
@@ -126,6 +234,9 @@ export function SyncSection() {
               </div>
             </>
           )}
+          <Button variant="ghost" icon={<LogOut className="h-4 w-4" />} disabled={busy} onClick={() => run(async () => setS(await disconnect(s)))} className="self-start">
+            {t('settings.sync.disconnect')}
+          </Button>
         </Surface>
       )}
 
@@ -170,7 +281,7 @@ export function SyncSection() {
             >
               {t('settings.sync.now')}
             </Button>
-            <Button variant="ghost" icon={<LogOut className="h-4 w-4" />} onClick={() => setS(disconnect(s))}>
+            <Button variant="ghost" icon={<LogOut className="h-4 w-4" />} disabled={busy} onClick={() => run(async () => setS(await disconnect(s)))}>
               {t('settings.sync.disconnect')}
             </Button>
           </div>

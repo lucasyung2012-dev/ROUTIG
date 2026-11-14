@@ -173,8 +173,11 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
 
   /* ---------- Pessoas: avatar (terceira pessoa) e moradores ---------- */
   const avatar = createCrowd(kit, 1);
+  // Lá fora o chão tem relevo: os pés acompanham a encosta (dentro dos prédios o piso é plano).
+  avatar.ground = heightAt;
   outside.add(avatar.group);
   const crowd = createCrowd(kit, 40);
+  crowd.ground = heightAt;
   outside.add(crowd.group);
   const town = createTown(world.seats);
   // Gente de passagem (bicicleta, skate, corrida, jardineiro, vendedores, crianças) e bichos.
@@ -513,6 +516,7 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
       camera.position.copy(v.cam);
       rig.controls.target.copy(v.target);
       scene.scene.add(avatar.group, indoorCrowd.group);
+      avatar.ground = undefined;
       if (rig.mode() !== 'orbit') {
         if (instant) rig.place(v.cam.x, v.cam.z, Math.atan2(-(v.target.x - v.cam.x), -(v.target.z - v.cam.z)));
         else {
@@ -557,6 +561,7 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
       camera.position.copy(center).addScaledVector(out, b.def.radius * 1.5).setY(center.y + 12);
       rig.controls.target.copy(center);
       outside.add(avatar.group);
+      avatar.ground = heightAt;
       const portal = doors.portals.get(id);
       if (rig.mode() !== 'orbit' && portal) {
         // Sai pela porta aberta e anda alguns passos para fora; a porta fecha atrás.

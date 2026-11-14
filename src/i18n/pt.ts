@@ -5002,11 +5002,12 @@ export const pt = {
       sports: 'Complexo Esportivo',
     },
     regions: {
-      central: 'Região central',
-      north: 'Região norte',
-      east: 'Região leste',
-      south: 'Região sul',
-      west: 'Região oeste',
+      central: 'Centro do Campus',
+      knowledge: 'Conhecimento e aprendizagem',
+      planning: 'Planejamento e organização',
+      growth: 'Desenvolvimento pessoal',
+      activity: 'Atividades e concentração',
+      finance: 'Gestão financeira',
     },
     inbox: {
       sectors: {

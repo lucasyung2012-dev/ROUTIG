@@ -73,6 +73,11 @@ export interface Crowd {
   /** Desenha estas figuras (as demais instâncias somem). */
   set: (list: Figure[]) => void;
   capacity: number;
+  /**
+   * Chão do lugar (parque). Com ele, quem está de pé ou andando numa encosta sobe o corpo o
+   * suficiente para nenhum pé entrar no morro. Sem ele (interiores, pisos planos), nada muda.
+   */
+  ground?: (x: number, z: number) => number;
 }
 
 // Medidas (m). Quadril a 0,86; ombros a 1,34; topo da cabeça ~1,70 com o cabelo.
@@ -941,7 +946,8 @@ export function createCrowd(kit: Kit, capacity: number, shadows = true): Crowd {
     for (let i = 0; i < n; i++) {
       const f = list[i]!;
       const j = joints(f);
-      base.compose(v.set(f.x, f.y, f.z), q.setFromEuler(e.set(0, f.yaw, 0)), sc.set(f.scale, f.scale, f.scale));
+      const lift = crowd.ground && ON_FEET.has(f.pose) ? slopeLift(j, crowd.ground, f) : 0;
+      base.compose(v.set(f.x, f.y + lift, f.z), q.setFromEuler(e.set(0, f.yaw, 0)), sc.set(f.scale, f.scale, f.scale));
       // Tronco e cabeça.
       step(m1, base, 0, j.hip, 0);
       pelvis.setMatrixAt(i, m1);
@@ -1068,7 +1074,33 @@ export function createCrowd(kit: Kit, capacity: number, shadows = true): Crowd {
     });
   };
 
-  return { group, set, capacity };
+  const crowd: Crowd = { group, set, capacity };
+  return crowd;
+}
+
+/** Poses com os pés no chão (sentado, pedalando ou no balanço não dependem da encosta). */
+const ON_FEET = new Set<Pose>(['stand', 'walk', 'run', 'wave', 'photo', 'cheer', 'exercise', 'tennis', 'kick', 'keeper']);
+
+/**
+ * Quanto subir o corpo numa encosta: a posição de cada pé (para a frente ou para trás do quadril,
+ * pela coxa e pela canela) é comparada com a altura do chão ali; o pé que ficaria dentro do morro
+ * define a subida. A outra perna fica um pouco mais dobrada no ar, como ao subir uma rampa.
+ */
+function slopeLift(j: Joints, ground: (x: number, z: number) => number, f: Figure): number {
+  const fx = Math.sin(f.yaw);
+  const fz = Math.cos(f.yaw);
+  const g0 = ground(f.x, f.z);
+  const slope = (ground(f.x + fx * 0.35, f.z + fz * 0.35) - ground(f.x - fx * 0.35, f.z - fz * 0.35)) / 0.7;
+  if (Math.abs(slope) < 0.02) return Math.max(0, g0 - f.y);
+  let lift = 0;
+  for (let k = 0; k < 2; k++) {
+    const hf = j.hf[k]!;
+    const sh = hf - j.kf[k]!;
+    const ahead = (THIGH * Math.sin(hf) + SHIN * Math.sin(sh)) * f.scale;
+    const footY = (j.hip - THIGH * Math.cos(hf) - SHIN * Math.cos(sh) - ANKLE) * f.scale;
+    lift = Math.max(lift, slope * ahead - footY);
+  }
+  return Math.max(0, lift + (g0 - f.y));
 }
 
 /** Avatar universal do visitante: cores neutras, sem gênero nem idade definidos. */

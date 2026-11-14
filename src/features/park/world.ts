@@ -5,10 +5,11 @@
  */
 import * as THREE from 'three';
 import type { ModuleId } from '@/app/modules';
-import { LAKE, onPath, plazaCarts, PLAYGROUNDS, ROAD_RADIUS, PARK_BUILDINGS, PARK_RADIUS, PARK_SCALE, PATH_WIDTH, PLAZA_RADIUS, POIS, PONDS, entranceOf, facingOf, heightAt, inWater, inField, isFreeGround, lakeRadiusAt, parkPaths, samplePath, seededRandom, treePositions, type ParkBuilding, type Point } from '@/domain/park';
+import { LAKE, PARK_REGIONS, TERRAIN, terrainVertex, themeAt, themeWeights, type ParkRegion, onPath, plazaCarts, PLAYGROUNDS, ROAD_RADIUS, PARK_BUILDINGS, PARK_RADIUS, PARK_SCALE, PATH_WIDTH, PLAZA_RADIUS, POIS, PONDS, entranceOf, facingOf, heightAt, inWater, inField, isFreeGround, lakeRadiusAt, parkPaths, samplePath, seededRandom, treePositions, type ParkBuilding, type Point } from '@/domain/park';
 import { amenities, houses, neighborhood, sportsFields, streetTrees, type Seat, type Viewpoint } from './buildings/amenities';
 import { city } from './buildings/city';
 import { navGraph } from '@/domain/parkPeople';
+import { landmarks } from './landmarks';
 import { Builder, Kit, signTexture, cloud, forest, setWaterNight, setWaterSky, setWaterWeather, shrubs, sky, stars, water, type Plant, type TreeSpecies } from './kit';
 import { birds, butterflies, drone, fountain, leaves, rain } from './life';
 import { playground } from './playground';
@@ -252,24 +253,71 @@ function mist(kit: Kit): { mesh: THREE.InstancedMesh; tick: (center: THREE.Vecto
   };
 }
 
+/* ---------- Identidade das áreas temáticas ---------- */
+
+/** Cor do gramado de cada área (misturada na transição entre áreas). */
+const THEME_GROUND: Record<ParkRegion, string> = {
+  central: '#7DB866',
+  knowledge: '#4E8A47',
+  planning: '#8CC46C',
+  growth: '#80BC62',
+  activity: '#6AA352',
+  finance: '#76AE6E',
+};
+
+/** Espécies de árvore de cada área. */
+const THEME_TREES: Record<ParkRegion, TreeSpecies[]> = {
+  central: ['palm', 'round', 'palm', 'blossom'],
+  knowledge: ['slender', 'round', 'conifer', 'round', 'slender', 'conifer'],
+  planning: ['slender', 'slender', 'round'],
+  growth: ['blossom', 'round', 'blossom', 'palm'],
+  activity: ['palm', 'round', 'round', 'slender'],
+  finance: ['conifer', 'slender', 'round'],
+};
+
 /* ---------- Terreno ---------- */
 
 
 function terrain(kit: Kit): THREE.Mesh {
-  const size = Math.round(PARK_RADIUS * 2 + 420);
-  const seg = 230;
-  const g = new THREE.PlaneGeometry(size, size, seg, seg);
-  g.rotateX(-Math.PI / 2);
+  // A mesma grade do chão de pisar (domain/park.ts, heightAt): desenho e chão do corpo coincidem.
+  const { size, seg } = TERRAIN;
+  const n = seg + 1;
+  const step = size / seg;
+  const verts = new Float32Array(n * n * 3);
+  for (let j = 0; j < n; j++)
+    for (let i = 0; i < n; i++) {
+      const k = (j * n + i) * 3;
+      verts[k] = -size / 2 + i * step;
+      verts[k + 1] = terrainVertex(i, j);
+      verts[k + 2] = -size / 2 + j * step;
+    }
+  // Cada quadrado em dois triângulos, cortado de (x0, z1) a (x1, z0): o mesmo corte de heightAt.
+  const index = new Uint32Array(seg * seg * 6);
+  let t = 0;
+  for (let j = 0; j < seg; j++)
+    for (let i = 0; i < seg; i++) {
+      const a = j * n + i;
+      const b = a + 1;
+      const c = a + n;
+      const d = c + 1;
+      index.set([a, c, b, b, c, d], t);
+      t += 6;
+    }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(verts, 3));
+  g.setIndex(new THREE.BufferAttribute(index, 1));
   const pos = g.attributes.position!;
   const col = new Float32Array(pos.count * 3);
-  // Norte: mata densa (verde escuro); Oeste: colinas tropicais; Leste: gramados abertos; Sul: jardins.
-  const base = { central: new THREE.Color('#7DB866'), north: new THREE.Color('#4F8E49'), east: new THREE.Color('#86BE68'), south: new THREE.Color('#7FBA64'), west: new THREE.Color('#5E9F50') };
+  // Cor do chão por área temática, misturada na transição: mata do Conhecimento (verde escuro),
+  // gramado aparado do Planejamento (verde claro), jardins do Desenvolvimento, campo das Atividades,
+  // gramado frio e baixo das Finanças.
+  const base = Object.fromEntries(PARK_REGIONS.map((t) => [t, new THREE.Color(THEME_GROUND[t])])) as Record<ParkRegion, THREE.Color>;
   const c = new THREE.Color();
   const tmp = new THREE.Color();
   for (let i = 0; i < pos.count; i++) {
     const x = pos.getX(i);
     const z = pos.getZ(i);
-    let y = heightAt(x, z);
+    let y = pos.getY(i);
     // Margens do lago descendo até a água (forma orgânica) e lagos ornamentais.
     const ang = Math.atan2(z - LAKE.z, x - LAKE.x);
     const lr = lakeRadiusAt(ang);
@@ -282,10 +330,10 @@ function terrain(kit: Kit): THREE.Mesh {
       if (dp > p.radius - 1 && dp < p.radius + 2.5) shore = true;
     }
     pos.setY(i, y - 0.03);
-    const a = Math.atan2(x, -z);
     const r = Math.hypot(x, z);
-    const pick = r < 55 * PARK_SCALE ? base.central : Math.abs(a) < Math.PI / 4 ? base.north : a > 0 && a < (3 * Math.PI) / 4 ? base.east : a < 0 && a > (-3 * Math.PI) / 4 ? base.west : base.south;
-    c.copy(pick);
+    const w = themeWeights(x, z);
+    c.setRGB(0, 0, 0);
+    for (const t of PARK_REGIONS) c.r += base[t].r * w[t], c.g += base[t].g * w[t], c.b += base[t].b * w[t];
     const n = Math.sin(x * 0.21) * Math.cos(z * 0.17) * 0.5 + Math.sin(x * 0.05 + z * 0.07) * 0.5;
     c.multiplyScalar(0.9 + n * 0.1);
     if (shore) c.lerp(tmp.set('#CDBB93'), 0.65);
@@ -325,10 +373,23 @@ function ribbonOn(points: THREE.Vector2[], width: number, lift: number): THREE.B
   return g;
 }
 
+/**
+ * Piso dos caminhos por área temática: pedra clara no centro, tijolo de campus no Conhecimento,
+ * granito cinza no Planejamento, saibro claro nos jardins do Desenvolvimento, piso emborrachado
+ * terracota nas Atividades e pedra escura polida nas Finanças.
+ */
+const THEME_PAVE: Record<ParkRegion, [string, string]> = {
+  central: ['#DCD3C0', '#B8AE98'],
+  knowledge: ['#C9A88A', '#9C7F64'],
+  planning: ['#D7DADD', '#A6ADB5'],
+  growth: ['#E3D2A8', '#B9A47A'],
+  activity: ['#C98D6C', '#8E5E48'],
+  finance: ['#A3ABB5', '#5F6975'],
+};
+
 function paths(kit: Kit): { group: THREE.Group; lamps: Point[] } {
   const b = new Builder();
-  const edge = kit.mat('#B8AE98', { rough: 0.9 });
-  const pave = kit.mat('#DCD3C0', { rough: 0.85 });
+  const mats = Object.fromEntries(PARK_REGIONS.map((t) => [t, { pave: kit.mat(THEME_PAVE[t][0], { rough: t === 'finance' ? 0.55 : 0.85 }), edge: kit.mat(THEME_PAVE[t][1], { rough: 0.9 }) }])) as Record<ParkRegion, { pave: THREE.Material; edge: THREE.Material }>;
   const trail = kit.mat('#C7B48E', { rough: 0.95 });
   const lamps: Point[] = [];
   for (const line of parkPaths()) {
@@ -338,6 +399,9 @@ function paths(kit: Kit): { group: THREE.Group; lamps: Point[] } {
       b.add(trail, ribbonOn(v, w, 0.05));
       continue;
     }
+    // O piso é o da área onde o caminho chega (as avenidas da praça ficam com a pedra do centro).
+    const endP = line.points[line.points.length - 1]!;
+    const { pave, edge } = mats[line.kind === 'main' && line.points.some((q) => Math.hypot(q.x, q.z) < PLAZA_RADIUS + 1) && Math.hypot(endP.x, endP.z) < 140 ? 'central' : themeAt(endP.x, endP.z)];
     b.add(edge, ribbonOn(v, w + 0.8, 0.04));
     b.add(pave, ribbonOn(v, w, 0.07));
     // Postes a cada ~22 m, alternando os lados.
@@ -589,21 +653,11 @@ function lake(kit: Kit): { group: THREE.Group; water: ReturnType<typeof water>; 
 function plants(): Plant[] {
   const pts = treePositions(2800);
   return pts.map((p, i) => {
-    const a = Math.atan2(p.x, -p.z);
     const r = Math.hypot(p.x, p.z);
-    const central = r < 60 * PARK_SCALE;
-    const north = Math.abs(a) < Math.PI / 4;
-    const east = a > Math.PI / 4 && a < (3 * Math.PI) / 4;
-    const west = a < -Math.PI / 4 && a > (-3 * Math.PI) / 4;
-    const pool: TreeSpecies[] = central
-      ? ['palm', 'round', 'palm', 'blossom']
-      : north
-        ? ['slender', 'round', 'round', 'palm', 'slender', 'conifer']
-        : west
-          ? ['palm', 'round', 'slender', 'round', 'blossom']
-          : east
-            ? ['round', 'blossom', 'slender']
-            : ['blossom', 'round', 'palm', 'round'];
+    // Espécies por área: mata alta no Conhecimento, palmeiras e copas redondas nas colinas das
+    // Atividades, árvores esguias e alinhadas no Planejamento, floradas nos jardins do
+    // Desenvolvimento, copas formais e coníferas nas Finanças.
+    const pool: TreeSpecies[] = r > PARK_RADIUS ? ['round', 'slender', 'palm', 'round'] : THEME_TREES[themeAt(p.x, p.z)];
     return { x: p.x, y: heightAt(p.x, p.z), z: p.z, s: p.s * (r > PARK_RADIUS ? 1.3 : 1), species: pool[i % pool.length]! };
   });
 }
@@ -773,7 +827,10 @@ export function createWorld(kit: Kit): World {
   const am = amenities(kit);
   const ww = walkway(kit, buildings.get('tasks')?.def, buildings.get('calendar')?.def);
   const fields = sportsFields(kit);
-  root.add(am.group, ww, fields);
+  // Marcos das áreas temáticas (sem árvore nem moita em cima).
+  const marks = landmarks(kit);
+  for (const m of marks.list) clearZones.push({ x: m.x, z: m.z, r: 8 });
+  root.add(am.group, ww, fields, marks.group);
   // Borda do mapa (bairro, casas, avenida, ônibus): monta logo depois que o parque aparece, para a
   // abertura não esperar por ela; e só é desenhada com a câmera perto da borda ou no alto.
   const edge = new THREE.Group();
@@ -786,7 +843,7 @@ export function createWorld(kit: Kit): World {
     ticks.push(hood.tick, streets.tick);
     kit.glowing.forEach((m) => (m.emissiveIntensity = 0.15 + glowNow * 1.6));
   }, 1500);
-  obstacles.push(...footprint(fields, heightAt));
+  obstacles.push(...footprint(fields, heightAt), ...footprint(marks.group, heightAt));
   // Barracas, quiosques, mesas, bancos, pérgolas, passarela, praça; postes e troncos das árvores.
   obstacles.push(...footprint(am.group, heightAt), ...footprint(ww, heightAt), ...footprint(plazaGroup, heightAt), ...pgs.flatMap((p) => footprint(p.solid, heightAt)));
   for (const l of p.lamps) obstacles.push({ x: l.x, z: l.z, r: 0.25, h: heightAt(l.x, l.z) + 4.2 });

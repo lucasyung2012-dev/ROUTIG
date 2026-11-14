@@ -113,3 +113,61 @@ describe('parque (V2): estações e eventos', () => {
     expect(festiveOn(new Date(2026, 10, 6))).toBe(false);
   });
 });
+
+describe('Campus temático (14/11/2026): terreno e áreas', () => {
+  it('o chão de pisar é a própria malha desenhada (nos vértices e entre eles)', async () => {
+    const { TERRAIN, terrainVertex } = await import('@/domain/park');
+    const step = TERRAIN.size / TERRAIN.seg;
+    const half = TERRAIN.size / 2;
+    for (const [i, j] of [[10, 20], [144, 144], [200, 90], [57, 233]] as const) {
+      expect(heightAt(-half + i * step, -half + j * step)).toBeCloseTo(terrainVertex(i, j), 5);
+      // No meio de um quadrado, a altura fica entre as dos quatro cantos (plano dos triângulos).
+      const hs = [terrainVertex(i, j), terrainVertex(i + 1, j), terrainVertex(i, j + 1), terrainVertex(i + 1, j + 1)];
+      const m = heightAt(-half + (i + 0.3) * step, -half + (j + 0.3) * step);
+      expect(m).toBeGreaterThanOrEqual(Math.min(...hs) - 1e-6);
+      expect(m).toBeLessThanOrEqual(Math.max(...hs) + 1e-6);
+    }
+  });
+
+  it('relevo variado: morros altos e depressões dentro do parque, praça plana', () => {
+    let max = -Infinity;
+    let min = Infinity;
+    for (let x = -360; x <= 360; x += 8)
+      for (let z = -360; z <= 360; z += 8) {
+        if (Math.hypot(x, z) > 360 || inWater(x, z, 30)) continue;
+        const h = heightAt(x, z);
+        max = Math.max(max, h);
+        min = Math.min(min, h);
+      }
+    expect(max).toBeGreaterThan(14);
+    expect(min).toBeLessThan(-0.8);
+    expect(heightAt(0, 0)).toBe(0);
+  });
+
+  it('todo caminho é caminhável (nenhum trecho mais íngreme que ~31°)', () => {
+    const steep: string[] = [];
+    for (const [i, p] of parkPaths().entries()) {
+      const s = samplePath(p.points, 1);
+      for (let k = 1; k < s.length; k++) {
+        const a = s[k - 1]!;
+        const c = s[k]!;
+        const run = Math.hypot(c.x - a.x, c.z - a.z);
+        if (run < 0.3) continue;
+        const g = Math.abs(heightAt(c.x, c.z) - heightAt(a.x, a.z)) / run;
+        if (g > 0.6) steep.push(`caminho ${i} em ${a.x.toFixed(0)},${a.z.toFixed(0)}: ${g.toFixed(2)}`);
+      }
+    }
+    expect(steep.slice(0, 10)).toEqual([]);
+  });
+
+  it('cada prédio fica na sua área temática; cada área tem prédios', async () => {
+    const { themeAt } = await import('@/domain/park');
+    for (const b of PARK_BUILDINGS) if (b.region !== 'central') expect(`${b.id}:${themeAt(b.x, b.z)}`).toBe(`${b.id}:${b.region}`);
+    const byTheme = (t: string) => PARK_BUILDINGS.filter((b) => b.region === t).map((b) => b.id).sort();
+    expect(byTheme('planning')).toEqual(['calendar', 'inbox', 'projects', 'tasks']);
+    expect(byTheme('knowledge')).toEqual(['academy', 'languages', 'library', 'notes']);
+    expect(byTheme('growth')).toEqual(['goals', 'habits', 'insights']);
+    expect(byTheme('activity')).toEqual(['focus', 'music', 'sports']);
+    expect(byTheme('finance')).toEqual(['finance']);
+  });
+});

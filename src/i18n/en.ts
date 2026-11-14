@@ -5004,11 +5004,12 @@ export const en: Messages = {
       sports: 'Sports Complex',
     },
     regions: {
-      central: 'Central region',
-      north: 'North region',
-      east: 'East region',
-      south: 'South region',
-      west: 'West region',
+      central: 'Campus center',
+      knowledge: 'Knowledge and learning',
+      planning: 'Planning and organization',
+      growth: 'Personal development',
+      activity: 'Activities and focus',
+      finance: 'Financial management',
     },
     inbox: {
       sectors: {

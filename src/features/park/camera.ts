@@ -84,6 +84,8 @@ const EYE = 1.7;
 const SEATED_EYE = 0.78;
 const GRAVITY = 18;
 const JUMP_V = Math.sqrt(2 * GRAVITY * 0.55);
+/** Encosta mais íngreme que se consegue subir andando (subida por metro; 0,7 ≈ 35°). */
+const MAX_GRADE = 0.7;
 const BASE_FOV = 55;
 const ease = (k: number) => (k < 0.5 ? 4 * k * k * k : 1 - (-2 * k + 2) ** 3 / 2);
 
@@ -349,6 +351,12 @@ export function createCameraRig(camera: THREE.PerspectiveCamera, canvas: HTMLCan
         running = false;
       }
     }
+    // Subindo um morro, o passo encurta conforme a inclinação (descendo, fica como no plano).
+    if (!airborne && want.lengthSq() > 0.01) {
+      const wl = want.length();
+      const ahead = (world.ground(feet.x + (want.x / wl) * 0.5, feet.z + (want.y / wl) * 0.5) - world.ground(feet.x, feet.z)) / 0.5;
+      if (ahead > 0.04) want.multiplyScalar(1 / (1 + ahead * 1.4));
+    }
     // Aceleração e desaceleração suaves (nada de parar seco); no ar, controle reduzido.
     const k = Math.min(1, dt * (want.lengthSq() > vel.lengthSq() ? 6 : 9) * (airborne ? 0.35 : 1));
     vel.lerp(want, k);
@@ -368,7 +376,18 @@ export function createCameraRig(camera: THREE.PerspectiveCamera, canvas: HTMLCan
       feet.z = prevZ;
       vel.set(0, 0);
     }
-    const g = world.ground(feet.x, feet.z);
+    let g = world.ground(feet.x, feet.z);
+    // Encosta íngreme demais: não sobe (escorrega de volta para onde estava; descer continua livre).
+    const stepLen = Math.hypot(feet.x - prevX, feet.z - prevZ);
+    if (!airborne && stepLen > 1e-4) {
+      const g0 = world.ground(prevX, prevZ);
+      if ((g - g0) / stepLen > MAX_GRADE) {
+        feet.x = prevX;
+        feet.z = prevZ;
+        vel.multiplyScalar(0.3);
+        g = g0;
+      }
+    }
     if (wantJump && !airborne) {
       vy = JUMP_V;
       airborne = true;

@@ -9,6 +9,7 @@
  * célula do mundo (não "escorregam" quando a câmera anda).
  */
 import * as THREE from 'three';
+import { themeAt, type ParkRegion } from '@/domain/park';
 import type { Kit } from './kit';
 
 const N = 9000;
@@ -130,7 +131,23 @@ export function createGrass(kit: Kit, ground: (x: number, z: number) => number, 
   // Manchas suaves: mato e flores aparecem em grupos, não espalhados por igual.
   const patch = (x: number, z: number, f: number, o: number) => 0.5 + 0.25 * Math.sin(x * f + o) * Math.cos(z * f * 1.3 - o) + 0.25 * Math.sin((x + z) * f * 0.7 + o * 2);
   const grassTones = ['#FFFFFF', '#E9F5D8', '#D8EFC0', '#F2E7B8', '#CFE8B4'];
-  const flowerTones = ['#FFFFFF', '#FFFFFF', '#FDE047', '#C4B5FD', '#F9A8D4', '#FCA5A5'];
+  // Flores de cada área temática (uma cor por canteiro de 16 m): jardins coloridos no
+  // Desenvolvimento, branco e azul nos canteiros do Planejamento, amarelo e laranja no campo das
+  // Atividades, lilás e branco na mata do Conhecimento, branco e dourado nas Finanças.
+  const THEME_FLOWERS: Record<ParkRegion, string[]> = {
+    central: ['#FFFFFF', '#FFFFFF', '#FDE047', '#C4B5FD', '#F9A8D4', '#FCA5A5'],
+    knowledge: ['#FFFFFF', '#C4B5FD', '#DDD6FE'],
+    planning: ['#FFFFFF', '#93C5FD', '#BFDBFE', '#FFFFFF'],
+    growth: ['#F9A8D4', '#FDE047', '#C084FC', '#FCA5A5', '#FB7185', '#FFFFFF'],
+    activity: ['#FDE047', '#FDBA74', '#FFFFFF', '#FACC15'],
+    finance: ['#FFFFFF', '#FDE68A', '#FFFFFF'],
+  };
+  const toneAt = (x: number, z: number) => {
+    const gx = Math.floor(x / 16);
+    const gz = Math.floor(z / 16);
+    const list = THEME_FLOWERS[themeAt(gx * 16 + 8, gz * 16 + 8)];
+    return list[Math.floor(hash(gx, gz) * list.length)]!;
+  };
   const rebuild = (cx: number, cz: number) => {
     const step = 1.0 / Math.sqrt(Math.max(0.2, density));
     let n = 0;
@@ -163,7 +180,7 @@ export function createGrass(kit: Kit, ground: (x: number, z: number) => number, 
           const s = (0.8 + r * 0.5) * fade;
           m4.compose(v.set(x, y, z), q.setFromEuler(e.set(0, r * 6.28, 0)), sc.set(s, s, s));
           flowers.setMatrixAt(nf, m4);
-          flowers.setColorAt(nf++, c.set(flowerTones[Math.floor(hash(Math.floor(x / 16), Math.floor(z / 16)) * flowerTones.length)]!));
+          flowers.setColorAt(nf++, c.set(toneAt(x, z)));
         }
         const s = (0.7 + r * 0.8) * fade;
         m4.compose(v.set(x, y, z), q.setFromEuler(e.set(0, r * 6.28, 0)), sc.set(s, s * (0.8 + r * 0.6), s));

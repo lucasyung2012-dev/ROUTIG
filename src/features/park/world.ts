@@ -21,7 +21,7 @@ import { calendarBuilding, financeBuilding, projectsBuilding, tasksBuilding } fr
 import { focusBuilding, goalsBuilding, habitsBuilding, musicBuilding, sportsBuilding } from './buildings/westsouth';
 import { prototypeBuilding } from './buildings/prototype';
 import type { Obstacle } from './camera';
-import { footprint } from './collision';
+import { footprint, ObstacleGrid } from './collision';
 import { upperFloors } from './buildings/upper';
 import { FLOOR_PLANS } from './interiors/floors';
 import { createGrass } from './grass';
@@ -191,6 +191,9 @@ export interface World {
   viewpoints: Viewpoint[];
   /** Árvores (para observar de perto). */
   treeSpots: Plant[];
+  /** Arbustos e flores dos jardins e moitas (diagnóstico: nada em caminho nem em prédio). */
+  bushSpots: Array<{ x: number; z: number; s: number }>;
+  flowerSpots: Array<{ x: number; z: number; s: number }>;
   spots: Array<{ id: string; x: number; z: number; kind: string }>;
   tick: (t: number, dt: number, focus: THREE.Vector3, cam: THREE.Vector3) => void;
   setLight: (l: Light) => void;
@@ -662,12 +665,14 @@ function plants(): Plant[] {
   });
 }
 
-function meadows(kit: Kit): THREE.Object3D[] {
+function meadows(kit: Kit, free: (x: number, z: number, r: number) => boolean): { objects: THREE.Object3D[]; flowers: Array<{ x: number; z: number; s: number }>; bushes: Array<{ x: number; z: number; s: number }> } {
   const rnd = seededRandom(17);
   const flowers: Array<{ x: number; y?: number; z: number; s: number; color: string }> = [];
   const bushes: typeof flowers = [];
+  // Só em chão livre: fora de caminho, praça, água, lote, quadra, e longe de qualquer peça sólida
+  // (lounge e calçada do elevador, marco, banco, quiosque, poste, parquinho).
   const put = (list: typeof flowers, x: number, z: number, s: number, color: string, pad = 0.4) => {
-    if (isFreeGround(x, z, pad)) list.push({ x, y: heightAt(x, z), z, s, color });
+    if (isFreeGround(x, z, pad) && free(x, z, 0.45 * s)) list.push({ x, y: heightAt(x, z), z, s, color });
   };
   // Jardins de frente de cada prédio (V2.1, 6.2): duas fileiras de flores e uma de arbustos
   // acompanhando o lote, abrindo espaço para a entrada.
@@ -708,7 +713,7 @@ function meadows(kit: Kit): THREE.Object3D[] {
     const z = Math.cos(a) * r;
     for (let i = 0; i < 3; i++) put(bushes, x + (rnd() - 0.5) * 3, z + (rnd() - 0.5) * 3, 0.7 + rnd() * 0.8, rnd() > 0.5 ? '#3E8E4A' : '#5A9A50', 1.5);
   }
-  return [shrubs(kit, flowers, 'flower'), shrubs(kit, bushes, 'bush')];
+  return { objects: [shrubs(kit, flowers, 'flower'), shrubs(kit, bushes, 'bush')], flowers, bushes };
 }
 
 /* ---------- Montagem ---------- */
@@ -849,14 +854,23 @@ export function createWorld(kit: Kit): World {
   for (const l of p.lamps) obstacles.push({ x: l.x, z: l.z, r: 0.25, h: heightAt(l.x, l.z) + 4.2 });
 
   // Árvores do parque e as da calçada do bairro (copas redondas e esguias alternadas).
-  const plantList = [...plants().filter((p) => !onPath(p.x, p.z, 0.9 * p.s) && !clearZones.some((c) => Math.hypot(c.x - p.x, c.z - p.z) < c.r + p.s)), ...streetTrees().map((p, i) => ({ x: p.x, y: heightAt(p.x, p.z), z: p.z, s: p.s, species: (i % 3 ? 'round' : 'slender') as Plant['species'] }))];
+  // Chão ocupado: tudo o que já é sólido (paredes dos prédios, lounges, marcos, bancos, quiosques,
+  // postes, parquinhos, quadras), os caminhos e as zonas livres. Nenhuma árvore, arbusto ou flor
+  // nasce aí — vale para todas as fontes de vegetação, não só para as árvores soltas.
+  const solid = new ObstacleGrid(obstacles.slice());
+  const free = (x: number, z: number, r: number) =>
+    !onPath(x, z, r + 0.3) &&
+    !clearZones.some((c) => Math.hypot(c.x - x, c.z - z) < c.r + r) &&
+    !PARK_BUILDINGS.some((bd) => Math.hypot(bd.x - x, bd.z - z) < bd.radius * 0.88 + r) &&
+    !solid.near(x, z).some((o) => Math.hypot(o.x - x, o.z - z) < o.r + r + 0.2);
+  const plantList = [...plants().filter((p) => !onPath(p.x, p.z, 0.9 * p.s) && free(p.x, p.z, 0.45 * p.s)), ...streetTrees().map((p, i) => ({ x: p.x, y: heightAt(p.x, p.z), z: p.z, s: p.s, species: (i % 3 ? 'round' : 'slender') as Plant['species'] }))];
   const trees = forest(kit, plantList);
   // Poças depois da chuva, grama gasta nos atalhos e na frente dos bancos, folhas secas no chão.
   const gnd = ground(kit, am.seats, plantList);
   root.add(gnd.group);
   for (const t of plantList) if (Math.hypot(t.x, t.z) < PARK_RADIUS + 30) obstacles.push({ x: t.x, z: t.z, r: 0.3 * t.s, h: (t.y ?? 0) + 3 });
-  const meadow = meadows(kit);
-  root.add(trees.group, ...meadow);
+  const meadow = meadows(kit, free);
+  root.add(trees.group, ...meadow.objects);
   // Luzes de fim de ano em volta da praça (só aparecem no evento).
   const festive = new THREE.InstancedMesh(kit.own(new THREE.SphereGeometry(0.22, 8, 6)), kit.own(new THREE.MeshBasicMaterial()), 120);
   {
@@ -964,6 +978,8 @@ export function createWorld(kit: Kit): World {
     stop: () => window.clearTimeout(edgeTimer),
     lifts,
     treeSpots: plantList,
+    bushSpots: meadow.bushes,
+    flowerSpots: meadow.flowers,
     viewpoints: am.viewpoints,
     spots: am.spots,
     tick: (t, dt, focus, cam) => {
@@ -1051,7 +1067,7 @@ export function createWorld(kit: Kit): World {
       };
       trees.setSeason(crowns[s]);
       gnd.setSeason(s);
-      meadow[0]!.visible = s !== 'winter';
+      meadow.objects[0]!.visible = s !== 'winter';
     },
     setFestive: (on) => {
       festive.visible = on;

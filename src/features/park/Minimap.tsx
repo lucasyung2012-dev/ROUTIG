@@ -2,13 +2,34 @@ import { useEffect, useMemo, useRef, useState, type MutableRefObject } from 'rea
 import { Maximize2, Minimize2, Minus, Plus } from 'lucide-react';
 import type { ModuleId } from '@/app/modules';
 import { useSettings } from '@/app/SettingsProvider';
-import { LAKE, PARK_BUILDINGS, PARK_RADIUS, PATH_WIDTH, PLAZA_RADIUS, PONDS, lakeRadiusAt, parkPaths } from '@/domain/park';
+import { LAKE, PARK_BUILDINGS, PARK_RADIUS, PARK_REGIONS, PATH_WIDTH, PLAZA_RADIUS, PONDS, lakeRadiusAt, parkPaths, themeAt, type ParkRegion } from '@/domain/park';
 import { IconButton } from '@/ui/IconButton';
 import { cn } from '@/ui/cn';
 import type { Engine } from './engine';
 
 const ZOOMS = [1, 2, 3.4] as const;
 const R = PARK_RADIUS + 70;
+
+/** Cor de cada área temática no minimapa (o centro fica sem cor). */
+const THEME_COLOR: Record<ParkRegion, string> = { central: 'transparent', knowledge: '#6366F1', planning: '#0EA5E9', growth: '#22C55E', activity: '#F97316', finance: '#EAB308' };
+const CELL = 16;
+
+/** Manchas das áreas temáticas (grade de 16 m pela área predominante) e o ponto do nome de cada uma. */
+function themeAreas() {
+  const d: Record<string, string> = {};
+  for (let x = -PARK_RADIUS; x < PARK_RADIUS; x += CELL)
+    for (let z = -PARK_RADIUS; z < PARK_RADIUS; z += CELL) {
+      if (Math.hypot(x + CELL / 2, z + CELL / 2) > PARK_RADIUS) continue;
+      const t = themeAt(x + CELL / 2, z + CELL / 2);
+      if (t === 'central') continue;
+      d[t] = (d[t] ?? '') + `M${x} ${z}h${CELL}v${CELL}h${-CELL}z`;
+    }
+  const labels = PARK_REGIONS.filter((t) => t !== 'central').map((t) => {
+    const bs = PARK_BUILDINGS.filter((b) => b.region === t);
+    return { t, x: bs.reduce((a, b) => a + b.x, 0) / bs.length, z: bs.reduce((a, b) => a + b.z, 0) / bs.length };
+  });
+  return { d, labels };
+}
 
 /**
  * Minimapa de verdade: uma foto do próprio parque vista de cima (prédios com a forma real,
@@ -25,6 +46,7 @@ export function Minimap({ engine, onPick }: { engine: MutableRefObject<Engine | 
   const svg = useRef<SVGSVGElement>(null);
   const cam = useRef<SVGGElement>(null);
   const lake = useMemo(() => Array.from({ length: 64 }, (_, i) => { const a = (i / 64) * Math.PI * 2; const r = lakeRadiusAt(a); return `${(LAKE.x + Math.cos(a) * r).toFixed(1)},${(LAKE.z + Math.sin(a) * r).toFixed(1)}`; }).join(' '), []);
+  const areas = useMemo(themeAreas, []);
   const paths = useMemo(() => parkPaths().map((p) => ({ w: PATH_WIDTH[p.kind] + 1, pts: p.points.map((q) => `${q.x.toFixed(1)},${q.z.toFixed(1)}`).join(' ') })), []);
 
   // Foto aérea: espera o parque montar e tira uma vez (meio-dia, sem neblina nem pessoas).
@@ -85,6 +107,18 @@ export function Minimap({ engine, onPick }: { engine: MutableRefObject<Engine | 
               ))}
             </g>
           )}
+          {/* Áreas temáticas: manchas de cor suaves; com o mapa grande ou com zoom, o nome de cada área. */}
+          <g style={{ pointerEvents: 'none' }}>
+            {Object.entries(areas.d).map(([t, d]) => (
+              <path key={t} d={d} fill={THEME_COLOR[t as ParkRegion]} opacity={0.24} shapeRendering="crispEdges" />
+            ))}
+            {(s > 1 || big) &&
+              areas.labels.map((l) => (
+                <text key={l.t} x={l.x} y={l.z + 6} textAnchor="middle" fontSize={(big ? 15 : 18) / s} fontWeight={800} fill={THEME_COLOR[l.t]} stroke="#0B1026" strokeWidth={3.5 / s} paintOrder="stroke" opacity={0.95}>
+                  {t(`park.regions.${l.t}`)}
+                </text>
+              ))}
+          </g>
           {/* Prédios tocáveis; com zoom (ou o mapa grande), o nome aparece. */}
           {PARK_BUILDINGS.map((b) => (
             <g key={b.id} onClick={() => onPick(b.id)} style={{ cursor: 'pointer' }}>

@@ -6,7 +6,7 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import type { ModuleId } from '@/app/modules';
-import { LAKE, PARK_BUILDINGS, PARK_RADIUS, PLAYGROUNDS, PLAZA_RADIUS, PONDS, heightAt, inWater, onPath } from '@/domain/park';
+import { LAKE, PARK_BUILDINGS, PARK_RADIUS, TERRAIN, PLAYGROUNDS, PLAZA_RADIUS, PONDS, heightAt, inWater, onPath } from '@/domain/park';
 import { Kit } from './kit';
 import { createCameraRig, type CamMode, type MoveSettings, type Posture } from './camera';
 import { AVATAR_LOOK, createCrowd, type Figure } from './people';
@@ -684,6 +684,46 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
         return { y: +h.point.y.toFixed(3), type: h.object.type, color: m?.color?.getHexString?.(), side: m?.side, vis, opacity: m?.opacity, depth: m?.depthTest };
       });
       document.documentElement.dataset.probe = JSON.stringify({ ground: heightAt(px!, pz!), hits });
+    }
+    // 'audit': varre o parque inteiro — cada árvore, arbusto e flor — olhando de cima para baixo no
+    // ponto onde ela nasce; se antes do chão aparece outra coisa (piso de caminho, parede, banco,
+    // lounge, marco...), anota. Resultado em data-audit (contagem e os primeiros casos).
+    if (cmd === 'audit') {
+      const veg = new Set<THREE.Object3D>();
+      let terrainMesh: THREE.Object3D | null = null;
+      world.root.traverse((o) => {
+        if ((o as THREE.InstancedMesh).isInstancedMesh) veg.add(o);
+        const idx = ((o as THREE.Mesh).geometry as THREE.BufferGeometry | undefined)?.index;
+        if ((o as THREE.Mesh).isMesh && idx && idx.count === TERRAIN.seg * TERRAIN.seg * 6) terrainMesh = o;
+      });
+      const ray = new THREE.Raycaster();
+      const down = new THREE.Vector3(0, -1, 0);
+      const found: Array<{ kind: string; x: number; z: number; hit: string; dy: number }> = [];
+      const check = (kind: string, x: number, z: number) => {
+        const g = heightAt(x, z);
+        ray.set(new THREE.Vector3(x, g + 40, z), down);
+        ray.far = 41;
+        for (const h of ray.intersectObject(world.root, true)) {
+          if (veg.has(h.object) || h.object === terrainMesh) continue;
+          let vis = true;
+          for (let o: THREE.Object3D | null = h.object; o; o = o.parent) if (!o.visible) vis = false;
+          if (!vis) continue;
+          const dy = h.point.y - g;
+          if (dy < -0.3 || dy > 8) continue;
+          const m = (h.object as THREE.Mesh).material as THREE.MeshStandardMaterial;
+          found.push({ kind, x: +x.toFixed(1), z: +z.toFixed(1), hit: m?.color?.getHexString?.() ?? h.object.type, dy: +dy.toFixed(2) });
+          break;
+        }
+      };
+      for (const t of world.treeSpots) if (Math.hypot(t.x, t.z) < PARK_RADIUS + 5) check('árvore', t.x, t.z);
+      for (const b of world.bushSpots) check('arbusto', b.x, b.z);
+      for (const f of world.flowerSpots) check('flor', f.x, f.z);
+      const count = (k: string) => found.filter((f) => f.kind === k).length;
+      document.documentElement.dataset.audit = JSON.stringify({
+        checked: { trees: world.treeSpots.length, bushes: world.bushSpots.length, flowers: world.flowerSpots.length },
+        problems: { trees: count('árvore'), bushes: count('arbusto'), flowers: count('flor') },
+        sample: found.slice(0, 40),
+      });
     }
     // 'cam:x,y,z,tx,ty,tz': câmera livre exatamente nesse ponto, olhando para o alvo.
     if (typeof cmd === 'string' && cmd.startsWith('cam:') && !inside) {

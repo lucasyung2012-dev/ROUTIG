@@ -271,9 +271,11 @@ function shapedHeight(x: number, z: number): number {
   }
   for (const p of PARK_BUILDINGS) {
     const d = Math.hypot(x - p.x, z - p.z);
-    // Rampa de 28 m em volta do lote: em encosta, o caminho até a entrada continua suave.
-    if (d < p.radius + 28) {
-      const k = 1 - smooth(p.radius * 0.95, p.radius + 28, d);
+    // Rampa de 28 m (mais nos lotes grandes) em volta do lote: em encosta, o caminho até a entrada
+    // continua suave.
+    const ramp = 28 + Math.max(0, p.radius - 30) * 1.2;
+    if (d < p.radius + ramp) {
+      const k = 1 - smooth(p.radius * 0.95, p.radius + ramp, d);
       h = h * (1 - k) + lotHeight(p) * k;
     }
   }

@@ -284,6 +284,15 @@ function naturalHeight(x: number, z: number): number {
     const k = 1 - smooth(15, 30, dS);
     h = h * (1 - k) + rawHeight(STAGE_AT.x, STAGE_AT.z) * k;
   }
+  // Chão plano sob o que tem piso próprio (praças, cafés, quiosques, pérgola, mirantes, parquinhos e
+  // os marcos das áreas): nada fica meio enterrado nem flutuando numa encosta.
+  for (const f of flatSpots()) {
+    const d = Math.hypot(x - f.x, z - f.z);
+    if (d < f.r + 12) {
+      const k = 1 - smooth(f.r, f.r + 12, d);
+      h = h * (1 - k) + rawHeight(f.x, f.z) * k;
+    }
+  }
   return h;
 }
 
@@ -336,6 +345,48 @@ export function heightAt(x: number, z: number): number {
 /** Inclinação do chão (subida por metro) na direção (dx, dz) normalizada. */
 export function slopeAt(x: number, z: number, dx: number, dz: number, d = 0.6): number {
   return (heightAt(x + dx * d, z + dz * d) - heightAt(x - dx * d, z - dz * d)) / (2 * d);
+}
+
+/** Raio do piso de cada tipo de ponto de convivência. */
+const POI_FLOOR: Record<PoiKind, number> = { cafe: 9, kiosk: 6, pergola: 8, viewpoint: 6, reading: 7, plaza: 9, stage: 0 };
+
+let flatCache: Array<Point & { r: number }> | null = null;
+/** Pontos com piso plano (fora os lotes e o palco, que têm regra própria). */
+function flatSpots(): Array<Point & { r: number }> {
+  if (flatCache) return flatCache;
+  flatCache = [
+    ...POIS.filter((p) => p.kind !== 'stage').map((p) => ({ x: p.x, z: p.z, r: POI_FLOOR[p.kind] })),
+    ...PLAYGROUNDS.map((g) => ({ x: g.x, z: g.z, r: 15 })),
+    ...landmarkSpots().map((l) => ({ x: l.x, z: l.z, r: 8 })),
+  ];
+  return flatCache;
+}
+
+let markCache: Array<Point & { theme: ParkRegion; face: number }> | null = null;
+/**
+ * Onde fica o marco de cada área temática: lugar livre (fora de caminhos, lotes, água e convivência)
+ * perto do centro da área ou do seu pátio, virado para ele.
+ */
+export function landmarkSpots(): Array<Point & { theme: ParkRegion; face: number }> {
+  if (markCache) return markCache;
+  const near = (theme: ParkRegion, p: Point, minR: number, maxR: number, pad: number) => {
+    for (let r = minR; r <= maxR; r += 2)
+      for (let k = 0; k < 24; k++) {
+        const a = (k / 24) * Math.PI * 2 + r * 0.13;
+        const x = p.x + Math.cos(a) * r;
+        const z = p.z + Math.sin(a) * r;
+        if (isFreeGround(x, z, pad)) return { theme, x, z, face: Math.atan2(p.x - x, p.z - z) };
+      }
+    return { theme, x: p.x + minR, z: p.z, face: 0 };
+  };
+  markCache = [
+    near('knowledge', REGION_HUB.knowledge, 10, 30, 6),
+    near('planning', COURTS.planning!, 12, 34, 6),
+    near('growth', COURTS.growth!, 10, 30, 6),
+    near('activity', REGION_HUB.activity, 12, 34, 7),
+    near('finance', COURTS.finance!, 10, 30, 6),
+  ];
+  return markCache;
 }
 
 const lotCache = new Map<string, number>();
@@ -551,7 +602,7 @@ export function isFreeGround(x: number, z: number, pad = 0.5): boolean {
   if (r < PLAZA_RADIUS + 2 + pad || r > PARK_RADIUS + 20) return false;
   if (inWater(x, z, 1 + pad) || inField(x, z, 2 + pad)) return false;
   // O piso de cada lote cobre o raio inteiro (com meio-fio): nada nasce em cima dele.
-  if (PARK_BUILDINGS.some((b) => Math.hypot(x - b.x, z - b.z) < b.radius + 0.4 + pad)) return false;
+  if (PARK_BUILDINGS.some((b) => Math.hypot(x - b.x, z - b.z) < b.radius + 1.3 + pad)) return false;
   if (POIS.some((p) => Math.hypot(x - p.x, z - p.z) < poiClear(p.kind) + pad)) return false;
   if (playSpots.some((p) => Math.hypot(x - p.x, z - p.z) < 12 + pad)) return false;
   const gx = Math.floor(x / 6);

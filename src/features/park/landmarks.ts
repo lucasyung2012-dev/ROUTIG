@@ -10,19 +10,12 @@
  * Cada marco fica fora dos caminhos, lotes, água e pontos de convivência (isFreeGround).
  */
 import * as THREE from 'three';
-import { COURTS, REGION_HUB, heightAt, isFreeGround, type ParkRegion, type Point } from '@/domain/park';
+import { heightAt, landmarkSpots, type ParkRegion, type Point } from '@/domain/park';
 import { Builder, type Kit } from './kit';
 
-/** Lugar livre perto de um ponto (anéis de raio crescente), virado para ele. */
-function spotNear(p: Point, minR: number, maxR: number, pad: number): Point & { face: number } {
-  for (let r = minR; r <= maxR; r += 2)
-    for (let k = 0; k < 24; k++) {
-      const a = (k / 24) * Math.PI * 2 + r * 0.13;
-      const x = p.x + Math.cos(a) * r;
-      const z = p.z + Math.sin(a) * r;
-      if (isFreeGround(x, z, pad)) return { x, z, face: Math.atan2(p.x - x, p.z - z) };
-    }
-  return { x: p.x + minR, z: p.z, face: 0 };
+/** Lugar do marco de uma área (calculado na planta, que também nivela o chão em volta). */
+function spotNear(theme: ParkRegion): Point & { face: number } {
+  return landmarkSpots().find((l) => l.theme === theme)!;
 }
 
 /** Peça posicionada no referencial do marco (giro `rot` em volta do centro). */
@@ -48,7 +41,7 @@ export function landmarks(kit: Kit): { group: THREE.Group; list: Landmark[] } {
 
   // Conhecimento: Pórtico do Saber.
   {
-    const p = spotNear(REGION_HUB.knowledge, 10, 30, 6);
+    const p = spotNear('knowledge');
     const put = placer(b, p.x, base(p), p.z, p.face);
     const stone = kit.mat('#D9CFBD', { rough: 0.8 });
     const bronze = kit.mat('#8C6A3F', { metal: 0.7, rough: 0.35 });
@@ -68,7 +61,7 @@ export function landmarks(kit: Kit): { group: THREE.Group; list: Landmark[] } {
 
   // Planejamento: Relógio de Sol entre sebes aparadas.
   {
-    const p = spotNear(COURTS.planning!, 12, 34, 6);
+    const p = spotNear('planning');
     const put = placer(b, p.x, base(p), p.z, p.face);
     const granite = kit.mat('#C9CED4', { rough: 0.55 });
     const steel = kit.mat('#5B6470', { metal: 0.85, rough: 0.3 });
@@ -93,7 +86,7 @@ export function landmarks(kit: Kit): { group: THREE.Group; list: Landmark[] } {
 
   // Desenvolvimento pessoal: Árvore em Flor num canteiro redondo, bancos em volta.
   {
-    const p = spotNear(COURTS.growth!, 10, 30, 6);
+    const p = spotNear('growth');
     const put = placer(b, p.x, base(p), p.z, p.face);
     const sand = kit.mat('#D8C49A', { rough: 0.85 });
     const soil = kit.mat('#5A4632', { rough: 1 });
@@ -120,7 +113,7 @@ export function landmarks(kit: Kit): { group: THREE.Group; list: Landmark[] } {
 
   // Atividades: Pórtico das Atividades sobre um anel de pista.
   {
-    const p = spotNear(REGION_HUB.activity, 12, 34, 7);
+    const p = spotNear('activity');
     const put = placer(b, p.x, base(p), p.z, p.face);
     const clay = kit.mat('#E2552D', { rough: 0.6 });
     const track = kit.mat('#B5523A', { rough: 0.9 });
@@ -137,7 +130,7 @@ export function landmarks(kit: Kit): { group: THREE.Group; list: Landmark[] } {
 
   // Finanças: Obelisco de granito escuro num espelho d'água quadrado.
   {
-    const p = spotNear(COURTS.finance!, 10, 30, 6);
+    const p = spotNear('finance');
     const put = placer(b, p.x, base(p), p.z, p.face);
     const dark = kit.mat('#2F3640', { rough: 0.3, metal: 0.2 });
     const granite = kit.mat('#4A5260', { rough: 0.45 });

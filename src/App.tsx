@@ -4,6 +4,9 @@ import { NAV_MODULE_IDS, MODULES } from '@/app/modules';
 import { SettingsProvider, useSettings } from '@/app/SettingsProvider';
 import { ErrorBoundary } from '@/app/ErrorBoundary';
 import { AppProviders, AppShell } from '@/app/layout/AppShell';
+import { HomeShell } from '@/features/home/HomeShell';
+import { ControlRoomEntry } from '@/features/home/ControlRoomEntry';
+import { CAMPUS_PATH } from '@/app/experience';
 import { Onboarding } from '@/features/onboarding/Onboarding';
 import { Logo } from '@/brand/Logo';
 import { Button } from '@/ui/Button';
@@ -48,6 +51,9 @@ const SettingsSectionPage = lazy(() => import('@/features/settings/SettingsPage'
 const LogoComparePage = lazy(() => import('@/features/brand/LogoComparePage').then((m) => ({ default: m.LogoComparePage })));
 const DesignSystemPage = lazy(() => import('@/features/design/DesignSystemPage').then((m) => ({ default: m.DesignSystemPage })));
 const ParkPage = lazy(() => import('@/features/park/ParkPage'));
+const HomePage = lazy(() => import('@/features/home/HomePage').then((m) => ({ default: m.HomePage })));
+const HelpPage = lazy(() => import('@/features/home/HelpPage').then((m) => ({ default: m.HelpPage })));
+const DistrictPage = lazy(() => import('@/features/home/DistrictPage').then((m) => ({ default: m.DistrictPage })));
 
 export function App({ extra }: { extra?: ReactNode }) {
   return (
@@ -114,20 +120,36 @@ function Gate() {
           </div>
         )}
       >
+        {/* Um só conjunto de serviços (Focus, avisos, sincronização, editores) para Home, Control
+            Room e Campus: trocar de ambiente não reinicia nada nem perde o que está em andamento. */}
+        <AppProviders>
         <Routes>
-          {/* Tela principal (V2): o parque 3D em tela cheia; o 3D só é carregado aqui. */}
+          {/* ROUTIG Home: a porta de entrada do ecossistema, com Perfil, Configurações e Ajuda. */}
+          <Route element={<HomeShell />}>
+            <Route element={<PageSuspense />}>
+              <Route index element={<HomePage />} />
+              <Route path="district" element={<DistrictPage />} />
+              <Route path="help" element={<HelpPage />} />
+              <Route path="profile" element={<ProfilePage />} />
+              <Route path="profile/interests/:id" element={<InterestPage />} />
+              <Route path="settings" element={<SettingsIndexPage />} />
+              <Route path="settings/logo" element={<LogoComparePage />} />
+              <Route path="settings/:section" element={<SettingsSectionPage />} />
+            </Route>
+          </Route>
+          {/* ROUTIG Campus: o parque 3D em tela cheia; o 3D só é carregado aqui. */}
           <Route
-            index
+            path="campus"
             element={
-              <AppProviders>
-                <Suspense fallback={<div className="ambient flex h-full items-center justify-center text-sm text-muted">{t('common.loading')}</div>}>
-                  <ParkPage />
-                </Suspense>
-              </AppProviders>
+              <Suspense fallback={<div className="ambient flex h-full items-center justify-center text-sm text-muted">{t('common.loading')}</div>}>
+                <ParkPage />
+              </Suspense>
             }
           />
-          {/* Endereços das provas da Etapa 0 levam ao parque. */}
-          <Route path="lab/*" element={<Navigate to="/" replace />} />
+          <Route path="control" element={<ControlRoomEntry />} />
+          {/* Endereços das provas da Etapa 0 levam ao Campus. */}
+          <Route path="lab/*" element={<Navigate to={CAMPUS_PATH} replace />} />
+          {/* ROUTIG Control Room: as telas 2D dos módulos. */}
           <Route element={<AppShell />}>
             <Route element={<PageSuspense />}>
               <Route path="dashboard" element={<DashboardPage />} />
@@ -162,16 +184,12 @@ function Gate() {
               {NAV_MODULE_IDS.filter((id) => !['dashboard', 'tasks', 'calendar', 'inbox', 'notes', 'projects', 'academy', 'languages', 'habits', 'goals', 'focus', 'music', 'sports', 'finance', 'library', 'insights'].includes(id)).map((id) => (
                 <Route key={id} path={MODULES[id].path.slice(1)} element={<ModuleRoadmapPage id={id} />} />
               ))}
-              <Route path="profile" element={<ProfilePage />} />
-              <Route path="profile/interests/:id" element={<InterestPage />} />
-              <Route path="settings" element={<SettingsIndexPage />} />
-              <Route path="settings/logo" element={<LogoComparePage />} />
-              <Route path="settings/:section" element={<SettingsSectionPage />} />
               <Route path="design" element={<DesignSystemPage />} />
               <Route path="*" element={<NotFound />} />
             </Route>
           </Route>
         </Routes>
+        </AppProviders>
       </ErrorBoundary>
     </AppLock>
   );

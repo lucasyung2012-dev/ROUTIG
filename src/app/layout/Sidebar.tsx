@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { NavLink } from 'react-router-dom';
-import { PanelLeftClose, PanelLeftOpen, Star, X } from 'lucide-react';
+import { Home, PanelLeftClose, PanelLeftOpen, Star, X } from 'lucide-react';
 import { MODULES, TONE_CLASSES, type ModuleId } from '@/app/modules';
 import { useSettings } from '@/app/SettingsProvider';
 import { visibleModules } from '@/domain/settings';
@@ -26,7 +26,7 @@ export function Sidebar({ mobileOpen, onCloseMobile }: SidebarProps) {
   const content = (compact: boolean) => (
     <div className="flex h-full flex-col">
       <div className={cn('flex h-16 shrink-0 items-center gap-3', compact ? 'justify-center px-2' : 'px-5')}>
-        <NavLink to="/" end aria-label={t('park.title')} title={t('park.title')} className="shrink-0 rounded-xl">
+        <NavLink to="/" end aria-label={t('home.nav.home')} title={t('home.nav.home')} className="shrink-0 rounded-xl">
           <Logo size={34} className="h-[34px] w-[34px]" />
         </NavLink>
         {!compact && (
@@ -52,9 +52,19 @@ export function Sidebar({ mobileOpen, onCloseMobile }: SidebarProps) {
         </Group>
       </nav>
 
+      {/* Perfil, Configurações e Ajuda ficam no Home (o logo, acima, também leva até lá). */}
       <div className="shrink-0 border-t border-line/70 px-3 py-3">
-        <Item id="profile" compact={compact} onNavigate={onCloseMobile} />
-        <Item id="settings" compact={compact} onNavigate={onCloseMobile} />
+        <NavLink
+          to="/"
+          end
+          onClick={onCloseMobile}
+          aria-label={compact ? t('home.nav.home') : undefined}
+          title={compact ? t('home.nav.home') : undefined}
+          className={cn('flex h-11 items-center gap-3 rounded-xl text-[0.9rem] font-medium text-muted transition hover:bg-surface-2 hover:text-fg', compact ? 'justify-center px-0' : 'px-3')}
+        >
+          <Home className="h-[19px] w-[19px] shrink-0" aria-hidden />
+          {!compact && <span className="truncate">{t('home.nav.homeFull')}</span>}
+        </NavLink>
       </div>
     </div>
   );

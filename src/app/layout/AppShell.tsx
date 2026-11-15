@@ -2,7 +2,9 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import { readParkContext } from '@/features/park/parkContext';
 import { AutoSync } from '@/app/AutoSync';
-import { Menu, Monitor, Moon, Pause, Search, Sun, Timer, Trees, WifiOff } from 'lucide-react';
+import { Menu, Monitor, Moon, Pause, Search, Sun, Timer, WifiOff } from 'lucide-react';
+import { rememberControlPath } from '@/app/experience';
+import { ExperienceSwitch } from './ExperienceSwitch';
 import { useSettings } from '@/app/SettingsProvider';
 import type { ThemeSetting } from '@/domain/settings';
 import { Logo } from '@/brand/Logo';
@@ -33,6 +35,7 @@ export function AppProviders({ children }: { children: ReactNode }) {
           <NotificationsProvider>
             <QuickPrivacyProvider>
               <AutoSync />
+              <AutoBackup />
               {children}
             </QuickPrivacyProvider>
           </NotificationsProvider>
@@ -42,17 +45,24 @@ export function AppProviders({ children }: { children: ReactNode }) {
   );
 }
 
+/** Cópia interna diária (Parte 25.2): alguns segundos depois de abrir o app, sem travar a tela. */
+function AutoBackup() {
+  const { t } = useSettings();
+  const toast = useToast();
+  useEffect(() => {
+    const id = window.setTimeout(() => void runAutoBackupIfDue().catch(() => toast.show(t('backup.autoFailed'), 'error')), 4000);
+    return () => window.clearTimeout(id);
+  }, []);
+  return null;
+}
+
+/** Control Room: as telas 2D dos módulos (os serviços vêm de AppProviders, montado uma vez em App.tsx). */
 export function AppShell() {
-  return (
-    <AppProviders>
-      <Shell />
-    </AppProviders>
-  );
+  return <Shell />;
 }
 
 function Shell() {
   const { settings, update, t } = useSettings();
-  const toast = useToast();
   const [menuOpen, setMenuOpen] = useState(false);
   // Lido depois da montagem: o parque grava o lugar ao desmontar, e isso acontece depois deste render.
   const [fromPark, setFromPark] = useState(() => !!readParkContext());
@@ -62,12 +72,9 @@ function Shell() {
   const location = useLocation();
 
   useEffect(() => setMenuOpen(false), [location.pathname]);
+  // O Home e o seletor continuam o Control Room de onde a pessoa estava.
+  useEffect(() => rememberControlPath(location.pathname), [location.pathname]);
 
-  // Cópia interna diária (Parte 25.2): alguns segundos depois de abrir, sem travar a tela.
-  useEffect(() => {
-    const id = window.setTimeout(() => void runAutoBackupIfDue().catch(() => toast.show(t('backup.autoFailed'), 'error')), 4000);
-    return () => window.clearTimeout(id);
-  }, []);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -102,15 +109,11 @@ function Shell() {
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-2 border-b border-line/60 bg-bg/70 px-3 backdrop-blur-xl safe-top sm:px-6">
           <IconButton label={t('nav.openMenu')} icon={<Menu className="h-5 w-5" />} onClick={() => setMenuOpen(true)} className="md:hidden" />
-          <Link to="/" className="hidden items-center gap-2 sm:flex md:hidden" aria-label={t('park.title')}>
+          <Link to="/" className="hidden items-center gap-2 sm:flex md:hidden" aria-label={t('home.nav.home')}>
             <Logo size={28} className="h-7 w-7" />
           </Link>
-          {fromPark && (
-            <Link to="/" className="flex h-10 shrink-0 items-center gap-2 rounded-xl bg-brand px-3 text-sm font-semibold text-white shadow-glow">
-              <Trees className="h-4 w-4" aria-hidden />
-              <span className="hidden sm:inline">{t('park.center.back')}</span>
-            </Link>
-          )}
+          {/* Control Room ↔ Campus sem voltar ao Home (vindo do Campus, ele retoma o mesmo lugar). */}
+          <ExperienceSwitch current="control" className={fromPark ? 'ring-2 ring-brand/40' : undefined} />
 
           <button
             type="button"

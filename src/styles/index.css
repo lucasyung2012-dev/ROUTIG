@@ -172,3 +172,17 @@ body {
   scrollbar-width: thin;
   scrollbar-color: rgb(var(--line)) transparent;
 }
+
+/* Fonte da praça do Home: os jatos sobem e descem de leve (parados com menos movimento). */
+@keyframes home-jets {
+  0%, 100% { transform: scaleY(1); opacity: 0.85; }
+  50% { transform: scaleY(0.82); opacity: 0.6; }
+}
+.home-jets {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  animation: home-jets 2.4s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .home-jets { animation: none; }
+}

@@ -13,6 +13,9 @@ beforeEach(() => {
   setDbForTests(new RoutigDB(dbName));
   window.location.hash = '#/dashboard';
   document.documentElement.removeAttribute('data-theme');
+  // Última tela do Control Room, favorita do Home e lugar do Campus não passam de um teste para o outro.
+  localStorage.clear();
+  sessionStorage.clear();
 });
 
 async function finishOnboarding() {
@@ -58,34 +61,42 @@ describe('onboarding (Parte 29)', () => {
 });
 
 describe('navegação (Parte 4)', () => {
-  it('a barra lateral mostra os 16 módulos do menu e o acesso a Profile e Settings', async () => {
+  it('a barra lateral do Control Room mostra os 16 módulos, o seletor para o Campus e o caminho para o Home', async () => {
     await finishOnboarding();
     render(<App />);
     const nav = await screen.findByRole('navigation', { name: 'Menu principal' });
     expect(within(nav).getAllByRole('link')).toHaveLength(16);
-    expect(screen.getAllByRole('link', { name: 'Settings' }).length).toBeGreaterThan(0);
+    // Perfil e Configurações ficam no Home: o Control Room leva até lá e mantém o atalho do perfil.
+    expect(screen.getAllByRole('link', { name: 'ROUTIG Home' }).length).toBeGreaterThan(0);
     expect(screen.getAllByRole('link', { name: 'Profile' }).length).toBeGreaterThan(0);
+    const swap = screen.getByRole('navigation', { name: 'Trocar de ambiente' });
+    expect(within(swap).getByRole('link', { name: /Campus/ })).toHaveAttribute('href', '#/campus');
+    expect(within(swap).getByRole('link', { name: /Control Room/ })).toHaveAttribute('aria-current', 'page');
   });
 
-  it('ocultar um módulo em Settings tira ele do menu e a escolha fica gravada', async () => {
+  it('ocultar um módulo em Configurações (no Home) tira ele do menu do Control Room e a escolha fica gravada', async () => {
     await finishOnboarding();
     window.location.hash = '#/settings/navigation';
     const user = userEvent.setup();
     render(<App />);
     await user.click(await screen.findByRole('button', { name: 'Ocultar: Finanças' }));
-    const nav = screen.getByRole('navigation', { name: 'Menu principal' });
+    await waitFor(async () => expect((await loadSettings()).nav.hidden).toContain('finance'));
+    window.location.hash = '#/tasks';
+    const nav = await screen.findByRole('navigation', { name: 'Menu principal' });
     expect(within(nav).queryByRole('link', { name: /Finanças/ })).not.toBeInTheDocument();
-    expect((await loadSettings()).nav.hidden).toContain('finance');
+    expect(within(nav).getAllByRole('link')).toHaveLength(15);
   });
 
-  it('favoritar coloca o módulo no grupo Favoritos', async () => {
+  it('favoritar coloca o módulo no grupo Favoritos do Control Room', async () => {
     await finishOnboarding();
     window.location.hash = '#/settings/navigation';
     const user = userEvent.setup();
     render(<App />);
     await user.click(await screen.findByRole('button', { name: 'Favoritar: Academy' }));
-    expect(await screen.findByText('Favoritos')).toBeInTheDocument();
-    expect((await loadSettings()).nav.favorites).toEqual(['academy']);
+    await waitFor(async () => expect((await loadSettings()).nav.favorites).toEqual(['academy']));
+    window.location.hash = '#/tasks';
+    const nav = await screen.findByRole('navigation', { name: 'Menu principal' });
+    expect(within(nav).getByText('Favoritos')).toBeInTheDocument();
   });
 
   it('todos os módulos existem: Insights abre a análise real, sem página de "em breve"', async () => {
@@ -177,10 +188,48 @@ describe('aparência (Parte 3.3)', () => {
   });
 });
 
-describe('parque como tela principal (V2)', () => {
-  it('abre o parque no início; sem 3D, todos os módulos continuam acessíveis', async () => {
+describe('ROUTIG Home (V3): a entrada do ecossistema', () => {
+  it('abre no Home: saudação, as três experiências e a navegação, sem dados de produtividade', async () => {
     await finishOnboarding();
     window.location.hash = '#/';
+    const user = userEvent.setup();
+    render(<App />);
+    const nav = await screen.findByRole('navigation', { name: 'Navegação do ROUTIG' });
+    expect(within(nav).getAllByRole('link').map((a) => a.textContent)).toEqual(['Início', 'Control Room', 'Campus', 'District', 'Perfil', 'Configurações', 'Ajuda']);
+    expect(await screen.findByRole('heading', { level: 1, name: /^(Bom dia|Boa tarde|Boa noite)!$/ })).toBeInTheDocument();
+    for (const name of ['Control Room', 'Campus', 'District']) expect(screen.getByRole('heading', { level: 3, name })).toBeInTheDocument();
+    // Nada de resumo de tarefas, cobranças ou números de produtividade na entrada.
+    expect(screen.queryByText(/atrasad/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole('navigation', { name: 'Menu principal' })).not.toBeInTheDocument();
+    // Marcar uma favorita só destaca o cartão (e fica guardado).
+    await user.click(screen.getByRole('button', { name: 'Marcar Campus como favorita' }));
+    expect(screen.getByRole('button', { name: 'Tirar Campus das favoritas' })).toHaveAttribute('aria-pressed', 'true');
+    expect(localStorage.getItem('routig.home.favorite')).toBe('campus');
+    // Entrar no Control Room leva às telas dos módulos.
+    await user.click(screen.getAllByRole('button', { name: /^Entrar/ })[0]!);
+    expect(await screen.findByRole('navigation', { name: 'Menu principal' })).toBeInTheDocument();
+  });
+
+  it('Perfil, Configurações e Ajuda ficam no Home; o District mostra o projeto sem fingir que há jogo', async () => {
+    await finishOnboarding();
+    window.location.hash = '#/help';
+    render(<App />);
+    expect(await screen.findByRole('heading', { level: 1, name: 'Ajuda' })).toBeInTheDocument();
+    expect(screen.getByRole('navigation', { name: 'Navegação do ROUTIG' })).toBeInTheDocument();
+    window.location.hash = '#/district';
+    expect(await screen.findByRole('heading', { level: 1, name: 'District' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Jogar/ })).not.toBeInTheDocument();
+    window.location.hash = '#/profile';
+    await waitFor(() => expect(window.location.hash).toBe('#/profile'));
+    expect(await screen.findByRole('navigation', { name: 'Navegação do ROUTIG' })).toBeInTheDocument();
+    expect(screen.queryByRole('navigation', { name: 'Menu principal' })).not.toBeInTheDocument();
+  });
+});
+
+describe('ROUTIG Campus (o parque 3D)', () => {
+  it('abre em /campus; sem 3D, todos os módulos continuam acessíveis', async () => {
+    await finishOnboarding();
+    window.location.hash = '#/campus';
     render(<App />);
     expect(await screen.findByRole('alert', {}, { timeout: 8000 })).toHaveTextContent('WebGL');
     const nav = screen.getByRole('navigation', { name: 'Menu' });

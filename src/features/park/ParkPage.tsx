@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type MutableRefObject, type PointerEvent as RPointerEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Armchair, ArrowUpDown, Camera, ChevronsUp, FastForward, Footprints, Hand, Home, LogIn, Mountain, Smile, TreePine, Waves, LogOut, Monitor, Navigation, RotateCcw, SlidersHorizontal, UserRound, X } from 'lucide-react';
+import { Armchair, ArrowUpDown, Camera, ChevronsUp, FastForward, Footprints, Hand, LocateFixed, LogIn, Mountain, Smile, TreePine, Waves, LogOut, Monitor, Navigation, RotateCcw, SlidersHorizontal, UserRound, X } from 'lucide-react';
 import { MODULES, NAV_MODULE_IDS, type ModuleId } from '@/app/modules';
 import { useSettings } from '@/app/SettingsProvider';
 import type { MessageKey } from '@/i18n';
@@ -12,6 +12,8 @@ import { PARK_BUILDINGS, buildingById } from '@/domain/park';
 import { useCalendarData } from '@/features/calendar/useCalendarData';
 import { greetingKey } from '@/features/dashboard/DashboardPage';
 import { Button } from '@/ui/Button';
+import { Logo } from '@/brand/Logo';
+import { ExperienceSwitch } from '@/app/layout/ExperienceSwitch';
 import { IconButton } from '@/ui/IconButton';
 import { Select } from '@/ui/Field';
 import { Segmented } from '@/ui/Segmented';
@@ -580,6 +582,11 @@ export default function ParkPage() {
       {/* Barra de cima e, dentro de um prédio, os setores logo abaixo. */}
       <div className="absolute inset-x-0 top-0 bg-gradient-to-b from-black/60 to-transparent safe-top">
         <div className="flex flex-wrap items-center gap-2 p-3">
+          {/* O logo volta ao ROUTIG Home; o seletor troca para o Control Room sem passar pelo Home. */}
+          <Link to="/" aria-label={t('home.nav.homeFull')} title={t('home.nav.homeFull')} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-surface/90 ring-1 ring-line">
+            <Logo size={26} className="h-[26px] w-[26px]" />
+          </Link>
+          <ExperienceSwitch current="campus" />
           {inside ? (
             <Button variant="secondary" icon={<LogOut className="h-4 w-4" />} onClick={() => engine.current?.exit()} className="bg-surface/90">
               {t('park.exit')}
@@ -602,7 +609,7 @@ export default function ParkPage() {
               }))}
             />
           )}
-          <span className="hidden truncate rounded-xl bg-surface/80 px-3 py-2 text-xs font-semibold text-fg sm:inline">{inside ? t(`park.names.${inside}`) : t('park.title')}</span>
+          <span className="hidden truncate rounded-xl bg-surface/80 px-3 py-2 text-xs font-semibold text-fg lg:inline">{inside ? t(`park.names.${inside}`) : t('park.title')}</span>
           <div className="ml-auto flex flex-wrap items-center gap-2">
             {!inside && (
               <Select aria-label={t('park.goTo')} value="" onChange={(e) => e.target.value && engine.current?.flyTo(e.target.value as ModuleId | 'plaza')} className="h-11 w-auto max-w-[10rem] bg-surface/90">
@@ -615,7 +622,7 @@ export default function ParkPage() {
                 ))}
               </Select>
             )}
-            <IconButton label={inside ? t('park.entryView') : t('park.plaza')} icon={<Home className="h-5 w-5" />} onClick={() => (inside ? (setSector(null), engine.current?.focusSector('entry')) : engine.current?.flyTo('plaza'))} className="bg-surface/90" />
+            <IconButton label={inside ? t('park.entryView') : t('park.plaza')} icon={<LocateFixed className="h-5 w-5" />} onClick={() => (inside ? (setSector(null), engine.current?.focusSector('entry')) : engine.current?.flyTo('plaza'))} className="bg-surface/90" />
             <CamButton mode={camMode} label={t('park.nextCam', { mode: t(`park.camModes.${camMode}`) })} onClick={() => setCamMode((m) => CAM_ORDER[(CAM_ORDER.indexOf(m) + 1) % CAM_ORDER.length]!)} />
             <IconButton label={t('park.options')} icon={<SlidersHorizontal className="h-5 w-5" />} active={options} onClick={() => setOptions((o) => !o)} className="bg-surface/90" />
           </div>

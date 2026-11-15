@@ -12,7 +12,7 @@ import * as THREE from 'three';
 import type { Kit } from '../kit';
 import type { Obstacle } from '../camera';
 import { canvasPlane, createRoom, finishRoom, setDetailCommon, wrap, zoneLabel, type InteriorScene } from './common';
-import { areaView, at, benchSeat, box, chair, closeZone, counter, credenza, cyl, deskLamp, hangSign as hangSignAt, lightBar, lowTable, palette, pendant, planter, rug, sofa, solid, table, tallPlant, zone, type F, type View } from './east';
+import { areaView, at, benchSeat, box, chair, closeZone, counter, credenza, cyl, deskLamp, groundSeats, hangSign as hangSignAt, lightBar, lowTable, palette, pendant, planter, rug, sofa, solid, table, tallPlant, zone, type F, type View } from './east';
 
 export const INBOX_SECTORS = ['atrium', 'triage', 'distribution', 'archive', 'gallery'] as const;
 export type InboxSector = (typeof INBOX_SECTORS)[number];
@@ -239,8 +239,9 @@ export function createInboxInterior(kit: Kit, labels: InboxLabels): InteriorScen
     const zn = zone(p, 6.0, 6.8, 0);
     planter(zn.f, 0, 0, 3.0, 0.9, 0, p.stone);
     tallPlant(zn.f, 0, 0, 1.2);
-    benchSeat(zn.f, 0, 0.95, 2.6, Math.PI, p.stone);
-    benchSeat(zn.f, 0, -0.95, 2.6, 0, p.stone);
+    // Quem senta fica de costas para a floreira.
+    benchSeat(zn.f, 0, 0.95, 2.6, Math.PI, p.stone, 0);
+    benchSeat(zn.f, 0, -0.95, 2.6, 0, p.stone, Math.PI);
     solid(obstacles, zn, -0.8, 0, 0.6);
     solid(obstacles, zn, 0.8, 0, 0.6);
     closeZone(scene, zn);
@@ -261,6 +262,7 @@ export function createInboxInterior(kit: Kit, labels: InboxLabels): InteriorScen
   capsules.userData.sector = 'distribution';
 
   finishRoom(room);
+  scene.userData.seats = groundSeats(scene, b);
 
   let data: ReceptionData | null = null;
   const col = new THREE.Color();

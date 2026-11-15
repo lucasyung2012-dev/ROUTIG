@@ -15,6 +15,7 @@ import { MASSING, groundHeight } from '../massing';
 import { inVol } from '../outline';
 import type { Placed } from './central';
 import { nameBoard } from './north';
+import { groundSeats, placeSeats, seatAt } from './east';
 
 export interface NamesData {
   names: string[];
@@ -36,6 +37,8 @@ const CORNERS = [
 interface Spot {
   at: (lx: number, y: number, lz: number) => V3;
   add: (m: Mat, g: THREE.BufferGeometry, lx: number, y: number, lz: number, rot?: number, sc?: V3) => void;
+  /** Anota um assento em (lx, lz), altura do assento `y`, com quem senta olhando para `face` (no sistema do ambiente). */
+  seat: (lx: number, y: number, lz: number, face: number) => void;
 }
 
 /** Ambiente em (x, z), de frente para `ry` (ângulo em y; 0 = +z). */
@@ -47,6 +50,10 @@ function spot(b: Builder, x: number, z: number, ry: number): Spot {
     at,
     add: (m, g, lx, y, lz, rot = 0, sc) => {
       b.add(m, g, at(lx, y, lz), [0, ry + rot, 0], sc);
+    },
+    seat: (lx, y, lz, face) => {
+      const [wx, , wz] = at(lx, y, lz);
+      seatAt(b, wx, y, wz, ry + face);
     },
   };
 }
@@ -65,6 +72,10 @@ function sub(p: Spot, lx: number, lz: number, rot: number): Spot {
       const [u, v] = loc(a, w);
       p.add(m, g, u, y, v, rot + r, sc);
     },
+    seat: (a, y, w, face) => {
+      const [u, v] = loc(a, w);
+      p.seat(u, y, v, rot + face);
+    },
   };
 }
 
@@ -74,6 +85,7 @@ function sectorAt(scene: THREE.Scene, id: string, x: number, z: number, face: nu
   const sb = new Builder();
   draw(spot(sb, 0, 0, 0), g);
   g.add(sb.build());
+  placeSeats(scene, sb, x, z, face);
   markSector(g, id);
   scene.add(g);
   return g;
@@ -138,10 +150,13 @@ function chair(p: Spot, seat: Mat, leg: Mat, lx: number, lz: number, face: numbe
   c.add(seat, new THREE.BoxGeometry(0.46, 0.06, 0.44), 0, 0.46, 0);
   c.add(seat, new THREE.BoxGeometry(0.46, 0.44, 0.05), 0, 0.73, -0.2);
   for (const [a, w] of CORNERS) c.add(leg, new THREE.CylinderGeometry(0.018, 0.018, 0.43, 5), a * 0.2, 0.215, w * 0.18);
+  c.seat(0, 0.45, 0, 0);
 }
 
-function stool(p: Spot, seat: Mat, leg: Mat, lx: number, lz: number, h = 0.66) {
+/** Banqueta (assento na altura `h`); quem senta olha para `face`. */
+function stool(p: Spot, seat: Mat, leg: Mat, lx: number, lz: number, h = 0.66, face = 0) {
   p.add(seat, new THREE.CylinderGeometry(0.2, 0.2, 0.06, 14), lx, h, lz);
+  p.seat(lx, h, lz, face);
   p.add(leg, new THREE.CylinderGeometry(0.03, 0.03, h - 0.03, 6), lx, (h - 0.03) / 2, lz);
   p.add(leg, new THREE.CylinderGeometry(0.18, 0.18, 0.02, 14), lx, 0.01, lz);
 }
@@ -153,12 +168,19 @@ function sofa(p: Spot, fab: Mat, leg: Mat, lx: number, lz: number, face: number,
   c.add(fab, new THREE.BoxGeometry(len, 0.5, 0.2), 0, 0.75, -0.33);
   for (const s of [-1, 1]) c.add(fab, new THREE.BoxGeometry(0.18, 0.32, 0.85), s * (len / 2 - 0.09), 0.66, 0);
   for (const [a, w] of CORNERS) c.add(leg, new THREE.CylinderGeometry(0.025, 0.02, 0.12, 5), a * (len / 2 - 0.1), 0.06, w * 0.34);
+  // Um lugar a cada ~0,7 m do assento (entre os braços).
+  const n = Math.max(1, Math.round((len - 0.36) / 0.7));
+  for (let k = 0; k < n; k++) c.seat((k + 0.5 - n / 2) * ((len - 0.36) / n), 0.5, 0.05, 0);
 }
 
+/** Banco comprido ao longo de x local; quem senta olha para `face`. */
 function bench(p: Spot, seat: Mat, base: Mat, lx: number, lz: number, face: number, len = 2.0) {
   const c = sub(p, lx, lz, face);
   c.add(seat, new THREE.BoxGeometry(len, 0.07, 0.45), 0, 0.45, 0);
   for (const s of [-1, 1]) c.add(base, new THREE.BoxGeometry(0.3, 0.42, 0.4), s * (len / 2 - 0.25), 0.21, 0);
+  // Um lugar a cada ~0,6 m.
+  const n = Math.max(1, Math.round(len / 0.6));
+  for (let k = 0; k < n; k++) c.seat((k + 0.5 - n / 2) * (len / n), 0.45, 0, 0);
 }
 
 function plant(p: Spot, pot: Mat, leaf: Mat, lx: number, lz: number, s = 1) {
@@ -352,7 +374,7 @@ export function createFocusInterior(kit: Kit, labels: Record<FocusSector, string
       p.add(m.metal, new THREE.BoxGeometry(0.03, 0.14, 0.03), 0, 0.87, -0.62);
       p.add(m.glow, new THREE.TorusGeometry(0.26, 0.022, 8, 40), 0, 1.2, -0.62);
       p.add(m.paper, new THREE.BoxGeometry(0.3, 0.02, 0.22), 0.8, 0.79, -0.4, 0.2);
-      for (const s of [-1, 1]) stool(p, m.fabric, m.metal, s * 0.7, 0.3);
+      for (const s of [-1, 1]) stool(p, m.fabric, m.metal, s * 0.7, 0.3, 0.66, Math.PI);
       slats(p, -1.3, 3.4, 2.2);
     }),
   );
@@ -364,7 +386,7 @@ export function createFocusInterior(kit: Kit, labels: Record<FocusSector, string
       p.add(m.wood, new THREE.BoxGeometry(1.9, 0.04, 0.7), 0, 1.02, -0.6);
       p.add(m.dark, new THREE.BoxGeometry(1.5, 0.03, 0.42).rotateX(0.35), 0, 1.12, -0.6);
       p.add(m.glow, new THREE.BoxGeometry(1.5, 0.02, 0.02).rotateX(0.35), 0, 1.04, -0.4);
-      for (const s of [-1, 1]) stool(p, m.fabric, m.metal, s * 0.55, 0.15, 0.75);
+      for (const s of [-1, 1]) stool(p, m.fabric, m.metal, s * 0.55, 0.15, 0.75, Math.PI);
       p.add(m.wood2, new THREE.BoxGeometry(2.4, 0.86, 0.35), 0, 0.43, -1.3);
       p.add(m.wood, new THREE.BoxGeometry(2.46, 0.04, 0.4), 0, 0.88, -1.3);
       for (let k = 0; k < 3; k++) p.add(m.stone, new THREE.IcosahedronGeometry(0.08 + k * 0.02, 0), -0.9 + k * 0.25, 0.95, -1.3, k, [1, 0.6, 1]);
@@ -456,7 +478,7 @@ export function createFocusInterior(kit: Kit, labels: Record<FocusSector, string
     p.add(m.wood, new THREE.BoxGeometry(1.98, 0.08, 1.78), 0, 2.34, 0);
     for (let k = 0; k < 12; k++) p.add(k % 3 ? m.fabric2 : m.wood, new THREE.BoxGeometry(0.38, 0.38, 0.03), -0.6 + (k % 4) * 0.4, 1.05 + Math.floor(k / 4) * 0.42, -0.8);
     p.add(m.wood, new THREE.BoxGeometry(1.6, 0.04, 0.42), 0, 0.74, -0.6);
-    stool(p, m.fabric2, m.metal, 0, 0.1, 0.62);
+    stool(p, m.fabric2, m.metal, 0, 0.1, 0.62, Math.PI);
     p.add(m.warm, new THREE.BoxGeometry(1.5, 0.02, 0.06), 0, 2.28, 0.6);
   }
   sign('booths', 12.9, 0, -Math.PI / 2);
@@ -498,6 +520,7 @@ export function createFocusInterior(kit: Kit, labels: Record<FocusSector, string
   sign('privacyDesks', 2.4, -11.4, 0, true);
 
   finishRoom(room);
+  scene.userData.seats = groundSeats(scene, b);
   const plan: Record<FocusSector, Placed> = { garden: P.station, history: reception, distraction: P.prepare };
   const overview = { cam: new THREE.Vector3(0, 3.8, 15.6), target: new THREE.Vector3(0, 1.3, 0) };
   return {
@@ -618,7 +641,7 @@ export function createHabitsInterior(kit: Kit, labels: Record<HabitsSector, stri
       for (let k = 0; k < 4; k++) potOn(p, m.clay, m.leaf, 0.85 + k * 0.22, 0.97, 0.05, 0.8);
       p.add(m.leaf3, new THREE.CylinderGeometry(0.11, 0.11, 0.24, 12), 1.45, 1.09, -0.45);
       p.add(m.leaf3, new THREE.CylinderGeometry(0.015, 0.02, 0.3, 6).rotateZ(-0.9), 1.27, 1.17, -0.45);
-      for (const s of [-1, 1]) stool(p, m.fabric, m.metal, s * 0.8, 0.75);
+      for (const s of [-1, 1]) stool(p, m.fabric, m.metal, s * 0.8, 0.75, 0.66, Math.PI);
       // Estante de vasos atrás.
       for (const s of [-1, 1]) p.add(m.wood2, new THREE.BoxGeometry(0.05, 1.9, 0.4), s * 1.5, 0.95, -1.4);
       for (let r = 0; r < 4; r++) {
@@ -695,6 +718,8 @@ export function createHabitsInterior(kit: Kit, labels: Record<HabitsSector, stri
       p.add(m.wood, new THREE.BoxGeometry(0.65, 0.28, 1.7), lx, 0.2, 0.2);
       p.add(m.fabric, new THREE.BoxGeometry(0.6, 0.06, 1.0), lx, 0.37, 0.45);
       p.add(m.wood, new THREE.BoxGeometry(0.62, 0.05, 0.75).rotateX(0.9), lx, 0.62, -0.45);
+      // Espreguiçadeira: encosto atrás (-z), quem deita olha para +z.
+      p.seat(lx, 0.4, 0.1, 0);
     }
     p.add(m.wood2, new THREE.CylinderGeometry(0.25, 0.25, 0.03, 16), 0, 0.45, 0.3);
     p.add(m.wood2, new THREE.CylinderGeometry(0.04, 0.04, 0.44, 6), 0, 0.22, 0.3);
@@ -714,12 +739,15 @@ export function createHabitsInterior(kit: Kit, labels: Record<HabitsSector, stri
     b.add(m.metal, new THREE.CylinderGeometry(0.015, 0.015, 3.0, 4), [19.6, 4.0, -1.8]);
     b.add(m.fabric, new THREE.SphereGeometry(0.6, 14, 10, 0, Math.PI * 2, 0, Math.PI * 0.72), [19.6, 1.55, -1.8], [Math.PI, 0, 0]);
     b.add(m.fabric2, new THREE.CylinderGeometry(0.42, 0.42, 0.1, 14), [19.6, 1.1, -1.8]);
+    // A poltrona suspensa: assento na almofada, virado para o salão (-x).
+    seatAt(b, 19.6, 1.15, -1.8, -Math.PI / 2);
     sign('pauseGarden', 8.8, -3.4, -Math.PI / 2);
   }
   pendants(kit, b, [[-11.5, 4.2], [-11.5, -6.0], [11.5, 4.2], [11.5, -6.0]], 6.4, H, '#FDE68A');
   pendants(kit, b, [[-20.75, -6.2], [20.75, 2.6]], 3.8, 5.5, '#FDE68A');
 
   finishRoom(room);
+  scene.userData.seats = groundSeats(scene, b);
   const plan: Record<HabitsSector, Placed> = { atrium: station, greenhouse: lab, evolution: review, analysis: lectern };
   const overview = { cam: new THREE.Vector3(0, 5.0, 13.8), target: new THREE.Vector3(0, 1.2, -2) };
   return {
@@ -863,6 +891,7 @@ export function createGoalsInterior(kit: Kit, labels: Record<GoalsSector, string
   sign('newGoal', 10.6, 2.6, -Math.PI / 2);
 
   finishRoom(room);
+  scene.userData.seats = groundSeats(scene, b);
   const plan: Record<GoalsSector, Placed> = { garden: create, achieved, analysis };
   const overview = { cam: new THREE.Vector3(0, 4.6, 15.5), target: new THREE.Vector3(0, 1.6, -1) };
   return {
@@ -1007,7 +1036,7 @@ export function createMusicInterior(kit: Kit, labels: Record<MusicSector, string
       }
       p.add(m.wood2, new THREE.BoxGeometry(0.7, 0.2, 0.36), 0, 1.16, -0.05);
       for (let k = 0; k < 8; k++) p.add(sleeves[k % sleeves.length]!, new THREE.BoxGeometry(0.31, 0.31, 0.01).rotateX(-0.25), -0.28 + k * 0.08, 1.3, -0.05, Math.PI / 2);
-      for (const lx of [-1, 0, 1]) stool(p, m.fabric, m.dark, lx, 0.75, 0.75);
+      for (const lx of [-1, 0, 1]) stool(p, m.fabric, m.dark, lx, 0.75, 0.75, Math.PI);
       shelf(p, m.wood2, 0, -1.15, 3.0, 1.3, 0.35, 3, sleeves);
     }),
   );
@@ -1016,7 +1045,7 @@ export function createMusicInterior(kit: Kit, labels: Record<MusicSector, string
     p.add(m.wood, new THREE.CylinderGeometry(0.4, 0.4, 0.04, 20), 0, 0.74, 0);
     p.add(m.dark, new THREE.CylinderGeometry(0.04, 0.04, 0.72, 6), 0, 0.36, 0);
     p.add(m.dark, new THREE.CylinderGeometry(0.25, 0.25, 0.02, 14), 0, 0.01, 0);
-    for (const s of [-1, 1]) stool(p, m.fabric, m.dark, 0, s * 0.7, 0.66);
+    for (const s of [-1, 1]) stool(p, m.fabric, m.dark, 0, s * 0.7, 0.66, s > 0 ? Math.PI : 0);
   }
   {
     const lw = spot(b, 17.6, 2.2, 0);
@@ -1039,6 +1068,7 @@ export function createMusicInterior(kit: Kit, labels: Record<MusicSector, string
   pendants(kit, b, [[16.2, 2.2], [18.6, 2.2]], 3.4, 5, '#FFE9C2');
 
   finishRoom(room);
+  scene.userData.seats = groundSeats(scene, b);
   const plan: Record<MusicSector, Placed> = { atrium: bar, instruments, analysis: study };
   const overview = { cam: new THREE.Vector3(0, 5.0, 12.2), target: new THREE.Vector3(0, 1.5, -3) };
   return {
@@ -1148,6 +1178,8 @@ export function createSportsInterior(kit: Kit, labels: Record<SportsSector, stri
       }
       rk.add(m.metal, new THREE.CylinderGeometry(0.025, 0.025, 2.1, 8).rotateZ(Math.PI / 2), 0, 1.4, 0.6);
       p.add(m.fabric, new THREE.BoxGeometry(0.32, 0.08, 1.2), 4.2, 0.45, 0.9);
+      // Banco de treino: um lugar na ponta longe do rack, virado para fora dele.
+      p.seat(4.2, 0.45, 1.2, 0);
       for (const s of [-1, 1]) p.add(m.dark, new THREE.BoxGeometry(0.25, 0.41, 0.08), 4.2, 0.205, 0.9 + s * 0.45);
       const dr = sub(p, -0.6, -2.3, 0);
       for (const y of [0.45, 0.85]) dr.add(m.dark, new THREE.BoxGeometry(2.6, 0.05, 0.5), 0, y, 0);
@@ -1240,6 +1272,7 @@ export function createSportsInterior(kit: Kit, labels: Record<SportsSector, stri
   pendants(kit, b, [[-23.5, -2.8], [-23.5, 1.8]], 3.6, 5, '#F0FDF4');
 
   finishRoom(room);
+  scene.userData.seats = groundSeats(scene, b);
   const plan: Record<SportsSector, Placed> = { atrium: cond, modalities: banners, analysis: log };
   const overview = { cam: new THREE.Vector3(0, 6.0, 15.2), target: new THREE.Vector3(0, 1.2, -2) };
   return {

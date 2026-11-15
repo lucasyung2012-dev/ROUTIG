@@ -14,6 +14,7 @@ import { canvasPlane, createRoom, finishRoom, gallerySlab, markSector, pendants,
 import type { Placed } from './central';
 import { MASSING } from '../massing';
 import type { Thing } from './things';
+import { groundSeats, placeSeats, seatAt } from './east';
 
 /** Placa com texto que muda com os dados (nome de disciplina, idioma). */
 export function nameBoard(kit: Kit, w: number, accent: string) {
@@ -40,24 +41,31 @@ export function nameBoard(kit: Kit, w: number, accent: string) {
  * Peças comuns dos ambientes
  * ===================================================================== */
 
-/** Coloca uma peça: posição local (x, y, z), giro em y e inclinação em x (aplicada antes do giro). */
-type Put = (m: THREE.Material, g: THREE.BufferGeometry, x: number, y: number, z: number, ry?: number, tilt?: number) => void;
+/**
+ * Coloca uma peça: posição local (x, y, z), giro em y e inclinação em x (aplicada antes do giro).
+ * `seat` anota um assento no mesmo sistema: (x, z), altura do assento `y` e para onde olha quem senta.
+ */
+type Put = ((m: THREE.Material, g: THREE.BufferGeometry, x: number, y: number, z: number, ry?: number, tilt?: number) => void) & {
+  seat: (x: number, y: number, z: number, face: number) => void;
+};
 
 /** Peças de um ambiente em coordenadas próprias (x para o lado, +z para quem chega), giradas `face` e levadas para (x0, z0). */
 function frame(b: Builder, x0: number, z0: number, face: number): Put {
   const c = Math.cos(face);
   const s = Math.sin(face);
-  return (m, g, x, y, z, ry = 0, tilt = 0) => {
+  const put = (m: THREE.Material, g: THREE.BufferGeometry, x: number, y: number, z: number, ry = 0, tilt = 0) => {
     if (tilt) g.rotateX(tilt);
     b.add(m, g, [x0 + x * c + z * s, y, z0 - x * s + z * c], [0, face + ry, 0]);
   };
+  return Object.assign(put, { seat: (x: number, y: number, z: number, f: number) => seatAt(b, x0 + x * c + z * s, y, z0 - x * s + z * c, face + f) });
 }
 
 /** Um móvel dentro de um ambiente: o mesmo `Put`, deslocado e girado. */
 function sub(put: Put, x0: number, z0: number, face: number): Put {
   const c = Math.cos(face);
   const s = Math.sin(face);
-  return (m, g, x, y, z, ry = 0, tilt = 0) => put(m, g, x0 + x * c + z * s, y, z0 - x * s + z * c, face + ry, tilt);
+  const p = (m: THREE.Material, g: THREE.BufferGeometry, x: number, y: number, z: number, ry = 0, tilt = 0) => put(m, g, x0 + x * c + z * s, y, z0 - x * s + z * c, face + ry, tilt);
+  return Object.assign(p, { seat: (x: number, y: number, z: number, f: number) => put.seat(x0 + x * c + z * s, y, z0 - x * s + z * c, face + f) });
 }
 
 /** Ponto local (x, z) de um ambiente em coordenadas do salão. */
@@ -135,11 +143,13 @@ function chair(put: Put, M: Mats, x: number, z: number, ry: number, seat = M.woo
   p(seat, B(0.44, 0.05, 0.44), 0, 0.46, 0);
   p(seat, B(0.44, 0.42, 0.04), 0, 0.7, -0.21);
   for (const [a, c] of [[-0.19, -0.19], [0.19, -0.19], [-0.19, 0.19], [0.19, 0.19]] as const) p(M.dark, B(0.03, 0.45, 0.03), a, 0.225, c);
+  p.seat(0, 0.45, 0, 0);
 }
 
-/** Banqueta alta (balcões e mesa de pé). */
-function stool(put: Put, M: Mats, x: number, z: number, h = 0.72) {
+/** Banqueta alta (balcões e mesa de pé); quem senta olha para `face`. */
+function stool(put: Put, M: Mats, x: number, z: number, h = 0.72, face = 0) {
   put(M.wood, C(0.2, 0.2, 0.05, 16), x, h, z);
+  put.seat(x, h, z, face);
   put(M.dark, C(0.03, 0.03, h, 6), x, h / 2, z);
   put(M.dark, C(0.18, 0.2, 0.02, 12), x, 0.01, z);
 }
@@ -152,6 +162,9 @@ function sofa(put: Put, M: Mats, x: number, z: number, ry: number, len = 2.2, cl
   for (const s of [-1, 1]) p(cloth, B(0.2, 0.6, 0.9), s * (len / 2 - 0.1), 0.36, 0);
   for (const s of [-1, 1]) p(M.fabric2, B(0.45, 0.35, 0.12), s * (len / 2 - 0.55), 0.68, -0.18, 0, -0.2);
   for (const s of [-1, 1]) p(M.dark, B(0.06, 0.06, 0.8), s * (len / 2 - 0.15), 0.03, 0);
+  // Um lugar a cada ~0,7 m do assento (entre os braços).
+  const n = Math.max(1, Math.round((len - 0.4) / 0.7));
+  for (let k = 0; k < n; k++) p.seat((k + 0.5 - n / 2) * ((len - 0.4) / n), 0.45, 0.05, 0);
 }
 
 /** Poltrona (quem senta olha para +z). */
@@ -161,6 +174,7 @@ function armchair(put: Put, M: Mats, x: number, z: number, ry: number, cloth = M
   p(cloth, B(0.8, 0.55, 0.18), 0, 0.72, -0.33);
   for (const s of [-1, 1]) p(cloth, B(0.14, 0.5, 0.8), s * 0.4, 0.45, 0);
   for (const [a, c] of [[-0.32, -0.32], [0.32, -0.32], [-0.32, 0.32], [0.32, 0.32]] as const) p(M.woodDark, C(0.025, 0.02, 0.1, 6), a, 0.05, c);
+  p.seat(0, 0.45, 0.05, 0);
 }
 
 /** Mesinha baixa redonda com um livro em cima. */
@@ -247,6 +261,11 @@ function treeBench(put: Put, M: Mats, x: number, z: number) {
   put(M.stone, C(0.95, 1.0, 0.9, 24), x, 0.45, z);
   put(M.woodDark, C(0.9, 0.9, 0.02, 24), x, 0.9, z);
   tree(put, M, x, 0.9, z, 1.3);
+  // Dez lugares no anel do banco, de costas para a árvore.
+  for (let k = 0; k < 10; k++) {
+    const a = (k / 10) * Math.PI * 2;
+    put.seat(x + Math.sin(a) * 1.25, 0.45, z + Math.cos(a) * 1.25, a);
+  }
 }
 
 /** Estante (`w` ao longo de x local, livros virados para +z; `both`: dupla face). */
@@ -429,6 +448,7 @@ function station(kit: Kit, scene: THREE.Scene, id: string, label: string, accent
   const sb = new Builder();
   build(frame(sb, 0, 0, 0));
   g.add(sb.build());
+  placeSeats(scene, sb, p.x, p.z, p.face);
   if (extras.length) g.add(...extras);
   if (sign) g.add(at(sectorSign(kit, label, accent, sign.w ?? 2.2), sign.x, sign.y, sign.z, sign.ry ?? 0));
   markSector(g, id);
@@ -530,6 +550,7 @@ export function createLibraryInterior(kit: Kit, labels: Record<LibrarySector, st
     scene.add(at(directory(kit, ['reception', 'orientation', 'atrium', 'catalog', 'newMaterials', 'casualReading', 'stairs', 'lifts'], accent, 2.0, 2.4), dx, 1.55, dz));
     for (const sx of [-1, 1]) plant(p, M, sx * 1.75, -0.2, 0.85);
     p(M.wood, B(1.8, 0.08, 0.45), 0, 0.45, 1.3);
+    for (const lx of [-0.6, 0, 0.6]) p.seat(lx, 0.45, 1.3, 0);
     for (const sx of [-1, 1]) p(M.dark, B(0.08, 0.42, 0.4), sx * 0.75, 0.21, 1.3);
     const [sx0, sz0] = toWorld(o, 0, -0.2);
     scene.add(at(zoneSign(kit, 'orientation', accent, 2.4), sx0, 3.35, sz0));
@@ -633,6 +654,7 @@ export function createLibraryInterior(kit: Kit, labels: Record<LibrarySector, st
   solid(obstacles, P.transfer, 0.4, 0.15, 4.4, 1.2, 1.2);
 
   finishRoom(room);
+  scene.userData.seats = groundSeats(scene, b);
   // Entrada: no fundo do átrio vazado, vendo os três níveis de galerias (sem ficar sob um mezanino).
   const overview = { cam: new THREE.Vector3(0, 3.4, 7.6), target: new THREE.Vector3(0, 4.5, -8) };
   return {
@@ -701,7 +723,7 @@ export function createNotesInterior(kit: Kit, labels: Record<NotesSector, string
       for (const sx of [-1, 1]) {
         p(M.dark, B(0.4, 0.3, 0.03), sx * 0.65, 1.28, 0.02, 0, -0.5);
         p(M.page, B(0.34, 0.24, 0.01), sx * 0.65, 1.28, 0.04, 0, -0.5);
-        stool(p, M, sx * 0.65, 0.75);
+        stool(p, M, sx * 0.65, 0.75, 0.72, Math.PI);
       }
       for (let k = 0; k < 3; k++) p(notes[k]!, B(0.2, 0.012, 0.2), -0.1 + k * 0.05, 1.11 + k * 0.012, 0.12, k * 0.3);
       p(M.dark, C(0.05, 0.05, 0.12, 10), 0.15, 1.16, -0.15);
@@ -765,7 +787,7 @@ export function createNotesInterior(kit: Kit, labels: Record<NotesSector, string
       p(M.wood, B(12, 0.16, 3), 0, 0.95, 0);
       for (const x of [-5.4, 0, 5.4]) p(M.wood, B(0.4, 0.95, 2.6), x, 0.47, 0);
       for (let k = 0; k < 9; k++) p(M.paper, B(0.9, 0.02, 1.2), -4.8 + k * 1.2, 1.05, ((k % 3) - 1) * 0.7, k * 0.2);
-      for (let k = 0; k < 5; k++) for (const s of [-1, 1]) stool(p, M, -4.8 + k * 2.4, s * 1.9, 0.75);
+      for (let k = 0; k < 5; k++) for (const s of [-1, 1]) stool(p, M, -4.8 + k * 2.4, s * 1.9, 0.75, s > 0 ? Math.PI : 0);
       for (const x of [-4.5, -1.5, 1.5, 4.5]) pendant(p, M, x, 0, H, 3.4);
       for (const sx of [-1, 1]) p(M.dark, C(0.006, 0.006, H - 3.17, 4), sx * 0.9, (H + 3.17) / 2, 0);
     }, { x: 0, y: 2.9, z: 0 }),
@@ -805,6 +827,7 @@ export function createNotesInterior(kit: Kit, labels: Record<NotesSector, string
   solid(obstacles, P.versions, 0, -0.35, 3.1, 0.7, 1.7);
 
   finishRoom(room);
+  scene.userData.seats = groundSeats(scene, b);
   const overview = { cam: new THREE.Vector3(0, 5.5, 11.5), target: new THREE.Vector3(0, 1, -2) };
   return {
     scene,
@@ -954,6 +977,7 @@ export function createAcademyInterior(kit: Kit, labels: Record<AcademySector, st
   solid(obstacles, { x: 21, z: -10.35, face: 0 }, 0, 0, 6, 0.4, 2.4);
 
   finishRoom(room);
+  scene.userData.seats = groundSeats(scene, b);
   const overview = { cam: new THREE.Vector3(0, 7, 15.5), target: new THREE.Vector3(0, 2, -2) };
   return {
     scene,
@@ -1130,14 +1154,19 @@ export function createLanguagesInterior(kit: Kit, labels: Record<LanguagesSector
     for (let k = 0; k < 9; k++) {
       const a = t0 + ((k + 0.5) / 9) * tl;
       put(M.fabric, B(0.9, 0.42, 0.5), cx + Math.sin(a) * 2.55, 0.21, cz + Math.cos(a) * 2.55, a);
+      put.seat(cx + Math.sin(a) * 2.55, 0.42, cz + Math.cos(a) * 2.55, a + Math.PI);
     }
     put(M.rug, C(2.0, 2.0, 0.012, 40), cx, 0.008, cz);
-    for (let k = 0; k < 3; k++) put(M.fabric2, C(0.32, 0.36, 0.38, 16), cx + Math.sin(k * 2.1) * 0.9, 0.19, cz + Math.cos(k * 2.1) * 0.9);
+    for (let k = 0; k < 3; k++) {
+      put(M.fabric2, C(0.32, 0.36, 0.38, 16), cx + Math.sin(k * 2.1) * 0.9, 0.19, cz + Math.cos(k * 2.1) * 0.9);
+      put.seat(cx + Math.sin(k * 2.1) * 0.9, 0.38, cz + Math.cos(k * 2.1) * 0.9, k * 2.1 + Math.PI);
+    }
     totem(b, scene, M, zoneSign(kit, 'immersion', accent, 2.4), 2.4, 13.9, -3, Math.PI / 2);
     for (const z of [-8.6, 2.6]) plant(put, M, 20.6, z, 1);
   }
 
   finishRoom(room);
+  scene.userData.seats = groundSeats(scene, b);
   const overview = { cam: new THREE.Vector3(0, 6, 13.5), target: new THREE.Vector3(0, 1.2, -1) };
   return {
     scene,
@@ -1264,10 +1293,13 @@ export function createInsightsInterior(kit: Kit, labels: Record<InsightsSector, 
     obstacles.push({ x, z, r: 0.6, h: 1.2 });
     for (const bz of [1.6, 6.4]) put(M.wood, B(2.2, 0.1, 0.5), -13.2, 0.45, bz);
     for (const bz of [1.6, 6.4]) for (const sx of [-1, 1]) put(M.dark, B(0.08, 0.42, 0.4), -13.2 + sx * 0.9, 0.21, bz);
+    // Três lugares em cada banco, virados para a luneta.
+    for (const bz of [1.6, 6.4]) for (const lx of [-0.7, 0, 0.7]) put.seat(-13.2 + lx, 0.45, bz, bz < z ? 0 : Math.PI);
     plant(put, M, -16.8, 1.2, 1);
   }
 
   finishRoom(room);
+  scene.userData.seats = groundSeats(scene, b);
   const overview = { cam: new THREE.Vector3(3.5, 7.5, 12.5), target: new THREE.Vector3(0, 1.5, -4) };
   return {
     scene,

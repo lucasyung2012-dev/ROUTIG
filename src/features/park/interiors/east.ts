@@ -10,7 +10,7 @@
  */
 import * as THREE from 'three';
 import { Builder, type Kit } from '../kit';
-import type { Obstacle } from '../camera';
+import type { Obstacle, Seat } from '../camera';
 import { STOREY } from '../massing';
 import { insideAt } from '../outline';
 import { canvasPlane, createRoom, finishRoom, gallerySlab, markSector, sectorGroup, sectorSign, setDetailCommon, wrap, zoneLabel, type InteriorScene, type Room } from './common';
@@ -69,6 +69,55 @@ export interface F {
   p: Palette;
 }
 
+/* ---------- Assentos do térreo (o motor lê scene.userData.seats: dá para sentar) ---------- */
+
+/** Assentos anotados por montador, no sistema dele. */
+const SEATS = new WeakMap<Builder, Seat[]>();
+/** Assentos dos grupos (ambientes girados), já no sistema do salão. */
+const HALL = new WeakMap<THREE.Object3D, Seat[]>();
+
+/** Assentos de um montador (cria a lista na primeira vez). */
+export function seatsOf(b: Builder): Seat[] {
+  let list = SEATS.get(b);
+  if (!list) {
+    list = [];
+    SEATS.set(b, list);
+  }
+  return list;
+}
+
+/** Anota um assento no sistema do montador: (x, z), altura do assento `y` e para onde olha quem senta (`face`). */
+export function seatAt(b: Builder, x: number, y: number, z: number, face: number): void {
+  seatsOf(b).push({ x, y, z, face });
+}
+
+/** Leva os assentos do montador `b` de um grupo em (x, z), virado `face`, para o salão da cena. */
+export function placeSeats(scene: THREE.Object3D, b: Builder, x: number, z: number, face: number): void {
+  let list = HALL.get(scene);
+  if (!list) {
+    list = [];
+    HALL.set(scene, list);
+  }
+  const c = Math.cos(face);
+  const s = Math.sin(face);
+  for (const st of seatsOf(b)) list.push({ x: x + st.x * c + st.z * s, y: st.y, z: z - st.x * s + st.z * c, face: st.face + face });
+}
+
+/** Todos os assentos do térreo: os dos grupos mais os do montador do salão (`b`, já no sistema da cena). */
+export function groundSeats(scene: THREE.Object3D, b: Builder): Seat[] {
+  return [...(HALL.get(scene) ?? []), ...seatsOf(b)];
+}
+
+/** `n` assentos em fila (passo `step`) ao longo de x local de um móvel em (x, z) girado `ry`, recuados `oz`; quem senta olha para `face`. */
+function seatRow(f: F, x: number, z: number, ry: number, n: number, step: number, oz: number, y: number, face: number) {
+  const c = Math.cos(ry);
+  const s = Math.sin(ry);
+  for (let k = 0; k < n; k++) {
+    const ox = (k + 0.5 - n / 2) * step;
+    seatAt(f.b, x + ox * c + oz * s, y, z - ox * s + oz * c, face);
+  }
+}
+
 export const box = (w: number, h: number, d: number) => new THREE.BoxGeometry(w, h, d);
 export const cyl = (rt: number, rb: number, h: number, n = 16) => new THREE.CylinderGeometry(rt, rb, h, n);
 
@@ -98,11 +147,13 @@ export function chair(f: F, x: number, z: number, ry: number, seat: THREE.Materi
   at(f, seat, box(0.46, 0.4, 0.06), x, 0.7, z, ry, 0, -0.21);
   at(f, f.p.dark, cyl(0.025, 0.025, 0.42, 6), x, 0.21, z, ry);
   at(f, f.p.dark, cyl(0.22, 0.22, 0.03, 12), x, 0.015, z, ry);
+  seatAt(f.b, x, 0.45, z, ry);
 }
 
-/** Banqueta alta (balcões e mesas em pé). */
-export function stool(f: F, x: number, z: number, seat: THREE.Material = f.p.fabric) {
+/** Banqueta alta (balcões e mesas em pé); quem senta olha para `face`. */
+export function stool(f: F, x: number, z: number, face = 0, seat: THREE.Material = f.p.fabric) {
   at(f, seat, cyl(0.19, 0.19, 0.06, 16), x, 0.74, z);
+  seatAt(f.b, x, 0.75, z, face);
   at(f, f.p.metal, cyl(0.025, 0.025, 0.72, 6), x, 0.36, z);
   f.b.add(f.p.metal, new THREE.TorusGeometry(0.16, 0.012, 4, 16), [x, 0.3, z], [Math.PI / 2, 0, 0]);
   at(f, f.p.metal, cyl(0.2, 0.22, 0.03, 16), x, 0.015, z);
@@ -172,6 +223,9 @@ export function sofa(f: F, x: number, z: number, len: number, ry: number, mat: T
   at(f, f.p.cushion, box(len - 0.4, 0.1, 0.62), x, 0.47, z, ry, 0, 0.06);
   at(f, mat, box(len, 0.5, 0.2), x, 0.65, z, ry, 0, -0.33);
   for (const s of [-1, 1]) at(f, mat, box(0.18, 0.62, 0.85), x, 0.31, z, ry, s * (len / 2 - 0.09), 0);
+  // Um lugar a cada ~0,7 m do assento (entre os braços).
+  const n = Math.max(1, Math.round((len - 0.4) / 0.7));
+  seatRow(f, x, z, ry, n, (len - 0.4) / n, 0.06, 0.45, ry);
 }
 
 /** Mesa de centro baixa. */
@@ -180,10 +234,13 @@ export function lowTable(f: F, x: number, z: number, w: number, d: number, ry = 
   at(f, f.p.dark, box(w - 0.3, 0.38, d - 0.3), x, 0.2, z, ry);
 }
 
-/** Banco de madeira sobre base maciça (sem encosto), comprido ao longo de x. */
-export function benchSeat(f: F, x: number, z: number, len: number, ry = 0, base: THREE.Material = f.p.stone) {
+/** Banco de madeira sobre base maciça (sem encosto), comprido ao longo de x; quem senta olha para `face`. */
+export function benchSeat(f: F, x: number, z: number, len: number, ry = 0, base: THREE.Material = f.p.stone, face = ry) {
   at(f, f.p.wood, box(len, 0.07, 0.5), x, 0.445, z, ry);
   at(f, base, box(len - 0.4, 0.41, 0.36), x, 0.205, z, ry);
+  // Um lugar a cada ~0,6 m.
+  const n = Math.max(1, Math.round(len / 0.6));
+  seatRow(f, x, z, ry, n, len / n, 0, 0.45, face);
 }
 
 /** Luminária de mesa (base, haste e cúpula acesa) com a base em `y`. */
@@ -255,6 +312,7 @@ export function zone(p: Palette, x: number, z: number, face: number, sector?: st
 /** Fecha o ambiente: junta as peças, marca o setor (se houver) e põe na cena. */
 export function closeZone(scene: THREE.Object3D, zn: Zone): THREE.Group {
   zn.g.add(zn.f.b.build());
+  placeSeats(scene, zn.f.b, zn.g.position.x, zn.g.position.z, zn.g.rotation.y);
   const id = zn.g.userData.sector as string | undefined;
   if (id) markSector(zn.g, id);
   scene.add(zn.g);
@@ -497,6 +555,7 @@ export function createCalendarInterior(kit: Kit, labels: Record<CalendarSector, 
   }
 
   finishRoom(room);
+  scene.userData.seats = groundSeats(scene, b);
   const overview = { cam: new THREE.Vector3(0, 4, 14.5), target: new THREE.Vector3(0, 4.5, -4) };
   return {
     scene,
@@ -578,7 +637,7 @@ export function createTasksInterior(kit: Kit, labels: Record<TasksSector, string
       at(cf, graphite, box(0.06, 0.2, 0.06), lx, 1.17, -0.12);
       cf.b.add(graphite, box(0.62, 0.42, 0.04), [lx, 1.32, -0.05], [-0.5, 0, 0]);
       cf.b.add(p.accGlow, box(0.54, 0.34, 0.01), [lx, 1.335, -0.025], [-0.5, 0, 0]);
-      stool(cf, lx, 0.75);
+      stool(cf, lx, 0.75, Math.PI);
     }
     shelf(cf, 0, -1.2, 3.0, 1.2, 0, 2, p.wood, [p.white, p.acc, silver]);
     hangSign(kit, zn.g, cf, zoneLabel('quickCreate'), ACC, 0, 3.0, 0, Math.PI / 2, 2.4, H);
@@ -595,7 +654,7 @@ export function createTasksInterior(kit: Kit, labels: Record<TasksSector, string
     at(of, graphite, box(7.6, 0.9, 3.0), 0, 0.45, 0);
     at(of, silver, box(7.8, 0.06, 3.2), 0, 0.93, 0);
     for (const s of [-1, 1]) at(of, p.accGlow, box(7.4, 0.03, 0.02), 0, 0.2, s * 1.51);
-    for (const lx of [-2.7, -0.9, 0.9, 2.7]) for (const s of [-1, 1]) stool(of, lx, s * 1.95);
+    for (const lx of [-2.7, -0.9, 0.9, 2.7]) for (const s of [-1, 1]) stool(of, lx, s * 1.95, s > 0 ? Math.PI : 0);
     top.mesh.rotation.x = -Math.PI / 2;
     top.mesh.position.set(0, 0.97, 0);
     zn.g.add(top.mesh);
@@ -642,7 +701,7 @@ export function createTasksInterior(kit: Kit, labels: Record<TasksSector, string
     at(pf, graphite, box(0.03, 2.1, 0.014), 0, 1.8, -0.345);
     at(pf, graphite, box(2.9, 0.03, 0.014), 0, 1.8, -0.345);
     roundTable(pf, 0, 1.6, 0.55, 1.05, p.wood);
-    for (const s of [-1, 1]) stool(pf, s * 0.75, 1.9);
+    for (const s of [-1, 1]) stool(pf, s * 0.75, 1.9, Math.atan2(-s * 0.75, -0.3));
     pendant(pf, 0, 1.6, 2.9, H, 0.4);
     hangSign(kit, zn.g, pf, zoneLabel('priority'), ACC, 0, 3.4, 0.6, 0, 2.6, H);
     solid(obstacles, zn, 0, 1.6, 0.6);
@@ -677,6 +736,7 @@ export function createTasksInterior(kit: Kit, labels: Record<TasksSector, string
     views.archive = areaView(room, -19.5, 1, Math.PI / 2, 8, 3.6);
   }
   finishRoom(room);
+  scene.userData.seats = groundSeats(scene, b);
 
   let data: TasksRoomData | null = null;
   const draw = () => {
@@ -878,9 +938,9 @@ export function createProjectsInterior(kit: Kit, labels: Record<ProjectsSector, 
     ([[0.7, p.acc], [0.48, white], [0.26, p.acc]] as Array<[number, THREE.Material]>).forEach(([r, m], k) => sf.b.add(m, new THREE.CircleGeometry(r, 32), [-1.0, 1.8, -2.05 + k * 0.004]));
     for (let k = 0; k < 4; k++) at(sf, kit.mat(['#FDBA74', '#93C5FD', '#86EFAC', '#CBD5E1'][k]!, { rough: 0.6 }), box(0.36, 1.6, 0.01), 0.15 + k * 0.42, 1.8, -2.05);
     roundTable(sf, 0, 0.3, 0.6, 1.05, p.wood);
-    stool(sf, -0.8, 0.6);
-    stool(sf, 0.8, 0.6);
-    stool(sf, 0, 1.15);
+    stool(sf, -0.8, 0.6, Math.atan2(0.8, -0.3));
+    stool(sf, 0.8, 0.6, Math.atan2(-0.8, -0.3));
+    stool(sf, 0, 1.15, Math.PI);
     pendant(sf, 0, 0.3, 2.9, H, 0.4);
     hangSign(kit, zn.g, sf, zoneLabel('status'), ACC, 0, 3.3, -0.6, 0, 2.6, H);
     solid(obstacles, zn, 0, 0.3, 0.65);
@@ -891,10 +951,11 @@ export function createProjectsInterior(kit: Kit, labels: Record<ProjectsSector, 
   {
     const zn = zone(p, 5.5, 7.5, -Math.PI / 2);
     planter(zn.f, 0, 0.45, 2.8, 0.6, 0, p.concrete);
-    benchSeat(zn.f, 0, -0.45, 2.6, 0, p.concrete);
+    benchSeat(zn.f, 0, -0.45, 2.6, 0, p.concrete, Math.PI);
     closeZone(scene, zn);
   }
   finishRoom(room);
+  scene.userData.seats = groundSeats(scene, b);
   const overview = { cam: new THREE.Vector3(0, 6, 14), target: new THREE.Vector3(0, 1.5, -2) };
   return {
     scene,
@@ -977,7 +1038,7 @@ export function createFinanceInterior(kit: Kit, labels: Record<FinanceSector, st
     at(vf, gold, new THREE.CylinderGeometry(1.25, 1.25, 0.08, 6), 0, 1.04, 0);
     for (let k = 0; k < 6; k++) {
       const a = (k / 6) * Math.PI * 2;
-      stool(vf, Math.sin(a) * 1.85, Math.cos(a) * 1.85);
+      stool(vf, Math.sin(a) * 1.85, Math.cos(a) * 1.85, a + Math.PI);
     }
     vf.b.add(gold, new THREE.TorusGeometry(1.1, 0.04, 6, 6), [0, 3.4, 0], [-Math.PI / 2, 0, Math.PI / 6]);
     vf.b.add(p.lamp, new THREE.TorusGeometry(1.0, 0.025, 6, 6), [0, 3.37, 0], [-Math.PI / 2, 0, Math.PI / 6]);
@@ -1068,6 +1129,7 @@ export function createFinanceInterior(kit: Kit, labels: Record<FinanceSector, st
   b.add(gold, new THREE.RingGeometry(1.1, 1.18, 48), [11.9, 0.014, 0], [-Math.PI / 2, 0, 0]);
   hangSign(kit, scene, f, zoneLabel('vault'), ACC, 12.6, 4.6, 0, -Math.PI / 2, 2.0, H);
   finishRoom(room);
+  scene.userData.seats = groundSeats(scene, b);
   const overview = { cam: new THREE.Vector3(0, 6, 13), target: new THREE.Vector3(0, 1.2, -2) };
   return {
     scene,

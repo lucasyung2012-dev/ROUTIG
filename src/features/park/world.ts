@@ -11,6 +11,7 @@ import { city } from './buildings/city';
 import { navGraph } from '@/domain/parkPeople';
 import { landmarks } from './landmarks';
 import { totems } from './totems';
+import { gardens } from './gardens';
 import { Builder, Kit, signTexture, cloud, forest, setWaterNight, setWaterSky, setWaterWeather, shrubs, sky, stars, water, type Plant, type TreeSpecies } from './kit';
 import { birds, butterflies, drone, fountain, leaves, rain } from './life';
 import { playground } from './playground';
@@ -954,6 +955,12 @@ export function createWorld(kit: Kit): World {
     !clearZones.some((c) => Math.hypot(c.x - x, c.z - z) < c.r + r) &&
     !PARK_BUILDINGS.some((bd) => Math.hypot(bd.x - x, bd.z - z) < bd.radius + 1.3 + r) &&
     !solid.near(x, z).some((o) => Math.hypot(o.x - x, o.z - z) < o.r + r + 0.2);
+  // Paisagismo de cada prédio (praça do relógio de sol, pérgolas, mesas, palco, espelho d'água...):
+  // nasce antes da vegetação solta, que respeita o chão dele.
+  const gd = gardens(kit, free);
+  root.add(gd.group);
+  clearZones.push(...gd.spots);
+  obstacles.push(...footprint(gd.group, heightAt));
   const plantList = [...plants().filter((p) => !onPath(p.x, p.z, 0.9 * p.s) && free(p.x, p.z, 0.45 * p.s)), ...streetTrees().map((p, i) => ({ x: p.x, y: heightAt(p.x, p.z), z: p.z, s: p.s, species: (i % 3 ? 'round' : 'slender') as Plant['species'] }))];
   // Jardim da ilha do Focus: árvores em volta do pavilhão (fora do piso, da ponte e do lounge).
   for (let k = 0; k < 10; k++) {
@@ -1065,7 +1072,7 @@ export function createWorld(kit: Kit): World {
     obstacles,
     pickables: [...buildings.values()].map((b) => b.group),
     // Todos os bancos do parque servem para sentar (inclusive os da praça).
-    seats: [...am.seats, ...plazaSeats(), ...pgs.flatMap((p) => p.seats)],
+    seats: [...am.seats, ...plazaSeats(), ...pgs.flatMap((p) => p.seats), ...gd.seats],
     play: (st) => st.forEach((s, i) => pgs[i]?.tick(s)),
     cityEvents: () => streets?.events() ?? [],
     bus: () => streets?.bus() ?? null,

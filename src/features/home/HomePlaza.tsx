@@ -192,16 +192,16 @@ export function HomePlaza({ period, label, still, className }: { period: Period;
         {[0, 1, 2].map((i) => (
           <line key={i} x1={589 + i * 11} y1={330} x2={597 + i * 3} y2={40} stroke={night ? '#7DD3FC' : '#FFFFFF'} strokeWidth="1.6" opacity={night ? 0.8 : 0.5} />
         ))}
-        <circle cx="600" cy="236" r="40" fill={p.glow} opacity={lit(0.2)} filter="url(#hp-blur)" />
-        <circle cx="600" cy="236" r="18" fill={night ? '#93C5FD' : '#E0F2FE'} stroke={p.metal} strokeWidth="2" />
+        <circle cx="600" cy="150" r="40" fill={p.glow} opacity={lit(0.2)} filter="url(#hp-blur)" />
+        <circle cx="600" cy="150" r="18" fill={night ? '#93C5FD' : '#E0F2FE'} stroke={p.metal} strokeWidth="2" />
         {[
           [0, 70, 18],
           [60, 62, 22],
           [120, 76, 14],
         ].map(([rot, rx, ry], i) => (
-          <g key={i} transform={`rotate(${rot} 600 236)`}>
-            <ellipse cx="600" cy="236" rx={rx} ry={ry} fill="none" stroke={p.metal} strokeWidth="5" opacity="0.95">
-              {anim(<animateTransform attributeName="transform" type="rotate" values={`0 600 236; ${i % 2 ? -360 : 360} 600 236`} dur={`${40 + i * 12}s`} repeatCount="indefinite" />)}
+          <g key={i} transform={`rotate(${rot} 600 150)`}>
+            <ellipse cx="600" cy="150" rx={rx} ry={ry} fill="none" stroke={p.metal} strokeWidth="5" opacity="0.95">
+              {anim(<animateTransform attributeName="transform" type="rotate" values={`0 600 150; ${i % 2 ? -360 : 360} 600 150`} dur={`${40 + i * 12}s`} repeatCount="indefinite" />)}
             </ellipse>
           </g>
         ))}

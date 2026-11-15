@@ -115,7 +115,7 @@ export function HomePage() {
                     >
                       <Star className={cn('h-4 w-4', isFav && 'fill-amber text-amber')} aria-hidden />
                     </button>
-                    {c.badge && <span className="absolute bottom-2 left-2 rounded-full bg-black/35 px-2.5 py-1 text-[0.7rem] font-semibold text-white backdrop-blur lg:bottom-auto lg:left-3 lg:top-3">{c.badge}</span>}
+                    {c.badge && <span className="absolute bottom-2 left-1.5 whitespace-nowrap rounded-full bg-black/35 px-2 py-1 text-[0.62rem] font-semibold text-white backdrop-blur sm:left-2 sm:px-2.5 sm:text-[0.7rem] lg:bottom-auto lg:left-3 lg:top-3">{c.badge}</span>}
                     {isFav && !c.badge && <span className="absolute left-3 top-3 hidden rounded-full bg-black/35 px-2.5 py-1 text-[0.7rem] font-semibold text-white backdrop-blur lg:inline">{t('home.favoriteOn')}</span>}
                   </div>
                   <div className="flex min-w-0 flex-1 flex-col gap-1.5 p-3.5 sm:p-4">

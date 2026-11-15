@@ -39,7 +39,6 @@ export interface InboxLabels {
   emptyFrame: string;
 }
 
-const R = 22;
 const H = 9;
 /** Posição e frente (para onde o setor "olha") de cada setor na planta. */
 const PLAN: Record<InboxSector, { x: number; z: number; face: number }> = {
@@ -51,7 +50,7 @@ const PLAN: Record<InboxSector, { x: number; z: number; face: number }> = {
 };
 
 export function createInboxInterior(kit: Kit, labels: InboxLabels): InteriorScene {
-  const room = createRoom(kit, { radius: R, height: H, sides: 8, floor: '#EEF3F8', glass: '#A9DDF5', frame: '#CBD5E1', accent: '#22D3EE', skylight: 9 });
+  const room = createRoom(kit, { id: 'inbox', floor: '#EEF3F8', glass: '#A9DDF5', frame: '#CBD5E1', accent: '#22D3EE' });
   const { scene, b } = room;
   const silver = kit.mat('#CBD5E1', { metal: 0.9, rough: 0.22 });
   const white = kit.mat('#F3F6FA', { rough: 0.45 });
@@ -64,7 +63,8 @@ export function createInboxInterior(kit: Kit, labels: InboxLabels): InteriorScen
     const a = (i / 8) * Math.PI * 2 + Math.PI / 8;
     b.add(silver, new THREE.BoxGeometry(0.5, H, 0.5), [Math.sin(a) * 9.6, H / 2, Math.cos(a) * 9.6]);
   }
-  b.add(kit.mat('#B9E6F7', { glass: true }), new THREE.CylinderGeometry(9.2, 9.2, 6, 8, 1, true), [0, H + 3.2, 0], [0, Math.PI / 8, 0]);
+  // Lanternim de vidro no pé-direito duplo do núcleo (até logo abaixo do 1º andar, aos 14 m).
+  b.add(kit.mat('#B9E6F7', { glass: true }), new THREE.CylinderGeometry(9.2, 9.2, 4.4, 8, 1, true), [0, H + 2.4, 0], [0, Math.PI / 8, 0]);
   // Piso: anel de luz no núcleo e linhas de luz até cada setor.
   const lb = new Builder();
   lb.add(cyan, new THREE.RingGeometry(9.0, 9.18, 8, 1, Math.PI / 8), [0, 0.012, 0], [-Math.PI / 2, 0, 0]);
@@ -77,7 +77,7 @@ export function createInboxInterior(kit: Kit, labels: InboxLabels): InteriorScen
   }
   scene.add(lb.build(false));
   // Decoração: vasos, bancos, luminárias.
-  pots(kit, b, [[-8, 17], [8, 17], [-18, 9], [18, 9], [-18, -9], [18, -9], [-6, -19], [6, -19]]);
+  pots(kit, b, [[-8, 17], [8, 17], [-18, 5], [18, 5], [-18, -5], [18, -5], [-6, -19], [6, -19]]);
   bench(kit, b, -6, 11, 0);
   bench(kit, b, 6, 11, 0);
   pendants(kit, b, [[-12, 8], [12, 8], [-12, -8], [12, -8]], 6.2, H);
@@ -295,10 +295,10 @@ export function createInboxInterior(kit: Kit, labels: InboxLabels): InteriorScen
     scene,
     sectors: INBOX_SECTORS,
     pickables: sectorGroups,
-    room: { radius: R, height: H + 5 },
+    room: room.spec,
     obstacles: [{ x: 0, z: 1, r: 3.6, h: 1 }, { x: 0, z: 14.5, r: 2.8, h: 1 }],
     view: (id) => {
-      if (id === 'entry') return { cam: new THREE.Vector3(0, 7.5, R - 2), target: new THREE.Vector3(0, 1.5, -2) };
+      if (id === 'entry') return { cam: new THREE.Vector3(0, 7.5, 17.5), target: new THREE.Vector3(0, 1.5, -2) };
       const p = PLAN[id as InboxSector] ?? PLAN.triage;
       return sectorView(p.x, p.z, p.face, id === 'triage' ? 11 : 9, id === 'triage' ? 6.5 : 4.6);
     },

@@ -5,7 +5,7 @@
  */
 import * as THREE from 'three';
 import type { Kit } from '../kit';
-import { canvasPlane, createRoom, finishRoom, pendants, pots, bench, setDetailCommon, type InteriorScene } from './common';
+import { canvasPlane, createRoom, finishRoom, gallerySlab, pendants, pots, bench, setDetailCommon, wallSpots, type InteriorScene } from './common';
 import { sectorsFrom, viewOf, type Placed } from './central';
 
 /** Placa com texto que muda com os dados (nome de disciplina, idioma). */
@@ -46,24 +46,23 @@ export const LIBRARY_SECTORS = ['atrium', 'collections', 'consult', 'search', 'p
 export type LibrarySector = (typeof LIBRARY_SECTORS)[number];
 
 export function createLibraryInterior(kit: Kit, labels: Record<LibrarySector, string>): InteriorScene {
-  const R = 18;
   const H = 14;
-  const room = createRoom(kit, { radius: R, height: H, sides: 8, floor: '#EFEAE0', glass: '#D3EAF2', frame: '#D8D1C2', accent: '#34D399', skylight: 6 });
+  const room = createRoom(kit, { id: 'library', floor: '#EFEAE0', glass: '#D3EAF2', frame: '#D8D1C2', accent: '#34D399' });
   const { scene, b } = room;
   const stone = kit.mat('#ECE7DC', { rough: 0.8 });
   const wood = kit.mat('#A97C55', { rough: 0.7 });
   const silver = kit.mat('#CBD5E1', { metal: 0.85, rough: 0.25 });
-  // Dois mezaninos em anel (1º e 2º andar) com guarda-corpo de vidro e estantes contínuas.
+  // Duas galerias (a meia altura do átrio de pé-direito alto) com guarda-corpo de vidro e estantes
+  // contínuas junto às paredes do bloco principal (a laje segue a planta do prédio).
+  const shelves = wallSpots(room, 24, 1.2, () => false, room.main);
   for (const y of [4.7, 9.4]) {
-    b.add(stone, new THREE.RingGeometry(8.5, R - 0.3, 8, 1, Math.PI / 8), [0, y, 0], [-Math.PI / 2, 0, 0]);
-    b.add(stone, new THREE.RingGeometry(8.5, R - 0.3, 8, 1, Math.PI / 8), [0, y - 0.25, 0], [Math.PI / 2, 0, 0]);
+    b.add(stone, gallerySlab(room, y, 8.5));
     b.add(kit.mat('#CFF3EA', { glass: true }), new THREE.CylinderGeometry(8.5, 8.5, 1.1, 8, 1, true), [0, y + 0.55, 0], [0, Math.PI / 8, 0]);
     b.add(silver, new THREE.TorusGeometry(8.6, 0.05, 4, 8), [0, y + 1.1, 0], [-Math.PI / 2, 0, Math.PI / 8]);
-    for (let i = 0; i < 24; i++) {
-      const a = (i / 24) * Math.PI * 2;
-      b.add(wood, new THREE.BoxGeometry(3.2, 3.6, 0.5), [Math.sin(a) * (R - 1.2), y + 2, Math.cos(a) * (R - 1.2)], [0, a, 0]);
-      for (let k = 0; k < 4; k++) b.add(kit.mat(['#34D399', '#60A5FA', '#F59E0B', '#F472B6'][(i + k) % 4]!, { rough: 0.6 }), new THREE.BoxGeometry(2.8, 0.5, 0.2), [Math.sin(a) * (R - 1.45), y + 0.6 + k * 0.85, Math.cos(a) * (R - 1.45)], [0, a, 0]);
-    }
+    shelves.forEach(({ x, z, face: a }, i) => {
+      b.add(wood, new THREE.BoxGeometry(3.2, 3.6, 0.5), [x, y + 2, z], [0, a, 0]);
+      for (let k = 0; k < 4; k++) b.add(kit.mat(['#34D399', '#60A5FA', '#F59E0B', '#F472B6'][(i + k) % 4]!, { rough: 0.6 }), new THREE.BoxGeometry(2.8, 0.5, 0.2), [x - Math.sin(a) * 0.25, y + 0.6 + k * 0.85, z - Math.cos(a) * 0.25], [0, a, 0]);
+    });
   }
   // Escada helicoidal e elevador de vidro ligando os andares.
   for (let k = 0; k < 28; k++) {
@@ -107,7 +106,7 @@ export function createLibraryInterior(kit: Kit, labels: Record<LibrarySector, st
     scene,
     sectors: LIBRARY_SECTORS,
     pickables: groups,
-    room: { radius: R, height: H },
+    room: room.spec,
     obstacles: [{ x: 0, z: 2, r: 2.6, h: 1 }, { x: -7, z: -7, r: 1.4, h: H }, { x: 7, z: -7, r: 2.2, h: H }],
     view: (id) => (id === 'atrium' ? { cam: new THREE.Vector3(0, 7, 13), target: new THREE.Vector3(0, 2, 0) } : viewOf(all, id, overview)),
     setData: () => undefined,
@@ -123,14 +122,13 @@ export const NOTES_SECTORS = ['reception', 'writing', 'advanced', 'handwriting',
 export type NotesSector = (typeof NOTES_SECTORS)[number];
 
 export function createNotesInterior(kit: Kit, labels: Record<NotesSector, string>): InteriorScene {
-  const R = 17;
   const H = 7;
-  const room = createRoom(kit, { radius: R, height: H, sides: 4, floor: '#EADFCB', glass: '#DCEBF2', frame: '#8A6240', accent: '#8B7CF6', skylight: 0.01 });
+  const room = createRoom(kit, { id: 'notes', floor: '#EADFCB', glass: '#DCEBF2', frame: '#8A6240', accent: '#8B7CF6' });
   const { scene, b } = room;
   const wood = kit.mat('#B8875A', { rough: 0.7 });
   const paper = kit.mat('#F7F1E6', { rough: 0.9 });
-  // Claraboias em dente de serra sobre o ateliê.
-  for (let k = 0; k < 4; k++) b.add(kit.mat('#CDEFFB', { glass: true }), new THREE.BoxGeometry(18, 0.1, 1.6), [0, H - 0.05, -7 + k * 4.4]);
+  // Luz das claraboias em dente de serra do ateliê (a ala térrea do leste; o corpo central tem o 1º andar em cima).
+  for (let k = 0; k < 4; k++) b.add(kit.mat('#CDEFFB', { glass: true }), new THREE.BoxGeometry(10, 0.1, 1.6), [17, H - 0.33, -7 + k * 4.4]);
   // A grande mesa criativa (12 m) e "folhas" de luz sobre ela.
   b.add(wood, new THREE.BoxGeometry(12, 0.16, 3), [0, 0.95, 0]);
   for (const x of [-5.4, 0, 5.4]) b.add(wood, new THREE.BoxGeometry(0.4, 0.95, 2.6), [x, 0.47, 0]);
@@ -141,7 +139,7 @@ export function createNotesInterior(kit: Kit, labels: Record<NotesSector, string
     reception: { x: 0, z: 8.5, face: Math.PI },
     writing: { x: -8.5, z: -6, face: Math.PI / 4 },
     advanced: { x: 8.5, z: -6, face: -Math.PI / 4 },
-    handwriting: { x: 0, z: -9, face: 0 },
+    handwriting: { x: 0, z: -8.5, face: 0 },
     organize: { x: -9.5, z: 4, face: Math.PI / 2 },
     versions: { x: 9.5, z: 4, face: -Math.PI / 2 },
   };
@@ -173,12 +171,12 @@ export function createNotesInterior(kit: Kit, labels: Record<NotesSector, string
   bench(kit, b, -3, 12, 0);
   bench(kit, b, 3, 12, 0);
   finishRoom(room);
-  const overview = { cam: new THREE.Vector3(0, 6, 14), target: new THREE.Vector3(0, 1, -2) };
+  const overview = { cam: new THREE.Vector3(0, 5.5, 11.5), target: new THREE.Vector3(0, 1, -2) };
   return {
     scene,
     sectors: NOTES_SECTORS,
     pickables: groups,
-    room: { radius: R - 4, height: H },
+    room: room.spec,
     obstacles: [{ x: -3, z: 0, r: 2, h: 1 }, { x: 3, z: 0, r: 2, h: 1 }],
     view: (id) => viewOf(plan, id, overview),
     setData: () => undefined,
@@ -198,9 +196,8 @@ export interface AcademyData {
 }
 
 export function createAcademyInterior(kit: Kit, labels: Record<AcademySector, string>): InteriorScene {
-  const R = 18;
   const H = 10;
-  const room = createRoom(kit, { radius: R, height: H, sides: 16, floor: '#EEF0F8', glass: '#C7D2FE', frame: '#6366F1', accent: '#A5B4FC', skylight: 5 });
+  const room = createRoom(kit, { id: 'academy', floor: '#EEF0F8', glass: '#C7D2FE', frame: '#6366F1', accent: '#A5B4FC' });
   const { scene, b } = room;
   const white = kit.mat('#F5F6FB', { rough: 0.5 });
   const indigo = kit.mat('#6366F1', { metal: 0.3, rough: 0.35 });
@@ -225,8 +222,8 @@ export function createAcademyInterior(kit: Kit, labels: Record<AcademySector, st
     scene.add(board.mesh);
     boards.push(board);
   }
-  // Galeria superior e escada.
-  b.add(white, new THREE.RingGeometry(10, R - 0.3, 16), [0, 5, 0], [-Math.PI / 2, 0, 0]);
+  // Galeria superior (segue a planta do bloco do átrio) e escada.
+  b.add(white, gallerySlab(room, 5, 10));
   b.add(kit.mat('#C7D2FE', { glass: true }), new THREE.CylinderGeometry(10, 10, 1, 32, 1, true), [0, 5.55, 0]);
   pendants(kit, b, [[-4, 2], [4, 2], [0, -5]], 7.5, H, '#EEF2FF');
   pots(kit, b, [[-5, 15], [5, 15]]);
@@ -252,12 +249,12 @@ export function createAcademyInterior(kit: Kit, labels: Record<AcademySector, st
     }
   });
   finishRoom(room);
-  const overview = { cam: new THREE.Vector3(0, 7, R - 2.5), target: new THREE.Vector3(0, 2, -2) };
+  const overview = { cam: new THREE.Vector3(0, 7, 15.5), target: new THREE.Vector3(0, 2, -2) };
   return {
     scene,
     sectors: ACADEMY_SECTORS,
     pickables: groups,
-    room: { radius: R - 3.5, height: H },
+    room: room.spec,
     obstacles: [],
     view: (id) => viewOf(plan, id, overview),
     setData: (d) => {
@@ -280,9 +277,8 @@ export interface LanguagesData {
 }
 
 export function createLanguagesInterior(kit: Kit, labels: Record<LanguagesSector, string>): InteriorScene {
-  const R = 16;
   const H = 8;
-  const room = createRoom(kit, { radius: R, height: H, sides: 8, floor: '#E4EFE8', glass: '#CBEFE9', frame: '#B08560', accent: '#14B8A6', skylight: 7 });
+  const room = createRoom(kit, { id: 'languages', floor: '#E4EFE8', glass: '#CBEFE9', frame: '#B08560', accent: '#14B8A6' });
   const { scene, b } = room;
   const wood = kit.mat('#B08560', { rough: 0.7 });
   const teal = kit.mat('#14B8A6', { metal: 0.2, rough: 0.4 });
@@ -323,12 +319,12 @@ export function createLanguagesInterior(kit: Kit, labels: Record<LanguagesSector
     }
   });
   finishRoom(room);
-  const overview = { cam: new THREE.Vector3(0, 6, R - 2.5), target: new THREE.Vector3(0, 1.2, -1) };
+  const overview = { cam: new THREE.Vector3(0, 6, 13.5), target: new THREE.Vector3(0, 1.2, -1) };
   return {
     scene,
     sectors: LANGUAGES_SECTORS,
     pickables: groups,
-    room: { radius: R - 1.5, height: H },
+    room: room.spec,
     obstacles: [{ x: 0, z: 0, r: 4.6, h: 1 }],
     view: (id) => viewOf(plan, id, overview),
     setData: (d) => {
@@ -347,14 +343,11 @@ export const INSIGHTS_SECTORS = ['overview', 'productivity', 'learning', 'habits
 export type InsightsSector = (typeof INSIGHTS_SECTORS)[number];
 
 export function createInsightsInterior(kit: Kit, labels: Record<InsightsSector, string>): InteriorScene {
-  const R = 15;
-  const H = 9;
-  const room = createRoom(kit, { radius: R, height: H, sides: 24, floor: '#F2EEF0', glass: '#F7D5DC', frame: '#F43F5E', accent: '#FDA4AF', skylight: 3 });
+  const room = createRoom(kit, { id: 'insights', floor: '#F2EEF0', glass: '#F7D5DC', frame: '#F43F5E', accent: '#FDA4AF' });
   const { scene, b } = room;
   const dark = kit.mat('#1F2A3A', { metal: 0.6, rough: 0.35 });
   const silver = kit.mat('#CBD5E1', { metal: 0.9, rough: 0.2 });
-  // Cúpula interna e o telescópio no centro.
-  b.add(kit.mat('#FBE4E8', { rough: 0.6, side: THREE.BackSide }), new THREE.SphereGeometry(R, 32, 12, 0, Math.PI * 2, 0, Math.PI / 2), [0, H, 0], [0, 0, 0], [1, 0.45, 1]);
+  // O telescópio no centro (a cúpula interna saiu: os dois andares do tambor ficam em cima do térreo).
   b.add(silver, new THREE.CylinderGeometry(0.6, 1.2, 3, 16), [0, 1.5, 0]);
   b.add(silver, new THREE.CylinderGeometry(0.7, 0.9, 5, 20), [0, 4.2, -0.8], [0.7, 0, 0]);
   b.add(kit.mat('#FDA4AF', { glow: true }), new THREE.TorusGeometry(3.2, 0.06, 6, 64), [0, 0.05, 0], [-Math.PI / 2, 0, 0]);
@@ -365,12 +358,12 @@ export function createInsightsInterior(kit: Kit, labels: Record<InsightsSector, 
     sb.add(kit.mat('#FDA4AF', { glow: true }), new THREE.BoxGeometry(2, 0.9, 0.05), [0, 1.35, -0.25], [-0.35, 0, 0]);
   });
   finishRoom(room);
-  const overview = { cam: new THREE.Vector3(3.5, 7.5, R - 2.5), target: new THREE.Vector3(0, 1.5, -4) };
+  const overview = { cam: new THREE.Vector3(3.5, 7.5, 12.5), target: new THREE.Vector3(0, 1.5, -4) };
   return {
     scene,
     sectors: INSIGHTS_SECTORS,
     pickables: groups,
-    room: { radius: R - 1.5, height: H },
+    room: room.spec,
     obstacles: [{ x: 0, z: 0, r: 1.6, h: 3 }],
     view: (id) => viewOf(plan, id, overview),
     setData: () => undefined,

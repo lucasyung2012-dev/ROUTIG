@@ -6,7 +6,8 @@
  */
 import * as THREE from 'three';
 import type { Kit } from '../kit';
-import { createRoom, finishRoom, pendants, pots, bench, setDetailCommon, type InteriorScene } from './common';
+import { createRoom, finishRoom, pendants, pots, bench, setDetailCommon, wallSpots, type InteriorScene } from './common';
+import { MASSING } from '../massing';
 import { sectorsFrom, viewOf, type Placed } from './central';
 import { nameBoard } from './north';
 
@@ -40,9 +41,7 @@ export const FOCUS_SECTORS = ['garden', 'history', 'distraction'] as const;
 export type FocusSector = (typeof FOCUS_SECTORS)[number];
 
 export function createFocusInterior(kit: Kit, labels: Record<FocusSector, string>): InteriorScene {
-  const R = 15;
-  const H = 7;
-  const room = createRoom(kit, { radius: R, height: H, sides: 32, floor: '#E8EEE9', glass: '#CDEFE6', frame: '#E2E8F0', accent: '#5EEAD4', skylight: 6 });
+  const room = createRoom(kit, { id: 'focus', floor: '#E8EEE9', glass: '#CDEFE6', frame: '#E2E8F0', accent: '#5EEAD4' });
   const { scene, b } = room;
   const wood = kit.mat('#C9A27A', { rough: 0.7 });
   b.add(kit.mat('#3E8FC9', { rough: 0.06, metal: 0.4 }), new THREE.CircleGeometry(5, 40), [0, 0.02, 0], [-Math.PI / 2, 0, 0]);
@@ -61,8 +60,8 @@ export function createFocusInterior(kit: Kit, labels: Record<FocusSector, string
   pots(kit, b, [[-7, 6], [7, 6], [-7, -6], [7, -6]]);
   const plan: Record<FocusSector, Placed> = {
     garden: { x: 0, z: 7.5, face: Math.PI },
-    history: { x: -8, z: -5, face: Math.PI * 0.7 },
-    distraction: { x: 8, z: -5, face: -Math.PI * 0.7 },
+    history: { x: -7.6, z: -4.8, face: Math.PI * 0.7 },
+    distraction: { x: 7.6, z: -4.8, face: -Math.PI * 0.7 },
   };
   const groups = sectorsFrom(kit, scene, plan, FOCUS_SECTORS, labels, '#5EEAD4', (id, sb) => {
     if (id === 'distraction') {
@@ -75,12 +74,12 @@ export function createFocusInterior(kit: Kit, labels: Record<FocusSector, string
     }
   });
   finishRoom(room);
-  const overview = { cam: new THREE.Vector3(0, 5, R - 2), target: new THREE.Vector3(0, 1.5, -2) };
+  const overview = { cam: new THREE.Vector3(0, 4, 13), target: new THREE.Vector3(0, 1.5, -2) };
   return {
     scene,
     sectors: FOCUS_SECTORS,
     pickables: groups,
-    room: { radius: R - 1.5, height: H },
+    room: room.spec,
     obstacles: [{ x: 0, z: 0, r: 5.2, h: 0.5 }],
     view: (id) => viewOf(plan, id, overview),
     setData: () => undefined,
@@ -96,19 +95,21 @@ export const HABITS_SECTORS = ['atrium', 'greenhouse', 'evolution', 'analysis'] 
 export type HabitsSector = (typeof HABITS_SECTORS)[number];
 
 export function createHabitsInterior(kit: Kit, labels: Record<HabitsSector, string>): InteriorScene {
-  const R = 18;
   const H = 10;
-  const room = createRoom(kit, { radius: R, height: H, sides: 12, floor: '#E6EDE2', glass: '#D8F2DE', frame: '#6B7F75', accent: '#E6B450', skylight: 8 });
+  const room = createRoom(kit, { id: 'habits', floor: '#E6EDE2', glass: '#D8F2DE', frame: '#6B7F75', accent: '#E6B450' });
   const { scene, b } = room;
   const frame = kit.mat('#6B7F75', { metal: 0.6, rough: 0.35 });
-  for (let i = 0; i < 6; i++) b.add(frame, new THREE.TorusGeometry(R - 1, 0.1, 6, 32, Math.PI), [0, 0, 0], [0, (i / 6) * Math.PI, 0], [1, 0.55, 1]);
+  // Arcos da estufa atravessando a nave (a mesma nave de fora), a cada 4 m.
+  const nave = MASSING.habits.vols[0]!;
+  const half = nave.kind === 'rect' ? nave.d / 2 - 0.3 : 10;
+  for (let i = 0; i < 9; i++) b.add(frame, new THREE.TorusGeometry(half, 0.1, 6, 32, Math.PI), [-16 + i * 4, 0, nave.cz], [0, Math.PI / 2, 0], [1, (H - 0.6) / half, 1]);
   // Canteiros (um por hábito) com plantas variadas.
   const names = boardsRing(kit, scene, 7, 12.5, 2.2, '#E6B450', 0.6);
   names.spots.forEach((s, i) => {
     b.add(kit.mat('#8A6240', { rough: 0.8 }), new THREE.BoxGeometry(3.2, 0.5, 2), [s.x * 0.92, 0.25, s.z * 0.92], [0, s.a, 0]);
     for (let k = 0; k < 3; k++) b.add(kit.mat(['#4C9A4F', '#6BAA4E', '#3E8E4A'][(i + k) % 3]!, { rough: 0.9 }), new THREE.IcosahedronGeometry(0.5 + ((i + k) % 3) * 0.15, 1), [s.x * 0.92 + Math.cos(s.a) * (k - 1), 0.85, s.z * 0.92 - Math.sin(s.a) * (k - 1)]);
   });
-  pendants(kit, b, [[-4, 0], [4, 0]], 7, H, '#FDE68A');
+  pendants(kit, b, [[-10.5, 0], [10.5, 0]], 7, H, '#FDE68A');
   const plan: Record<HabitsSector, Placed> = {
     atrium: { x: 0, z: 8, face: Math.PI },
     greenhouse: { x: -5.5, z: -2, face: Math.PI / 2 },
@@ -126,12 +127,12 @@ export function createHabitsInterior(kit: Kit, labels: Record<HabitsSector, stri
   });
   bench(kit, b, 0, 13, 0);
   finishRoom(room);
-  const overview = { cam: new THREE.Vector3(0, 6, R - 2.5), target: new THREE.Vector3(0, 1.2, -2) };
+  const overview = { cam: new THREE.Vector3(0, 5.5, 13.5), target: new THREE.Vector3(0, 1.2, -2) };
   return {
     scene,
     sectors: HABITS_SECTORS,
     pickables: groups,
-    room: { radius: R - 2, height: H },
+    room: room.spec,
     obstacles: [],
     view: (id) => viewOf(plan, id, overview),
     setData: (d) => names.set((d as NamesData).names),
@@ -147,9 +148,7 @@ export const GOALS_SECTORS = ['garden', 'achieved', 'analysis'] as const;
 export type GoalsSector = (typeof GOALS_SECTORS)[number];
 
 export function createGoalsInterior(kit: Kit, labels: Record<GoalsSector, string>): InteriorScene {
-  const R = 16;
-  const H = 9;
-  const room = createRoom(kit, { radius: R, height: H, sides: 6, floor: '#EFEADB', glass: '#FEF3C7', frame: '#EAB308', accent: '#FDE68A', skylight: 5 });
+  const room = createRoom(kit, { id: 'goals', floor: '#EFEADB', glass: '#FEF3C7', frame: '#EAB308', accent: '#FDE68A' });
   const { scene, b } = room;
   const stone = kit.mat('#E9E2D0', { rough: 0.8 });
   for (let k = 0; k < 3; k++) b.add(stone, new THREE.CylinderGeometry(6 - k * 1.6, 6.2 - k * 1.6, 0.5, 6), [0, 0.25 + k * 0.5, 0]);
@@ -171,12 +170,12 @@ export function createGoalsInterior(kit: Kit, labels: Record<GoalsSector, string
     sb.add(kit.mat('#EAB308', { metal: 0.6, rough: 0.3 }), new THREE.BoxGeometry(2.5, 0.06, 1.1), [0, 0.93, -0.3]);
   });
   finishRoom(room);
-  const overview = { cam: new THREE.Vector3(0, 6, R - 2), target: new THREE.Vector3(0, 1.5, -2) };
+  const overview = { cam: new THREE.Vector3(0, 5, 14), target: new THREE.Vector3(0, 1.5, -2) };
   return {
     scene,
     sectors: GOALS_SECTORS,
     pickables: groups,
-    room: { radius: R - 1.5, height: H },
+    room: room.spec,
     obstacles: [{ x: 0, z: 0, r: 6.2, h: 1.5 }],
     view: (id) => viewOf(plan, id, overview),
     setData: (d) => names.set((d as NamesData).names),
@@ -192,17 +191,16 @@ export const MUSIC_SECTORS = ['atrium', 'instruments', 'analysis'] as const;
 export type MusicSector = (typeof MUSIC_SECTORS)[number];
 
 export function createMusicInterior(kit: Kit, labels: Record<MusicSector, string>): InteriorScene {
-  const R = 16;
   const H = 9;
-  const room = createRoom(kit, { radius: R, height: H, sides: 24, floor: '#F2EAEE', glass: '#F5D0E4', frame: '#EC4899', accent: '#F9A8D4', skylight: 4 });
+  const room = createRoom(kit, { id: 'music', floor: '#F2EAEE', glass: '#F5D0E4', frame: '#EC4899', accent: '#F9A8D4' });
   const { scene, b } = room;
   const wood = kit.mat('#B08560', { rough: 0.7 });
-  // Painéis acústicos em ondas pelas paredes e palco pequeno ao fundo.
-  for (let i = 0; i < 20; i++) {
-    const a = (i / 20) * Math.PI * 2;
-    if (Math.cos(a) > 0.8) continue;
-    b.add(wood, new THREE.BoxGeometry(1.6, 3 + Math.sin(i * 1.3) * 0.8, 0.2), [Math.sin(a) * (R - 0.8), 3.2, Math.cos(a) * (R - 0.8)], [0, a, 0]);
-  }
+  // Painéis acústicos em ondas pelas paredes (as da planta; a ala baixa do leste fica de fora) e
+  // palco pequeno ao fundo.
+  const front = room.spec.front;
+  wallSpots(room, 22, 0.8, (x, z) => (z > front - 5 && Math.abs(x) < 7) || x > 12).forEach(({ x, z, face }, i) => {
+    b.add(wood, new THREE.BoxGeometry(1.6, 3 + Math.sin(i * 1.3) * 0.8, 0.2), [x, 3.2, z], [0, face, 0]);
+  });
   b.add(wood, new THREE.CylinderGeometry(4, 4.2, 0.6, 32, 1, false, -Math.PI / 2, Math.PI), [0, 0.3, -9]);
   const names = boardsRing(kit, scene, 6, 11.5, 2.6, '#EC4899', 0.6);
   names.spots.forEach((s) => b.add(kit.mat('#FCE7F3', { rough: 0.5 }), new THREE.CylinderGeometry(1.3, 1.3, 0.15, 24), [s.x * 0.9, 0.08, s.z * 0.9]));
@@ -222,12 +220,12 @@ export function createMusicInterior(kit: Kit, labels: Record<MusicSector, string
   });
   bench(kit, b, 0, 12, 0);
   finishRoom(room);
-  const overview = { cam: new THREE.Vector3(0, 6, R - 2), target: new THREE.Vector3(0, 1.5, -3) };
+  const overview = { cam: new THREE.Vector3(0, 6, 11.5), target: new THREE.Vector3(0, 1.5, -3) };
   return {
     scene,
     sectors: MUSIC_SECTORS,
     pickables: groups,
-    room: { radius: R - 1.5, height: H },
+    room: room.spec,
     obstacles: [{ x: 0, z: -9, r: 4, h: 0.6 }],
     view: (id) => viewOf(plan, id, overview),
     setData: (d) => names.set((d as NamesData).names),
@@ -243,9 +241,8 @@ export const SPORTS_SECTORS = ['atrium', 'modalities', 'analysis'] as const;
 export type SportsSector = (typeof SPORTS_SECTORS)[number];
 
 export function createSportsInterior(kit: Kit, labels: Record<SportsSector, string>): InteriorScene {
-  const R = 17;
   const H = 10;
-  const room = createRoom(kit, { radius: R, height: H, sides: 8, floor: '#E4E9E4', glass: '#BFE8CF', frame: '#2B3442', accent: '#22C55E', skylight: 4 });
+  const room = createRoom(kit, { id: 'sports', floor: '#E4E9E4', glass: '#BFE8CF', frame: '#2B3442', accent: '#22C55E' });
   const { scene, b } = room;
   const line = room.accentMat;
   // Linhas de quadra no piso (o elemento exclusivo do átrio).
@@ -272,12 +269,12 @@ export function createSportsInterior(kit: Kit, labels: Record<SportsSector, stri
     }
   });
   finishRoom(room);
-  const overview = { cam: new THREE.Vector3(0, 6.5, R - 2.5), target: new THREE.Vector3(0, 1.2, -2) };
+  const overview = { cam: new THREE.Vector3(0, 6.5, 14.5), target: new THREE.Vector3(0, 1.2, -2) };
   return {
     scene,
     sectors: SPORTS_SECTORS,
     pickables: groups,
-    room: { radius: R - 2, height: H },
+    room: room.spec,
     obstacles: [],
     view: (id) => viewOf(plan, id, overview),
     setData: (d) => names.set((d as NamesData).names),

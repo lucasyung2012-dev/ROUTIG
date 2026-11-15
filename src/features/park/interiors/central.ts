@@ -50,9 +50,8 @@ export interface DashboardData {
 }
 
 export function createDashboardInterior(kit: Kit, labels: Record<DashboardSector, string>): InteriorScene {
-  const R = 18;
   const H = 8;
-  const room = createRoom(kit, { radius: R, height: H, sides: 12, floor: '#EEF2F7', glass: '#A9D8F2', frame: '#CBD5E1', accent: '#22D3EE', skylight: 4 });
+  const room = createRoom(kit, { id: 'dashboard', floor: '#EEF2F7', glass: '#A9D8F2', frame: '#CBD5E1', accent: '#22D3EE' });
   const { scene, b } = room;
   const silver = kit.mat('#CBD5E1', { metal: 0.9, rough: 0.2 });
   const white = kit.mat('#F3F6FA', { rough: 0.45 });
@@ -156,7 +155,7 @@ export function createDashboardInterior(kit: Kit, labels: Record<DashboardSector
     scene,
     sectors: DASHBOARD_SECTORS,
     pickables: groups,
-    room: { radius: R, height: H },
+    room: room.spec,
     obstacles: [{ x: 0, z: 0, r: 1.5, h: 1 }],
     view: (id) => (id === 'entry' ? overview : id === 'atrium' ? { cam: new THREE.Vector3(0, 5.5, 9), target: new THREE.Vector3(0, 1.5, 0) } : viewOf(plan, id, overview)),
     setData: (d) => {
@@ -177,7 +176,7 @@ export type ProfileSector = (typeof PROFILE_SECTORS)[number];
 export function createProfileInterior(kit: Kit, labels: Record<ProfileSector, string>): InteriorScene {
   const R = 17;
   const H = 6.5;
-  const room = createRoom(kit, { radius: R, height: H, sides: 8, floor: '#EFE9DD', glass: '#D6ECF5', frame: '#A0714F', accent: '#FFD9A0', skylight: 3 });
+  const room = createRoom(kit, { id: 'profile', floor: '#EFE9DD', glass: '#D6ECF5', frame: '#A0714F', accent: '#FFD9A0' });
   const { scene, b } = room;
   const wood = kit.mat('#A0714F', { rough: 0.7 });
   const stone = kit.mat('#EDE6D8', { rough: 0.8 });
@@ -239,7 +238,7 @@ export function createProfileInterior(kit: Kit, labels: Record<ProfileSector, st
     scene,
     sectors: PROFILE_SECTORS,
     pickables: groups,
-    room: { radius: R, height: H },
+    room: room.spec,
     obstacles: [],
     view: (id) => viewOf(plan, id, overview),
     setData: () => undefined,
@@ -257,7 +256,7 @@ export type SettingsRoom = (typeof SETTINGS_ROOMS)[number];
 export function createSettingsInterior(kit: Kit, labels: Record<SettingsRoom, string>): InteriorScene {
   const R = 16;
   const H = 7;
-  const room = createRoom(kit, { radius: R, height: H, sides: 6, floor: '#EEF0F2', glass: '#BFE3F2', frame: '#B08560', accent: '#94E2FF', skylight: 4 });
+  const room = createRoom(kit, { id: 'settings', floor: '#EEF0F2', glass: '#BFE3F2', frame: '#B08560', accent: '#94E2FF' });
   const { scene, b } = room;
   const wood = kit.mat('#B08560', { rough: 0.7 });
   const slate = kit.mat('#64748B', { metal: 0.3, rough: 0.5 });
@@ -288,7 +287,7 @@ export function createSettingsInterior(kit: Kit, labels: Record<SettingsRoom, st
     scene,
     sectors: SETTINGS_ROOMS,
     pickables: groups,
-    room: { radius: R, height: H },
+    room: room.spec,
     obstacles: [{ x: 0, z: 0, r: 3, h: 1 }],
     view: (id) => viewOf(plan, id, overview),
     setData: () => undefined,

@@ -299,7 +299,9 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
   const levelWorld = (L: number) => {
     const sc = inside!.scene;
     const lv = sc.floors?.levels[L];
-    if (!lv || L === 0) return { ground: () => 0, obstacles: sc.obstacles, limit: { x: 0, z: 0, r: sc.room.radius - 1.2 }, ceiling: lv?.ceiling ?? sc.room.height, minDistance: 1.5, maxDistance: sc.room.radius * 1.7 };
+    // Térreo: anda-se dentro da planta do prédio (massing.ts), não num círculo; a câmera da 3ª
+    // pessoa não atravessa a fachada.
+    if (!lv || L === 0) return { ground: () => 0, obstacles: sc.obstacles, limit: { x: 0, z: 0, r: sc.room.radius + 1 }, ceiling: lv?.ceiling ?? sc.room.height, minDistance: 1.5, maxDistance: sc.room.radius * 1.7, blocked: sc.room.blocked, wall: sc.room.wallAt };
     // Cada planta diz onde não se pisa (vazios, núcleo, fachada fora das portas, borda do terraço).
     return { ground: () => lv.y, obstacles: lv.obstacles, limit: { x: 0, z: 0, r: lv.walk }, ceiling: lv.ceiling, minDistance: 1.5, maxDistance: sc.room.radius * 1.7, blocked: lv.blocked, wall: lv.wallAt };
 
@@ -531,7 +533,7 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
         else {
           // Acabou de passar pela porta (a entrada fica na frente, +z): aparece logo dentro dela,
           // de costas para a porta, e dá alguns passos para dentro do saguão.
-          const edge = scene.room.radius - 1.2;
+          const edge = scene.room.front - 1.2;
           rig.place(0, edge - 0.4, 0);
           rig.autoWalk(0, edge - 3.4, 1.9, () => undefined);
         }

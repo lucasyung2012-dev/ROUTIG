@@ -6,6 +6,8 @@
 import * as THREE from 'three';
 import { seededRandom } from '@/domain/park';
 import { Builder, shrubs, signTexture, type Kit } from '../kit';
+import { groundShell, signSpot } from './shell';
+import { MASSING, STOREY, topLevel } from '../massing';
 
 export interface DetailedBuilding {
   group: THREE.Group;
@@ -51,114 +53,65 @@ export function planting(kit: Kit, rMin: number, rMax: number, n: number, palett
 }
 
 /* =====================================================================
- * INBOX — Central de Recepção (3.10): núcleo octogonal alto, alas laterais
- * translúcidas, volume de distribuição atrás, cobertura convergente.
+ * INBOX — Central de Recepção (seção 17): volumes retangulares ligados (núcleo de 3 pavimentos,
+ * alas de 2, hall de entrada e volume de distribuição térreos), entrada ampla com marquise,
+ * jardins tecnológicos na frente e a antena girando sobre o núcleo.
  * ===================================================================== */
 export function inboxBuilding(kit: Kit): DetailedBuilding {
   const group = new THREE.Group();
   const b = new Builder();
   const silver = kit.mat(SILVER, { metal: 0.9, rough: 0.22 });
   const white = kit.mat('#EEF2F7', { rough: 0.5 });
-  const glassBlue = kit.mat('#6FB6EE', { glass: true });
-  const glassWing = kit.mat('#A7DCF5', { glass: true });
-  const cyanPanel = kit.mat('#5BC8DE', { metal: 0.35, rough: 0.35 });
   const cyanGlow = kit.mat('#22D3EE', { glow: true, rough: 0.3 });
-  const turqGlow = kit.mat('#14B8A6', { glow: true, rough: 0.3 });
-  const warm = kit.mat('#FFD9A0', { glow: true, rough: 0.9 });
   const dark = kit.mat('#1F2A3A', { metal: 0.6, rough: 0.35 });
 
-  lotBase(kit, b, 25);
-  // Embasamento octogonal em dois degraus + escadaria e rampa frontais.
-  b.add(white, new THREE.CylinderGeometry(15.5, 16, 0.5, 8), [0, 0.25, 0], [0, Math.PI / 8, 0]);
-  b.add(kit.mat('#E2E8F0', { rough: 0.45 }), new THREE.CylinderGeometry(14.5, 15, 0.5, 8), [0, 0.75, 0], [0, Math.PI / 8, 0]);
-  for (let s = 0; s < 4; s++) b.add(white, new THREE.BoxGeometry(14 - s * 0.4, 0.25, 0.7), [0, 0.125 + s * 0.25, 17.2 - s * 0.6]);
-  b.add(white, new THREE.BoxGeometry(2.2, 0.12, 9), [9.5, 0.5, 17], [0.11, 0, 0]);
-
-  // Núcleo octogonal (Ø 20, 16 m): vidro azul, montantes nos cantos, faixas de piso.
-  b.add(glassBlue, new THREE.CylinderGeometry(9.6, 9.6, 15, 8, 1, true), [0, 8.5, 0], [0, Math.PI / 8, 0]);
-  for (let i = 0; i < 8; i++) {
-    const a = (i / 8) * Math.PI * 2;
-    b.add(silver, new THREE.BoxGeometry(0.45, 15.2, 0.45), [Math.sin(a) * 10.4, 8.6, Math.cos(a) * 10.4]);
-  }
-  for (const y of [5.5, 10.5, 15.8]) b.add(silver, new THREE.CylinderGeometry(10.4, 10.4, 0.45, 8, 1, true), [0, y, 0], [0, Math.PI / 8, 0]);
-  // Interior quente visto pelo vidro (à noite, o núcleo acende).
-  b.add(warm, new THREE.CylinderGeometry(8.6, 8.6, 14, 8, 1, true), [0, 8.5, 0], [0, Math.PI / 8, 0]);
-  // Cobertura convergente: placas triangulares subindo para o topo do núcleo.
-  b.add(silver, new THREE.CylinderGeometry(2.2, 11.4, 3.2, 8), [0, 17.6, 0], [0, Math.PI / 8, 0]);
-  b.add(cyanGlow, new THREE.TorusGeometry(10.9, 0.12, 6, 8), [0, 16.05, 0], [-Math.PI / 2, 0, Math.PI / 8]);
-  for (let i = 0; i < 8; i++) {
-    const a = (i / 8) * Math.PI * 2 + Math.PI / 8;
-    b.add(white, new THREE.BoxGeometry(0.25, 0.2, 9), [Math.sin(a) * 6.2, 17.75, Math.cos(a) * 6.2], [0.33, a, 0]);
-  }
-  // Mastro e antena no topo.
-  b.add(dark, new THREE.CylinderGeometry(0.15, 0.3, 6, 8), [0, 22, 0]);
-  for (let k = 0; k < 4; k++) b.add(silver, new THREE.CylinderGeometry(0.04, 0.04, 1.6 - k * 0.3, 6), [0, 20 + k * 1.2, 0], [0, 0, Math.PI / 2]);
-
-  // Alas laterais (Arquivo a oeste, Galeria a leste): 20 × 12 × 7, parcialmente transparentes.
-  for (const s of [-1, 1]) {
-    const x = s * 19;
-    b.add(white, new THREE.BoxGeometry(20, 0.6, 12.6), [x, 1.3, 0]);
-    b.add(glassWing, new THREE.BoxGeometry(19, 6, 12), [x, 4.6, 0]);
-    // Montantes verticais a cada 2 m na frente e atrás.
-    for (let k = 0; k < 10; k++) for (const zz of [6.05, -6.05]) b.add(silver, new THREE.BoxGeometry(0.14, 6, 0.3), [x - 9 + k * 2 + s * 0.5, 4.6, zz]);
-    // Painéis ciano opacos na metade de baixo da ala (parte não transparente).
-    b.add(cyanPanel, new THREE.BoxGeometry(19.1, 2, 12.1), [x, 2.6, 0]);
-    // Cobertura inclinada subindo para o núcleo (as placas "convergem").
-    b.add(silver, new THREE.BoxGeometry(21, 0.35, 13.4), [x, 8.0, 0], [0, 0, s * -0.1]);
-    b.add(turqGlow, new THREE.BoxGeometry(20.4, 0.08, 0.1), [x, 7.6, 6.75], [0, 0, s * -0.1]);
-    b.add(warm, new THREE.BoxGeometry(18, 4.5, 11), [x, 4.6, 0]);
-  }
-  // Volume de distribuição atrás do núcleo (14 × 12 × 8), em painéis ciano com fitas de vidro.
-  b.add(cyanPanel, new THREE.BoxGeometry(14, 8, 12), [0, 4.8, -15]);
-  for (let k = 0; k < 4; k++) b.add(glassBlue, new THREE.BoxGeometry(14.1, 0.8, 12.1), [0, 2.2 + k * 1.8, -15]);
-  b.add(silver, new THREE.BoxGeometry(15, 0.4, 13), [0, 9, -15]);
-  // Tubos de distribuição saindo do volume para o chão (leitura de "encaminhamento").
-  for (let k = 0; k < 4; k++) b.add(kit.mat('#CFF3FB', { glass: true }), new THREE.CylinderGeometry(0.35, 0.35, 9, 12, 1, true), [-4.5 + k * 3, 5, -21.3]);
-
-  // Entrada: vão de 12 m no núcleo, portas de vidro, marquise suspensa por tirantes.
-  b.add(kit.mat('#9BE7F5', { glass: true }), new THREE.BoxGeometry(8, 4.2, 0.15), [0, 3.1, 9.3]);
-  b.add(dark, new THREE.BoxGeometry(0.12, 4.2, 0.2), [0, 3.1, 9.35]);
-  b.add(silver, new THREE.BoxGeometry(14, 0.4, 7), [0, 6.2, 13.2]);
-  b.add(cyanGlow, new THREE.BoxGeometry(13.4, 0.06, 0.1), [0, 6.0, 16.7]);
-  for (const s of [-1, 1]) {
-    const tie = new THREE.CylinderGeometry(0.05, 0.05, 6.8, 6);
-    b.add(dark, tie, [s * 5.5, 8.6, 13.6], [-0.9, 0, 0]);
-  }
-  // Jardins tecnológicos: canteiros com treliça metálica.
-  for (const s of [-1, 1])
-    for (let k = 0; k < 3; k++) {
-      const x = s * (11 + k * 4.2);
-      b.add(white, new THREE.BoxGeometry(3.4, 0.7, 2.4), [x, 0.35, 17.5]);
-      b.add(silver, new THREE.BoxGeometry(0.06, 2.4, 2.4), [x - 1.7, 1.9, 17.5]);
-      b.add(silver, new THREE.BoxGeometry(0.06, 2.4, 2.4), [x + 1.7, 1.9, 17.5]);
-      b.add(silver, new THREE.BoxGeometry(3.4, 0.06, 2.4), [x, 3.1, 17.5]);
+  lotBase(kit, b, 26.5);
+  const s = groundShell(kit, b, 'inbox', { base: '#D9DEE5', canopy: 5, canopyColor: SILVER, glow: '#FFD9A0' });
+  // Tubos de distribuição saindo do volume dos fundos para o chão (leitura de "encaminhamento"),
+  // dos dois lados do lounge do elevador.
+  for (const x of [-7, -5.6, 5.6, 7]) b.add(kit.mat('#CFF3FB', { glass: true }), new THREE.CylinderGeometry(0.35, 0.35, 8.5, 12, 1, true), [x, 4.25, -21.8]);
+  b.add(cyanGlow, new THREE.BoxGeometry(17.6, 0.08, 0.1), [0, s.door.glass + 0.32, s.front + 4.95]);
+  // Jardins tecnológicos: canteiros com treliça metálica dos dois lados do caminho da porta.
+  for (const sx of [-1, 1])
+    for (let k = 0; k < 2; k++) {
+      const x = sx * (11 + k * 4);
+      b.add(white, new THREE.BoxGeometry(3.4, 0.7, 2.4), [x, 0.35, 21]);
+      b.add(silver, new THREE.BoxGeometry(0.06, 2.4, 2.4), [x - 1.7, 1.9, 21]);
+      b.add(silver, new THREE.BoxGeometry(0.06, 2.4, 2.4), [x + 1.7, 1.9, 21]);
+      b.add(silver, new THREE.BoxGeometry(3.4, 0.06, 2.4), [x, 3.1, 21]);
     }
   group.add(b.build());
 
-  // Letreiros: no núcleo, acima da marquise, e na frente de cada ala.
+  // Letreiro na parede do hall de entrada, acima da fachada envidraçada.
+  const sp = signSpot(s, 2.2);
   const sign = signPlane(kit, ['INBOX', 'CENTRAL DE RECEPÇÃO'], 9, 2.2, '#22D3EE');
-  sign.position.set(0, 8.2, 10.45);
+  sign.position.set(0, sp.y, sp.z);
   group.add(sign);
 
-  // Antena girando e luz de topo.
+  // Antena girando e luz de topo, sobre o beiral da cobertura do núcleo.
+  const roof = MASSING.inbox.ground + topLevel('inbox') * STOREY;
+  const mast = new Builder();
+  mast.add(dark, new THREE.CylinderGeometry(0.15, 0.3, 6, 8), [0, roof + 6, 0]);
+  for (let k = 0; k < 4; k++) mast.add(silver, new THREE.CylinderGeometry(0.04, 0.04, 1.6 - k * 0.3, 6), [0, roof + 4 + k * 1.2, 0], [0, 0, Math.PI / 2]);
+  group.add(mast.build());
   const dish = new THREE.Mesh(kit.own(new THREE.SphereGeometry(1.1, 20, 10, 0, Math.PI * 2, 0, Math.PI / 3)), kit.mat(SILVER, { metal: 0.9, rough: 0.22, side: THREE.DoubleSide }));
   dish.rotation.x = -Math.PI / 2.6;
   const dishHolder = new THREE.Group();
-  dishHolder.position.set(0, 24.6, 0);
+  dishHolder.position.set(0, roof + 8.6, 0);
   dishHolder.add(dish);
   const beacon = new THREE.Mesh(kit.own(new THREE.SphereGeometry(0.2, 10, 8)), kit.own(new THREE.MeshBasicMaterial({ color: '#FF4D6D' })));
-  beacon.position.set(0, 25.3, 0);
+  beacon.position.set(0, roof + 9.3, 0);
   group.add(dishHolder, beacon);
 
   // Arbustos nos canteiros e flores em volta.
   const trellis: Array<{ x: number; y?: number; z: number; s: number; color: string }> = [];
-  for (const s of [-1, 1]) for (let k = 0; k < 3; k++) for (let j = 0; j < 3; j++) trellis.push({ x: s * (11 + k * 4.2) + (j - 1) * 1, y: 0.7, z: 17.5, s: 0.55, color: '#3E8E4A' });
-  group.add(shrubs(kit, trellis, 'bush'), ...planting(kit, 18, 24.5, 160, ['#60A5FA', '#22D3EE', '#FFFFFF', '#A78BFA']));
+  for (const sx of [-1, 1]) for (let k = 0; k < 2; k++) for (let j = 0; j < 3; j++) trellis.push({ x: sx * (11 + k * 4) + (j - 1) * 1, y: 0.7, z: 21, s: 0.55, color: '#3E8E4A' });
+  group.add(shrubs(kit, trellis, 'bush'), ...planting(kit, s.bound + 1, 26.8, 120, ['#60A5FA', '#22D3EE', '#FFFFFF', '#A78BFA']));
 
   return {
     group,
-    top: 26.5,
-    core: 16,
+    top: s.top,
+    core: s.core,
     tick: (t) => {
       dishHolder.rotation.y = t * 0.6;
       (beacon.material as THREE.MeshBasicMaterial).color.setRGB(Math.sin(t * 3) > 0.6 ? 1 : 0.25, 0.1, 0.2);

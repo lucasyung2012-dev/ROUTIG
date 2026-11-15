@@ -5,7 +5,7 @@
  */
 import * as THREE from 'three';
 import type { Kit } from '../kit';
-import { canvasPlane, createRoom, finishRoom, pendants, pots, bench, setDetailCommon, wrap, type InteriorScene } from './common';
+import { canvasPlane, createRoom, finishRoom, gallerySlab, pendants, pots, bench, setDetailCommon, wrap, type InteriorScene } from './common';
 import { sectorsFrom, viewOf, type Placed } from './central';
 import { vault, type Thing } from './things';
 
@@ -26,9 +26,8 @@ export const CALENDAR_SECTORS = ['atrium', 'daily', 'weekly', 'monthly', 'agenda
 export type CalendarSector = (typeof CALENDAR_SECTORS)[number];
 
 export function createCalendarInterior(kit: Kit, labels: Record<CalendarSector, string>): InteriorScene {
-  const R = 17;
   const H = 10;
-  const room = createRoom(kit, { radius: R, height: H, sides: 24, floor: '#EDF1F8', glass: '#BFD3F5', frame: '#B8C2CF', accent: '#93C5FD', skylight: 4 });
+  const room = createRoom(kit, { id: 'calendar', floor: '#EDF1F8', glass: '#BFD3F5', frame: '#B8C2CF', accent: '#93C5FD' });
   const { scene, b } = room;
   const brass = kit.mat('#D4B572', { metal: 0.8, rough: 0.3 });
   const blue = kit.mat('#2563EB', { metal: 0.3, rough: 0.35 });
@@ -38,8 +37,8 @@ export function createCalendarInterior(kit: Kit, labels: Record<CalendarSector, 
     const a = (h / 12) * Math.PI * 2;
     b.add(kit.mat('#C9D6EE', { rough: 0.6 }), new THREE.BoxGeometry(0.1, 0.02, 6), [Math.sin(a) * 7, 0.01, Math.cos(a) * 7], [0, a, 0]);
   }
-  // Mezanino circular (2º pavimento).
-  b.add(white, new THREE.RingGeometry(12.5, R - 0.3, 48), [0, 5, 0], [-Math.PI / 2, 0, 0]);
+  // Mezanino circular (galeria a meia altura do tambor, na planta dele).
+  b.add(white, gallerySlab(room, 5, 12.5));
   b.add(kit.mat('#CFE0FA', { glass: true }), new THREE.CylinderGeometry(12.5, 12.5, 1, 48, 1, true), [0, 5.55, 0]);
   pendants(kit, b, [[-5, 5], [5, 5], [0, -6]], 4.2, H, '#E8F0FF');
   pots(kit, b, [[-6, 14], [6, 14]]);
@@ -92,7 +91,7 @@ export function createCalendarInterior(kit: Kit, labels: Record<CalendarSector, 
     scene,
     sectors: CALENDAR_SECTORS,
     pickables: groups,
-    room: { radius: R - 1, height: H },
+    room: room.spec,
     obstacles: [{ x: 0, z: 9, r: 1.8, h: 1 }],
     view: (id) => viewOf(plan, id, overview),
     setData: () => undefined,
@@ -127,9 +126,8 @@ export interface TasksRoomData {
 }
 
 export function createTasksInterior(kit: Kit, labels: Record<TasksSector, string>): InteriorScene {
-  const R = 17;
   const H = 8;
-  const room = createRoom(kit, { radius: R, height: H, sides: 8, floor: '#E9ECF1', glass: '#BBD3F0', frame: '#2B3442', accent: '#22D3EE', skylight: 3 });
+  const room = createRoom(kit, { id: 'tasks', floor: '#E9ECF1', glass: '#BBD3F0', frame: '#2B3442', accent: '#22D3EE' });
   const { scene, b } = room;
   const graphite = kit.mat('#2B3442', { metal: 0.5, rough: 0.4 });
   const silver = kit.mat('#CBD5E1', { metal: 0.85, rough: 0.25 });
@@ -206,7 +204,7 @@ export function createTasksInterior(kit: Kit, labels: Record<TasksSector, string
     scene,
     sectors: TASKS_SECTORS,
     pickables: groups,
-    room: { radius: R - 1.5, height: H },
+    room: room.spec,
     obstacles: [{ x: -3, z: 0, r: 2.4, h: 1 }, { x: 3, z: 0, r: 2.4, h: 1 }],
     view: (id) => viewOf(plan, id, overview),
     setData: (d) => {
@@ -228,9 +226,8 @@ export interface ProjectsRoomData {
 }
 
 export function createProjectsInterior(kit: Kit, labels: Record<ProjectsSector, string>): InteriorScene {
-  const R = 16;
   const H = 9;
-  const room = createRoom(kit, { radius: R, height: H, sides: 6, floor: '#F2EDE6', glass: '#F5DCC7', frame: '#F97316', accent: '#FDBA74', skylight: 5 });
+  const room = createRoom(kit, { id: 'projects', floor: '#F2EDE6', glass: '#F5DCC7', frame: '#F97316', accent: '#FDBA74' });
   const { scene, b } = room;
   const white = kit.mat('#F7F4EF', { rough: 0.5 });
   pendants(kit, b, [[-4, 0], [4, 0], [0, 5]], 6, H, '#FFE7C2');
@@ -266,12 +263,12 @@ export function createProjectsInterior(kit: Kit, labels: Record<ProjectsSector, 
     }
   });
   finishRoom(room);
-  const overview = { cam: new THREE.Vector3(0, 6, R - 2), target: new THREE.Vector3(0, 1.5, -2) };
+  const overview = { cam: new THREE.Vector3(0, 6, 14), target: new THREE.Vector3(0, 1.5, -2) };
   return {
     scene,
     sectors: PROJECTS_SECTORS,
     pickables: groups,
-    room: { radius: R - 1.5, height: H },
+    room: room.spec,
     obstacles: [],
     view: (id) => viewOf(plan, id, overview),
     setData: (d) => {
@@ -303,9 +300,8 @@ export const FINANCE_SECTORS = ['academy', 'investments', 'market', 'planning', 
 export type FinanceSector = (typeof FINANCE_SECTORS)[number];
 
 export function createFinanceInterior(kit: Kit, labels: Record<FinanceSector, string>): InteriorScene {
-  const R = 15;
   const H = 8;
-  const room = createRoom(kit, { radius: R, height: H, sides: 6, floor: '#EEF0F4', glass: '#C7D7F5', frame: '#2563EB', accent: '#FDE68A', skylight: 3 });
+  const room = createRoom(kit, { id: 'finance', floor: '#EEF0F4', glass: '#C7D7F5', frame: '#2563EB', accent: '#FDE68A' });
   const { scene, b } = room;
   const gold = kit.mat('#D4B572', { metal: 0.85, rough: 0.25 });
   const blue = kit.mat('#2563EB', { metal: 0.35, rough: 0.35 });
@@ -313,26 +309,26 @@ export function createFinanceInterior(kit: Kit, labels: Record<FinanceSector, st
   b.add(blue, new THREE.CylinderGeometry(1.2, 1.4, 1, 6), [0, 0.5, 0]);
   b.add(gold, new THREE.CylinderGeometry(1.25, 1.25, 0.08, 6), [0, 1.04, 0]);
   pendants(kit, b, [[-4, 3], [4, 3]], 5.5, H, '#FFF3D6');
-  pots(kit, b, [[-6, 12], [6, 12]]);
+  pots(kit, b, [[-6, 10.5], [6, 10.5]]);
   const plan = ring(FINANCE_SECTORS, 9.5);
   const groups = sectorsFrom(kit, scene, plan, FINANCE_SECTORS, labels, '#D4B572', (id, sb) => {
     sb.add(kit.mat('#F2F4F8', { rough: 0.5 }), new THREE.BoxGeometry(2.4, 0.9, 1), [0, 0.45, 0]);
     sb.add(kit.mat('#1F2A3A', { metal: 0.5 }), new THREE.BoxGeometry(1.4, 0.8, 0.05), [0, 1.35, -0.3], [-0.3, 0, 0]);
     if (id === 'investments') for (let k = 0; k < 5; k++) sb.add(kit.mat('#FDE68A', { glow: true }), new THREE.BoxGeometry(0.2, 0.3 + k * 0.25, 0.2), [-1.6 + k * 0.4 + 2.6, 0.15 + k * 0.125, 0.3]);
   });
-  // Cofre: porta redonda na parede leste, numa câmara entre as duas faces de vidro desse canto do
-  // hexágono (entre as salas de 60° e 120°, longe da entrada e do lounge dos elevadores). Abre com o
-  // PIN real de Finanças, pelo mesmo bloqueio da tela de Finanças; o motor junta o cofre aos objetos
-  // funcionais do térreo (userData.things).
-  const things: Thing[] = [vault(kit, scene, 0, 12.6, 0, 0, -Math.PI / 2)];
+  // Cofre: porta redonda no anexo leste (o volume geométrico do cofre, massing.ts), de frente para o
+  // salão, com a câmara encostada na parede de fora do anexo (entre as salas de 60° e 120°, longe da
+  // entrada e do lounge dos elevadores). Abre com o PIN real de Finanças, pelo mesmo bloqueio da tela
+  // de Finanças; o motor junta o cofre aos objetos funcionais do térreo (userData.things).
+  const things: Thing[] = [vault(kit, scene, 0, 13.5, 0, 0, -Math.PI / 2)];
   scene.userData.things = things;
   finishRoom(room);
-  const overview = { cam: new THREE.Vector3(0, 6, R - 2), target: new THREE.Vector3(0, 1.2, -2) };
+  const overview = { cam: new THREE.Vector3(0, 6, 13), target: new THREE.Vector3(0, 1.2, -2) };
   return {
     scene,
     sectors: FINANCE_SECTORS,
     pickables: groups,
-    room: { radius: R - 1.5, height: H },
+    room: room.spec,
     obstacles: [{ x: 0, z: 0, r: 1.6, h: 1 }],
     view: (id) => viewOf(plan, id, overview),
     setData: () => undefined,

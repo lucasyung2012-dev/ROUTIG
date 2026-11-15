@@ -1,6 +1,8 @@
 /**
- * Base dos interiores: salão com piso, paredes de vidro (o jardim aparece lá fora), teto com
- * claraboia, luz e placas de setor. Cada prédio monta os próprios ambientes em cima disto.
+ * Base dos interiores: o térreo pela planta do prédio (massing.ts), igual ao de fora: piso de cada
+ * volume, paredes na fachada do prédio (o jardim aparece pelo vidro), teto de cada volume na sua
+ * altura (vazio do átrio, pé-direito alto do mezanino ou claraboia), luz e placas de setor. Cada
+ * prédio monta os próprios ambientes em cima disto.
  * Um interior por vez fica na memória (criado ao entrar, descartado ao sair).
  */
 import * as THREE from 'three';
@@ -9,6 +11,10 @@ import { Builder, forest, sky, type Kit, type Plant, type TreeSpecies } from '..
 import type { Obstacle } from '../camera';
 import type { Quality } from '../world';
 import type { Floors } from './floors';
+import type { ModuleId } from '@/app/modules';
+import { FORMS, circle, clipZ, facadeMats, slab, upperPlan, volSlab, wallsAlong } from '../forms';
+import { MASSING, groundHeight, groundSpan, sideCut, topLevel, volsAt } from '../massing';
+import { exitAt, inVol, insideAt, tallerInside, volPoly, wallRuns, type Vol, type WallRun } from '../outline';
 
 export interface InteriorScene {
   scene: THREE.Scene;
@@ -17,7 +23,7 @@ export interface InteriorScene {
   pickables: THREE.Object3D[];
   /** Vista de um setor; 'entry' = vista larga da entrada, mostrando o salão inteiro. */
   view: (id: string) => { cam: THREE.Vector3; target: THREE.Vector3 };
-  room: { radius: number; height: number };
+  room: RoomSpec;
   obstacles: Obstacle[];
   setData: (d: unknown) => void;
   tick: (t: number, camera: THREE.Camera) => void;
@@ -26,16 +32,28 @@ export interface InteriorScene {
   floors?: Floors;
 }
 
-export interface RoomOpts {
+/** O térreo pela planta do prédio (massing.ts): onde se anda, a fachada e o tamanho. */
+export interface RoomSpec {
+  /** Raio que cobre a planta (câmera). */
   radius: number;
+  /** Pé-direito do térreo (o 1º andar começa aqui). */
   height: number;
-  /** Lados do salão (6, 8, 12…; 64 = redondo). */
-  sides: number;
+  /** Fachada da frente (entrada) e dos fundos (elevadores) em x = 0. */
+  front: number;
+  back: number;
+  /** Onde não se pisa: fora da planta (com folga das paredes). */
+  blocked: (x: number, z: number) => boolean;
+  /** Para a câmera da 3ª pessoa não atravessar a parede (do mesmo lado de quem anda). */
+  wallAt: (x: number, z: number) => number;
+}
+
+export interface RoomOpts {
+  /** Prédio: a planta e a fachada vêm dele (massing.ts, forms.ts). */
+  id: ModuleId;
   floor: string;
   glass: string;
   frame: string;
   accent: string;
-  skylight?: number;
 }
 
 export interface Room {
@@ -44,10 +62,27 @@ export interface Room {
   b: Builder;
   trees: ReturnType<typeof forest>;
   accentMat: THREE.MeshBasicMaterial;
+  spec: RoomSpec;
+  /** Volumes do térreo e as paredes (trechos), para encaixar os móveis na planta. */
+  vols: Vol[];
+  runs: WallRun[];
+  /** O volume principal (o maior que contém o centro). */
+  main: Vol;
 }
 
-/** Salão base. `b` recebe as peças do prédio; chame `finish` no fim. */
+/** Área do volume (para achar o principal). */
+const area = (v: Vol) => (v.kind === 'rect' ? v.w * v.d : v.kind === 'circle' ? Math.PI * v.r * v.r : 0.5 * v.sides * v.r * v.r * Math.sin((Math.PI * 2) / v.sides));
+
+/** Salão do térreo pela planta do prédio. `b` recebe as peças do prédio; chame `finish` no fim. */
 export function createRoom(kit: Kit, o: RoomOpts): Room {
+  const M = MASSING[o.id];
+  const form = FORMS[o.id];
+  const g = volsAt(o.id, 0);
+  const span = groundSpan(o.id);
+  const R = span.bound;
+  const H = M.ground;
+  const hOf = (i: number) => groundHeight(o.id, g[i]!);
+  const runs = wallRuns(g, 1, hOf);
   const scene = new THREE.Scene();
   const sk = sky(kit);
   sk.set(new THREE.Color('#5AA9E6'), new THREE.Color('#E3F2F9'));
@@ -55,9 +90,9 @@ export function createRoom(kit: Kit, o: RoomOpts): Room {
   sk.mesh.userData.outdoorOnly = true;
   scene.add(new THREE.HemisphereLight('#FFFFFF', '#9FB0C4', 0.85));
   const key = new THREE.DirectionalLight('#FFF6E8', 1.2);
-  key.position.set(o.radius * 0.4, 30, o.radius * 0.3);
+  key.position.set(R * 0.4, 30, R * 0.3);
   key.shadow.mapSize.set(1024, 1024);
-  Object.assign(key.shadow.camera, { left: -o.radius - 2, right: o.radius + 2, top: o.radius + 2, bottom: -o.radius - 2, near: 1, far: 60 });
+  Object.assign(key.shadow.camera, { left: -R - 2, right: R + 2, top: R + 2, bottom: -R - 2, near: 1, far: 60 });
   scene.add(key);
 
   // Lado de fora: gramado e um anel de árvores visto pelo vidro.
@@ -66,12 +101,12 @@ export function createRoom(kit: Kit, o: RoomOpts): Room {
   lawn.position.y = -0.05;
   lawn.userData.outdoorOnly = true;
   scene.add(lawn);
-  const rnd = seededRandom(Math.round(o.radius * 13));
+  const rnd = seededRandom(Math.round(R * 13));
   const ring: Plant[] = [];
   const species: TreeSpecies[] = ['round', 'conifer', 'slender', 'blossom'];
   for (let i = 0; i < 90; i++) {
     const a = rnd() * Math.PI * 2;
-    const r = o.radius + 6 + rnd() * 40;
+    const r = R + 6 + rnd() * 40;
     ring.push({ x: Math.sin(a) * r, z: Math.cos(a) * r, s: 1 + rnd() * 0.6, species: species[i % 4]! });
   }
   const trees = forest(kit, ring);
@@ -80,21 +115,85 @@ export function createRoom(kit: Kit, o: RoomOpts): Room {
 
   const b = new Builder();
   const frame = kit.mat(o.frame, { metal: 0.85, rough: 0.25 });
-  const rot = o.sides <= 12 ? Math.PI / o.sides : 0;
-  b.add(kit.mat(o.floor, { rough: 0.18, metal: 0.12 }), new THREE.CylinderGeometry(o.radius, o.radius, 0.1, o.sides), [0, -0.05, 0], [0, rot, 0]);
-  b.add(kit.mat(o.glass, { glass: true, side: THREE.DoubleSide }), new THREE.CylinderGeometry(o.radius, o.radius, o.height, o.sides, 1, true), [0, o.height / 2, 0], [0, rot, 0]);
-  const mullions = o.sides <= 12 ? o.sides * 4 : 56;
-  for (let i = 0; i < mullions; i++) {
-    const a = (i / mullions) * Math.PI * 2;
-    b.add(frame, new THREE.BoxGeometry(0.1, o.height, 0.3), [Math.sin(a) * (o.radius - 0.15), o.height / 2, Math.cos(a) * (o.radius - 0.15)], [0, a, 0]);
-  }
-  // Teto com claraboia central.
-  const sky0 = o.skylight ?? o.radius * 0.3;
-  b.add(kit.mat('#F3F6FA', { rough: 0.5 }), new THREE.RingGeometry(sky0, o.radius + 0.3, o.sides <= 12 ? o.sides : 96, 1, rot), [0, o.height, 0], [Math.PI / 2, 0, 0]);
-  b.add(kit.mat('#CDEFFB', { glass: true }), new THREE.CircleGeometry(sky0, 48), [0, o.height + 0.6, 0], [Math.PI / 2, 0, 0]);
-  b.add(frame, new THREE.CylinderGeometry(sky0 + 0.1, sky0 + 0.1, 0.6, 48, 1, true), [0, o.height + 0.3, 0]);
+  const floor = kit.mat(o.floor, { rough: 0.18, metal: 0.12 });
+  // Piso de cada volume.
+  for (const v of g) b.add(floor, volSlab(v, 0, 0.1));
+  // Paredes: a mesma fachada de fora (vidro, pedra, tijolo, ripas, brises, painéis), por dentro,
+  // com o vidro na cor do prédio e os montantes na cor da estrutura; a entrada envidraçada na frente.
+  const fm = { ...facadeMats(kit, form), glass: kit.mat(o.glass, { glass: true, side: THREE.DoubleSide }), metal: frame };
+  wallsAlong(b, form, fm, runs, hOf, M.entry, { glass: kit.mat('#CFEFFB', { glass: true, side: THREE.DoubleSide }), dark: frame });
+  // Teto de cada volume na sua altura. Sobre o átrio, o vazio continua até a claraboia do alto; na
+  // planta com mezanino, o pé-direito alto da frente fica aberto; volume sem andar em cima (e com o
+  // centro) ganha a claraboia; o resto é laje fechada (há andar em cima).
+  const up = upperPlan(form);
+  const cut = topLevel(o.id) >= 1 && up === 'side' ? sideCut(o.id, 1) : Infinity;
+  const ceil = kit.mat('#F3F6FA', { rough: 0.5 });
+  const glassTop = kit.mat('#CDEFFB', { glass: true });
+  g.forEach((v, i) => {
+    const h = hOf(i);
+    const centre = inVol(v, 0, 0, 1);
+    const above = v.hi >= 1;
+    // Volume mais alto que sobe do meio deste (torre sobre o embasamento): furo no teto.
+    const holes: Array<Array<[number, number]>> = tallerInside(g, i, hOf);
+    let sky0 = 0;
+    if (centre && above && up === 'atrium') holes.push(circle(M.void, 40));
+    else if (centre && !above && M.sky) {
+      sky0 = Math.min(M.sky, ...[0, Math.PI / 2, Math.PI, -Math.PI / 2].map((a) => exitAt([v], a, 0) - 1.5));
+      if (sky0 > 1) holes.push(circle(sky0, 40));
+      else sky0 = 0;
+    }
+    let pts = volPoly(v);
+    if (above && Number.isFinite(cut)) pts = clipZ(pts, cut);
+    if (pts.length >= 3) b.add(ceil, slab(pts, holes, h - 0.02, 0.25));
+    if (sky0) {
+      b.add(glassTop, new THREE.CircleGeometry(sky0, 48), [0, h + 0.6, 0], [Math.PI / 2, 0, 0]);
+      b.add(frame, new THREE.CylinderGeometry(sky0 + 0.1, sky0 + 0.1, 0.6, 48, 1, true), [0, h + 0.3, 0]);
+    }
+  });
   const accentMat = kit.own(new THREE.MeshBasicMaterial({ color: o.accent }));
-  return { scene, key, b, trees, accentMat };
+  const main = g.filter((v) => inVol(v, 0, 0)).sort((u, v) => area(v) - area(u))[0] ?? g[0]!;
+  const spec: RoomSpec = {
+    radius: R,
+    height: H,
+    front: span.front,
+    back: span.back,
+    blocked: (x, z) => !insideAt(g, x, z, 0.45),
+    wallAt: (x, z) => Math.hypot(x, z) + (insideAt(g, x, z, 0.35) ? 1 : -1),
+  };
+  return { scene, key, b, trees, accentMat, spec, vols: g, runs, main };
+}
+
+/**
+ * Galeria (mezanino em volta do vazio do meio) na altura `y`: a laje segue a planta do volume
+ * principal do térreo, com o vazio redondo de raio `inner` no meio.
+ */
+export function gallerySlab(room: Room, y: number, inner: number, thick = 0.25): THREE.BufferGeometry {
+  return slab(volPoly(room.main), [circle(inner, 40)], y, thick);
+}
+
+/**
+ * Lugares ao longo das paredes (de `vol`, ou de todos os volumes), `n` no total, recuados `inset` m
+ * para dentro, com `face` = ângulo da normal da parede para fora; `skip` tira os que não servem
+ * (entrada, elevadores). Só paredes que vão do chão (não as que sobem acima de uma ala mais baixa).
+ */
+export function wallSpots(room: Room, n: number, inset: number, skip: (x: number, z: number) => boolean = () => false, vol?: Vol): Array<{ x: number; z: number; face: number }> {
+  const vi = vol ? room.vols.indexOf(vol) : -1;
+  const runs = room.runs.filter((r) => (vi < 0 || r.vol === vi) && r.from === 0);
+  const total = runs.reduce((s, r) => s + r.len, 0);
+  const out: Array<{ x: number; z: number; face: number }> = [];
+  if (!total || n <= 0) return out;
+  const step = total / n;
+  let acc = step / 2;
+  for (const r of runs) {
+    while (acc <= r.len) {
+      const x = r.ax + ((r.bx - r.ax) * acc) / r.len - r.nx * inset;
+      const z = r.az + ((r.bz - r.az) * acc) / r.len - r.nz * inset;
+      if (!skip(x, z) && insideAt(room.vols, x, z, Math.min(inset, 0.5))) out.push({ x, z, face: Math.atan2(r.nx, r.nz) });
+      acc += step;
+    }
+    acc -= r.len;
+  }
+  return out;
 }
 
 export function finishRoom(room: Room): void {

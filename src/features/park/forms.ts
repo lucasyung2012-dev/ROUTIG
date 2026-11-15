@@ -4,13 +4,16 @@
  * - planta do andar: átrio central com galerias, núcleo maciço com escada, corredor com salas dos
  *   dois lados, mezanino sobre um pé-direito alto na frente, planta livre com ilhas ou anel de
  *   salas em volta de um jardim interno;
- * - forma (redonda, quadrada, hexagonal, octogonal...), recuo entre andares e giro (torre torcida);
  * - fachada: pele de vidro, pedra com janelas, tijolo, brises, ripas de madeira ou painéis com
- *   janela em fita.
+ *   janela em fita, desenhada trecho a trecho ao longo das paredes (facadeAlong, wallsAlong).
+ * A forma e o tamanho (a planta de cada nível, alas mais baixas, átrio) vêm da volumetria do
+ * prédio (massing.ts, outline.ts). `sides`, `rot`, `setback` e `twist` são do desenho antigo em
+ * polígono (polyR, outline, terraceSpots), mantidos para quem ainda usa esses ajudantes.
  */
 import * as THREE from 'three';
 import type { ModuleId } from '@/app/modules';
 import type { Builder, Kit } from './kit';
+import { alongRun, entranceRun, volPoly, type Vol, type WallRun } from './outline';
 
 export type Plan = 'atrium' | 'core' | 'corridor' | 'side' | 'open' | 'garden';
 export type Facade = 'glass' | 'stone' | 'brick' | 'wood' | 'louver' | 'panel';
@@ -41,7 +44,7 @@ export const FORMS: Record<ModuleId, Form> = {
   tasks: { sides: 4, rot: Math.PI / 4, setback: 0, twist: 0, plan: 'corridor', facade: 'louver', frame: '#3A4656' },
   finance: { sides: 6, rot: Math.PI / 6, setback: 0.07, twist: 0, plan: 'corridor', facade: 'stone', frame: '#D9D2C2' },
   music: { sides: 0, rot: 0, setback: 0.06, twist: 0, plan: 'corridor', facade: 'wood', frame: '#9A6B47' },
-  academy: { sides: 4, rot: Math.PI / 4, setback: 0.06, twist: 0, plan: 'side', facade: 'brick', frame: '#A65A3F' },
+  academy: { sides: 4, rot: Math.PI / 4, setback: 0.06, twist: 0, plan: 'atrium', facade: 'brick', frame: '#A65A3F' },
   projects: { sides: 6, rot: Math.PI / 6, setback: 0, twist: 0, plan: 'side', facade: 'panel', frame: '#F1E7DC' },
   notes: { sides: 5, rot: 0, setback: 0, twist: 0, plan: 'open', facade: 'wood', frame: '#B08560' },
   inbox: { sides: 8, rot: Math.PI / 8, setback: 0.06, twist: 0, plan: 'open', facade: 'glass', frame: '#C3CDD8' },
@@ -150,14 +153,128 @@ export function facadeMats(kit: Kit, f: Form): FacadeMats {
   };
 }
 
+/** Referencial de um trecho reto de fachada: ponto de referência e ângulo da normal para fora. */
+interface Frame {
+  cx: number;
+  cz: number;
+  phi: number;
+}
+
+/** Peça no referencial do trecho: `lx` ao longo da parede, `lz` para fora, `ly` para cima a partir de `y`. */
+function putIn(b: Builder, fr: Frame, y: number, mat: THREE.Material, geo: THREE.BufferGeometry, lx: number, ly: number, lz: number) {
+  const c = Math.cos(fr.phi);
+  const s = Math.sin(fr.phi);
+  b.add(mat, geo, [fr.cx + s * lz + c * lx, y + ly, fr.cz + c * lz - s * lx], [0, fr.phi, 0]);
+}
+
+/** Um pedaço [x0, x1] do trecho, no tipo da fachada do prédio, com altura `top`. */
+function facadeSpan(b: Builder, f: Form, m: FacadeMats, fr: Frame, y: number, x0: number, x1: number, top: number) {
+  const w = x1 - x0;
+  if (w < 0.05 || top < 0.3) return;
+  const cx = (x0 + x1) / 2;
+  const put = (mat: THREE.Material, geo: THREE.BufferGeometry, lx: number, ly: number, lz: number) => putIn(b, fr, y, mat, geo, lx, ly, lz);
+  switch (f.facade) {
+    case 'glass':
+    case 'louver':
+    case 'wood': {
+      put(m.glass, new THREE.BoxGeometry(w, top, 0.04), cx, top / 2, 0);
+      const n = Math.max(1, Math.round(w / 1.6));
+      for (let i = 0; i <= n; i++) put(m.metal, new THREE.BoxGeometry(0.08, top, 0.16), x0 + (i / n) * w, top / 2, 0);
+      put(m.metal, new THREE.BoxGeometry(w, 0.06, 0.12), cx, Math.min(1.0, top - 0.1), 0.02);
+      if (f.facade === 'louver') {
+        const k = Math.max(1, Math.round(w / 0.7));
+        for (let i = 0; i < k; i++) put(m.frame, new THREE.BoxGeometry(0.05, top, 0.55), x0 + ((i + 0.5) / k) * w, top / 2, 0.42);
+      }
+      if (f.facade === 'wood') {
+        const k = Math.max(1, Math.round(w / 0.42));
+        for (let i = 0; i < k; i++) if (i % 3 !== 1) put(m.frame, new THREE.BoxGeometry(0.07, top, 0.12), x0 + ((i + 0.5) / k) * w, top / 2, 0.22);
+      }
+      break;
+    }
+    case 'stone':
+    case 'brick': {
+      // Parapeito e verga maciços, janelas altas entre pilares.
+      if (top < 3.4) {
+        put(m.frame, new THREE.BoxGeometry(w, top, 0.3), cx, top / 2, 0);
+        break;
+      }
+      put(m.frame, new THREE.BoxGeometry(w, 0.9, 0.3), cx, 0.45, 0);
+      put(m.frame, new THREE.BoxGeometry(w, Math.max(0.3, top - 3.0), 0.3), cx, 3.0 + Math.max(0.3, top - 3.0) / 2, 0);
+      const n = Math.max(1, Math.round(w / 2.2));
+      const pw = f.facade === 'stone' ? 0.55 : 0.45;
+      for (let i = 0; i <= n; i++) put(m.frame, new THREE.BoxGeometry(pw, top, 0.36), x0 + (i / n) * w, top / 2, 0.02);
+      put(m.glass, new THREE.BoxGeometry(w, 2.1, 0.04), cx, 1.95, -0.05);
+      for (let i = 0; i < n; i++) put(m.metal, new THREE.BoxGeometry(0.05, 2.1, 0.08), x0 + ((i + 0.5) / n) * w, 1.95, -0.03);
+      if (f.facade === 'stone') put(m.frame, new THREE.BoxGeometry(w + 0.1, 0.12, 0.5), cx, 0.92, 0.1);
+      break;
+    }
+    case 'panel': {
+      // Painéis claros com uma janela em fita contínua.
+      if (top < 3.1) {
+        put(m.frame, new THREE.BoxGeometry(w, top, 0.18), cx, top / 2, 0);
+        break;
+      }
+      put(m.frame, new THREE.BoxGeometry(w, 0.95, 0.18), cx, 0.475, 0);
+      put(m.frame, new THREE.BoxGeometry(w, Math.max(0.3, top - 2.75), 0.18), cx, 2.75 + Math.max(0.3, top - 2.75) / 2, 0);
+      put(m.glass, new THREE.BoxGeometry(w, 1.8, 0.04), cx, 1.85, 0);
+      const n = Math.max(1, Math.round(w / 2.4));
+      for (let i = 0; i <= n; i++) put(m.metal, new THREE.BoxGeometry(0.06, 1.8, 0.1), x0 + (i / n) * w, 1.85, 0);
+      break;
+    }
+  }
+}
+
+/** Porta de 2 × `dw` m no trecho (verga, batentes e soleira) em `lx`. */
+function doorIn(b: Builder, m: FacadeMats, fr: Frame, y: number, lx: number, h: number, dw: number) {
+  putIn(b, fr, y, m.frame, new THREE.BoxGeometry(dw * 2, Math.max(0.1, h - 2.4), 0.3), lx, 2.4 + Math.max(0.1, h - 2.4) / 2, 0);
+  for (const s of [-1, 1]) putIn(b, fr, y, m.metal, new THREE.BoxGeometry(0.1, 2.4, 0.3), lx + s * dw, 1.2, 0);
+  putIn(b, fr, y, m.metal, new THREE.BoxGeometry(dw * 2, 0.03, 0.4), lx, 0.015, 0);
+}
+
 /**
- * Fachada de um andar no tipo do prédio, face a face. `doors` são ângulos onde a face mais
- * próxima ganha uma porta de 1,8 m (para o terraço ou a ponte do elevador). Devolve os ângulos
- * reais das portas (centro das faces escolhidas).
+ * Fachada de um trecho reto de parede (de a até b, normal para fora n), no tipo do prédio, de `y`
+ * até `y + h`. Paredes altas (térreo de pé-direito alto) repetem a fachada em faixas de até 4,8 m,
+ * uma por galeria. `doors` são posições ao longo do trecho (metros a partir de a) onde fica uma
+ * porta de 2 × `dw` m (só na faixa de baixo).
+ */
+export function facadeAlong(b: Builder, f: Form, m: FacadeMats, r: { ax: number; az: number; bx: number; bz: number; nx: number; nz: number }, y: number, h: number, doors: readonly number[] = [], dw = 0.9) {
+  const len = Math.hypot(r.bx - r.ax, r.bz - r.az);
+  if (len < 0.05 || h < 0.05) return;
+  const fr: Frame = { cx: (r.ax + r.bx) / 2, cz: (r.az + r.bz) / 2, phi: Math.atan2(r.nx, r.nz) };
+  // Eixo ao longo da parede no referencial (cos φ, −sen φ): a e b viram −len/2 ou +len/2.
+  const tx = Math.cos(fr.phi);
+  const tz = -Math.sin(fr.phi);
+  const sa = (r.ax - fr.cx) * tx + (r.az - fr.cz) * tz;
+  const dir = sa < 0 ? 1 : -1;
+  const half = len / 2 + 0.02;
+  const bands = Math.max(1, Math.round(h / 4.6));
+  const bh = h / bands;
+  const ds = doors
+    .map((d) => dir * (d - len / 2))
+    .filter((lx) => Math.abs(lx) <= half - dw - 0.1)
+    .sort((u, v) => u - v);
+  for (let k = 0; k < bands; k++) {
+    const yy = y + k * bh;
+    if (k > 0 || !ds.length) {
+      facadeSpan(b, f, m, fr, yy, -half, half, bh);
+      continue;
+    }
+    let x = -half;
+    for (const lx of ds) {
+      facadeSpan(b, f, m, fr, yy, x, lx - dw, bh);
+      doorIn(b, m, fr, yy, lx, bh, dw);
+      x = lx + dw;
+    }
+    facadeSpan(b, f, m, fr, yy, x, half, bh);
+  }
+}
+
+/**
+ * Fachada de um andar no tipo do prédio, face a face de um polígono regular. `doors` são ângulos
+ * onde a face mais próxima ganha uma porta de 1,8 m. Devolve os ângulos reais das portas.
  */
 export function facade(b: Builder, f: Form, m: FacadeMats, R: number, rot: number, y: number, h: number, doors: number[] = []): number[] {
   const fs = faces(f.sides, rot, R);
-  // Cada porta fica na face que o ângulo cruza, no ponto exato (puxada para dentro da face se cair no canto).
   const dw = 0.9;
   const doorAt = new Map<number, number>();
   for (const d of doors) {
@@ -176,71 +293,17 @@ export function facade(b: Builder, f: Form, m: FacadeMats, R: number, rot: numbe
     const t = Math.atan2(Math.sin(d - fc.phi), Math.cos(d - fc.phi));
     doorAt.set(best, Math.max(-lim, Math.min(lim, fc.a * Math.tan(t))));
   }
-  const put = (fc: { phi: number; a: number }, mat: THREE.Material, geo: THREE.BufferGeometry, lx: number, ly: number, lz: number) => {
-    const c = Math.cos(fc.phi);
-    const s = Math.sin(fc.phi);
-    b.add(mat, geo, [s * (fc.a + lz) + c * lx, y + ly, c * (fc.a + lz) - s * lx], [0, fc.phi, 0]);
-  };
-  // Um trecho [x0, x1] da face, no tipo da fachada.
-  const span = (fc: { phi: number; a: number }, x0: number, x1: number, top: number) => {
-    const w = x1 - x0;
-    if (w < 0.05) return;
-    const cx = (x0 + x1) / 2;
-    switch (f.facade) {
-      case 'glass':
-      case 'louver':
-      case 'wood': {
-        put(fc, m.glass, new THREE.BoxGeometry(w, top, 0.04), cx, top / 2, 0);
-        const n = Math.max(1, Math.round(w / 1.6));
-        for (let i = 0; i <= n; i++) put(fc, m.metal, new THREE.BoxGeometry(0.08, top, 0.16), x0 + (i / n) * w, top / 2, 0);
-        put(fc, m.metal, new THREE.BoxGeometry(w, 0.06, 0.12), cx, 1.0, 0.02);
-        if (f.facade === 'louver') {
-          const k = Math.max(1, Math.round(w / 0.7));
-          for (let i = 0; i < k; i++) put(fc, m.frame, new THREE.BoxGeometry(0.05, top, 0.55), x0 + ((i + 0.5) / k) * w, top / 2, 0.42);
-        }
-        if (f.facade === 'wood') {
-          const k = Math.max(1, Math.round(w / 0.42));
-          for (let i = 0; i < k; i++) if (i % 3 !== 1) put(fc, m.frame, new THREE.BoxGeometry(0.07, top, 0.12), x0 + ((i + 0.5) / k) * w, top / 2, 0.22);
-        }
-        break;
-      }
-      case 'stone':
-      case 'brick': {
-        // Parapeito e verga maciços, janelas altas entre pilares.
-        put(fc, m.frame, new THREE.BoxGeometry(w, 0.9, 0.3), cx, 0.45, 0);
-        put(fc, m.frame, new THREE.BoxGeometry(w, Math.max(0.3, top - 3.0), 0.3), cx, 3.0 + Math.max(0.3, top - 3.0) / 2, 0);
-        const n = Math.max(1, Math.round(w / 2.2));
-        const pw = f.facade === 'stone' ? 0.55 : 0.45;
-        for (let i = 0; i <= n; i++) put(fc, m.frame, new THREE.BoxGeometry(pw, top, 0.36), x0 + (i / n) * w, top / 2, 0.02);
-        put(fc, m.glass, new THREE.BoxGeometry(w, 2.1, 0.04), cx, 1.95, -0.05);
-        for (let i = 0; i < n; i++) put(fc, m.metal, new THREE.BoxGeometry(0.05, 2.1, 0.08), x0 + ((i + 0.5) / n) * w, 1.95, -0.03);
-        if (f.facade === 'stone') put(fc, m.frame, new THREE.BoxGeometry(w + 0.1, 0.12, 0.5), cx, 0.92, 0.1);
-        break;
-      }
-      case 'panel': {
-        // Painéis claros com uma janela em fita contínua.
-        put(fc, m.frame, new THREE.BoxGeometry(w, 0.95, 0.18), cx, 0.475, 0);
-        put(fc, m.frame, new THREE.BoxGeometry(w, Math.max(0.3, top - 2.75), 0.18), cx, 2.75 + Math.max(0.3, top - 2.75) / 2, 0);
-        put(fc, m.glass, new THREE.BoxGeometry(w, 1.8, 0.04), cx, 1.85, 0);
-        const n = Math.max(1, Math.round(w / 2.4));
-        for (let i = 0; i <= n; i++) put(fc, m.metal, new THREE.BoxGeometry(0.06, 1.8, 0.1), x0 + (i / n) * w, 1.85, 0);
-        break;
-      }
-    }
-  };
   const out: number[] = [];
   fs.forEach((fc, i) => {
+    const fr: Frame = { cx: Math.sin(fc.phi) * fc.a, cz: Math.cos(fc.phi) * fc.a, phi: fc.phi };
     const half = fc.len / 2 + 0.02;
     const lx = doorAt.get(i);
     if (lx !== undefined) {
-      span(fc, -half, lx - dw, h);
-      span(fc, lx + dw, half, h);
-      // Verga sobre a porta, batentes e soleira.
-      put(fc, m.frame, new THREE.BoxGeometry(dw * 2, h - 2.4, 0.3), lx, 2.4 + (h - 2.4) / 2, 0);
-      for (const s of [-1, 1]) put(fc, m.metal, new THREE.BoxGeometry(0.1, 2.4, 0.3), lx + s * dw, 1.2, 0);
-      put(fc, m.metal, new THREE.BoxGeometry(dw * 2, 0.03, 0.4), lx, 0.015, 0);
+      facadeSpan(b, f, m, fr, y, -half, lx - dw, h);
+      facadeSpan(b, f, m, fr, y, lx + dw, half, h);
+      doorIn(b, m, fr, y, lx, h, dw);
       out.push(fc.phi + Math.atan2(lx, fc.a));
-    } else span(fc, -half, half, h);
+    } else facadeSpan(b, f, m, fr, y, -half, half, h);
   });
   return out;
 }
@@ -331,4 +394,74 @@ export function railRuns(pts: Array<[number, number]>, skip: (x: number, z: numb
   }
   flush();
   return runs;
+}
+
+/**
+ * Bloco (ou prisma aberto, sem tampas) com a forma do volume, recuado `inset` m das paredes, de
+ * y = 0 a y = h, já no lugar do volume (planta local do prédio).
+ */
+export function volGeo(v: Vol, inset: number, h: number, open = false): THREE.BufferGeometry {
+  let geo: THREE.BufferGeometry;
+  if (v.kind === 'rect') {
+    geo = new THREE.BoxGeometry(Math.max(0.1, v.w - inset * 2), h, Math.max(0.1, v.d - inset * 2));
+    geo.rotateY(v.rot ?? 0);
+  } else if (v.kind === 'circle') geo = new THREE.CylinderGeometry(Math.max(0.1, v.r - inset), Math.max(0.1, v.r - inset), h, 40, 1, open);
+  else {
+    const r = Math.max(0.1, v.r - inset / Math.cos(Math.PI / v.sides));
+    geo = new THREE.CylinderGeometry(r, r, h, v.sides, 1, open, v.rot ?? 0);
+  }
+  geo.translate(v.cx, h / 2, v.cz);
+  return geo;
+}
+
+/** Laje com a forma do volume (e furos), topo em `y`. */
+export const volSlab = (v: Vol, y: number, thick: number, holes: Array<Array<[number, number]>> = [], grow = 0): THREE.BufferGeometry =>
+  slab(grow ? volPoly(v).map(([x, z]) => [v.cx + (x - v.cx) * (1 + grow / Math.max(1, Math.hypot(x - v.cx, z - v.cz))), v.cz + (z - v.cz) * (1 + grow / Math.max(1, Math.hypot(x - v.cx, z - v.cz)))] as [number, number]) : volPoly(v), holes, y, thick);
+
+/** Peça reta ao longo de um trecho de parede (parapeito, friso, guarda-corpo), de `y` a `y + h`, com espessura `t`. */
+export function alongGeo(r: { ax: number; az: number; bx: number; bz: number }, y: number, h: number, t: number, out = 0, nx = 0, nz = 0): { geo: THREE.BufferGeometry; pos: [number, number, number]; rot: [number, number, number] } {
+  const len = Math.hypot(r.bx - r.ax, r.bz - r.az);
+  return { geo: new THREE.BoxGeometry(t, h, Math.max(0.01, len)), pos: [(r.ax + r.bx) / 2 + nx * out, y + h / 2, (r.az + r.bz) / 2 + nz * out], rot: [0, Math.atan2(r.bx - r.ax, r.bz - r.az), 0] };
+}
+
+/**
+ * Paredes de um nível por trecho (outline.ts), no tipo da fachada do prédio: cada trecho de `from`
+ * até a altura do volume dono. O trecho da frente que cruza x = 0 ganha a fachada envidraçada da
+ * entrada (largura `entry`, até 5,2 m de altura) com montantes e travessa; acima dela, a fachada
+ * continua. Igual por fora (térreo do prédio) e por dentro (salão do térreo).
+ */
+export function wallsAlong(b: Builder, f: Form, fm: FacadeMats, runs: readonly WallRun[], hOf: (i: number) => number, entry: number, door: { glass: THREE.Material; dark: THREE.Material }, y0 = 0): void {
+  const ent = entry > 0 ? entranceRun(runs) : null;
+  for (const r of runs) {
+    const top = hOf(r.vol);
+    if (r !== ent) {
+      facadeAlong(b, f, fm, r, y0 + r.from, top - r.from);
+      continue;
+    }
+    const gh = Math.min(5.2, top - 0.6);
+    const zAt0 = r.az + ((r.bz - r.az) * (0 - r.ax)) / (r.bx - r.ax || 1);
+    const p0 = alongRun(r, 0, zAt0);
+    const e = Math.min(entry, r.len - 1.2);
+    const ux = (r.bx - r.ax) / r.len;
+    const uz = (r.bz - r.az) / r.len;
+    const s0 = Math.max(0, p0 - e / 2);
+    const s1 = Math.min(r.len, p0 + e / 2);
+    const A = { x: r.ax + ux * s0, z: r.az + uz * s0 };
+    const B = { x: r.ax + ux * s1, z: r.az + uz * s1 };
+    facadeAlong(b, f, fm, { ...r, bx: A.x, bz: A.z }, y0, top);
+    facadeAlong(b, f, fm, { ...r, ax: B.x, az: B.z }, y0, top);
+    const mid = { ax: A.x, az: A.z, bx: B.x, bz: B.z };
+    const w = alongGeo(mid, y0, gh, 0.08);
+    b.add(door.glass, w.geo, w.pos, w.rot);
+    const n = Math.max(2, Math.round((s1 - s0) / 2));
+    for (let k = 0; k <= n; k++) {
+      const s = s0 + ((s1 - s0) * k) / n;
+      // O vão da porta de correr (2,4 m) fica sem montante.
+      if (Math.abs(r.ax + ux * s) < 1.4) continue;
+      b.add(door.dark, new THREE.BoxGeometry(0.12, gh, 0.12), [r.ax + ux * s + r.nx * 0.05, y0 + gh / 2, r.az + uz * s + r.nz * 0.05]);
+    }
+    const tr = alongGeo(mid, y0 + gh, 0.25, 0.3);
+    b.add(door.dark, tr.geo, tr.pos, tr.rot);
+    if (top - gh > 0.6) facadeAlong(b, f, fm, { ...r, ...mid }, y0 + gh + 0.25, top - gh - 0.25);
+  }
 }

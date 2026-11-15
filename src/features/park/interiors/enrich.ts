@@ -1,7 +1,7 @@
 /**
  * Camada de detalhe dos interiores (V2.1, seção 11), em todos os andares:
- * - térreo: plantas altas em vasos, bancos, luminárias, painéis de arte, pendentes em anel e
- *   balcão de recepção, encaixados em volta do salão sem cobrir o que o prédio já tem;
+ * - térreo: plantas altas em vasos, bancos, luminárias, painéis de arte, pendentes e balcão de
+ *   recepção, junto às paredes da planta do prédio sem cobrir o que ele já tem;
  * - andares de cima: teto diferente em cada andar, saguão do elevador com sofá e mesa,
  *   bancos e floreiras ao longo do guarda-corpo do átrio e a marca de cada prédio.
  */
@@ -11,6 +11,7 @@ import type { Builder, Kit } from '../kit';
 import type { Obstacle, Seat } from '../camera';
 import { clock, drums, globe, guitar, lamp as floorLamp, piano, record, telescope, type Thing } from './things';
 import { extinguisher, recycleStation, waterCooler } from '../props';
+import { exitAt, insideAt, type Vol, type WallRun } from '../outline';
 
 interface Ctx {
   kit: Kit;
@@ -76,38 +77,56 @@ function artPanel(c: Ctx, x: number, y: number, z: number, face: number, seed: n
   c.b.add(c.kit.mat(cols[(seed + 2) % cols.length]!, { rough: 0.8 }), new THREE.CircleGeometry(0.22, 20), [x + Math.sin(face) * 0.05, y + 1.7, z + Math.cos(face) * 0.05], [0, face, 0]);
 }
 
-/** Térreo: anel de detalhes junto ao vidro, pendentes e recepção, sem invadir o que já existe. */
-export function enrichGround(kit: Kit, b: Builder, seats: Seat[], obstacles: Obstacle[], overhead: Obstacle[], R: number, H: number, accent: string, warm: boolean, root: THREE.Object3D, things: Thing[]) {
+/** Planta do térreo para a camada de detalhe: volumes, paredes, frente/fundos e a altura do teto. */
+export interface GroundPlan {
+  vols: readonly Vol[];
+  runs: readonly WallRun[];
+  front: number;
+  back: number;
+  /** Altura do teto no ponto (alas mais baixas têm teto mais baixo). */
+  ceilAt: (x: number, z: number) => number;
+}
+
+/** Térreo: detalhes junto às paredes, pendentes e recepção, sem invadir o que já existe. */
+export function enrichGround(kit: Kit, b: Builder, seats: Seat[], obstacles: Obstacle[], overhead: Obstacle[], g: GroundPlan, accent: string, warm: boolean, root: THREE.Object3D, things: Thing[]) {
   const c: Ctx = { kit, b, seats, accent, warm, root, things, level: 0, top: false };
-  const free = (x: number, z: number, r: number) => !obstacles.some((o) => Math.hypot(o.x - x, o.z - z) < o.r + r);
-  const n = Math.max(10, Math.floor((Math.PI * 2 * R) / 5.5));
-  for (let k = 0; k < n; k++) {
-    const a = (k / n) * Math.PI * 2;
-    // Livre na entrada (frente) e na passagem para o elevador (fundos).
-    if (Math.abs(Math.atan2(Math.sin(a), Math.cos(a))) < 0.38 || Math.abs(Math.atan2(Math.sin(a - Math.PI), Math.cos(a - Math.PI))) < 0.3) continue;
-    const r = R - 1.7;
+  const free = (x: number, z: number, r: number) => insideAt(g.vols, x, z, r) && !obstacles.some((o) => Math.hypot(o.x - x, o.z - z) < o.r + r);
+  // Ao longo de cada parede, a 1,7 m dela, de frente para dentro, a cada 5,5 m.
+  let k = 0;
+  for (const r of g.runs) {
+    if (r.from > 0) continue;
+    const n = Math.floor(r.len / 5.5);
+    const face = Math.atan2(r.nx, r.nz) + Math.PI;
+    for (let i = 0; i < n; i++) {
+      const s = ((i + 0.5) * r.len) / n;
+      const x = r.ax + ((r.bx - r.ax) * s) / r.len - r.nx * 1.7;
+      const z = r.az + ((r.bz - r.az) * s) / r.len - r.nz * 1.7;
+      k++;
+      // Livre na entrada (frente) e na passagem para o elevador (fundos).
+      if (Math.abs(x) < 4.5 && (z > g.front - 7 || z < -g.back + 6)) continue;
+      if (!free(x, z, 1.2)) continue;
+      const kind = k % 4;
+      if (kind === 0) tallPlant(c, x, 0, z, 1.1);
+      else if (kind === 1) bench(c, x, 0, z, face);
+      else if (kind === 2) things.push(floorLamp(kit, root, 0, x, 0, z, warm));
+      else artPanel(c, x, 0, z, face, k);
+    }
+  }
+  // Pendentes no alto do salão, a 62% do caminho até a parede em cada direção.
+  const m = mats(c);
+  for (let j = 0; j < 12; j++) {
+    const a = (j / 12) * Math.PI * 2 + 0.26;
+    const r = exitAt(g.vols, a, 0) * 0.62;
     const x = Math.sin(a) * r;
     const z = Math.cos(a) * r;
-    if (!free(x, z, 1.2)) continue;
-    const kind = k % 4;
-    if (kind === 0) tallPlant(c, x, 0, z, 1.1);
-    else if (kind === 1) bench(c, x, 0, z, a + Math.PI);
-    else if (kind === 2) things.push(floorLamp(kit, root, 0, x, 0, z, warm));
-    else artPanel(c, x, 0, z, a + Math.PI, k);
-  }
-  // Pendentes em anel no alto do salão.
-  const m = mats(c);
-  for (let k = 0; k < 12; k++) {
-    const a = (k / 12) * Math.PI * 2 + 0.26;
-    const x = Math.sin(a) * R * 0.62;
-    const z = Math.cos(a) * R * 0.62;
-    if (overhead.some((o) => Math.hypot(o.x - x, o.z - z) < o.r + 0.5)) continue;
+    const H = g.ceilAt(x, z);
+    if (H < 4.5 || overhead.some((o) => Math.hypot(o.x - x, o.z - z) < o.r + 0.5)) continue;
     c.b.add(m.metal, new THREE.CylinderGeometry(0.008, 0.008, 1.4, 4), [x, H - 0.7, z]);
     c.b.add(m.glow, new THREE.SphereGeometry(0.2, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), [x, H - 1.45, z], [Math.PI, 0, 0]);
   }
   // Balcão de recepção perto da entrada, de frente para quem chega.
-  const rx = R * 0.35;
-  const rz = R - 5;
+  const rx = 4.6;
+  const rz = g.front - 5;
   if (free(rx, rz, 2)) {
     b.add(m.light, new THREE.BoxGeometry(2.6, 1.05, 0.7), [rx, 0.52, rz]);
     b.add(m.white, new THREE.BoxGeometry(2.7, 0.05, 0.8), [rx, 1.07, rz]);
@@ -228,7 +247,7 @@ function service(c: Ctx, x: number, y: number, z: number) {
  * saguão do elevador e a marca do prédio; nas plantas com vazio no meio, bancos e floreiras ao
  * longo do guarda-corpo.
  */
-export function enrichLevel(kit: Kit, b: Builder, seats: Seat[], id: ModuleId, L: number, top: boolean, y: number, lobby: Lobby, ring: number, apo: number, ceiling: number, accent: string, warm: boolean, root: THREE.Object3D, things: Thing[]) {
+export function enrichLevel(kit: Kit, b: Builder, seats: Seat[], id: ModuleId, L: number, top: boolean, y: number, lobby: Lobby, ring: number, apo: number, ceiling: number, accent: string, warm: boolean, root: THREE.Object3D, things: Thing[], ok: (x: number, z: number) => boolean = () => true) {
   const c: Ctx = { kit, b, seats, accent, warm, root, things, level: L, top };
   const m = mats(c);
   const variant = L % 3;
@@ -239,16 +258,18 @@ export function enrichLevel(kit: Kit, b: Builder, seats: Seat[], id: ModuleId, L
     for (let k = 0; k < 40; k++) {
       const a = (k / 40) * Math.PI * 2;
       const mr = (r0 + r1) / 2;
+      if (r1 - r0 < 1 || !ok(Math.sin(a) * r0, Math.cos(a) * r0) || !ok(Math.sin(a) * r1, Math.cos(a) * r1)) continue;
       b.add(m.wood, new THREE.BoxGeometry(0.12, 0.08, r1 - r0 - 0.4), [Math.sin(a) * mr, ceiling - 0.06, Math.cos(a) * mr], [0, a, 0]);
     }
   } else if (variant === 2) {
     for (let k = 0; k < 16; k++) {
       const a = (k / 16) * Math.PI * 2 + 0.1;
       const mr = r0 + 1.2;
+      if (!ok(Math.sin(a) * mr, Math.cos(a) * mr)) continue;
       b.add(m.white, new THREE.BoxGeometry(1.2, 0.05, 1.2), [Math.sin(a) * mr, ceiling - 0.04, Math.cos(a) * mr], [0, a, 0]);
       b.add(m.glow, new THREE.BoxGeometry(1.0, 0.02, 1.0), [Math.sin(a) * mr, ceiling - 0.075, Math.cos(a) * mr], [0, a, 0]);
     }
-  } else {
+  } else if (Array.from({ length: 12 }, (_, k) => (k / 12) * Math.PI * 2).every((a) => ok(Math.sin(a) * (r0 + 1.5), Math.cos(a) * (r0 + 1.5)))) {
     b.add(m.glow, new THREE.TorusGeometry(r0 + 1.2, 0.05, 4, 64), [0, ceiling - 0.08, 0], [Math.PI / 2, 0, 0]);
     b.add(m.acc, new THREE.TorusGeometry(r0 + 1.45, 0.03, 4, 64), [0, ceiling - 0.08, 0], [Math.PI / 2, 0, 0]);
   }
@@ -260,6 +281,7 @@ export function enrichLevel(kit: Kit, b: Builder, seats: Seat[], id: ModuleId, L
       const r = ring + 0.75;
       const x = Math.sin(a) * r;
       const z = Math.cos(a) * r;
+      if (!ok(x, z)) continue;
       if (k % 2) bench(c, x, y, z, a, 1.4);
       else {
         b.add(m.pot, new THREE.BoxGeometry(1.1, 0.45, 0.4), [x, y + 0.22, z], [0, a + Math.PI / 2, 0]);
@@ -279,6 +301,7 @@ export function enrichLevel(kit: Kit, b: Builder, seats: Seat[], id: ModuleId, L
   for (let k = 0; k < 20; k++) {
     const a = (k / 20) * Math.PI * 2 + 0.15;
     const r = Math.max(r0, apo * 0.35) + (k % 2 ? 0.9 : 2.2);
+    if (!ok(Math.sin(a) * (r + 1.2), Math.cos(a) * (r + 1.2)) || !ok(Math.sin(a) * r, Math.cos(a) * r)) continue;
     b.add(sprk, new THREE.CylinderGeometry(0.035, 0.05, 0.06, 8), [Math.sin(a) * r, ceiling - 0.03, Math.cos(a) * r]);
     if (k % 5 === 0) b.add(m.white, new THREE.CylinderGeometry(0.07, 0.07, 0.035, 14), [Math.sin(a + 0.1) * r, ceiling - 0.02, Math.cos(a + 0.1) * r]);
     if (k % 4 === 2) b.add(m.white, new THREE.BoxGeometry(0.55, 0.02, 0.55), [Math.sin(a) * (r + 1.2), ceiling - 0.01, Math.cos(a) * (r + 1.2)], [0, a, 0]);

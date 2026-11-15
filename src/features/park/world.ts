@@ -1245,7 +1245,9 @@ function liftSpot(def: ParkBuilding, r0: number, toWorld: (lx: number, lz: numbe
   // A torre fica fora da parede do térreo daquele lado (o térreo pode ser maior que os andares).
   const distAt = (a: number) => Math.max(r0, wallAt(a)) + 2.8;
   let best = { angle: Math.PI, score: Infinity };
-  for (const da of [0, 0.35, -0.35, 0.7, -0.7, 1.05, -1.05, 1.4, -1.4, 1.75, -1.75]) {
+  // Sempre nos fundos (π): é onde a planta de dentro põe o elevador (massing.liftDist); girar a torre
+  // desalinhava o elevador de fora do de dentro.
+  for (const da of [0]) {
     const a = Math.PI + da;
     const D = distAt(a);
     let score = Math.abs(da) * 4;

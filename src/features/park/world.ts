@@ -5,7 +5,7 @@
  */
 import * as THREE from 'three';
 import type { ModuleId } from '@/app/modules';
-import { LAKE, PARK_REGIONS, TERRAIN, terrainVertex, themeAt, themeWeights, type ParkRegion, onPath, plazaCarts, PLAYGROUNDS, ROAD_RADIUS, PARK_BUILDINGS, PARK_RADIUS, PARK_SCALE, PATH_WIDTH, PLAZA_RADIUS, POIS, PONDS, entranceOf, facingOf, heightAt, inWater, inField, isFreeGround, lakeRadiusAt, parkPaths, samplePath, seededRandom, treePositions, type ParkBuilding, type Point } from '@/domain/park';
+import { BRIDGE, ISLAND, LAKE, onBridge, PARK_REGIONS, TERRAIN, terrainVertex, themeAt, themeWeights, type ParkRegion, onPath, plazaCarts, PLAYGROUNDS, ROAD_RADIUS, PARK_BUILDINGS, PARK_RADIUS, PARK_SCALE, PATH_WIDTH, PLAZA_RADIUS, POIS, PONDS, entranceOf, facingOf, heightAt, inWater, inField, isFreeGround, lakeRadiusAt, parkPaths, samplePath, seededRandom, treePositions, type ParkBuilding, type Point } from '@/domain/park';
 import { amenities, houses, neighborhood, sportsFields, streetTrees, type Seat, type Viewpoint } from './buildings/amenities';
 import { city } from './buildings/city';
 import { navGraph } from '@/domain/parkPeople';
@@ -325,8 +325,10 @@ function terrain(kit: Kit): THREE.Mesh {
     const ang = Math.atan2(z - LAKE.z, x - LAKE.x);
     const lr = lakeRadiusAt(ang);
     const dl = Math.hypot(x - LAKE.x, z - LAKE.z);
-    if (dl < lr + 5) y -= 1.8 * (1 - THREE.MathUtils.smoothstep(dl, lr - 6, lr + 5));
-    let shore = dl > lr - 2 && dl < lr + 4;
+    // A ilha do Focus fica acima da água: o fundo só afunda fora dela, e a margem dela também é de areia.
+    const di = Math.hypot(x - ISLAND.x, z - ISLAND.z);
+    if (dl < lr + 5) y -= 1.8 * (1 - THREE.MathUtils.smoothstep(dl, lr - 6, lr + 5)) * THREE.MathUtils.smoothstep(di, ISLAND.radius - 1, ISLAND.radius + 6);
+    let shore = (dl > lr - 2 && dl < lr + 4) || (di > ISLAND.radius - 3 && di < ISLAND.radius + 3);
     for (const p of PONDS) {
       const dp = Math.hypot(x - p.x, z - p.z);
       if (dp < p.radius + 3) y -= 1.1 * (1 - THREE.MathUtils.smoothstep(dp, p.radius - 3, p.radius + 3));
@@ -396,6 +398,8 @@ function paths(kit: Kit): { group: THREE.Group; lamps: Point[] } {
   const trail = kit.mat('#C7B48E', { rough: 0.95 });
   const lamps: Point[] = [];
   for (const line of parkPaths()) {
+    // Sobre a ponte o piso é o tabuleiro de madeira (desenhado com o lago).
+    if (line.deck) continue;
     const w = PATH_WIDTH[line.kind];
     const v = line.points.map((p) => new THREE.Vector2(p.x, p.z));
     if (line.kind === 'trail') {
@@ -612,6 +616,74 @@ function lake(kit: Kit): { group: THREE.Group; water: ReturnType<typeof water>; 
       reedSpots.push({ x: LAKE.x + Math.cos(tt) * r, z: LAKE.z + Math.sin(tt) * r, h: 0.9 + rnd() * 1.1 });
     }
   }
+  // Margem da ilha do Focus: pedras e juncos em volta (menos onde a ponte chega).
+  for (let k = 0; k < 30; k++) {
+    const t = rnd() * Math.PI * 2;
+    const r = ISLAND.radius + 0.6 + rnd() * 1.8;
+    const x = ISLAND.x + Math.cos(t) * r;
+    const z = ISLAND.z + Math.sin(t) * r;
+    if (onBridge(x, z, -3)) continue;
+    b.add(rnd() > 0.5 ? rockMat : rockMat2, rock(0.3 + rnd() * 0.7), [x, -0.2 + rnd() * 0.2, z], [0, rnd() * 6, 0]);
+  }
+  for (let k = 0; k < 12; k++) {
+    const t = rnd() * Math.PI * 2;
+    for (let j = 0; j < 10; j++) {
+      const tt = t + (rnd() - 0.5) * 0.14;
+      const r = ISLAND.radius + 0.8 + rnd() * 2;
+      const x = ISLAND.x + Math.cos(tt) * r;
+      const z = ISLAND.z + Math.sin(tt) * r;
+      if (!onBridge(x, z, -3)) reedSpots.push({ x, z, h: 0.8 + rnd() });
+    }
+  }
+  // Ponte do Focus: tabuleiro de madeira sobre estacas, guarda-corpos dos dois lados e luminárias
+  // baixas. Não entra na colisão por peças: quem anda fica no tabuleiro porque fora dele é água.
+  {
+    const { from, to, half } = BRIDGE;
+    const L = Math.hypot(to.x - from.x, to.z - from.z);
+    const ux = (to.x - from.x) / L;
+    const uz = (to.z - from.z) / L;
+    const ry = Math.atan2(ux, uz);
+    const at = (s: number, side: number): [number, number] => [from.x + ux * s + uz * side, from.z + uz * s - ux * side];
+    const [mx, mz] = at(L / 2, 0);
+    const deckM = kit.mat('#9A7650', { rough: 0.85 });
+    const beamM = kit.mat('#5E4630', { rough: 0.9 });
+    const railM = kit.mat('#3A2E24', { rough: 0.7 });
+    const headM = kit.mat('#B9B1A2', { rough: 0.9 });
+    const lampM = kit.mat('#FFE7B0', { glow: true });
+    b.add(deckM, new THREE.BoxGeometry(half * 2, 0.22, L + 1.5), [mx, -0.09, mz], [0, ry, 0]);
+    for (const side of [-1, 1]) {
+      const [bx, bz] = at(L / 2, side * half);
+      b.add(beamM, new THREE.BoxGeometry(0.28, 0.4, L + 1.5), [bx, -0.12, bz], [0, ry, 0]);
+      const [tx, tz] = at(L / 2, side * (half - 0.14));
+      b.add(railM, new THREE.BoxGeometry(0.09, 0.08, L), [tx, 1.05, tz], [0, ry, 0]);
+      b.add(railM, new THREE.BoxGeometry(0.06, 0.06, L), [tx, 0.6, tz], [0, ry, 0]);
+    }
+    // Juntas das tábuas (leem-se de perto).
+    for (let s = 0.6; s < L; s += 1.2) {
+      const [px, pz] = at(s, 0);
+      b.add(beamM, new THREE.BoxGeometry(half * 2 - 0.3, 0.012, 0.05), [px, 0.025, pz], [0, ry, 0]);
+    }
+    const posts = Math.max(2, Math.round(L / 2.4));
+    for (let k = 0; k <= posts; k++) {
+      const s = (k / posts) * L;
+      for (const side of [-1, 1]) {
+        const [px, pz] = at(s, side * (half - 0.14));
+        b.add(railM, new THREE.BoxGeometry(0.11, 1.12, 0.11), [px, 0.56, pz], [0, ry, 0]);
+        // Estacas até o fundo, a cada duas colunas do guarda-corpo.
+        if (k % 2 === 0) b.add(beamM, new THREE.CylinderGeometry(0.16, 0.18, 2, 8), [px, -1.1, pz]);
+        // Luminária a cada quatro colunas, alternando os lados.
+        if (k % 4 === (side > 0 ? 0 : 2)) {
+          b.add(railM, new THREE.CylinderGeometry(0.04, 0.05, 1.5, 6), [px, 1.85, pz]);
+          b.add(lampM, new THREE.SphereGeometry(0.16, 10, 8), [px, 2.68, pz]);
+        }
+      }
+    }
+    // Cabeceiras de pedra nas duas pontas.
+    for (const s of [-0.4, L + 0.4]) {
+      const [px, pz] = at(s, 0);
+      b.add(headM, new THREE.BoxGeometry(half * 2 + 1.4, 0.5, 2.6), [px, -0.24, pz], [0, ry, 0]);
+    }
+  }
   const reedGeo = kit.own(new THREE.ConeGeometry(0.03, 1, 4));
   reedGeo.translate(0, 0.5, 0);
   const reeds = new THREE.InstancedMesh(reedGeo, kit.mat('#6E8F46', { rough: 0.9 }), reedSpots.length);
@@ -645,7 +717,10 @@ function lake(kit: Kit): { group: THREE.Group; water: ReturnType<typeof water>; 
   for (let k = 0; k < 40; k++) {
     const t = rnd() * Math.PI * 2;
     const r = lakeRadiusAt(t) * (0.45 + rnd() * 0.45);
-    pads.push({ x: LAKE.x + Math.cos(t) * r, y: -0.55, z: LAKE.z + Math.sin(t) * r, s: 1.6, color: k % 5 === 0 ? '#F9A8D4' : '#4D9E57' });
+    const px = LAKE.x + Math.cos(t) * r;
+    const pz = LAKE.z + Math.sin(t) * r;
+    // Só na água aberta (longe da ilha e da ponte).
+    if (inWater(px, pz, -2.5)) pads.push({ x: px, y: -0.55, z: pz, s: 1.6, color: k % 5 === 0 ? '#F9A8D4' : '#4D9E57' });
   }
   group.add(shrubs(kit, pads, 'flower'));
   return { group, water: w, ponds };
@@ -865,6 +940,13 @@ export function createWorld(kit: Kit): World {
     !PARK_BUILDINGS.some((bd) => Math.hypot(bd.x - x, bd.z - z) < bd.radius + 1.3 + r) &&
     !solid.near(x, z).some((o) => Math.hypot(o.x - x, o.z - z) < o.r + r + 0.2);
   const plantList = [...plants().filter((p) => !onPath(p.x, p.z, 0.9 * p.s) && free(p.x, p.z, 0.45 * p.s)), ...streetTrees().map((p, i) => ({ x: p.x, y: heightAt(p.x, p.z), z: p.z, s: p.s, species: (i % 3 ? 'round' : 'slender') as Plant['species'] }))];
+  // Jardim da ilha do Focus: árvores em volta do pavilhão (fora do piso, da ponte e do lounge).
+  for (let k = 0; k < 10; k++) {
+    const a = (k / 10) * Math.PI * 2 + 0.3;
+    const x = ISLAND.x + Math.cos(a) * 31.2;
+    const z = ISLAND.z + Math.sin(a) * 31.2;
+    if (!onBridge(x, z, -4) && free(x, z, 0.5)) plantList.push({ x, y: heightAt(x, z), z, s: 0.8, species: k % 2 ? 'blossom' : 'slender' });
+  }
   const trees = forest(kit, plantList);
   // Poças depois da chuva, grama gasta nos atalhos e na frente dos bancos, folhas secas no chão.
   const gnd = ground(kit, am.seats, plantList);

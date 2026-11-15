@@ -16,7 +16,7 @@ describe('parque V2.1: moradores do campus', () => {
     for (const p of a) expect(Math.hypot(p.home.x, p.home.z)).toBeGreaterThan(250);
   });
 
-  it('a rede de caminhos liga a praça à entrada de todos os 18 prédios', () => {
+  it('a rede de caminhos liga a praça à entrada de todos os prédios (o Focus, pela ponte)', () => {
     const g = navGraph();
     expect(g.gates.length).toBeGreaterThan(0);
     const plaza = nearestNode(g, { x: 0, z: 20 });

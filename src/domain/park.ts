@@ -80,12 +80,29 @@ export function beyondEdge(x: number, z: number, pad = 0): boolean {
 }
 export const PLAZA_RADIUS = 26;
 /** Lago principal: centro e raio médio; a margem real é orgânica (lakeRadiusAt). */
-export const LAKE = { x: -125 * PARK_SCALE, z: 95 * PARK_SCALE, radius: 36 * PARK_SCALE };
+export const LAKE = { x: -125 * PARK_SCALE, z: 95 * PARK_SCALE, radius: 47.5 * PARK_SCALE };
 /** Lagos ornamentais menores (Sul, contemplação). */
 export const PONDS: Array<Point & { radius: number }> = [
   { x: -15 * PARK_SCALE, z: 162 * PARK_SCALE, radius: 11 },
   { x: -92 * PARK_SCALE, z: 150 * PARK_SCALE, radius: 10 },
 ];
+
+/**
+ * Ilha do Jardim da Concentração (Focus), no meio do lago, e a ponte que a liga à margem: larga,
+ * plana e com guarda-corpos, pousando na enseada do lado nordeste (o trecho mais curto de água).
+ * A ilha e a ponte não são água (inWater): dá para andar nelas.
+ */
+export const ISLAND = { x: LAKE.x, z: LAKE.z, radius: 34 };
+const BRIDGE_ANGLE = -0.8;
+export const BRIDGE: { from: Point; to: Point; half: number } = (() => {
+  const dx = Math.cos(BRIDGE_ANGLE);
+  const dz = Math.sin(BRIDGE_ANGLE);
+  const r0 = ISLAND.radius - 2;
+  const r1 = lakeRadiusAt(BRIDGE_ANGLE) + 4;
+  return { from: { x: ISLAND.x + dx * r0, z: ISLAND.z + dz * r0 }, to: { x: LAKE.x + dx * r1, z: LAKE.z + dz * r1 }, half: 3 };
+})();
+/** Largo da cabeceira da ponte, 14 m além dela na mesma direção (o caminho chega alinhado à ponte). */
+export const BRIDGE_HEAD: Point = { x: BRIDGE.to.x + Math.cos(BRIDGE_ANGLE) * 14, z: BRIDGE.to.z + Math.sin(BRIDGE_ANGLE) * 14 };
 
 /** Centro de cada região (para caminhos e identidade paisagística). */
 export const REGION_HUB: Record<ParkRegion, Point> = {
@@ -108,14 +125,11 @@ export const COURTS: Record<string, Point> = {
 };
 
 const b = (id: ModuleId, region: ParkRegion, x: number, z: number, radius: number, shape: BuildingShape, color: string, faces: Point): ParkBuilding => ({ id, region, x, z, radius, shape, color, faces });
-const PLAZA = { x: 0, z: 0 };
 
-/** Os 18 prédios, agrupados por área temática (14/11/2026). */
+/** Os 15 prédios dos módulos, agrupados por área temática (15/11/2026). */
 export const PARK_BUILDINGS: ParkBuilding[] = [
-  // Centro: núcleo principal em volta da praça monumental.
-  b('dashboard', 'central', 0, -96, 30, 'tower', '#7C5CFC', PLAZA),
-  b('profile', 'central', -88, 56, 26, 'house', '#A78BFA', PLAZA),
-  b('settings', 'central', 88, 56, 24, 'gear', '#94A3B8', PLAZA),
+  // Centro: só a praça monumental (Dashboard, Profile e Settings não têm prédio no Campus:
+  // Perfil e Configurações ficam no ROUTIG Home e o Dashboard, no Control Room).
   // Conhecimento e aprendizagem (Norte, mata): Academy e Library no pátio de estudos; Notes e
   // Idiomas no pátio de leitura.
   b('academy', 'knowledge', -72, -240, 33, 'campus', '#6366F1', COURTS.learning!),
@@ -135,7 +149,8 @@ export const PARK_BUILDINGS: ParkBuilding[] = [
   b('insights', 'growth', 8, 307.2, 24, 'observatory', '#F43F5E', REGION_HUB.growth),
   // Atividades e concentração (Oeste, colinas): esporte, Focus e Música com o palco.
   b('sports', 'activity', -264, 0, 40, 'stadium', '#EF4444', { x: -176, z: 0 }),
-  b('focus', 'activity', -150, -56, 28, 'pavilion', '#10B981', COURTS.activity!),
+  // Focus: numa ilha do lago, com a entrada virada para a ponte.
+  b('focus', 'activity', ISLAND.x, ISLAND.z, 28, 'pavilion', '#10B981', BRIDGE.to),
   b('music', 'activity', -184, -184, 31, 'amphitheater', '#EC4899', COURTS.activity!),
 ];
 
@@ -172,8 +187,28 @@ export function lakeRadiusAt(angle: number): number {
 export function inWater(x: number, z: number, pad = 0): boolean {
   const dx = x - LAKE.x;
   const dz = z - LAKE.z;
-  if (Math.hypot(dx, dz) < lakeRadiusAt(Math.atan2(dz, dx)) + pad) return true;
+  if (Math.hypot(dx, dz) < lakeRadiusAt(Math.atan2(dz, dx)) + pad) return !onIsland(x, z, pad) && !onBridge(x, z, pad);
   return PONDS.some((p) => Math.hypot(x - p.x, z - p.z) < p.radius + pad);
+}
+
+/** Ponto da linha central da ponte mais perto de (x, z). */
+export function bridgePoint(x: number, z: number): Point {
+  const { from, to } = BRIDGE;
+  const vx = to.x - from.x;
+  const vz = to.z - from.z;
+  const t = Math.min(1, Math.max(0, ((x - from.x) * vx + (z - from.z) * vz) / (vx * vx + vz * vz)));
+  return { x: from.x + vx * t, z: from.z + vz * t };
+}
+
+/** Em cima da ponte, a mais de `pad` metros das bordas (pad negativo: também a essa distância dela). */
+export function onBridge(x: number, z: number, pad = 0): boolean {
+  const c = bridgePoint(x, z);
+  return Math.hypot(x - c.x, z - c.z) < BRIDGE.half - pad;
+}
+
+/** Na ilha do Focus, a mais de `pad` metros da margem (pad negativo: também na água em volta). */
+export function onIsland(x: number, z: number, pad = 0): boolean {
+  return Math.hypot(x - ISLAND.x, z - ISLAND.z) < ISLAND.radius - pad;
 }
 
 /** Elevação arredondada (morro ou, com altura negativa, depressão) de raio `r` na planta original. */
@@ -406,7 +441,8 @@ const lotCache = new Map<string, number>();
 export function lotHeight(p: ParkBuilding): number {
   let v = lotCache.get(p.id);
   if (v === undefined) {
-    v = rawHeight(p.x, p.z);
+    // Na ilha, o lote fica no nível da margem do lago (o relevo bruto ali seria um morro).
+    v = onIsland(p.x, p.z) ? 0 : rawHeight(p.x, p.z);
     lotCache.set(p.id, v);
   }
   return v;
@@ -417,6 +453,8 @@ export type PathKind = 'main' | 'secondary' | 'trail';
 export interface ParkPath {
   kind: PathKind;
   points: Point[];
+  /** Trecho sobre a ponte: o piso é o tabuleiro de madeira (sem faixa de pedra, postes ou bancos). */
+  deck?: boolean;
 }
 
 export const PATH_WIDTH: Record<PathKind, number> = { main: 5.5, secondary: 3, trail: 1.6 };
@@ -447,7 +485,7 @@ export function parkPaths(): ParkPath[] {
   }
   // Núcleos: hub da região → pátio → entrada de cada prédio.
   const seen = new Set<string>();
-  for (const p of PARK_BUILDINGS.filter((x) => x.region !== 'central')) {
+  for (const p of PARK_BUILDINGS.filter((x) => x.region !== 'central' && x.id !== 'focus')) {
     const e = entranceOf(p);
     const court = p.faces;
     const key = `${court.x},${court.z}`;
@@ -470,10 +508,19 @@ export function parkPaths(): ParkPath[] {
   out.push({ kind: 'secondary', points: [H.growth, P(-20, 142), P(-15, 95), P(-65, 70), P(-105, 30), H.activity] });
   out.push({ kind: 'secondary', points: [COURTS.activity!, { x: -100, z: -140 }, H.knowledge] });
 
+  // Focus na ilha: do circuito das Atividades até o largo da cabeceira, a ponte (reta, sobre a
+  // água) e, já na ilha, da ponte à entrada do Jardim da Concentração.
+  const focus = PARK_BUILDINGS.find((x) => x.id === 'focus');
+  if (focus) {
+    out.push({ kind: 'secondary', points: [P(-105, 30), BRIDGE_HEAD, BRIDGE.to] });
+    out.push({ kind: 'secondary', points: [BRIDGE.to, BRIDGE.from], deck: true });
+    out.push({ kind: 'secondary', points: [BRIDGE.from, entranceOf(focus)] });
+  }
+
   // Trilha contemplativa em volta do lago (acompanha a margem, com folga).
   const loop: Point[] = [];
-  for (let i = 0; i <= 28; i++) {
-    const a = (i / 28) * Math.PI * 2;
+  for (let i = 0; i <= 40; i++) {
+    const a = (i / 40) * Math.PI * 2;
     const r = lakeRadiusAt(a) + 7;
     loop.push({ x: LAKE.x + Math.cos(a) * r, z: LAKE.z + Math.sin(a) * r });
   }
@@ -481,12 +528,12 @@ export function parkPaths(): ParkPath[] {
   // A trilha do lago se liga à rede: ao circuito Sul–Oeste e ao fim da trilha das colinas.
   const nearLoop = (p: Point) => samplePath(loop, 2).reduce((m, q) => (dist(q, p) < dist(m, p) ? q : m), loop[0]!);
   out.push({ kind: 'trail', points: [P(-65, 70), nearLoop(P(-65, 70))] });
-  out.push({ kind: 'trail', points: [P(-150, 60), nearLoop(P(-150, 60))] });
+  out.push({ kind: 'trail', points: [P(-158, 52), nearLoop(P(-158, 52))] });
   // Acesso às quadras externas do Complexo Esportivo.
   out.push({ kind: 'secondary', points: [REGION_HUB.activity, { x: -205, z: -60 }, { x: SPORT_FIELDS.tennis.x, z: SPORT_FIELDS.tennis.z + SPORT_FIELDS.tennis.d / 2 + 3 }] });
   out.push({ kind: 'secondary', points: [{ x: -205, z: -60 }, { x: -240, z: -80 }, { x: -245, z: -110 }, { x: SPORT_FIELDS.football.x + SPORT_FIELDS.football.w / 2 + 3, z: SPORT_FIELDS.football.z + 10 }] });
   // Trilhas das colinas do Oeste e da mata do Norte.
-  out.push({ kind: 'trail', points: [P(-120, -10), P(-170, -60), P(-205, -40), P(-200, 40), P(-150, 60)] });
+  out.push({ kind: 'trail', points: [P(-120, -10), P(-170, -60), P(-205, -40), P(-200, 40), P(-158, 52)] });
   out.push({ kind: 'trail', points: [{ x: -100, z: -140 }, P(-88, -150), P(-60, -200), P(10, -215), P(55, -170), P(60, -100)] });
   // Trilha dos lagos ornamentais.
   out.push({ kind: 'trail', points: [COURTS.growth!, P(-75, 150), P(-92, 165), P(-35, 150), P(-30, 176), P(-15, 180), P(5, 172), REGION_HUB.growth] });
@@ -532,7 +579,9 @@ export function layoutProblems(buildings: ParkBuilding[] = PARK_BUILDINGS): stri
   buildings.forEach((p, i) => {
     if (dist(p, { x: 0, z: 0 }) + p.radius > parkEdgeAt(Math.atan2(p.z, p.x))) out.push(`${p.id}: fora do parque`);
     if (dist(p, { x: 0, z: 0 }) < PLAZA_RADIUS + p.radius) out.push(`${p.id}: na praça`);
-    if (dist(p, LAKE) < LAKE.radius + 14 + p.radius) out.push(`${p.id}: no lago`);
+    // Na ilha (inteiro dentro dela) não conta como "no lago".
+    const islanded = dist(p, ISLAND) + p.radius <= ISLAND.radius;
+    if (!islanded && dist(p, LAKE) < LAKE.radius + 14 + p.radius) out.push(`${p.id}: no lago`);
     if (PONDS.some((q) => dist(p, q) < q.radius + p.radius)) out.push(`${p.id}: num lago ornamental`);
     buildings.slice(i + 1).forEach((c) => {
       if (dist(p, c) < p.radius + c.radius + 2) out.push(`${p.id} e ${c.id}: muito perto`);

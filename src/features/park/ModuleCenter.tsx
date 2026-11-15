@@ -13,6 +13,8 @@ import { readFavorites, readRecents, writeFavorites } from './parkContext';
 const keyboardFirst = () => typeof window !== 'undefined' && !!window.matchMedia?.('(pointer: fine)').matches && (navigator.maxTouchPoints ?? 0) === 0;
 
 const ALL: ModuleId[] = PARK_REGIONS.flatMap((r) => PARK_BUILDINGS.filter((b) => b.region === r).map((b) => b.id));
+/** Só módulos que têm prédio no Campus (favoritos e recentes antigos podem citar prédios que saíram). */
+const hasBuilding = (id: ModuleId) => !!buildingById(id);
 const SHORTCUTS: Array<{ id: ModuleId; icon: typeof Inbox }> = [
   { id: 'inbox', icon: Inbox },
   { id: 'calendar', icon: CalendarDays },
@@ -21,16 +23,16 @@ const SHORTCUTS: Array<{ id: ModuleId; icon: typeof Inbox }> = [
 ];
 
 /**
- * Central de Módulos (V2.1, seção 4): acesso rápido aos 18 módulos sem sair do parque.
- * Lista lateral, busca, favoritos, recentes e atalhos; cada módulo abre a interface 2D clássica
- * ou leva para dentro do prédio. Ao voltar do 2D, o parque retoma de onde a pessoa estava.
+ * Central de Módulos: acesso rápido aos 15 prédios do Campus sem andar até eles. Lista lateral,
+ * busca, favoritos, recentes e atalhos; cada módulo leva para dentro do prédio (o caminho do Campus)
+ * ou abre a tela dele no Control Room. Ao voltar, o Campus retoma de onde a pessoa estava.
  */
 export function ModuleCenter({ inside, onClose, onEnter, onOpen2D }: { inside: ModuleId | null; onClose: () => void; onEnter: (id: ModuleId) => void; onOpen2D: (id: ModuleId) => void }) {
   const { t } = useSettings();
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<ModuleId | null>(inside);
-  const [favorites, setFavorites] = useState<ModuleId[]>(readFavorites);
-  const recents = useMemo(readRecents, []);
+  const [favorites, setFavorites] = useState<ModuleId[]>(() => readFavorites().filter(hasBuilding));
+  const recents = useMemo(() => readRecents().filter(hasBuilding), []);
   const search = useRef<HTMLInputElement>(null);
   const autoFocus = useMemo(keyboardFirst, []);
 
@@ -70,14 +72,14 @@ export function ModuleCenter({ inside, onClose, onEnter, onOpen2D }: { inside: M
         {big && <p className="text-xs text-muted">{t(`moduleSummary.${id}`)}</p>}
         {inside === id && <p className="text-xs font-medium text-accent">{t('park.center.here')}</p>}
         <div className="mt-auto flex flex-wrap gap-2">
-          <Button size="sm" variant="primary" icon={<Monitor className="h-4 w-4" />} onClick={() => onOpen2D(id)}>
-            {t('park.center.open2d')}
-          </Button>
           {inside !== id && (
-            <Button size="sm" variant="secondary" icon={<LogIn className="h-4 w-4" />} onClick={() => onEnter(id)}>
+            <Button size="sm" variant="primary" icon={<LogIn className="h-4 w-4" />} onClick={() => onEnter(id)}>
               {t('park.center.enter')}
             </Button>
           )}
+          <Button size="sm" variant={inside === id ? 'secondary' : 'ghost'} icon={<Monitor className="h-4 w-4" />} onClick={() => onOpen2D(id)}>
+            {t('park.center.open2d')}
+          </Button>
         </div>
       </article>
     );
@@ -96,7 +98,7 @@ export function ModuleCenter({ inside, onClose, onEnter, onOpen2D }: { inside: M
       <div role="dialog" aria-modal="true" aria-label={t('park.center.title')} className="relative flex w-full max-w-5xl overflow-hidden bg-surface shadow-lift ring-1 ring-line safe-top sm:rounded-3xl">
         {/* Lista lateral: os 18 módulos por região */}
         <nav aria-label={t('park.center.all')} className="hidden w-56 shrink-0 overflow-y-auto border-r border-line/70 p-2 md:block">
-          {PARK_REGIONS.map((r) => (
+          {PARK_REGIONS.filter((r) => ALL.some((id) => buildingById(id)!.region === r)).map((r) => (
             <div key={r} className="mb-2">
               <p className="px-2 pb-1 pt-2 text-[0.68rem] font-semibold uppercase tracking-wide text-subtle">{t(`park.regions.${r}`)}</p>
               {ALL.filter((id) => buildingById(id)!.region === r).map((id) => {
@@ -139,7 +141,7 @@ export function ModuleCenter({ inside, onClose, onEnter, onOpen2D }: { inside: M
                   <h2 className="text-xs font-semibold uppercase tracking-wide text-muted">{t('park.center.shortcuts')}</h2>
                   <div className="flex flex-wrap gap-2">
                     {SHORTCUTS.map(({ id, icon: Icon }) => (
-                      <button key={id} type="button" onClick={() => onOpen2D(id)} className="flex h-10 items-center gap-2 rounded-full bg-surface-2 px-4 text-sm font-medium text-fg ring-1 ring-inset ring-line hover:bg-surface">
+                      <button key={id} type="button" onClick={() => onEnter(id)} className="flex h-10 items-center gap-2 rounded-full bg-surface-2 px-4 text-sm font-medium text-fg ring-1 ring-inset ring-line hover:bg-surface">
                         <Icon className="h-4 w-4 text-accent" aria-hidden />
                         {t(`park.center.sc.${id as 'inbox' | 'calendar' | 'tasks' | 'focus'}`)}
                       </button>

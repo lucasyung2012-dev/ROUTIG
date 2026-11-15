@@ -6,7 +6,7 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import type { ModuleId } from '@/app/modules';
-import { LAKE, PARK_BUILDINGS, PARK_RADIUS, TERRAIN, PLAYGROUNDS, PLAZA_RADIUS, PONDS, heightAt, inWater, onPath } from '@/domain/park';
+import { LAKE, PARK_BUILDINGS, PARK_RADIUS, TERRAIN, onBridge, PLAYGROUNDS, PLAZA_RADIUS, PONDS, heightAt, inWater, onPath } from '@/domain/park';
 import { Kit } from './kit';
 import { createCameraRig, type CamMode, type MoveSettings, type Posture } from './camera';
 import { AVATAR_LOOK, createCrowd, type Figure } from './people';
@@ -1037,7 +1037,7 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
       if (mode !== 'orbit' && !riding && !body.airborne && body.speed > 0.4) {
         const p = body.pos;
         const paved = onPath(p.x, p.z) || Math.hypot(p.x, p.z) < PLAZA_RADIUS + 0.5 || PARK_BUILDINGS.some((b) => Math.hypot(p.x - b.x, p.z - b.z) < b.radius * 0.8);
-        const surface = inside ? 'floor' : inWater(p.x, p.z, 0) ? 'wood' : weather.rain > 0.25 && paved ? 'wet' : paved ? 'stone' : 'grass';
+        const surface = inside ? 'floor' : onBridge(p.x, p.z) || inWater(p.x, p.z, 0) ? 'wood' : weather.rain > 0.25 && paved ? 'wet' : paved ? 'stone' : 'grass';
         audio?.footstep(surface, Math.min(0.55, 0.25 + body.speed * 0.05) * (body.running ? 1.3 : 1));
       }
     }

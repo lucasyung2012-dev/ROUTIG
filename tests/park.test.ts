@@ -7,12 +7,40 @@ import { receptionData } from '@/features/park/receptionData';
 import { createLogo3D } from '@/features/park/logo3d';
 
 describe('parque 3D (V2, Etapa 0): planta', () => {
-  it('um prédio por módulo (16 do menu + Profile e Settings), nas 5 regiões, sem sobreposição', () => {
-    const ids = PARK_BUILDINGS.map((b) => b.id);
-    expect(new Set(ids).size).toBe(18);
-    for (const id of [...NAV_MODULE_IDS, 'profile', 'settings']) expect(ids).toContain(id);
-    for (const r of PARK_REGIONS) expect(PARK_BUILDINGS.some((b) => b.region === r)).toBe(true);
+  it('15 prédios: um por módulo de trabalho; Dashboard, Profile e Settings não têm prédio; sem sobreposição', () => {
+    const ids: string[] = PARK_BUILDINGS.map((b) => b.id);
+    expect(new Set(ids).size).toBe(15);
+    for (const id of NAV_MODULE_IDS.filter((m) => m !== 'dashboard')) expect(ids).toContain(id);
+    for (const id of ['dashboard', 'profile', 'settings']) expect(ids).not.toContain(id);
+    // Toda área temática tem prédios; o centro é só a praça.
+    for (const r of PARK_REGIONS.filter((x) => x !== 'central')) expect(PARK_BUILDINGS.some((b) => b.region === r)).toBe(true);
+    expect(PARK_BUILDINGS.some((b) => b.region === 'central')).toBe(false);
     expect(layoutProblems()).toEqual([]);
+  });
+
+  it('Focus fica numa ilha do lago, ligada à margem por uma ponte em que dá para andar', async () => {
+    const { ISLAND, BRIDGE, onBridge, onIsland } = await import('@/domain/park');
+    const focus = PARK_BUILDINGS.find((b) => b.id === 'focus')!;
+    expect(Math.hypot(focus.x - ISLAND.x, focus.z - ISLAND.z) + focus.radius).toBeLessThanOrEqual(ISLAND.radius);
+    // Ilha e ponte não são água (dá para andar); a água em volta delas é.
+    expect(inWater(ISLAND.x, ISLAND.z, 0.8)).toBe(false);
+    const mx = (BRIDGE.from.x + BRIDGE.to.x) / 2;
+    const mz = (BRIDGE.from.z + BRIDGE.to.z) / 2;
+    expect(onBridge(mx, mz)).toBe(true);
+    expect(inWater(mx, mz, 0.8)).toBe(false);
+    const L = Math.hypot(BRIDGE.to.x - BRIDGE.from.x, BRIDGE.to.z - BRIDGE.from.z);
+    const nx = -(BRIDGE.to.z - BRIDGE.from.z) / L;
+    const nz = (BRIDGE.to.x - BRIDGE.from.x) / L;
+    for (const side of [-1, 1]) expect(inWater(mx + nx * 8 * side, mz + nz * 8 * side, 0.8)).toBe(true);
+    expect(inWater(ISLAND.x + ISLAND.radius + 6, ISLAND.z, 0)).toBe(true);
+    // A ponte começa dentro da ilha, termina em terra firme e é plana (como o chão da ilha).
+    expect(onIsland(BRIDGE.from.x, BRIDGE.from.z)).toBe(true);
+    expect(inWater(BRIDGE.to.x, BRIDGE.to.z, 0)).toBe(false);
+    expect(L).toBeGreaterThan(20);
+    expect(Math.abs(heightAt(mx, mz))).toBeLessThan(0.05);
+    expect(Math.abs(heightAt(focus.x, focus.z))).toBeLessThan(0.05);
+    // Algum caminho passa pela ponte e outro chega à entrada do prédio.
+    expect(parkPaths().some((p) => p.deck)).toBe(true);
   });
 
   it('árvores sempre nas mesmas posições e fora de prédios, praça e lago', () => {

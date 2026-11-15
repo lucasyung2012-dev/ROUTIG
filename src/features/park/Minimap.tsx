@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type MutableRefObject } from 'rea
 import { Maximize2, Minimize2, Minus, Plus } from 'lucide-react';
 import type { ModuleId } from '@/app/modules';
 import { useSettings } from '@/app/SettingsProvider';
-import { LAKE, PARK_BUILDINGS, PARK_RADIUS, PARK_REGIONS, PATH_WIDTH, PLAZA_RADIUS, PONDS, lakeRadiusAt, parkPaths, themeAt, type ParkRegion } from '@/domain/park';
+import { BRIDGE, ISLAND, LAKE, PARK_BUILDINGS, PARK_RADIUS, PARK_REGIONS, PATH_WIDTH, PLAZA_RADIUS, PONDS, lakeRadiusAt, parkPaths, themeAt, type ParkRegion } from '@/domain/park';
 import { IconButton } from '@/ui/IconButton';
 import { cn } from '@/ui/cn';
 import type { Engine } from './engine';
@@ -98,6 +98,8 @@ export function Minimap({ engine, onPick }: { engine: MutableRefObject<Engine | 
                 <polyline key={i} points={p.pts} fill="none" stroke="#E7E1D3" strokeWidth={p.w} strokeLinecap="round" strokeLinejoin="round" />
               ))}
               <polygon points={lake} fill="#3E8FC9" />
+              <line x1={BRIDGE.from.x} y1={BRIDGE.from.z} x2={BRIDGE.to.x} y2={BRIDGE.to.z} stroke="#9A7650" strokeWidth={BRIDGE.half * 2} />
+              <circle cx={ISLAND.x} cy={ISLAND.z} r={ISLAND.radius} fill="#5E9A55" />
               {PONDS.map((p, i) => (
                 <circle key={i} cx={p.x} cy={p.z} r={p.radius} fill="#3E8FC9" />
               ))}

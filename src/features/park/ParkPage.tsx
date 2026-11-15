@@ -6,11 +6,10 @@ import { MODULES, NAV_MODULE_IDS, type ModuleId } from '@/app/modules';
 import { useSettings } from '@/app/SettingsProvider';
 import type { MessageKey } from '@/i18n';
 import { getDb } from '@/data/db';
-import { capitalizeFirst, todayKey } from '@/domain/dates';
+import { todayKey } from '@/domain/dates';
 import { isClosedKind, statusKind } from '@/domain/tasks';
 import { PARK_BUILDINGS, buildingById } from '@/domain/park';
 import { useCalendarData } from '@/features/calendar/useCalendarData';
-import { greetingKey } from '@/features/dashboard/DashboardPage';
 import { Button } from '@/ui/Button';
 import { Logo } from '@/brand/Logo';
 import { ExperienceSwitch } from '@/app/layout/ExperienceSwitch';
@@ -29,9 +28,7 @@ import { createEngine, type Engine, type Hint, type InteriorFactory, type Stats 
 import { CLEAR_SKY, SKY_PRESETS, autoSky, festiveOn, phaseOf, seasonOf, type Quality, type Season, type Sky, type SkyPreset } from './world';
 import { AUDIO_CATS, DEFAULT_MIX, createParkAudio, type AudioMix, type ParkAudio } from './audio';
 import { createInboxInterior, DESTINATIONS, INBOX_SECTORS, type InboxSector } from './interiors/inbox';
-import { createDashboardInterior, createProfileInterior, createSettingsInterior, DASHBOARD_SECTORS, PROFILE_SECTORS, SETTINGS_ROOMS, type DashboardData, type DashboardSector, type ProfileSector, type SettingsRoom } from './interiors/central';
 import { InboxPanel } from './panels/InboxPanel';
-import { DashboardPanel, ProfilePanel, SettingsPanel } from './panels/CentralPanels';
 import { AcademyPanel, InsightsPanel, LanguagesPanel, LibraryPanel, NotesPanel } from './panels/NorthPanels';
 import { CalendarPanel, FinancePanel, ProjectsPanel, TasksPanel } from './panels/EastPanels';
 import { FocusPanel, GoalsPanel, HabitsPanel, MusicPanel, SportsPanel } from './panels/WestSouthPanels';
@@ -116,9 +113,6 @@ const SKY_PARTS = ['cloud', 'rain', 'fog', 'wind'] as const;
 /** Setores de cada prédio com interior (os demais chegam nos próximos blocos). */
 const SECTORS: Partial<Record<ModuleId, readonly string[]>> = {
   inbox: INBOX_SECTORS,
-  dashboard: DASHBOARD_SECTORS,
-  profile: PROFILE_SECTORS,
-  settings: SETTINGS_ROOMS,
   library: LIBRARY_SECTORS,
   notes: NOTES_SECTORS,
   academy: ACADEMY_SECTORS,
@@ -135,7 +129,7 @@ const SECTORS: Partial<Record<ModuleId, readonly string[]>> = {
   sports: SPORTS_SECTORS,
 };
 /** Setores cujo painel é uma tela grande (o módulo inteiro dentro do ambiente). */
-const WIDE = new Set(['dashboard:overview', 'dashboard:panels', 'profile:interests', 'profile:trajectory', 'profile:personalize', 'settings:identity', 'settings:appearance', 'settings:modules', 'settings:privacy', 'settings:data', 'settings:help', 'library:atrium', 'library:collections', 'library:consult', 'library:search', 'library:preserve', 'library:transfer', 'academy:hall', 'academy:review', 'academy:plan', 'languages:garden', ...INSIGHTS_SECTORS.map((s) => `insights:${s}`),
+const WIDE = new Set(['library:atrium', 'library:collections', 'library:consult', 'library:search', 'library:preserve', 'library:transfer', 'academy:hall', 'academy:review', 'academy:plan', 'languages:garden', ...INSIGHTS_SECTORS.map((s) => `insights:${s}`),
   ...CALENDAR_SECTORS.filter((s) => s !== 'atrium').map((s) => `calendar:${s}`),
   ...TASKS_SECTORS.map((s) => `tasks:${s}`),
   'projects:studio',
@@ -209,7 +203,11 @@ export default function ParkPage() {
   const [talk, setTalk] = useState<{ name: string; activity: string; line: number; at: number } | null>(null);
   const reopened = useRef(false);
   const navigate = useNavigate();
-  const restore = useMemo(readParkContext, []);
+  const restore = useMemo(() => {
+    const r = readParkContext();
+    // Lugar guardado dentro de um prédio que não existe mais no Campus: retoma do lado de fora.
+    return r && r.inside && !buildingById(r.inside) ? { ...r, inside: null, sector: null, zone: null } : r;
+  }, []);
   const [options, setOptions] = useState(false);
 
   /* ---------- Dados reais para os interiores ---------- */
@@ -218,24 +216,6 @@ export default function ParkPage() {
   const live = useMemo(() => (items ?? []).filter((i) => !i.deletedAt), [items]);
   const inboxData = useMemo(() => (items ? receptionData(items, today) : null), [items, today]);
   const cal = useCalendarData();
-  const dashData = useMemo<DashboardData | null>(() => {
-    if (cal.loading || !items) return null;
-    const now = new Date();
-    const events = cal.itemsInRange(today, today, { showTasks: false, categoryId: null }).filter((i) => i.kind === 'event').length;
-    const open = cal.tasks.active.filter((x) => !isClosedKind(statusKind(cal.tasks.config, x.statusId)));
-    const name = settings.profile.displayName.trim();
-    const greeting = t(greetingKey(now.getHours()));
-    return {
-      greeting: name ? t('dashboard.greetingNamed', { greeting, name }) : greeting,
-      date: capitalizeFirst(new Intl.DateTimeFormat(settings.locale, { weekday: 'long', day: 'numeric', month: 'long' }).format(now)),
-      stats: [
-        [t('park.dashboard.stats.events'), events],
-        [t('park.dashboard.stats.dueToday'), open.filter((x) => x.dueDate === today).length],
-        [t('park.dashboard.stats.overdue'), open.filter((x) => x.dueDate && x.dueDate < today).length],
-        [t('park.dashboard.stats.inbox'), inboxData?.open ?? 0],
-      ],
-    };
-  }, [cal, items, inboxData, today, settings.locale, settings.profile.displayName, t]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -255,9 +235,6 @@ export default function ParkPage() {
           destinations: Object.fromEntries(DESTINATIONS.map((d) => [d, d === 'library' ? t('modules.library') : t(`inbox.types.${d}`)])) as Record<(typeof DESTINATIONS)[number], string>,
           emptyFrame: t('park.inbox.emptyFrame'),
         }),
-      dashboard: (kit) => createDashboardInterior(kit, sectorLabels<DashboardSector>('park.dashboard.sectors', DASHBOARD_SECTORS)),
-      profile: (kit) => createProfileInterior(kit, sectorLabels<ProfileSector>('park.profile.sectors', PROFILE_SECTORS)),
-      settings: (kit) => createSettingsInterior(kit, sectorLabels<SettingsRoom>('park.settings.rooms', SETTINGS_ROOMS)),
       library: (kit) => createLibraryInterior(kit, sectorLabels<LibrarySector>('park.library.sectors', LIBRARY_SECTORS)),
       notes: (kit) => createNotesInterior(kit, sectorLabels<NotesSector>('park.notes.sectors', NOTES_SECTORS)),
       academy: (kit) => createAcademyInterior(kit, sectorLabels<AcademySector>('park.academy.sectors', ACADEMY_SECTORS)),
@@ -481,11 +458,6 @@ export default function ParkPage() {
   useEffect(() => {
     if (inboxData) engine.current?.setData('inbox', inboxData);
   }, [inboxData]);
-  // Só redesenha a tela do Dashboard quando os números mudam.
-  const dashKey = JSON.stringify(dashData);
-  useEffect(() => {
-    if (dashData) engine.current?.setData('dashboard', dashData);
-  }, [dashKey]);
   // Nomes das salas da Academy e dos quiosques de Idiomas: as disciplinas e os idiomas reais.
   const academy = useAcademyData();
   const langs = useLanguages();
@@ -835,9 +807,6 @@ export default function ParkPage() {
           </header>
           <div className={cn('min-h-0 flex-1 overflow-y-auto p-4', sheet === 'peek' && 'hidden sm:block')} style={{ touchAction: 'pan-y' }}>
             {inside === 'inbox' && <InboxPanel id={sector as InboxSector} items={live} data={inboxData} today={today} onError={(m) => toast.show(m, 'error')} onDone={(m) => toast.show(m, 'success')} />}
-            {inside === 'dashboard' && <DashboardPanel id={sector as DashboardSector} />}
-            {inside === 'profile' && <ProfilePanel id={sector as ProfileSector} />}
-            {inside === 'settings' && <SettingsPanel id={sector as SettingsRoom} />}
             {inside === 'library' && <LibraryPanel id={sector as LibrarySector} />}
             {inside === 'notes' && <NotesPanel id={sector as NotesSector} />}
             {inside === 'academy' && <AcademyPanel id={sector as AcademySector} />}

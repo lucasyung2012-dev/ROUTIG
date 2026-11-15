@@ -318,7 +318,7 @@ export function indoorOf(p: Person, a: Activity, c: Conditions): ModuleId | null
     case 'music':
       return Math.floor(c.hour) < 17 ? 'music' : null;
     case 'cafe':
-      return c.rain > 0.15 && p.id % 2 ? 'dashboard' : null;
+      return c.rain > 0.15 && p.id % 2 ? 'inbox' : null;
     default:
       return null;
   }

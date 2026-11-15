@@ -83,8 +83,9 @@ export function HomePage() {
       {/* Praça de entrada: céu e luz mudam com o horário. */}
       <section className="relative overflow-hidden rounded-3xl shadow-lift ring-1 ring-line">
         <Plaza period={period} label={t(period === 'night' ? 'home.plazaNight' : 'home.plaza')} />
-        <div className="absolute inset-x-0 bottom-0 p-4 sm:p-6">
-          <div className="max-w-md rounded-2xl bg-surface/90 p-4 shadow-lift ring-1 ring-line backdrop-blur-md sm:p-5">
+        {/* No alto, à esquerda: a fonte, os bancos e as pessoas ficam à vista embaixo. */}
+        <div className="absolute inset-x-0 top-0 p-3 sm:p-5">
+          <div className="max-w-sm rounded-2xl bg-surface/90 p-4 shadow-lift ring-1 ring-line backdrop-blur-md sm:p-5">
             <div className="flex items-center gap-3">
               <Logo size={40} className="h-10 w-10 shrink-0" />
               <div className="min-w-0">

@@ -5,7 +5,7 @@
  * pais no banco, pombos na praça (voam quando alguém chega perto), patos no lago e um gato de rua.
  * Tudo por hora do dia e clima: de noite e com chuva o parque esvazia.
  */
-import { LAKE, ROAD_RADIUS, PARK_SCALE, PLAY, PLAYGROUNDS, POIS, heightAt, lakeRadiusAt, onPath, playAt, plazaCarts, type Point } from '@/domain/park';
+import { ISLAND, LAKE, bridgePoint, onBridge, ROAD_RADIUS, PARK_SCALE, PLAY, PLAYGROUNDS, POIS, heightAt, lakeRadiusAt, onPath, playAt, plazaCarts, type Point } from '@/domain/park';
 import { navGraph, routeBetween } from '@/domain/parkPeople';
 import type { Figure } from './people';
 
@@ -156,9 +156,18 @@ export function createExtras(): Extras {
   let cooAt = 0;
   // Patos: nadando devagar pelo lago, em fila solta.
   const duckList: Duck[] = Array.from({ length: 7 }, (_, i) => {
-    const a = hash(600 + i) * Math.PI * 2;
-    const r = lakeRadiusAt(a) * (0.35 + hash(610 + i) * 0.4);
-    return { x: LAKE.x + Math.cos(a) * r, z: LAKE.z + Math.sin(a) * r, yaw: hash(620 + i) * 6.3, bob: i };
+    // Nascem no anel de água entre a ilha do Focus e a margem, fora da ponte.
+    let a = hash(600 + i) * Math.PI * 2;
+    const spot = () => {
+      const r = ISLAND.radius + 7 + hash(610 + i) * Math.max(4, lakeRadiusAt(a) - ISLAND.radius - 14);
+      return { x: LAKE.x + Math.cos(a) * r, z: LAKE.z + Math.sin(a) * r };
+    };
+    let p = spot();
+    if (onBridge(p.x, p.z, -5)) {
+      a += 0.7;
+      p = spot();
+    }
+    return { x: p.x, z: p.z, yaw: hash(620 + i) * 6.3, bob: i };
   });
   const duckTurn = duckList.map((_, i) => hash(630 + i) - 0.5);
   let quackAt = 0;
@@ -489,7 +498,12 @@ export function createExtras(): Extras {
       const a = Math.atan2(dk.z - LAKE.z, dk.x - LAKE.x);
       const rr = Math.hypot(dk.x - LAKE.x, dk.z - LAKE.z);
       if (rr > lakeRadiusAt(a) - 5) dk.yaw = turn(dk.yaw, Math.atan2(LAKE.x - dk.x, LAKE.z - dk.z), dt * 1.2);
-      else dk.yaw += duckTurn[i]! * dt * 0.25 + Math.sin(t * 0.2 + i) * dt * 0.1;
+      // Perto da ilha, viram para a água aberta; perto da ponte, afastam-se dela.
+      else if (rr < ISLAND.radius + 5) dk.yaw = turn(dk.yaw, Math.atan2(dk.x - LAKE.x, dk.z - LAKE.z), dt * 1.2);
+      else if (onBridge(dk.x, dk.z, -4)) {
+        const c = bridgePoint(dk.x, dk.z);
+        dk.yaw = turn(dk.yaw, Math.atan2(dk.x - c.x, dk.z - c.z), dt * 1.6);
+      } else dk.yaw += duckTurn[i]! * dt * 0.25 + Math.sin(t * 0.2 + i) * dt * 0.1;
       const sp = 0.35 + (i % 3) * 0.08;
       dk.x += Math.sin(dk.yaw) * sp * dt;
       dk.z += Math.cos(dk.yaw) * sp * dt;

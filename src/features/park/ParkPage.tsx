@@ -47,6 +47,7 @@ import { receptionData } from './receptionData';
 import { ModuleCenter } from './ModuleCenter';
 import { DEFAULT_FAB, FloatingCenterButton, PlacesMenu, type FabPlace } from './ParkUi';
 import { floorNameKey, withFloors } from './interiors/floors';
+import { setZoneLabels } from './interiors/common';
 import { DRUM_PADS, GUITAR_CHORDS, GUITAR_STRINGS, PIANO_KEYS, vaultStateOf, type Instrument } from './interiors/things';
 import { clearParkContext, pushRecent, readParkContext, saveParkContext } from './parkContext';
 
@@ -228,6 +229,8 @@ export default function ParkPage() {
     if (!canvas) return;
     const sectorLabels = <T extends string>(prefix: string, ids: readonly T[]) => Object.fromEntries(ids.map((s) => [s, t(`${prefix}.${s}` as MessageKey)])) as Record<T, string>;
     const interiors: Partial<Record<ModuleId, InteriorFactory>> = {};
+    // Nomes dos ambientes do térreo (placas): uma tradução para todos os interiores.
+    setZoneLabels((k) => t(`park.zones.${k}` as MessageKey));
     const base: Partial<Record<ModuleId, InteriorFactory>> = {
       inbox: (kit) =>
         createInboxInterior(kit, {

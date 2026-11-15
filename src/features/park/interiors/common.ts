@@ -213,6 +213,15 @@ export function canvasPlane(kit: Kit, w: number, h: number, px = 256, opaque = f
   return { mesh, ctx, tex };
 }
 
+/** Ambientes do térreo com placa própria (nomes em i18n: park.zones.*). */
+export type ZoneKey = 'reception' | 'orientation' | 'atrium' | 'lounge' | 'infoPanel' | 'lifts' | 'stairs' | 'immersion' | 'international' | 'exhibits' | 'conversation' | 'courseInfo' | 'writingStudio' | 'ideas' | 'quietRooms' | 'capture' | 'catalog' | 'newMaterials' | 'casualReading' | 'arrivals' | 'intake' | 'firstReview' | 'timePanel' | 'quickAgenda' | 'dayView' | 'tasksOverview' | 'quickCreate' | 'priority' | 'review' | 'projectsBoard' | 'newProject' | 'activeProjects' | 'status' | 'garden' | 'focusStation' | 'focusSettings' | 'choose' | 'prepare' | 'singleRooms' | 'booths' | 'privacyDesks' | 'habitStation' | 'routineLab' | 'tracking' | 'pauseGarden' | 'overview' | 'newGoal' | 'indicators' | 'analysisAccess' | 'musicSocial' | 'instruments' | 'smallStage' | 'multiuse' | 'conditioning' | 'individual' | 'lockers' | 'financeView' | 'balances' | 'mainFunctions' | 'vault';
+let zoneText: (k: ZoneKey) => string = (k) => k;
+/** O ParkPage passa a tradução uma vez; os interiores pedem o nome do ambiente por chave. */
+export function setZoneLabels(fn: (k: ZoneKey) => string): void {
+  zoneText = fn;
+}
+export const zoneLabel = (k: ZoneKey): string => zoneText(k);
+
 /** Placa do setor (nome), com a cor do prédio. Duas faces: legível dos dois lados. */
 export function sectorSign(kit: Kit, label: string, accent: string, w = 2.6): THREE.Object3D {
   const s = canvasPlane(kit, w, w * 0.25, 128);

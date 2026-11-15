@@ -240,8 +240,9 @@ function totemSpot(b: ParkBuilding): (Point & { face: number }) | null {
   const a = facingOf(b);
   const fx = Math.sin(a);
   const fz = Math.cos(a);
-  for (const fwd of [2.6, 4, 5.5])
-    for (const lat of [3.6, 4.6, 5.8])
+  // Primeiro colado ao caminho de entrada; se não couber (quiosque, lounge, outro caminho), mais ao lado.
+  for (const lat of [3.6, 4.6, 5.8, 7.5, 9.5, 12])
+    for (const fwd of [2.6, 4, 5.5, 7.5])
       for (const side of [1, -1]) {
         const x = b.x + fx * (b.radius + fwd) + fz * side * lat;
         const z = b.z + fz * (b.radius + fwd) - fx * side * lat;

@@ -10,6 +10,7 @@ import { amenities, houses, neighborhood, sportsFields, streetTrees, type Seat, 
 import { city } from './buildings/city';
 import { navGraph } from '@/domain/parkPeople';
 import { landmarks } from './landmarks';
+import { totems } from './totems';
 import { Builder, Kit, signTexture, cloud, forest, setWaterNight, setWaterSky, setWaterWeather, shrubs, sky, stars, water, type Plant, type TreeSpecies } from './kit';
 import { birds, butterflies, drone, fountain, leaves, rain } from './life';
 import { playground } from './playground';
@@ -911,7 +912,10 @@ export function createWorld(kit: Kit): World {
   // Marcos das áreas temáticas (sem árvore nem moita em cima).
   const marks = landmarks(kit);
   for (const m of marks.list) clearZones.push({ x: m.x, z: m.z, r: 8 });
-  root.add(am.group, ww, fields, marks.group);
+  // Totens dos prédios e placas das áreas (nada plantado em cima).
+  const signs = totems(kit);
+  for (const p of signs.spots) clearZones.push({ x: p.x, z: p.z, r: 1.6 });
+  root.add(am.group, ww, fields, marks.group, signs.group);
   // Borda do mapa (bairro, casas, avenida, ônibus): monta logo depois que o parque aparece, para a
   // abertura não esperar por ela; e só é desenhada com a câmera perto da borda ou no alto.
   const edge = new THREE.Group();
@@ -924,7 +928,7 @@ export function createWorld(kit: Kit): World {
     ticks.push(hood.tick, streets.tick);
     kit.glowing.forEach((m) => (m.emissiveIntensity = 0.15 + glowNow * 1.6));
   }, 1500);
-  obstacles.push(...footprint(fields, heightAt), ...footprint(marks.group, heightAt));
+  obstacles.push(...footprint(fields, heightAt), ...footprint(marks.group, heightAt), ...footprint(signs.group, heightAt));
   // Barracas, quiosques, mesas, bancos, pérgolas, passarela, praça; postes e troncos das árvores.
   obstacles.push(...footprint(am.group, heightAt), ...footprint(ww, heightAt), ...footprint(plazaGroup, heightAt), ...pgs.flatMap((p) => footprint(p.solid, heightAt)));
   for (const l of p.lamps) obstacles.push({ x: l.x, z: l.z, r: 0.25, h: heightAt(l.x, l.z) + 4.2 });
@@ -934,8 +938,19 @@ export function createWorld(kit: Kit): World {
   // postes, parquinhos, quadras), os caminhos e as zonas livres. Nenhuma árvore, arbusto ou flor
   // nasce aí — vale para todas as fontes de vegetação, não só para as árvores soltas.
   const solid = new ObstacleGrid(obstacles.slice());
+  // Lajotas dos portões até a calçada da rua (saem em raio do fim de cada caminho de portão).
+  const gateRays = navGraph().gates.map((gi) => {
+    const n = navGraph().nodes[gi]!;
+    return { a: Math.atan2(n.z, n.x), r: Math.hypot(n.x, n.z) };
+  });
+  const onGateWalk = (x: number, z: number, pad: number) => {
+    const r = Math.hypot(x, z);
+    const a = Math.atan2(z, x);
+    return gateRays.some((g) => r > g.r - 3 && Math.abs(Math.atan2(Math.sin(a - g.a), Math.cos(a - g.a))) * r < 1.3 + pad);
+  };
   const free = (x: number, z: number, r: number) =>
     !onPath(x, z, r + 0.3) &&
+    !onGateWalk(x, z, r + 0.5) &&
     !clearZones.some((c) => Math.hypot(c.x - x, c.z - z) < c.r + r) &&
     !PARK_BUILDINGS.some((bd) => Math.hypot(bd.x - x, bd.z - z) < bd.radius + 1.3 + r) &&
     !solid.near(x, z).some((o) => Math.hypot(o.x - x, o.z - z) < o.r + r + 0.2);
@@ -1011,10 +1026,6 @@ export function createWorld(kit: Kit): World {
         const k = `${i},${j}`;
         zoneGrid.set(k, [...(zoneGrid.get(k) ?? []), c]);
       }
-  const gateRays = navGraph().gates.map((gi) => {
-    const n = navGraph().nodes[gi]!;
-    return { a: Math.atan2(n.z, n.x), r: Math.hypot(n.x, n.z) };
-  });
   const paved = (x: number, z: number) => {
     const r = Math.hypot(x, z);
     if (r > ROAD_RADIUS - 9) return true;

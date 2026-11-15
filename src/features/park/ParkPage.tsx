@@ -132,7 +132,7 @@ const SECTORS: Partial<Record<ModuleId, readonly string[]>> = {
   sports: SPORTS_SECTORS,
 };
 /** Setores cujo painel é uma tela grande (o módulo inteiro dentro do ambiente). */
-const WIDE = new Set(['library:atrium', 'library:collections', 'library:consult', 'library:search', 'library:preserve', 'library:transfer', 'academy:hall', 'academy:review', 'academy:plan', 'languages:garden', ...INSIGHTS_SECTORS.map((s) => `insights:${s}`),
+const WIDE = new Set(['library:atrium', 'library:collections', 'library:consult', 'library:search', 'library:preserve', 'library:transfer', 'academy:hall', 'academy:review', 'academy:plan', 'languages:garden', 'languages:spaces', 'notes:reception', 'notes:writing', 'notes:advanced', 'notes:organize', 'notes:versions', ...INSIGHTS_SECTORS.map((s) => `insights:${s}`),
   ...CALENDAR_SECTORS.filter((s) => s !== 'atrium').map((s) => `calendar:${s}`),
   ...TASKS_SECTORS.map((s) => `tasks:${s}`),
   'projects:studio',

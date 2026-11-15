@@ -270,16 +270,32 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
   canvas.addEventListener('pointerdown', onDown);
   canvas.addEventListener('pointerup', onUp);
 
-  /* ---------- Troca de cena com escurecimento ---------- */
+  /* ---------- Troca de cena sem tela preta (seção 33) ---------- */
+  // A última imagem (a porta vista de perto) fica por cima e se dissolve sobre a cena nova: a
+  // passagem do parque para o prédio (e de volta) é contínua, sem escurecer a tela.
   const fadeSwap = (swap: () => void) => {
-    const run = () => {
-      swap();
-      canvas.style.opacity = '1';
-    };
-    if (opts.reduceMotion) return run();
-    canvas.style.transition = 'opacity 260ms ease';
-    canvas.style.opacity = '0';
-    window.setTimeout(run, 280);
+    if (opts.reduceMotion) return swap();
+    let snap: HTMLCanvasElement | null = null;
+    try {
+      renderer.render(inside ? inside.scene.scene : outside, camera);
+      snap = document.createElement('canvas');
+      snap.width = canvas.width;
+      snap.height = canvas.height;
+      snap.getContext('2d')?.drawImage(canvas, 0, 0);
+      Object.assign(snap.style, { position: 'absolute', inset: '0', width: '100%', height: '100%', pointerEvents: 'none', opacity: '1', transition: 'opacity 450ms ease' });
+      canvas.after(snap);
+    } catch {
+      snap = null;
+    }
+    swap();
+    const s = snap;
+    if (!s) return;
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        s.style.opacity = '0';
+        window.setTimeout(() => s.remove(), 500);
+      }),
+    );
   };
 
   const fit = (v: { cam: THREE.Vector3; target: THREE.Vector3 }) => {

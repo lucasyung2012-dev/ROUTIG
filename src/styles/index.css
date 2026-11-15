@@ -186,3 +186,9 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .home-jets { animation: none; }
 }
+
+/* Home no tema escuro: o cenário da praça fica um pouco mais escuro, junto com a interface. */
+:root[data-theme='dark'] .home-dim { opacity: 0.22; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .home-dim { opacity: 0.22; }
+}

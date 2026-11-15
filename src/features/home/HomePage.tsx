@@ -6,6 +6,7 @@ import { CAMPUS_PATH, controlPath, hasControlHistory } from '@/app/experience';
 import { readParkContext } from '@/features/park/parkContext';
 import { Logo } from '@/brand/Logo';
 import { cn } from '@/ui/cn';
+import { HomePlaza, type Period } from './HomePlaza';
 
 type Xp = 'control' | 'campus' | 'district';
 const FAV_KEY = 'routig.home.favorite';
@@ -21,22 +22,26 @@ function readFav(): Xp | null {
 }
 
 /** Período do dia para a luz da praça e a saudação. */
-function periodOf(h: number): 'morning' | 'afternoon' | 'night' {
+function periodOf(h: number): Period {
   if (h >= 5 && h < 12) return 'morning';
   if (h >= 12 && h < 18) return 'afternoon';
   return 'night';
 }
 
+const reducedMotion = () => typeof window !== 'undefined' && (document.documentElement.dataset.motion === 'reduce' || !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches);
+
 /**
- * ROUTIG Home: a porta de entrada do ecossistema. Uma praça com fonte, árvores e gente passando
- * (com a luz do horário), a saudação e as três experiências com a mesma importância. Não mostra
- * tarefas, números nem cobranças: produtividade fica no Control Room e no Campus.
+ * ROUTIG Home: a tela inicial, como o menu de abertura de um jogo. A praça do ROUTIG (fonte,
+ * árvores, gente passando, luz do horário) ocupa a tela como cenário e, por cima, o título, a
+ * saudação e as três experiências com a mesma importância. É uma tela 2D; não mostra tarefas,
+ * números nem cobranças: produtividade fica no Control Room e no Campus.
  */
 export function HomePage() {
   const { t, settings } = useSettings();
   const navigate = useNavigate();
   const [fav, setFav] = useState<Xp | null>(readFav);
   const [period, setPeriod] = useState(() => periodOf(new Date().getHours()));
+  const [still] = useState(reducedMotion);
   const [returning] = useState(() => {
     try {
       return localStorage.getItem(VISITED_KEY) === '1';
@@ -79,181 +84,81 @@ export function HomePage() {
   ];
 
   return (
-    <div className="flex flex-col gap-6">
-      {/* Praça de entrada: céu e luz mudam com o horário. */}
-      <section className="relative overflow-hidden rounded-3xl shadow-lift ring-1 ring-line">
-        <Plaza period={period} label={t(period === 'night' ? 'home.plazaNight' : 'home.plaza')} />
-        {/* No alto, à esquerda: a fonte, os bancos e as pessoas ficam à vista embaixo. */}
-        <div className="absolute inset-x-0 top-0 p-3 sm:p-5">
-          <div className="max-w-sm rounded-2xl bg-surface/90 p-4 shadow-lift ring-1 ring-line backdrop-blur-md sm:p-5">
-            <div className="flex items-center gap-3">
-              <Logo size={40} className="h-10 w-10 shrink-0" />
-              <div className="min-w-0">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-subtle">{t('app.name')}</p>
-                <h1 className="truncate text-xl font-semibold text-fg sm:text-2xl">{name ? `${hello}, ${name}!` : `${hello}!`}</h1>
-              </div>
+    <div className="relative isolate min-h-[calc(100dvh-3.5rem)] overflow-hidden md:min-h-[100dvh]">
+      {/* Cenário: a praça cobre a tela; um véu escurece embaixo para o menu ficar legível. */}
+      <div className="absolute inset-0 -z-10">
+        <HomePlaza period={period} still={still} label={t(period === 'night' ? 'home.plazaNight' : 'home.plaza')} className="block h-full w-full" />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-transparent to-black/55" aria-hidden />
+        <div className="home-dim absolute inset-0 bg-[#0B1026] opacity-0" aria-hidden />
+      </div>
+
+      <div className="mx-auto flex min-h-[calc(100dvh-3.5rem)] w-full max-w-6xl flex-col gap-6 px-4 pb-8 pt-6 sm:px-8 md:min-h-[100dvh] md:pt-10">
+        {/* Título, como na abertura de um jogo, com a saudação. */}
+        <header className="flex flex-col items-center text-center sm:items-start sm:text-left">
+          <div className="flex items-center gap-3 rounded-2xl bg-surface/80 px-4 py-3 shadow-lift ring-1 ring-white/30 backdrop-blur-md">
+            <Logo size={48} className="h-12 w-12 shrink-0" />
+            <div className="min-w-0">
+              <p className="text-lg font-bold tracking-[0.3em] text-fg">{t('app.name')}</p>
+              <p className="text-xs text-muted">{t('app.tagline')}</p>
             </div>
-            <p className="mt-2 text-sm text-muted">{welcome}</p>
           </div>
-        </div>
-      </section>
+          <h1 className="mt-4 text-3xl font-semibold text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.45)] sm:text-4xl">{name ? `${hello}, ${name}!` : `${hello}!`}</h1>
+          <p className="mt-1 text-sm font-medium text-white/90 drop-shadow-[0_1px_6px_rgba(0,0,0,0.5)] sm:text-base">{welcome}</p>
+        </header>
 
-      <section aria-labelledby="xp-title">
-        <h2 id="xp-title" className="sr-only">
-          {t('home.xp.title')}
-        </h2>
-        <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {cards.map((c) => {
-            const Icon = c.icon;
-            const isFav = fav === c.id;
-            return (
-              <li key={c.id} className={cn('group flex flex-col overflow-hidden rounded-2xl bg-surface shadow-soft ring-1 transition duration-200 hover:-translate-y-0.5 hover:shadow-lift motion-reduce:transform-none', isFav ? 'ring-2 ring-amber/70' : 'ring-line')}>
-                <div className={cn('relative h-32 bg-gradient-to-br', c.accent)}>
-                  {c.preview}
-                  <button
-                    type="button"
-                    onClick={() => toggleFav(c.id)}
-                    aria-pressed={isFav}
-                    aria-label={isFav ? t('home.unfavorite', { name: t(`home.xp.${c.id}.name`) }) : t('home.favorite', { name: t(`home.xp.${c.id}.name`) })}
-                    title={isFav ? t('home.favoriteOn') : t('home.favoriteSet')}
-                    className="absolute right-2 top-2 flex h-9 w-9 items-center justify-center rounded-full bg-black/25 text-white backdrop-blur transition hover:bg-black/40"
-                  >
-                    <Star className={cn('h-4 w-4', isFav && 'fill-amber text-amber')} aria-hidden />
-                  </button>
-                  {c.badge && <span className="absolute left-3 top-3 rounded-full bg-black/35 px-2.5 py-1 text-[0.7rem] font-semibold text-white backdrop-blur">{c.badge}</span>}
-                </div>
-                <div className="flex flex-1 flex-col gap-2 p-4">
-                  <h3 className="flex items-center gap-2 text-lg font-semibold text-fg">
-                    <Icon className="h-5 w-5 text-accent" aria-hidden />
-                    {t(`home.xp.${c.id}.name`)}
-                  </h3>
-                  <p className="flex-1 text-sm text-muted">{t(`home.xp.${c.id}.desc`)}</p>
-                  <button type="button" onClick={c.go} className="mt-1 inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-brand px-4 text-sm font-semibold text-white shadow-glow transition hover:brightness-110">
-                    {c.action}
-                    <ArrowRight className="h-4 w-4" aria-hidden />
-                  </button>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
-      </section>
+        <div className="flex-1" />
+
+        {/* Menu: as três experiências. */}
+        <section aria-labelledby="xp-title">
+          <h2 id="xp-title" className="sr-only">
+            {t('home.xp.title')}
+          </h2>
+          <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {cards.map((c, i) => {
+              const Icon = c.icon;
+              const isFav = fav === c.id;
+              return (
+                <li
+                  key={c.id}
+                  style={{ animationDelay: `${120 + i * 90}ms` }}
+                  className={cn(
+                    'group flex animate-fade-up flex-col overflow-hidden rounded-2xl bg-surface/90 shadow-lift ring-1 backdrop-blur-md transition duration-200 hover:-translate-y-1 hover:shadow-glow motion-reduce:transform-none',
+                    isFav ? 'ring-2 ring-amber/80' : 'ring-white/30',
+                  )}
+                >
+                  <div className={cn('relative h-28 bg-gradient-to-br sm:h-32', c.accent)}>
+                    {c.preview}
+                    <button
+                      type="button"
+                      onClick={() => toggleFav(c.id)}
+                      aria-pressed={isFav}
+                      aria-label={isFav ? t('home.unfavorite', { name: t(`home.xp.${c.id}.name`) }) : t('home.favorite', { name: t(`home.xp.${c.id}.name`) })}
+                      title={isFav ? t('home.favoriteOn') : t('home.favoriteSet')}
+                      className="absolute right-2 top-2 flex h-9 w-9 items-center justify-center rounded-full bg-black/25 text-white backdrop-blur transition hover:bg-black/40"
+                    >
+                      <Star className={cn('h-4 w-4', isFav && 'fill-amber text-amber')} aria-hidden />
+                    </button>
+                    {c.badge && <span className="absolute left-3 top-3 rounded-full bg-black/35 px-2.5 py-1 text-[0.7rem] font-semibold text-white backdrop-blur">{c.badge}</span>}
+                    {isFav && !c.badge && <span className="absolute left-3 top-3 rounded-full bg-black/35 px-2.5 py-1 text-[0.7rem] font-semibold text-white backdrop-blur">{t('home.favoriteOn')}</span>}
+                  </div>
+                  <div className="flex flex-1 flex-col gap-2 p-4">
+                    <h3 className="flex items-center gap-2 text-lg font-semibold text-fg">
+                      <Icon className="h-5 w-5 text-accent" aria-hidden />
+                      {t(`home.xp.${c.id}.name`)}
+                    </h3>
+                    <p className="flex-1 text-sm text-muted">{t(`home.xp.${c.id}.desc`)}</p>
+                    <button type="button" onClick={c.go} className="mt-1 inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-brand px-4 text-sm font-semibold text-white shadow-glow transition hover:brightness-110 active:scale-[0.98]">
+                      {c.action}
+                      <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" aria-hidden />
+                    </button>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      </div>
     </div>
-  );
-}
-
-const SKY = {
-  morning: ['#9FD2F2', '#FCE3C4'],
-  afternoon: ['#5CB3EE', '#BFE3F7'],
-  night: ['#0B1530', '#2B2F5E'],
-} as const;
-
-/** Praça desenhada: céu do horário, prédios ao fundo, árvores, caminhos, fonte com água e gente andando. */
-function Plaza({ period, label }: { period: 'morning' | 'afternoon' | 'night'; label: string }) {
-  const night = period === 'night';
-  const still = typeof window !== 'undefined' && (document.documentElement.dataset.motion === 'reduce' || !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches);
-  const [top, bottom] = SKY[period];
-  const grass = night ? '#2E5A35' : '#7DB866';
-  const grassFar = night ? '#284C2F' : '#6AA352';
-  const stone = night ? '#8C8C9E' : '#E7E1D3';
-  const tree = (x: number, y: number, s: number, c: string) => (
-    <g key={`${x}-${y}`} transform={`translate(${x} ${y}) scale(${s})`}>
-      <rect x="-3" y="-4" width="6" height="22" rx="2" fill={night ? '#3B2C22' : '#6B4A33'} />
-      <circle cx="0" cy="-16" r="18" fill={c} />
-      <circle cx="-12" cy="-8" r="12" fill={c} opacity="0.9" />
-      <circle cx="12" cy="-9" r="13" fill={c} opacity="0.9" />
-    </g>
-  );
-  const green = night ? '#2F6B3A' : '#3E8E4A';
-  const green2 = night ? '#356F40' : '#4F9F55';
-  return (
-    <svg viewBox="0 0 1200 460" className="block h-[300px] w-full sm:h-[380px]" preserveAspectRatio="xMidYMid slice" role="img" aria-label={label}>
-      <defs>
-        <linearGradient id="home-sky" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor={top} />
-          <stop offset="1" stopColor={bottom} />
-        </linearGradient>
-        <radialGradient id="home-glow" cx="0.5" cy="0.6" r="0.5">
-          <stop offset="0" stopColor={night ? '#FFE7B0' : '#FFFFFF'} stopOpacity={night ? 0.35 : 0.25} />
-          <stop offset="1" stopColor="#FFFFFF" stopOpacity="0" />
-        </radialGradient>
-      </defs>
-      <rect width="1200" height="460" fill="url(#home-sky)" />
-      {night && [80, 210, 340, 520, 690, 840, 980, 1110, 160, 760, 430, 1050].map((x, i) => <circle key={x} cx={x} cy={30 + ((i * 37) % 120)} r={i % 3 ? 1.4 : 2.1} fill="#FFFFFF" opacity="0.8" />)}
-      {!night && <circle cx={period === 'morning' ? 180 : 980} cy={period === 'morning' ? 120 : 80} r="38" fill="#FFF4C9" opacity="0.9" />}
-      {night && <circle cx="1020" cy="80" r="26" fill="#F5F1E1" />}
-      {/* Prédios do Campus ao fundo. */}
-      <g fill={night ? '#3A4266' : '#DDE6F1'} opacity="0.95">
-        <rect x="120" y="190" width="90" height="90" rx="6" />
-        <rect x="230" y="160" width="70" height="120" rx="6" />
-        <path d="M840 280 V180 Q900 140 960 180 V280 Z" />
-        <rect x="980" y="200" width="110" height="80" rx="6" />
-        <rect x="520" y="170" width="160" height="110" rx="10" />
-      </g>
-      {night && (
-        <g fill="#FFE7A8" opacity="0.85">
-          {[135, 160, 185, 245, 270, 535, 565, 595, 625, 655, 995, 1025, 1055].map((x, i) => (
-            <rect key={x} x={x} y={i < 5 ? 210 + (i % 2) * 30 : i < 10 ? 195 : 220} width="10" height="12" rx="2" />
-          ))}
-        </g>
-      )}
-      <path d="M0 270 Q300 240 600 262 T1200 256 V460 H0 Z" fill={grassFar} />
-      <path d="M0 300 Q300 280 600 296 T1200 292 V460 H0 Z" fill={grass} />
-      {/* Caminhos saindo da praça. */}
-      <g fill={stone} opacity="0.95">
-        <path d="M560 360 L380 460 H470 L590 365 Z" />
-        <path d="M640 360 L820 460 H730 L610 365 Z" />
-        <path d="M520 345 L0 330 V350 L515 355 Z" />
-        <path d="M680 345 L1200 330 V350 L685 355 Z" />
-      </g>
-      <ellipse cx="600" cy="352" rx="210" ry="58" fill={stone} />
-      <ellipse cx="600" cy="352" rx="210" ry="58" fill="url(#home-glow)" />
-      {/* Árvores e canteiros. */}
-      {[tree(90, 300, 1.2, green), tree(250, 290, 1, green2), tree(330, 315, 1.3, green), tree(880, 300, 1.15, green2), tree(990, 312, 1.3, green), tree(1120, 296, 1.05, green2)]}
-      <ellipse cx="420" cy="380" rx="44" ry="10" fill={night ? '#6B2D4A' : '#F472B6'} opacity="0.8" />
-      <ellipse cx="780" cy="380" rx="44" ry="10" fill={night ? '#6B5A2D' : '#FBBF24'} opacity="0.8" />
-      {/* Fonte: bacia, pedestal e jatos que sobem e descem. */}
-      <ellipse cx="600" cy="352" rx="78" ry="20" fill={night ? '#5F6F8E' : '#C9C1AE'} />
-      <ellipse cx="600" cy="349" rx="70" ry="16" fill={night ? '#3F6F9E' : '#5BB0E6'} />
-      <rect x="592" y="300" width="16" height="50" rx="6" fill={night ? '#8C8C9E' : '#E7E1D3'} />
-      <ellipse cx="600" cy="302" rx="30" ry="7" fill={night ? '#3F6F9E' : '#7CC4EE'} />
-      <g className={still ? undefined : 'home-jets'} stroke={night ? '#A9D8FF' : '#FFFFFF'} strokeWidth="3" strokeLinecap="round" fill="none" opacity="0.85">
-        <path d="M600 300 Q600 262 600 252" />
-        <path d="M600 300 Q586 270 572 300" />
-        <path d="M600 300 Q614 270 628 300" />
-      </g>
-      {/* Bancos e postes. */}
-      {[460, 740].map((x) => (
-        <g key={x}>
-          <rect x={x - 22} y="368" width="44" height="6" rx="2" fill={night ? '#5A4636' : '#9A6B43'} />
-          <rect x={x - 18} y="374" width="4" height="8" fill="#2B3442" />
-          <rect x={x + 14} y="374" width="4" height="8" fill="#2B3442" />
-        </g>
-      ))}
-      {[380, 820].map((x) => (
-        <g key={x}>
-          <rect x={x - 2} y="300" width="4" height="62" fill="#2B3442" />
-          <circle cx={x} cy="298" r="7" fill={night ? '#FFE7A8' : '#F5F5F4'} opacity={night ? 1 : 0.9} />
-          {night && <circle cx={x} cy="298" r="22" fill="#FFE7A8" opacity="0.18" />}
-        </g>
-      ))}
-      {/* Gente passeando pela praça (para quem pede menos movimento, ficam paradas). */}
-      {[
-        { c: '#3E6E9E', d: 'M150 345 L1050 345', dur: '38s' },
-        { c: '#C2410C', d: 'M1080 338 L120 338', dur: '46s' },
-        { c: '#16A34A', d: 'M470 455 L600 372', dur: '24s' },
-      ].map((p, i) => (
-        <g key={i} transform={still ? `translate(${300 + i * 260} ${i === 2 ? 410 : 342})` : undefined}>
-          <g>
-            <circle r="4.5" cy="-24" fill={night ? '#C9A27E' : '#E0B48C'} />
-            <rect x="-5" y="-20" width="10" height="14" rx="3" fill={p.c} />
-            <rect x="-4" y="-6" width="3" height="10" fill="#2F3A4F" />
-            <rect x="1" y="-6" width="3" height="10" fill="#2F3A4F" />
-            {still ? null : <animateMotion dur={p.dur} repeatCount="indefinite" path={p.d} />}
-          </g>
-        </g>
-      ))}
-    </svg>
   );
 }
 

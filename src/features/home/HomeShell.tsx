@@ -101,9 +101,14 @@ export function HomeShell() {
           </NavLink>
         </header>
         <main id="main" tabIndex={-1} className="flex-1 overflow-y-auto focus:outline-none">
-          <div key={location.pathname} className="mx-auto w-full max-w-6xl animate-fade-up px-4 pb-16 pt-6 sm:px-8 sm:pt-8">
+          {/* Início: tela de menu com o cenário de ponta a ponta. Demais páginas: conteúdo centralizado. */}
+          {location.pathname === '/' ? (
             <Outlet />
-          </div>
+          ) : (
+            <div key={location.pathname} className="mx-auto w-full max-w-6xl animate-fade-up px-4 pb-16 pt-6 sm:px-8 sm:pt-8">
+              <Outlet />
+            </div>
+          )}
         </main>
       </div>
     </div>

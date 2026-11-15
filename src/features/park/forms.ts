@@ -25,6 +25,8 @@ export interface Form {
   /** Giro de cada andar em relação ao de baixo (torre torcida). */
   twist: number;
   plan: Plan;
+  /** Planta dos andares de cima, quando difere da do térreo (Focus: mezanino parcial sobre o salão). */
+  upper?: Plan;
   facade: Facade;
   /** Cor da estrutura da fachada (pedra, tijolo, madeira, brises, painéis). */
   frame: string;
@@ -47,9 +49,20 @@ export const FORMS: Record<ModuleId, Form> = {
   sports: { sides: 8, rot: Math.PI / 8, setback: 0, twist: 0, plan: 'open', facade: 'louver', frame: '#2F3B4A' },
   languages: { sides: 8, rot: Math.PI / 8, setback: 0.06, twist: 0, plan: 'garden', facade: 'brick', frame: '#C27A55' },
   habits: { sides: 12, rot: Math.PI / 12, setback: 0.05, twist: 0, plan: 'garden', facade: 'glass', frame: '#7C9A84' },
-  focus: { sides: 0, rot: 0, setback: 0.1, twist: 0, plan: 'garden', facade: 'wood', frame: '#B9905F' },
+  focus: { sides: 0, rot: 0, setback: 0.1, twist: 0, plan: 'garden', upper: 'side', facade: 'wood', frame: '#B9905F' },
   goals: { sides: 6, rot: Math.PI / 6, setback: 0.12, twist: 0, plan: 'garden', facade: 'stone', frame: '#E9DDB8' },
 };
+
+/** Planta dos andares de cima (a do térreo, salvo quando o prédio define outra). */
+export const upperPlan = (f: Form): Plan => f.upper ?? f.plan;
+
+/**
+ * Prédios com terraço aberto na cobertura (programa aprovado dos prédios do Campus): o último nível
+ * do interior, alcançado pelo mesmo elevador (e pela escada do núcleo, onde há), a céu aberto, com
+ * guarda-corpo em volta, bancos, floreiras e a vista. Por fora, a cobertura mostra o mesmo terraço.
+ */
+export const ROOF_TERRACES: readonly ModuleId[] = ['academy', 'languages', 'library', 'calendar', 'tasks', 'projects', 'goals', 'insights'];
+export const hasRoofTerrace = (id: ModuleId): boolean => ROOF_TERRACES.includes(id);
 
 /** Fração do raio do térreo que o andar L ocupa (L ≥ 1). */
 export const levelScale = (f: Form, L: number) => (L <= 0 ? 1 : 0.94 * (1 - f.setback) ** (L - 1));
@@ -230,4 +243,92 @@ export function facade(b: Builder, f: Form, m: FacadeMats, R: number, rot: numbe
     } else span(fc, -half, half, h);
   });
   return out;
+}
+
+/** Peça do terraço da cobertura: floreira e banco junto ao guarda-corpo; árvore e mesa no meio. */
+export interface TerraceSpot {
+  kind: 'planter' | 'bench' | 'tree' | 'table';
+  x: number;
+  z: number;
+  /** Para onde a peça olha (banco: para fora, para a vista). */
+  face: number;
+}
+
+/**
+ * Onde ficam as peças do terraço da cobertura do andar `L` (raio circunscrito `R`), o mesmo desenho
+ * por dentro e por fora: floreiras e bancos alternados a 1,1 m da borda, de frente para a vista,
+ * nunca na ponte do elevador (direção `back`, ângulo de atan2(x, z)) nem nos cantos; árvores em
+ * vasos e mesas no meio, fora do eixo da ponte e longe do vão/núcleo do meio (raio `hole`).
+ */
+export function terraceSpots(f: Form, L: number, R: number, hole: number, back: number): TerraceSpot[] {
+  const rot = f.sides >= 3 ? levelRot(f, L) : 0;
+  const sec = f.sides >= 3 ? (Math.PI * 2) / f.sides : 0;
+  const apo = apothem(f.sides, R);
+  const sb = Math.sin(back);
+  const cb = Math.cos(back);
+  const lateral = (x: number, z: number) => Math.abs(x * cb - z * sb);
+  const out: TerraceSpot[] = [];
+  const d = apo - 1.1;
+  const half = sec ? d * Math.tan(sec / 2) : Infinity;
+  const n = Math.max(8, Math.round((Math.PI * 2 * apo) / 3.4));
+  for (let k = 0; k < n; k++) {
+    const a = rot + ((k + 0.5) / n) * Math.PI * 2;
+    // Normal da face que o ângulo cruza (redondo: o próprio ângulo) e a posição ao longo dela.
+    let phi = a;
+    if (sec) {
+      let t = (a - rot) % sec;
+      if (t < 0) t += sec;
+      phi = a - t + sec / 2;
+    }
+    const s = d * Math.tan(a - phi);
+    if (Math.abs(s) + 1.0 > half) continue;
+    const x = Math.sin(phi) * d + Math.cos(phi) * s;
+    const z = Math.cos(phi) * d - Math.sin(phi) * s;
+    if (x * sb + z * cb > 0 && lateral(x, z) < 2.6) continue;
+    out.push({ kind: k % 2 ? 'bench' : 'planter', x, z, face: phi });
+  }
+  const r0 = Math.max(hole, 2.5);
+  const r1 = apo - 2.8;
+  if (r1 - r0 > 2.4) {
+    const rt = (r0 + r1) / 2;
+    const m = Math.max(3, Math.floor((Math.PI * 2 * rt) / 6));
+    for (let j = 0; j < m; j++) {
+      const a = rot + ((j + 0.25) / m) * Math.PI * 2;
+      const x = Math.sin(a) * rt;
+      const z = Math.cos(a) * rt;
+      if (lateral(x, z) < 2.4) continue;
+      out.push({ kind: j % 2 ? 'table' : 'tree', x, z, face: a });
+    }
+  }
+  return out;
+}
+
+/**
+ * Trechos de guarda-corpo ao longo de um contorno fechado, em pedaços de até `step` m, sem os
+ * pedaços cujo meio cai onde `skip` diz (a passagem da ponte do elevador).
+ */
+export function railRuns(pts: Array<[number, number]>, skip: (x: number, z: number) => boolean, step = 0.8): Array<Array<[number, number]>> {
+  const runs: Array<Array<[number, number]>> = [];
+  let run: Array<[number, number]> = [];
+  const flush = () => {
+    if (run.length > 1) runs.push(run);
+    run = [];
+  };
+  for (let i = 0; i < pts.length; i++) {
+    const p = pts[i]!;
+    const q = pts[(i + 1) % pts.length]!;
+    const n = Math.max(1, Math.ceil(Math.hypot(q[0] - p[0], q[1] - p[1]) / step));
+    for (let k = 0; k < n; k++) {
+      const a: [number, number] = [p[0] + ((q[0] - p[0]) * k) / n, p[1] + ((q[1] - p[1]) * k) / n];
+      const c: [number, number] = [p[0] + ((q[0] - p[0]) * (k + 1)) / n, p[1] + ((q[1] - p[1]) * (k + 1)) / n];
+      if (skip((a[0] + c[0]) / 2, (a[1] + c[1]) / 2)) {
+        flush();
+        continue;
+      }
+      if (!run.length) run.push(a);
+      run.push(c);
+    }
+  }
+  flush();
+  return runs;
 }

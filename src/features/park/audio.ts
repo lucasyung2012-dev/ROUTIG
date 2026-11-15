@@ -3,7 +3,8 @@
  * fonte, pássaros nas árvores, roda de música no palco, trânsito da rua, parquinho), clima em volta
  * (vento nas folhas e chuva), bichos (pássaros de várias espécies, grilos, sapos, cigarras, cachorros,
  * patos, pombos, gato) e passos que mudam com o piso (pedra, grama, madeira, piso interno, poça).
- * Tudo sintetizado no aparelho com Web Audio, no mesmo contexto de áudio do Focus (sem abrir outro).
+ * Tudo sintetizado no aparelho com Web Audio, no mesmo contexto de áudio do Focus (sem abrir outro);
+ * o violão da Música é uma corda dedilhada de verdade (Karplus-Strong), não um tom puro.
  * Dentro dos prédios o som de fora fica abafado. Volume por categoria e silenciar.
  */
 import type * as THREE from 'three';
@@ -356,10 +357,54 @@ export function createParkAudio(mix: AudioMix): ParkAudio | null {
 
   const ramp = (p: AudioParam, v: number, tc = 0.4) => p.setTargetAtTime(v, now(), tc);
 
-  // Instrumentos dos interiores (piano, bateria, sinos, toca-discos): no volume da música, sem abafar.
+  // Instrumentos dos interiores (piano, bateria, violão, sinos, toca-discos): no volume da música, sem abafar.
   const inst = keep(ctx.createGain());
   inst.connect(master);
   const hz = (m: number) => 440 * 2 ** ((m - 69) / 12);
+  /**
+   * Corda de violão dedilhada (síntese Karplus-Strong): um sopro curto de ruído do tamanho de um
+   * período volta sobre si mesmo, perdendo um pouco a cada volta (as notas agudas morrem antes,
+   * como numa corda de verdade); o ponto onde o dedo pega na corda tira alguns harmônicos. Cada
+   * nota é calculada uma vez e guardada. `rate` corrige a afinação (o atraso é inteiro).
+   */
+  const pluckCache = new Map<number, { buf: AudioBuffer; rate: number }>();
+  const pluckedString = (midi: number) => {
+    const done = pluckCache.get(midi);
+    if (done) return done;
+    const sr = ctx.sampleRate;
+    const f = hz(midi);
+    const N = Math.max(4, Math.round(sr / f - 0.5));
+    const len = Math.floor(sr * 3.4);
+    const buf = ctx.createBuffer(1, len, sr);
+    const y = buf.getChannelData(0);
+    // Toque do dedo: ruído suavizado...
+    let prev = 0;
+    for (let i = 0; i < N; i++) {
+      prev = prev * 0.5 + (Math.random() * 2 - 1) * 0.5;
+      y[i] = prev;
+    }
+    // ...pego a 17% do comprimento da corda (um pente que tira os harmônicos desse ponto).
+    const pick = Math.max(1, Math.round(N * 0.17));
+    for (let i = N - 1; i >= pick; i--) y[i] = y[i]! - y[i - pick]! * 0.85;
+    let mean = 0;
+    for (let i = 0; i < N; i++) mean += y[i]!;
+    mean /= N;
+    let peak = 1e-6;
+    for (let i = 0; i < N; i++) {
+      y[i] = y[i]! - mean;
+      peak = Math.max(peak, Math.abs(y[i]!));
+    }
+    for (let i = 0; i < N; i++) y[i] = (y[i]! / peak) * 0.8;
+    // A corda: cada amostra é a média das duas de um período atrás, com uma pequena perda.
+    const rho = 0.9965;
+    for (let n = N; n < len; n++) y[n] = rho * 0.5 * (y[n - N]! + y[n - N - 1 < 0 ? 0 : n - N - 1]!);
+    // Fim suave do trecho guardado (sem estalo).
+    const fade = Math.floor(sr * 0.3);
+    for (let n = len - fade; n < len; n++) y[n] = y[n]! * ((len - n) / fade);
+    const out = { buf, rate: (f * (N + 0.5)) / sr };
+    pluckCache.set(midi, out);
+    return out;
+  };
   const note = (midi: number, timbre: Timbre, delay = 0, pos?: { x: number; y?: number; z: number }) => {
     const at = now() + delay + 0.005;
     const out = ctx.createGain();
@@ -481,6 +526,34 @@ export function createParkAudio(mix: AudioMix): ParkAudio | null {
         osc('triangle', f, 0.28, 0.006, 1.2);
         osc('sine', f / 2, 0.12, 0.01, 1.4);
         break;
+      case 'guitar': {
+        // Violão: a corda dedilhada passa pelo corpo de madeira (ressonância grave do tampo e da
+        // caixa) e por um corte suave do brilho; um raspar curto do dedo na corda no começo.
+        const str = pluckedString(midi);
+        const src = ctx.createBufferSource();
+        src.buffer = str.buf;
+        src.playbackRate.value = str.rate;
+        const top = ctx.createBiquadFilter();
+        top.type = 'peaking';
+        top.frequency.value = 110;
+        top.Q.value = 1.1;
+        top.gain.value = 6;
+        const box = ctx.createBiquadFilter();
+        box.type = 'peaking';
+        box.frequency.value = 230;
+        box.Q.value = 1.4;
+        box.gain.value = 3;
+        const soft = ctx.createBiquadFilter();
+        soft.type = 'lowpass';
+        soft.frequency.value = 5200;
+        soft.Q.value = 0.5;
+        const gain = ctx.createGain();
+        gain.gain.value = 0.32;
+        src.connect(top).connect(box).connect(soft).connect(gain).connect(out);
+        src.start(at);
+        hiss(0.025, 0.018, 3200, 'bandpass');
+        break;
+      }
       case 'door': {
         // Porta automática: chiado do trilho que corre e o baque macio no fim do curso.
         burst(out, at, white, 'bandpass', 500, 1.5, 0.22, 0.7, 1500);

@@ -4,8 +4,9 @@
  * núcleo com escada, corredor com salas, mezanino sobre pé-direito alto, planta livre ou anel em
  * volta de um jardim; forma, recuos, giro e fachada próprios. Uma torre de elevador envidraçada,
  * nos fundos, liga todos os andares.
- * Cada sala dos andares abre o painel real do módulo que corresponde a ela (nenhum dado novo);
- * salas sem tela própria ainda não abrem nada e aparecem assim na auditoria.
+ * Cada sala dos andares abre o painel real do módulo que corresponde a ela (nenhum dado novo).
+ * Nos prédios com terraço (forms.ts), a cobertura do último andar é mais um nível: a céu aberto,
+ * com guarda-corpo, bancos, floreiras e árvores, ligado ao mesmo elevador (e à escada do núcleo).
  */
 import * as THREE from 'three';
 import type { ModuleId } from '@/app/modules';
@@ -16,72 +17,88 @@ import { sectorSign, type InteriorScene } from './common';
 import { footprint } from '../collision';
 import { decorate, furnish, roomType, type RoomType } from './furnish';
 import { enrichGround, enrichLevel, type Lobby } from './enrich';
-import { FORMS, apothem, circle, clipZ, facade, facadeMats, levelRot, levelScale, outline, polyR, slab, type Plan } from '../forms';
+import { FORMS, apothem, circle, clipZ, facade, facadeMats, hasRoofTerrace, levelRot, levelScale, outline, polyR, railRuns, slab, terraceSpots, upperPlan, type Plan } from '../forms';
 import type { Thing } from './things';
 
 /** Sala de um andar: chave do nome, setor real que ela abre (null = sem tela própria), tipo de mobília. */
 export type RoomKind = 'desk' | 'shelf' | 'screen' | 'lounge' | 'studio';
 export type FloorRoom = [key: string, sector: string | null, kind: RoomKind];
 
-/** Andares acima do térreo, na ordem (1º, 2º, 3º). `@options` abre as opções do parque. */
+/**
+ * Andares acima do térreo, na ordem (1º, 2º, 3º), pelo programa aprovado de cada prédio do Campus.
+ * Só entra sala que abre um painel real do módulo (setor do próprio prédio; `@options` abre as
+ * opções do parque); funções do programa que o módulo não tem não viram sala. Andar sem nenhuma
+ * dessas funções existe (circulação, saguão do elevador), mas sem salas. O terraço da cobertura
+ * (ROOF_TERRACES, em forms.ts) é um nível a mais, a céu aberto, sem salas.
+ */
 export const FLOOR_PLANS: Record<ModuleId, FloorRoom[][]> = {
   dashboard: [
     [['indicators', 'panels', 'screen'], ['widgets', 'panels', 'screen'], ['visuals', 'overview', 'screen']],
     [['customize', 'profiles', 'desk'], ['observatory', 'overview', 'lounge']],
   ],
   profile: [[['achievements', 'achievements', 'shelf'], ['archive', 'archive', 'shelf'], ['personalize', 'personalize', 'desk']]],
-  notes: [[['advanced', 'advanced', 'desk'], ['drawing', 'handwriting', 'studio'], ['versions', 'versions', 'shelf']]],
+  notes: [[['organize', 'organize', 'desk'], ['handwriting', 'handwriting', 'studio'], ['versions', 'versions', 'shelf']]],
   library: [
-    [['consult', 'consult', 'desk'], ['research', 'search', 'desk']],
-    [['preserve', 'preserve', 'shelf'], ['transfer', 'transfer', 'desk']],
+    [['collection', 'collections', 'shelf'], ['research', 'search', 'desk'], ['reading', 'consult', 'lounge']],
+    [['deep', 'search', 'desk'], ['documents', 'consult', 'shelf']],
   ],
   calendar: [
-    [['monthly', 'monthly', 'screen'], ['weekly', 'weekly', 'screen'], ['daily', 'daily', 'screen'], ['recurring', 'planning', 'desk']],
-    [['history', 'agenda', 'shelf'], ['distribution', 'planning', 'screen'], ['trends', 'planning', 'screen']],
+    [['daily', 'daily', 'screen'], ['weekly', 'weekly', 'screen'], ['monthly', 'monthly', 'screen'], ['events', 'atrium', 'desk']],
+    [['timeline', 'calendars', 'screen'], ['agenda', 'agenda', 'shelf'], ['links', 'planning', 'desk']],
   ],
   tasks: [
-    [['projects', 'lists', 'desk'], ['recurrence', 'recurrence', 'desk'], ['priorities', 'kanban', 'screen'], ['deadlines', 'planning', 'screen'], ['custom', 'kanban', 'studio']],
-    [['done', 'archive', 'shelf'], ['analysis', 'planning', 'screen'], ['pending', 'capture', 'desk']],
+    [['stations', 'capture', 'desk'], ['organize', 'kanban', 'screen'], ['priorities', 'planning', 'screen']],
+    [['review', 'lists', 'desk'], ['done', 'archive', 'shelf'], ['execution', 'recurrence', 'screen'], ['late', 'atrium', 'screen']],
   ],
-  focus: [[['private', 'garden', 'desk'], ['reading', 'garden', 'lounge'], ['rest', 'history', 'lounge']]],
-  habits: [[['monthly', 'evolution', 'screen'], ['yearly', 'evolution', 'screen'], ['streaks', 'analysis', 'screen'], ['growth', 'evolution', 'lounge']]],
+  // Mezanino parcial (forms.ts: upper 'side') sobre o salão.
+  focus: [[['history', 'history', 'screen']]],
+  // Só o térreo: sem andar, mezanino, terraço, elevador ou escada.
+  habits: [],
   academy: [
-    [['math', 'rooms', 'desk'], ['science', 'rooms', 'desk'], ['humanities', 'rooms', 'desk'], ['tech', 'rooms', 'desk'], ['exercises', 'review', 'desk']],
-    [['labs', 'rooms', 'studio'], ['projects', 'rooms', 'studio'], ['talks', 'hall', 'screen'], ['resources', 'hall', 'shelf']],
-    [['plan', 'plan', 'desk'], ['performance', 'review', 'screen'], ['review', 'review', 'desk']],
+    [['classrooms', 'rooms', 'desk'], ['individual', 'plan', 'desk'], ['activities', 'hall', 'desk']],
+    [['practice', 'review', 'studio']],
+    [],
   ],
   languages: [
-    [['grammar', 'spaces', 'desk'], ['pronunciation', 'spaces', 'studio'], ['listening', 'spaces', 'studio'], ['reading', 'spaces', 'lounge'], ['booths', 'spaces', 'studio']],
-    [['conversation', 'spaces', 'lounge'], ['situations', 'spaces', 'desk'], ['culture', 'garden', 'lounge'], ['writing', 'spaces', 'desk']],
+    [['languageRooms', 'spaces', 'desk'], ['sessions', 'spaces', 'desk'], ['grammar', 'spaces', 'desk'], ['skills', 'garden', 'lounge']],
+    [['conversation', 'spaces', 'lounge'], ['booths', 'spaces', 'studio']],
+    [],
   ],
   projects: [
-    [['dev', 'studio', 'desk'], ['lab', 'studio', 'screen'], ['proto', 'studio', 'studio'], ['docs', 'studio', 'shelf'], ['collab', 'studio', 'desk']],
-    [['present', 'gallery', 'screen'], ['gallery', 'gallery', 'lounge'], ['review', 'gallery', 'desk'], ['archive', 'gallery', 'shelf']],
+    [['planning', 'studio', 'desk'], ['milestones', 'gallery', 'screen'], ['tasks', 'gallery', 'desk']],
+    [['tracking', 'studio', 'screen'], ['materials', 'gallery', 'shelf'], ['done', 'studio', 'shelf']],
   ],
-  music: [
-    [['rehearsal', 'instruments', 'studio'], ['recording', 'instruments', 'studio'], ['editing', 'analysis', 'screen'], ['composing', 'instruments', 'desk'], ['booths', 'instruments', 'studio']],
-    [['shows', 'atrium', 'lounge'], ['listening', 'analysis', 'lounge'], ['gallery', 'analysis', 'shelf'], ['rest', null, 'lounge']],
+  music: [[['individual', 'instruments', 'studio'], ['study', 'instruments', 'desk']], []],
+  sports: [[['training', 'modalities', 'studio'], ['activities', 'atrium', 'screen'], ['records', 'analysis', 'screen']]],
+  goals: [
+    [['planning', 'garden', 'desk'], ['links', 'garden', 'desk']],
+    [['tracking', 'analysis', 'screen'], ['updates', 'garden', 'desk'], ['history', 'achieved', 'shelf']],
   ],
-  sports: [
-    [['gym', 'modalities', 'studio'], ['mobility', 'modalities', 'studio'], ['stretching', 'modalities', 'studio'], ['guided', 'modalities', 'screen'], ['records', 'analysis', 'screen']],
-    [['planning', 'analysis', 'desk'], ['history', 'analysis', 'shelf'], ['recovery', null, 'lounge'], ['rest', null, 'lounge']],
-  ],
-  goals: [[['tracking', 'analysis', 'screen'], ['done', 'achieved', 'shelf'], ['history', 'achieved', 'shelf'], ['longterm', 'garden', 'desk']]],
   insights: [
-    [['academic', 'learning', 'screen'], ['productivity', 'productivity', 'screen'], ['habits', 'habits', 'screen'], ['activity', 'activities', 'screen'], ['evolution', 'overview', 'screen']],
-    [['charts', 'overview', 'screen'], ['reports', 'overview', 'shelf'], ['explore', 'activities', 'desk'], ['trends', 'overview', 'screen'], ['dashboards', null, 'desk']],
-    [['integrated', 'overview', 'screen'], ['longterm', 'overview', 'screen'], ['indicators', null, 'desk']],
+    [['indicators', 'overview', 'screen'], ['charts', 'productivity', 'screen']],
+    [['comparisons', 'overview', 'screen'], ['deep', 'learning', 'screen']],
   ],
   finance: [
-    [['planning', 'planning', 'desk'], ['investments', 'investments', 'screen'], ['goals', 'planning', 'desk'], ['education', 'academy', 'shelf']],
-    [['assets', 'investments', 'screen'], ['evolution', 'journal', 'screen'], ['archive', 'journal', 'shelf'], ['longterm', 'planning', 'desk']],
+    [['budget', 'planning', 'desk'], ['records', 'investments', 'shelf']],
+    [['history', 'planning', 'shelf'], ['charts', 'investments', 'screen']],
   ],
   settings: [
     [['devices', 'data', 'desk'], ['sync', 'data', 'screen'], ['storage', 'data', 'shelf'], ['permissions', 'privacy', 'desk'], ['integrations', 'data', 'desk']],
     [['park', '@options', 'lounge'], ['privacy', 'privacy', 'desk'], ['security', 'privacy', 'desk']],
   ],
-  inbox: [[['archived', 'archive', 'shelf'], ['categories', 'distribution', 'desk'], ['important', 'triage', 'screen'], ['history', 'archive', 'shelf']]],
+  inbox: [
+    [['triage', 'triage', 'desk'], ['tags', 'gallery', 'desk']],
+    [['flow', 'distribution', 'screen'], ['pending', 'triage', 'desk']],
+  ],
 };
+
+/**
+ * Chave i18n do nome do nível `n` do prédio (0 = térreo): o terraço da cobertura tem nome próprio
+ * (park.floorRooms.<prédio>.terrace); os demais, park.floorNames.f<n>.
+ */
+export function floorNameKey(id: ModuleId, n: number): string {
+  return hasRoofTerrace(id) && n === (FLOOR_PLANS[id]?.length ?? 0) + 1 ? `park.floorRooms.${id}.terrace` : `park.floorNames.f${n}`;
+}
 
 const STOREY = 4.4;
 
@@ -183,6 +200,9 @@ export function withFloors(kit: Kit, scene: InteriorScene, id: ModuleId, label: 
   const plan = FLOOR_PLANS[id];
   if (!plan?.length) return scene;
   const form = FORMS[id];
+  // Planta dos andares de cima (a do térreo ou a própria, como o mezanino do Focus).
+  const fp = upperPlan(form);
+  const roofT = hasRoofTerrace(id);
   const R = scene.room.radius;
   const H = scene.room.height;
   const accent = buildingById(id)?.color ?? '#22D3EE';
@@ -229,13 +249,13 @@ export function withFloors(kit: Kit, scene: InteriorScene, id: ModuleId, label: 
       terraceW = Math.min(terraceW, prB(a) - pr(a));
     }
     const hasTerrace = terraceW > 1.4;
-    const inner = form.plan === 'atrium' || form.plan === 'garden' ? Math.max(3.2, apo * 0.36) : form.plan === 'core' ? Math.max(2.6, apo * 0.24) : 0;
-    const zv = form.plan === 'side' ? apo * 0.12 : Infinity;
+    const inner = fp === 'atrium' || fp === 'garden' ? Math.max(3.2, apo * 0.36) : fp === 'core' ? Math.max(2.6, apo * 0.24) : 0;
+    const zv = fp === 'side' ? apo * 0.12 : Infinity;
 
     // Laje: o próprio andar (com o vazio do meio ou cortada no mezanino) e o terraço do recuo.
     const holes: Array<Array<[number, number]>> = [];
-    if (form.plan === 'atrium' || (form.plan === 'garden' && L > 1)) holes.push(circle(inner));
-    b.add(slabMat, slab(form.plan === 'side' ? clipZ(own, zv) : own, holes, y, 0.3));
+    if (fp === 'atrium' || (fp === 'garden' && L > 1)) holes.push(circle(inner));
+    b.add(slabMat, slab(fp === 'side' ? clipZ(own, zv) : own, holes, y, 0.3));
     if (hasTerrace || L === 1) b.add(kit.mat('#E4DED2', { rough: 0.85 }), slab(belowLine, [own], y - 0.03, 0.27));
     // Guarda-corpo de vidro na borda do terraço.
     if (hasTerrace) railing(b, glass, metal, belowLine, y, true);
@@ -244,7 +264,7 @@ export function withFloors(kit: Kit, scene: InteriorScene, id: ModuleId, label: 
       b.add(glass, new THREE.CylinderGeometry(inner, inner, 1.1, 48, 1, true), [0, y + 0.55, 0]);
       b.add(metal, new THREE.TorusGeometry(inner, 0.05, 6, 64), [0, y + 1.1, 0], [Math.PI / 2, 0, 0]);
     }
-    if (form.plan === 'side') {
+    if (fp === 'side') {
       const half = Math.sqrt(Math.max(0, pr(Math.PI / 2) ** 2 - zv * zv)) + 2;
       const pts: Array<[number, number]> = [];
       for (let x = -half; x <= half; x += 0.5) if (inside(x, zv, 0.1)) pts.push([x, zv]);
@@ -256,9 +276,9 @@ export function withFloors(kit: Kit, scene: InteriorScene, id: ModuleId, label: 
     const doorHalf = 0.8 / apo;
     if (top) {
       // Cobertura: claraboia sobre o átrio; jardim a céu aberto; laje inteira nos demais.
-      const roofHoles = form.plan === 'atrium' || form.plan === 'garden' ? [circle(form.plan === 'atrium' ? inner * 0.8 : inner)] : [];
+      const roofHoles = fp === 'atrium' || fp === 'garden' ? [circle(fp === 'atrium' ? inner * 0.8 : inner)] : [];
       b.add(slabMat, slab(own.map(([x, z]) => [x * 1.03, z * 1.03] as [number, number]), roofHoles, y + STOREY, 0.3));
-      if (form.plan === 'atrium') {
+      if (fp === 'atrium') {
         b.add(glass, new THREE.SphereGeometry(inner * 0.8, 32, 10, 0, Math.PI * 2, 0, Math.PI / 2), [0, y + STOREY - 0.3, 0], undefined, [1, 0.35, 1]);
         for (let k = 0; k < 8; k++) b.add(metal, new THREE.TorusGeometry(inner * 0.8, 0.03, 4, 24, Math.PI), [0, y + STOREY - 0.3, 0], [0, (k / 8) * Math.PI, 0], [1, 0.35, 1]);
       }
@@ -300,11 +320,11 @@ export function withFloors(kit: Kit, scene: InteriorScene, id: ModuleId, label: 
 
     // Piso de circulação do andar.
     const corridorMat = kit.mat(style.floors[(L - 1) % style.floors.length]!, { rough: 0.35, metal: 0.05 });
-    b.add(corridorMat, slab(form.plan === 'side' ? clipZ(own, zv) : own, holes, y + 0.012, 0.01));
+    b.add(corridorMat, slab(fp === 'side' ? clipZ(own, zv) : own, holes, y + 0.012, 0.01));
 
     // Salas: cada planta distribui do seu jeito.
-    const slots = layout(form.plan, rooms.length, apo, inner, zv, inside);
-    const lobby = lobbyOf(form.plan, apo, inner, slots);
+    const slots = layout(fp, rooms.length, apo, inner, zv, inside);
+    const lobby = lobbyOf(fp, apo, inner, zv);
     slots.forEach((sl, k) => {
       const [key, sector] = rooms[k]!;
       const type = roomType(key, id);
@@ -385,13 +405,13 @@ export function withFloors(kit: Kit, scene: InteriorScene, id: ModuleId, label: 
     });
 
     // Corredor do meio (planta em corredor e planta livre): faixa no piso e luz contínua no teto.
-    if (form.plan === 'corridor' || form.plan === 'open') {
-      const half = form.plan === 'corridor' ? 1.6 : 2.4;
+    if (fp === 'corridor' || fp === 'open') {
+      const half = fp === 'corridor' ? 1.6 : 2.4;
       const zf = apo - 0.6;
       const zb = -apo + 0.6;
       b.add(kit.mat(style.warm ? '#B9936C' : '#9AA8B8', { rough: 0.6 }), new THREE.BoxGeometry(half * 1.2, 0.01, zf - zb), [0, y + 0.025, (zf + zb) / 2]);
       b.add(lampMat, new THREE.BoxGeometry(0.3, 0.04, zf - zb - 1), [0, y + wallH - 0.05, (zf + zb) / 2]);
-      if (form.plan === 'open') {
+      if (fp === 'open') {
         // Canteiros baixos no meio do corredor largo, com bancos dos dois lados.
         for (let zz = zb + 6; zz < zf - 3; zz += 7) {
           b.add(kit.mat('#D9CBB6', { rough: 0.8 }), new THREE.BoxGeometry(1.0, 0.45, 2.2), [0, y + 0.22, zz]);
@@ -404,12 +424,12 @@ export function withFloors(kit: Kit, scene: InteriorScene, id: ModuleId, label: 
       }
     }
     // Núcleo maciço (planta com núcleo): parede de pedra, nichos com telas, porta da escada.
-    if (form.plan === 'core') coreLevel(kit, b, thingRoot, things, L, y, inner, accent, top, plan.length);
+    if (fp === 'core') coreLevel(kit, b, thingRoot, things, L, y, inner, accent, top && !roofT, plan.length);
     // Jardim interno no 1º andar (a céu aberto), com árvores, espelho d'água e bancos.
-    if (form.plan === 'garden' && L === 1) gardenCourt(kit, b, seats, obstacles, y, inner, top ? 0 : plan.length - 1);
+    if (fp === 'garden' && L === 1) gardenCourt(kit, b, seats, obstacles, y, inner, top ? 0 : plan.length - 1);
 
     const ceiling = y + STOREY - 0.35;
-    enrichLevel(kit, b, seats, id, L, top, y, lobby, form.plan === 'atrium' || form.plan === 'garden' ? inner : 0, apo, ceiling, accent, style.warm, thingRoot, things);
+    enrichLevel(kit, b, seats, id, L, top, y, lobby, fp === 'atrium' || fp === 'garden' ? inner : 0, apo, ceiling, accent, style.warm, thingRoot, things);
 
     {
       const s = sectorSign(kit, floorName(L), accent, 1.8);
@@ -428,12 +448,117 @@ export function withFloors(kit: Kit, scene: InteriorScene, id: ModuleId, label: 
       const f = pr(a);
       if (Math.abs(r - f) <= 0.3) return !atDoor(a);
       if (r > f) return !hasTerrace || r > prB(a) - 0.5;
-      if (inner && (form.plan !== 'garden' || L > 1) && r < inner + (form.plan === 'core' ? 0.3 : 0.5)) return true;
+      if (inner && (fp !== 'garden' || L > 1) && r < inner + (fp === 'core' ? 0.3 : 0.5)) return true;
       if (z > zv - 0.4) return true;
       return false;
     };
     levels.push({ y, outer: apo, walk: Math.max(R, Ro) + 1, inner, ceiling, obstacles, doors, doorHalf, blocked, wallAt: (x, z) => pr(Math.atan2(x, z)), arrive: { x: 0, z: -backR + 2.4 } });
   });
+
+  // Terraço na cobertura do último andar: mais um nível, a céu aberto (sem teto), com deque,
+  // guarda-corpo em toda a borda (aberto só na ponte do elevador) e em volta do vão/claraboia do
+  // meio, bancos virados para a vista, floreiras, árvores em vasos e mesas. Nenhuma sala.
+  if (roofT) {
+    const LT = plan.length;
+    const L = LT + 1;
+    const y = H + LT * STOREY;
+    const rot = levelRot(form, LT);
+    const Rr = R * levelScale(form, LT) * 1.03;
+    const apo0 = apothem(form.sides, R * levelScale(form, LT));
+    const inner = fp === 'atrium' || fp === 'garden' ? Math.max(3.2, apo0 * 0.36) : fp === 'core' ? Math.max(2.6, apo0 * 0.24) : 0;
+    const edge = (a: number) => polyR(form.sides, form.sides >= 3 ? rot : 0, Rr, a);
+    const roof = outline(form.sides, rot, Rr);
+    const backR = edge(Math.PI);
+    // Vão do meio na cobertura: claraboia do átrio ou jardim interno a céu aberto.
+    const hole = fp === 'atrium' ? inner * 0.8 : fp === 'garden' ? inner : 0;
+    // Até onde não se pisa no meio: vão (com o guarda-corpo) ou casa da escada do núcleo.
+    const free = fp === 'core' ? inner + 0.3 : hole ? hole + 0.6 : 0;
+    const deck = kit.mat(style.warm ? '#B08968' : '#9C8F80', { rough: 0.8 });
+    b.add(deck, slab(roof.map(([x, z]) => [x * 0.99, z * 0.99] as [number, number]), hole ? [circle(hole + 0.05)] : [], y + 0.03, 0.03));
+    for (const run of railRuns(roof, (x, z) => Math.abs(x) < 1.25 && z < 0)) railing(b, glass, metal, run, y, false);
+    if (hole) railing(b, glass, metal, circle(hole + (fp === 'atrium' ? 0.35 : 0.1), 48), y, true);
+    if (fp === 'core') {
+      // A escada do núcleo chega ao terraço numa casa de pedra com porta na frente.
+      const stone = kit.mat('#D8D2C6', { rough: 0.9 });
+      const h = 2.8;
+      const gap = 0.7;
+      b.add(stone, new THREE.CylinderGeometry(inner, inner, h, 40, 1, true, gap / 2, Math.PI * 2 - gap), [0, y + h / 2, 0]);
+      b.add(kit.mat('#D2CBBE', { rough: 0.9, side: THREE.BackSide }), new THREE.CylinderGeometry(inner - 0.3, inner - 0.3, h, 40, 1, true, gap / 2, Math.PI * 2 - gap), [0, y + h / 2, 0]);
+      b.add(stone, new THREE.CylinderGeometry(inner, inner, h - 2.4, 8, 1, true, -gap / 2, gap), [0, y + 2.4 + (h - 2.4) / 2, 0]);
+      b.add(stone, new THREE.CylinderGeometry(inner + 0.25, inner + 0.25, 0.3, 40), [0, y + h + 0.15, 0]);
+      things.push({ kind: 'stairs', level: L, x: 0, z: inner + 1.0, face: 0 });
+    }
+    const stoneMat = kit.mat('#CFC6B6', { rough: 0.9 });
+    const soil = kit.mat('#5B4636', { rough: 1 });
+    const bark = kit.mat('#6B4F3A', { rough: 0.9 });
+    const leafB = kit.mat('#3E7F44', { rough: 0.9 });
+    const tableTop = kit.mat('#E5E7EB', { rough: 0.5 });
+    for (const s of terraceSpots(form, LT, Rr, free + 0.6, Math.PI)) {
+      const c = Math.cos(s.face);
+      const sn = Math.sin(s.face);
+      if (s.kind === 'planter') {
+        b.add(stoneMat, new THREE.BoxGeometry(1.6, 0.55, 0.6), [s.x, y + 0.275, s.z], [0, s.face, 0]);
+        b.add(soil, new THREE.BoxGeometry(1.45, 0.02, 0.45), [s.x, y + 0.56, s.z], [0, s.face, 0]);
+        for (const t of [-0.45, 0, 0.45]) b.add(t ? leaf : leafB, new THREE.IcosahedronGeometry(0.32, 1), [s.x + c * t, y + 0.8, s.z - sn * t], undefined, [1.2, 0.9, 1]);
+      } else if (s.kind === 'bench') {
+        // Banco de frente para a vista (encosto do lado de dentro) e balizador de luz ao lado.
+        b.add(wood, new THREE.BoxGeometry(1.8, 0.08, 0.45), [s.x, y + 0.45, s.z], [0, s.face, 0]);
+        b.add(wood, new THREE.BoxGeometry(1.8, 0.4, 0.06), [s.x - sn * 0.22, y + 0.72, s.z - c * 0.22], [0, s.face, 0]);
+        for (const t of [-0.75, 0.75]) b.add(dark, new THREE.BoxGeometry(0.08, 0.42, 0.4), [s.x + c * t, y + 0.21, s.z - sn * t], [0, s.face, 0]);
+        seats.push({ x: s.x, y: y + 0.45, z: s.z, face: s.face });
+        b.add(dark, new THREE.CylinderGeometry(0.07, 0.09, 0.7, 10), [s.x + c * 1.2, y + 0.35, s.z - sn * 1.2]);
+        b.add(lampMat, new THREE.CylinderGeometry(0.075, 0.075, 0.12, 10), [s.x + c * 1.2, y + 0.76, s.z - sn * 1.2]);
+      } else if (s.kind === 'tree') {
+        b.add(stoneMat, new THREE.CylinderGeometry(0.85, 0.75, 0.6, 20), [s.x, y + 0.3, s.z]);
+        b.add(soil, new THREE.CircleGeometry(0.78, 20), [s.x, y + 0.61, s.z], [-Math.PI / 2, 0, 0]);
+        b.add(bark, new THREE.CylinderGeometry(0.1, 0.15, 2.4, 8), [s.x, y + 1.8, s.z]);
+        for (let j = 0; j < 3; j++) b.add(j % 2 ? leaf : leafB, new THREE.IcosahedronGeometry(0.9 - j * 0.15, 1), [s.x + Math.sin(j * 2.1) * 0.3, y + 3.0 + j * 0.4, s.z + Math.cos(j * 2.1) * 0.3]);
+      } else {
+        // Mesa redonda com dois bancos baixos.
+        b.add(tableTop, new THREE.CylinderGeometry(0.45, 0.45, 0.04, 20), [s.x, y + 0.75, s.z]);
+        b.add(dark, new THREE.CylinderGeometry(0.04, 0.06, 0.73, 8), [s.x, y + 0.37, s.z]);
+        for (const t of [-0.85, 0.85]) {
+          const px = s.x + c * t;
+          const pz = s.z - sn * t;
+          b.add(wood, new THREE.CylinderGeometry(0.2, 0.2, 0.05, 14), [px, y + 0.45, pz]);
+          b.add(dark, new THREE.CylinderGeometry(0.03, 0.03, 0.43, 6), [px, y + 0.22, pz]);
+          seats.push({ x: px, y: y + 0.45, z: pz, face: Math.atan2(s.x - px, s.z - pz) });
+        }
+      }
+    }
+    // Ponte da cobertura até a torre do elevador e o pórtico com o nome do terraço.
+    b.add(slabMat, new THREE.BoxGeometry(2.4, 0.3, -tower.z - backR + 0.6), [0, y - 0.15, -(backR + -tower.z) / 2]);
+    for (const s of [-1, 1]) railing(b, glass, metal, [[s * 1.2, -backR], [s * 1.2, tower.z + 1.3]], y, false);
+    for (const s of [-1, 1]) b.add(dark, new THREE.BoxGeometry(0.12, 3.0, 0.12), [s * 1.9, y + 1.5, -backR + 1.2]);
+    b.add(dark, new THREE.BoxGeometry(3.92, 0.12, 0.12), [0, y + 3.0, -backR + 1.2]);
+    const gate = sectorSign(kit, label('terrace'), accent, 2.6);
+    gate.position.set(0, y + 2.6, -backR + 1.2);
+    scene.scene.add(gate);
+    const bridge = (x: number, z: number) => Math.abs(x) < 1.1 && z < -backR + 0.6 && z > tower.z + 1.2;
+    levels.push({
+      y,
+      outer: apothem(form.sides, Rr),
+      walk: Math.max(R, Rr) + 1,
+      inner: free,
+      // Céu aberto: nada em cima. Um teto alto (e não infinito) mantém a folga de colisão de
+      // dentro dos prédios, igual à dos outros andares na ponte do elevador.
+      ceiling: y + 60,
+      obstacles: [],
+      doors: [],
+      doorHalf: 0,
+      // Não se passa do guarda-corpo da borda nem entra no vão ou no núcleo do meio.
+      blocked: (x, z) => {
+        if (bridge(x, z)) return false;
+        const r = Math.hypot(x, z);
+        return r > edge(Math.atan2(x, z)) - 0.45 || r < free;
+      },
+      // Sem fachada em volta: a câmera da 3ª pessoa fica livre.
+      wallAt: () => Infinity,
+      arrive: { x: 0, z: -backR + 2.4 },
+    });
+  }
+  /** Nome de cada nível (o terraço tem nome próprio). */
+  const levelName = (n: number) => (roofT && n === plan.length + 1 ? label('terrace') : floorName(n));
 
   // Térreo: camada de detalhe em volta do salão (sem cobrir o que o prédio já tem).
   // O que já ocupa o térreo (móveis, balcões, estantes) e o alto do salão, pelo desenho: os detalhes novos desviam.
@@ -492,18 +617,20 @@ export function withFloors(kit: Kit, scene: InteriorScene, id: ModuleId, label: 
     const sign = sectorSign(kit, elevators, accent, 2.4);
     sign.position.set(0, 3.2, pz + 0.12);
     scene.scene.add(sign);
-    // Quadro com os andares (do térreo ao último) ao lado do portal.
-    b.add(legs, new THREE.BoxGeometry(1.5, 0.5 + plan.length * 0.42, 0.06), [-2.4, 1.7, pz + 0.05]);
-    [0, ...plan.map((_, n) => n + 1)].forEach((n, k) => {
-      const s = sectorSign(kit, floorName(n), n === 0 ? accent : '#94A3B8', 1.3);
-      s.position.set(-2.4, 1.7 + (plan.length / 2 - k) * 0.42, pz + 0.1);
+    // Quadro com os níveis (do térreo ao último, terraço incluído) ao lado do portal.
+    const nLv = levels.length;
+    b.add(legs, new THREE.BoxGeometry(1.5, 0.5 + (nLv - 1) * 0.42, 0.06), [-2.4, 1.7, pz + 0.05]);
+    levels.forEach((_, n) => {
+      const s = sectorSign(kit, levelName(n), n === 0 ? accent : '#94A3B8', 1.3);
+      s.position.set(-2.4, 1.7 + ((nLv - 1) / 2 - n) * 0.42, pz + 0.1);
       scene.scene.add(s);
     });
     occupied.push({ x: 0, z: lz, r: 2.2, h: 0.1 }, { x: 0, z: -(R - 1.2), r: 1.6, h: 3 });
   }
   enrichGround(kit, b, seats, occupied, overhead, R, H, accent, style.warm, thingRoot, things);
   // Torre do elevador: vidro, estrutura e uma cabine em cada andar; placa com o nome de cada andar.
-  const topY = H + plan.length * STOREY;
+  // Com terraço, a torre passa da cobertura (a cabine para no terraço).
+  const topY = H + plan.length * STOREY + (roofT ? 3.0 : 0);
   b.add(glass, new THREE.CylinderGeometry(1.4, 1.4, topY, 24, 1, true), [tower.x, topY / 2, tower.z]);
   for (let k = 0; k < 6; k++) {
     const a = (k / 6) * Math.PI * 2 + Math.PI / 6;
@@ -511,7 +638,7 @@ export function withFloors(kit: Kit, scene: InteriorScene, id: ModuleId, label: 
   }
   b.add(slabMat, new THREE.CylinderGeometry(1.6, 1.6, 0.3, 24), [tower.x, topY, tower.z]);
   levels.forEach((lv, n) => {
-    const s = sectorSign(kit, floorName(n), accent, 1.6);
+    const s = sectorSign(kit, levelName(n), accent, 1.6);
     s.position.set(tower.x, lv.y + 2.9, tower.z + 1.5);
     scene.scene.add(s);
   });
@@ -544,7 +671,7 @@ export function withFloors(kit: Kit, scene: InteriorScene, id: ModuleId, label: 
   scene.scene.add(cabin);
   // Colisão de cada andar pelo desenho (móveis, floreiras, paredes das salas).
   levels.forEach((lv, n) => n > 0 && lv.obstacles.push(...footprint(scene.scene, () => lv.y, 0.3, 1.45, 0.5)));
-  scene.floors = { levels, zones, elevator: tower, seats, cabin, doors, things, plan: form.plan };
+  scene.floors = { levels, zones, elevator: tower, seats, cabin, doors, things, plan: fp };
   return scene;
 }
 
@@ -602,7 +729,8 @@ function layout(plan: Plan, n: number, apo: number, inner: number, zv: number, i
       const z = zb + (j + 0.5) * len;
       const s = left ? -1 : 1;
       const face = left ? Math.PI / 2 : -Math.PI / 2;
-      const w = len - (plan === 'open' ? 0.8 : 0.15);
+      // Poucas salas num lado: a sala não vira um corredor de 15 m (no máximo 8 m de frente).
+      const w = Math.min(8, len - (plan === 'open' ? 0.8 : 0.15));
       let d = 2.5;
       while (d < apo && fits(s * (half + (d + 0.25) / 2), z, face, w, d + 0.25)) d += 0.25;
       out.push({ x: s * (half + d / 2), z, face, w, d, kind: plan === 'corridor' ? 'box' : 'island' });
@@ -620,7 +748,8 @@ function layout(plan: Plan, n: number, apo: number, inner: number, zv: number, i
     const m = left ? nL : n - nL;
     const j = left ? k : k - nL;
     const wAll = xm - 1.5;
-    const w = wAll / m - 0.15;
+    // Sala sozinha num lado do mezanino: no máximo 7 m de frente, no meio da sua vaga.
+    const w = Math.min(7, wAll / m - 0.15);
     const cx = (left ? -1 : 1) * (1.5 + (j + 0.5) * (wAll / m));
     let d = 2.5;
     while (d < apo * 2 && fits(cx, zr1 - (d + 0.25) / 2, 0, w, d + 0.25)) d += 0.25;
@@ -630,10 +759,11 @@ function layout(plan: Plan, n: number, apo: number, inner: number, zv: number, i
 }
 
 /** Saguão do elevador de cada planta (sofá, mesa, planta, luminária e a marca do prédio). */
-function lobbyOf(plan: Plan, apo: number, inner: number, slots: Slot[]): Lobby {
+function lobbyOf(plan: Plan, apo: number, inner: number, zv: number): Lobby {
   if (plan === 'side') {
-    // Na galeria sobre o pé-direito alto, nas pontas: sofá de frente para o vazio.
-    const zg = Math.max(...slots.map((s) => s.z + s.d / 2)) + 1.4;
+    // Na galeria sobre o pé-direito alto, nas pontas: sofá de frente para o vazio. As salas do
+    // mezanino abrem a 2,8 m da borda (zv); a galeria fica no meio disso (andar sem salas também).
+    const zg = zv - 1.4;
     const sx = -apo * 0.5;
     return { sofa: { x: sx, z: zg - 0.5, face: 0 }, table: [sx, zg + 0.45], plant: [sx - 1.6, zg - 0.3], lamp: [sx + 1.5, zg - 0.6], sig: { x: apo * 0.5, z: zg - 0.4, face: Math.PI } };
   }

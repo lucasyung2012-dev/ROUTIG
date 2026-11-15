@@ -1,7 +1,9 @@
 /**
  * Objetos funcionais dos interiores (V2.1, seção 11): chegando perto aparece "Interagir" e o
  * objeto faz o que faz de verdade:
- * - piano de cauda e bateria: abrem o teclado/pads na tela e tocam (as teclas e peças se mexem);
+ * - piano de cauda, bateria e violão (os três instrumentos da Música): abrem o teclado, os pads ou
+ *   as cordas e acordes na tela e tocam (as teclas e peças se mexem; as cordas do violão vibram);
+ * - cofre de Finanças: a porta redonda mostra o bloqueio real de Finanças e abre com o PIN de verdade;
  * - toca-discos: o disco gira e toca uma melodia;
  * - luminárias: acendem e apagam;
  * - globo: gira com um empurrão e vai parando;
@@ -14,8 +16,8 @@ import * as THREE from 'three';
 import { Builder, type Kit } from '../kit';
 import type { Seat } from '../camera';
 
-export type ThingKind = 'piano' | 'drums' | 'record' | 'lamp' | 'globe' | 'clock' | 'telescope' | 'stairs' | 'room';
-export type Timbre = 'piano' | 'kick' | 'snare' | 'hat' | 'tom' | 'bell' | 'pluck' | 'voice' | 'whistle' | 'ball' | 'kid' | 'door' | 'gate' | 'bark' | 'quack' | 'coo' | 'meow' | 'bikebell' | 'horn' | 'brake' | 'frog';
+export type ThingKind = 'piano' | 'drums' | 'guitar' | 'record' | 'lamp' | 'globe' | 'clock' | 'telescope' | 'stairs' | 'room' | 'vault';
+export type Timbre = 'piano' | 'guitar' | 'kick' | 'snare' | 'hat' | 'tom' | 'bell' | 'pluck' | 'voice' | 'whistle' | 'ball' | 'kid' | 'door' | 'gate' | 'bark' | 'quack' | 'coo' | 'meow' | 'bikebell' | 'horn' | 'brake' | 'frog';
 
 export interface ThingCtx {
   /** Toca uma nota (MIDI) com um timbre, daqui a `delay` segundos. */
@@ -31,17 +33,78 @@ export interface Thing {
   face: number;
   /** Sala que a porta abre (índice da zona). */
   zone?: number;
-  /** Ação local (luz, globo, relógio, disco). Piano, bateria, luneta, escada e sala são do motor. */
+  /** Ação local (luz, globo, relógio, disco). Instrumentos, luneta, escada, sala e cofre são do motor. */
   act?: (c: ThingCtx) => void;
   /** Animação por quadro (tempo em ms). */
   tick?: (t: number) => void;
-  /** Tecla/peça tocada (piano: índice da tecla; bateria: peça). */
+  /** Tecla/peça tocada (piano: índice da tecla; bateria: peça; violão: corda ou acorde, ver guitarStrum). */
   press?: (i: number) => void;
+  /** Instrumento que fica abaixo dos olhos (violão): ponto do mundo para onde a vista se volta ao tocar. */
+  focus?: { x: number; y: number; z: number };
+  /** Cofre: mostra o estado do bloqueio de Finanças; devolve true quando a porta muda de posição. */
+  setVault?: (s: VaultState, instant?: boolean) => boolean;
 }
 
 /** Notas do teclado na tela: duas oitavas a partir do Dó central. */
 export const PIANO_KEYS: Array<{ midi: number; black: boolean }> = Array.from({ length: 25 }, (_, i) => ({ midi: 60 + i, black: [1, 3, 6, 8, 10].includes(i % 12) }));
 export const DRUM_PADS: Timbre[] = ['kick', 'snare', 'hat', 'tom'];
+
+/** Os três instrumentos tocáveis do prédio da Música. */
+export const INSTRUMENTS = ['piano', 'drums', 'guitar'] as const;
+export type Instrument = (typeof INSTRUMENTS)[number];
+
+/** Violão em afinação padrão, da 6ª corda (Mi grave, E2) à 1ª (Mi agudo, E4), em MIDI. */
+export const GUITAR_STRINGS: readonly number[] = [40, 45, 50, 55, 59, 64];
+export type ChordId = 'C' | 'D' | 'E' | 'G' | 'A' | 'Am' | 'Em';
+/** Acordes abertos: casa apertada em cada corda (da 6ª à 1ª); null = corda abafada (não soa). */
+export const GUITAR_CHORDS: ReadonlyArray<{ id: ChordId; frets: ReadonlyArray<number | null> }> = [
+  { id: 'C', frets: [null, 3, 2, 0, 1, 0] },
+  { id: 'D', frets: [null, null, 0, 2, 3, 2] },
+  { id: 'E', frets: [0, 2, 2, 1, 0, 0] },
+  { id: 'G', frets: [3, 2, 0, 0, 0, 3] },
+  { id: 'A', frets: [null, 0, 2, 2, 2, 0] },
+  { id: 'Am', frets: [null, 0, 2, 2, 1, 0] },
+  { id: 'Em', frets: [0, 2, 2, 0, 0, 0] },
+];
+/** Intervalo entre uma corda e a seguinte na batida (da grave para a aguda), em segundos. */
+export const STRUM_GAP = 0.024;
+
+/** Notas (MIDI) que um acorde faz soar, da corda grave para a aguda (as abafadas ficam de fora). */
+export function chordNotes(frets: ReadonlyArray<number | null>): number[] {
+  const out: number[] = [];
+  frets.forEach((f, s) => {
+    const open = GUITAR_STRINGS[s];
+    if (f !== null && open !== undefined) out.push(open + f);
+  });
+  return out;
+}
+
+/**
+ * O que soa ao tocar o índice `i` do violão: 0–5 = uma corda solta (6ª à 1ª); 6 em diante = um
+ * acorde de GUITAR_CHORDS, batido da corda grave para a aguda. Índice fora disso não toca nada.
+ */
+export function guitarStrum(i: number): Array<{ string: number; midi: number; delay: number }> {
+  if (!Number.isInteger(i) || i < 0) return [];
+  const open = GUITAR_STRINGS[i];
+  if (open !== undefined) return [{ string: i, midi: open, delay: 0 }];
+  const chord = GUITAR_CHORDS[i - GUITAR_STRINGS.length];
+  if (!chord) return [];
+  const out: Array<{ string: number; midi: number; delay: number }> = [];
+  chord.frets.forEach((f, s) => {
+    const o = GUITAR_STRINGS[s];
+    if (f === null || o === undefined) return;
+    out.push({ string: s, midi: o + f, delay: out.length * STRUM_GAP });
+  });
+  return out;
+}
+
+/** Estado do cofre de Finanças: sem PIN não há o que trancar; com PIN, aberto só se Finanças está desbloqueado. */
+export type VaultState = 'none' | 'locked' | 'open';
+/** `hasPin` undefined (ainda lendo): fica fechado, para nada parecer aberto antes da hora. */
+export function vaultStateOf(hasPin: boolean | undefined, unlocked: boolean): VaultState {
+  if (hasPin === false) return 'none';
+  return hasPin === true && unlocked ? 'open' : 'locked';
+}
 
 const place = (g: THREE.Object3D, x: number, y: number, z: number, face: number) => {
   g.position.set(x, y, z);
@@ -358,4 +421,297 @@ export function telescope(kit: Kit, root: THREE.Object3D, level: number, x: numb
   g.add(b.build());
   root.add(g);
   return { kind: 'telescope', level, x: x - Math.sin(face) * 0.7, z: z - Math.cos(face) * 0.7, face };
+}
+
+/** Ponta a ponta: cilindro entre dois pontos (hastes do suporte). */
+function rodBetween(b: Builder, m: THREE.Material, a: THREE.Vector3, c: THREE.Vector3, r: number) {
+  const d = new THREE.Vector3().subVectors(c, a);
+  const e = new THREE.Euler().setFromQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.clone().normalize()));
+  b.add(m, new THREE.CylinderGeometry(r, r, d.length(), 8), [(a.x + c.x) / 2, (a.y + c.y) / 2, (a.z + c.z) / 2], [e.x, e.y, e.z]);
+}
+
+const P2 = (a: number, b: number) => new THREE.Vector2(a, b);
+
+/**
+ * Violão de aço num suporte de chão: corpo em oito com filete, tampo de abeto, boca com roseta,
+ * escudo, cavalete com rastilho e pinos, braço com 19 trastes e marcações, mão com seis tarraxas
+ * e as seis cordas (as quatro graves de bronze), que vibram ao tocar — uma corda ou o acorde inteiro.
+ * Medidas de um violão de verdade: 1 m de ponta a ponta, escala de 65 cm.
+ */
+export function guitar(kit: Kit, root: THREE.Object3D, level: number, x: number, y: number, z: number, face: number): Thing {
+  const g = place(new THREE.Group(), x, y, z, face);
+  // De pé no suporte, um pouco inclinado para trás (o pé do violão no berço).
+  const tilt = -0.24;
+  const base = new THREE.Vector3(0, 0.2, 0.06);
+  const tiltE = new THREE.Euler(tilt, 0, 0);
+  const onGuitar = (lx: number, ly: number, lz: number) => new THREE.Vector3(lx, ly, lz).applyEuler(tiltE).add(base);
+  const V = (a: number, b: number, c: number) => new THREE.Vector3(a, b, c);
+
+  // Suporte em tripé: berço com apoios de borracha, duas pernas na frente e a haste de trás até o garfo do braço.
+  const sb = new Builder();
+  const frame = kit.mat('#23272E', { metal: 0.6, rough: 0.35 });
+  const rubber = kit.mat('#3A3F47', { rough: 0.9 });
+  rodBetween(sb, frame, V(-0.15, 0.185, 0.07), V(0.15, 0.185, 0.07), 0.012);
+  for (const sd of [-1, 1]) {
+    rodBetween(sb, frame, V(sd * 0.21, 0.015, 0.25), V(sd * 0.14, 0.185, 0.07), 0.01);
+    rodBetween(sb, rubber, V(sd * 0.11, 0.185, 0.07), V(sd * 0.11, 0.185, 0.135), 0.012);
+    rodBetween(sb, rubber, V(sd * 0.11, 0.185, 0.135), V(sd * 0.11, 0.25, 0.145), 0.012);
+    sb.add(rubber, new THREE.CylinderGeometry(0.022, 0.022, 0.02, 10), [sd * 0.21, 0.01, 0.25]);
+  }
+  rodBetween(sb, frame, V(0, 0.015, -0.34), onGuitar(0, 0.7, -0.005), 0.011);
+  sb.add(rubber, new THREE.CylinderGeometry(0.022, 0.022, 0.02, 10), [0, 0.01, -0.34]);
+  rodBetween(sb, rubber, onGuitar(-0.042, 0.7, -0.005), onGuitar(0.042, 0.7, -0.005), 0.009);
+  for (const sd of [-1, 1]) rodBetween(sb, rubber, onGuitar(sd * 0.042, 0.7, -0.005), onGuitar(sd * 0.042, 0.7, 0.05), 0.008);
+  g.add(sb.build());
+
+  // O violão (no próprio plano: comprimento em y, tampo virado para +z).
+  const gt = new THREE.Group();
+  gt.position.copy(base);
+  gt.rotation.x = tilt;
+  g.add(gt);
+  // Meio contorno do corpo (bojo de baixo, cintura, bojo de cima), espelhado.
+  const half = new THREE.SplineCurve([P2(0, 0), P2(0.1, 0.008), P2(0.165, 0.05), P2(0.185, 0.13), P2(0.17, 0.21), P2(0.125, 0.285), P2(0.128, 0.33), P2(0.145, 0.395), P2(0.13, 0.455), P2(0.08, 0.485), P2(0, 0.49)]).getPoints(48);
+  const shape = new THREE.Shape([...half, ...half.slice(1, -1).reverse().map((p) => P2(-p.x, p.y))]);
+  const gb = new Builder();
+  const sides = kit.mat('#7A4527', { rough: 0.45 });
+  const spruce = kit.mat('#E2B97F', { rough: 0.5 });
+  const binding = kit.mat('#F1E6CF', { rough: 0.5 });
+  const ebony = kit.mat('#2B1A10', { rough: 0.55 });
+  const bone = kit.mat('#EFE8D8', { rough: 0.4 });
+  const nickel = kit.mat('#C9CDD2', { metal: 0.9, rough: 0.25 });
+  const pearl = kit.mat('#F3EFE6', { rough: 0.3 });
+  const body = new THREE.ExtrudeGeometry(shape, { depth: 0.1, bevelEnabled: true, bevelThickness: 0.004, bevelSize: 0.004, bevelSegments: 2 });
+  body.translate(0, 0, -0.05);
+  gb.add(sides, body);
+  // Filete claro na borda e o tampo por dentro dele.
+  gb.add(binding, new THREE.ShapeGeometry(shape), [0, 0, 0.0546]);
+  const plate = new THREE.ShapeGeometry(shape);
+  plate.translate(0, -0.245, 0);
+  plate.scale(0.972, 0.972, 1);
+  plate.translate(0, 0.245, 0);
+  gb.add(spruce, plate, [0, 0, 0.0549]);
+  // Boca com roseta e escudo.
+  gb.add(kit.mat('#120C08', { rough: 0.9 }), new THREE.CircleGeometry(0.044, 40), [0, 0.335, 0.0556]);
+  gb.add(kit.mat('#3B2416', { rough: 0.5 }), new THREE.RingGeometry(0.05, 0.061, 48), [0, 0.335, 0.0553]);
+  gb.add(binding, new THREE.RingGeometry(0.064, 0.067, 48), [0, 0.335, 0.0553]);
+  const guard = new THREE.Shape();
+  guard.absellipse(0, 0, 0.042, 0.064, 0, Math.PI * 2, false, 0);
+  gb.add(kit.mat('#3A2216', { rough: 0.35 }), new THREE.ShapeGeometry(guard, 24), [0.066, 0.285, 0.0551], [0, 0, -0.45]);
+  // Cavalete, rastilho e os seis pinos.
+  const xs = (k: number) => -0.027 + k * 0.0108;
+  const xn = (k: number) => -0.0215 + k * 0.0086;
+  gb.add(ebony, new THREE.BoxGeometry(0.16, 0.034, 0.01), [0, 0.163, 0.0595]);
+  gb.add(bone, new THREE.BoxGeometry(0.075, 0.004, 0.006), [0, 0.172, 0.067]);
+  for (let k = 0; k < 6; k++) gb.add(bone, new THREE.CylinderGeometry(0.0035, 0.0035, 0.006, 8), [xs(k), 0.155, 0.0655], [Math.PI / 2, 0, 0]);
+  // Braço, escala, pestana, trastes (posição real pela regra das 12 notas) e marcações.
+  const NUT = 0.815;
+  const SCALE = 0.65;
+  const fret = (n: number) => NUT - SCALE * (1 - 2 ** (-n / 12));
+  gb.add(sides, new THREE.BoxGeometry(0.05, 0.37, 0.034), [0, 0.655, 0.041]);
+  gb.add(ebony, new THREE.BoxGeometry(0.052, NUT - 0.372, 0.009), [0, (NUT + 0.372) / 2, 0.0595]);
+  gb.add(bone, new THREE.BoxGeometry(0.052, 0.006, 0.007), [0, NUT, 0.0665]);
+  for (let n = 1; n <= 19; n++) gb.add(nickel, new THREE.BoxGeometry(0.052, 0.0025, 0.003), [0, fret(n), 0.0655]);
+  for (const n of [3, 5, 7, 9, 12, 15, 17]) for (const dx of n === 12 ? [-0.012, 0.012] : [0]) gb.add(pearl, new THREE.CircleGeometry(0.0038, 12), [dx, (fret(n - 1) + fret(n)) / 2, 0.0642]);
+  gt.add(gb.build());
+  // Mão inclinada para trás, com as tarraxas (três de cada lado).
+  const hs = new THREE.Group();
+  hs.position.set(0, NUT + 0.004, 0.05);
+  hs.rotation.x = -0.2;
+  const hb = new Builder();
+  hb.add(sides, new THREE.BoxGeometry(0.085, 0.19, 0.016), [0, 0.095, -0.004]);
+  hb.add(kit.mat('#16100C', { rough: 0.3 }), new THREE.BoxGeometry(0.08, 0.182, 0.002), [0, 0.096, 0.0045]);
+  for (const sd of [-1, 1])
+    for (let k = 0; k < 3; k++) {
+      const py = 0.045 + k * 0.05;
+      hb.add(nickel, new THREE.CylinderGeometry(0.0045, 0.0045, 0.014, 8), [sd * 0.026, py, 0.011], [Math.PI / 2, 0, 0]);
+      hb.add(nickel, new THREE.CylinderGeometry(0.003, 0.003, 0.03, 6), [sd * 0.05, py, -0.004], [0, 0, Math.PI / 2]);
+      hb.add(bone, new THREE.BoxGeometry(0.008, 0.02, 0.012), [sd * 0.067, py, -0.004]);
+    }
+  hs.add(hb.build());
+  gt.add(hs);
+  // As seis cordas, do rastilho à pestana (abrem um pouco em leque); cada uma é uma peça solta que vibra.
+  const RADII = [0.0028, 0.0024, 0.002, 0.0017, 0.0012, 0.0011];
+  const strings: THREE.Mesh[] = [];
+  const lit: THREE.MeshStandardMaterial[] = [];
+  const restX: number[] = [];
+  for (let k = 0; k < 6; k++) {
+    const x0 = xs(k);
+    const x1 = xn(k);
+    const y0 = 0.172;
+    const len = Math.hypot(x1 - x0, NUT - y0);
+    const m = kit.own(new THREE.MeshStandardMaterial({ color: k < 4 ? '#C8A26B' : '#DDE2E8', metalness: 0.85, roughness: 0.3, emissive: '#FFD58A', emissiveIntensity: 0 }));
+    const s = new THREE.Mesh(new THREE.CylinderGeometry(RADII[k]!, RADII[k]!, len, 6), m);
+    s.position.set((x0 + x1) / 2, (y0 + NUT) / 2, 0.0705);
+    s.rotation.z = -Math.atan2(x1 - x0, NUT - y0);
+    gt.add(s);
+    strings.push(s);
+    lit.push(m);
+    restX.push(s.position.x);
+  }
+  root.add(g);
+  const cf = Math.cos(face);
+  const sf = Math.sin(face);
+  // Para onde olhar ao tocar: um pouco abaixo da boca (o painel na tela fica embaixo).
+  const hole = onGuitar(0, 0.335, 0.055);
+  const hit = strings.map(() => -Infinity);
+  return {
+    kind: 'guitar',
+    level,
+    x: x + sf * 1.0,
+    z: z + cf * 1.0,
+    face,
+    focus: { x: x + cf * hole.x + sf * hole.z, y: y + hole.y - 0.12, z: z - sf * hole.x + cf * hole.z },
+    press: (i) => {
+      const now = performance.now();
+      for (const n of guitarStrum(i)) hit[n.string] = now + n.delay * 1000;
+    },
+    // Corda tocada: engrossa (o borrão da vibração), treme e brilha, e vai parando sozinha.
+    tick: (t) =>
+      strings.forEach((s, k) => {
+        const age = t - hit[k]!;
+        const a = age >= 0 && age < 3000 ? Math.exp(-age / 700) : 0;
+        s.scale.x = s.scale.z = 1 + a * 2.8;
+        s.position.x = restX[k]! + Math.sin(age * 0.37) * 0.0015 * a;
+        lit[k]!.emissiveIntensity = a * 0.8;
+      }),
+  };
+}
+
+/**
+ * Cofre de Finanças: porta redonda de aço embutida numa parede de pedra escura com frisos de latão,
+ * aro de luz quente discreto e uma luz de estado acima (âmbar = trancado, verde = aberto, apagada =
+ * Finanças sem PIN). Atrás, a câmara com caixas de depósito. A porta só mostra o estado: quem confere
+ * o PIN é o bloqueio de Finanças do app (o mesmo da tela de Finanças). Nenhum número aparece aqui.
+ * A frente da parede fica em z = 0 do grupo, virada para `face`.
+ */
+export function vault(kit: Kit, root: THREE.Object3D, level: number, x: number, y: number, z: number, face: number): Thing {
+  const g = place(new THREE.Group(), x, y, z, face);
+  const b = new Builder();
+  const stone = kit.mat('#2A2D33', { rough: 0.35, metal: 0.25 });
+  const inner = kit.mat('#3A3530', { rough: 0.7 });
+  const brass = kit.mat('#C9A45C', { metal: 0.9, rough: 0.25 });
+  const steel = kit.mat('#B7BEC6', { metal: 0.92, rough: 0.28 });
+  const chrome = kit.mat('#D6DBE1', { metal: 0.95, rough: 0.15 });
+  const W = 1.7;
+  const HT = 3.6;
+  const D = 0.36;
+  const CY = 1.3;
+  const HOLE = 0.98;
+  // Parede com o vão redondo.
+  const wall = new THREE.Shape([P2(-W, 0), P2(W, 0), P2(W, HT), P2(-W, HT)]);
+  wall.holes.push(new THREE.Path().absarc(0, CY, HOLE, 0, Math.PI * 2, true));
+  const wallGeo = new THREE.ExtrudeGeometry(wall, { depth: D, bevelEnabled: false, curveSegments: 48 });
+  wallGeo.translate(0, 0, -D);
+  b.add(stone, wallGeo);
+  // Cornija, rodapé e frisos de latão.
+  b.add(stone, new THREE.BoxGeometry(W * 2 + 0.2, 0.16, D + 0.14), [0, HT + 0.08, -D / 2 + 0.07]);
+  b.add(brass, new THREE.BoxGeometry(W * 2, 0.025, 0.02), [0, HT - 0.06, 0.01]);
+  b.add(brass, new THREE.BoxGeometry(W * 2, 0.04, 0.02), [0, 0.14, 0.01]);
+  for (const sd of [-1, 1]) b.add(brass, new THREE.BoxGeometry(0.025, 3.38, 0.02), [sd * (W - 0.22), 1.85, 0.01]);
+  // Batente de aço, aro de latão e o fio de luz quente em volta.
+  b.add(chrome, new THREE.TorusGeometry(HOLE + 0.04, 0.07, 14, 80), [0, CY, 0]);
+  b.add(brass, new THREE.TorusGeometry(HOLE + 0.16, 0.016, 8, 80), [0, CY, 0.012]);
+  b.add(kit.mat('#FFD9A0', { glow: true }), new THREE.TorusGeometry(HOLE + 0.24, 0.009, 6, 96), [0, CY, 0.01]);
+  // Dobradiças (lado esquerdo de quem olha).
+  for (const dy of [-0.55, 0.55]) b.add(chrome, new THREE.CylinderGeometry(0.05, 0.05, 0.26, 16), [-HOLE - 0.02, CY + dy, 0.1]);
+  // Luz de estado com moldura de latão.
+  const LY = CY + HOLE + 0.42;
+  b.add(brass, new THREE.RingGeometry(0.034, 0.048, 24), [0, LY, 0.004]);
+  const pip = kit.own(new THREE.MeshStandardMaterial({ color: '#3A3F47', roughness: 0.3, emissive: '#000000', emissiveIntensity: 0 }));
+  const pipM = new THREE.Mesh(new THREE.CircleGeometry(0.032, 24), pip);
+  pipM.position.set(0, LY, 0.006);
+  // Câmara atrás da parede: paredes, teto com luz quente e caixas de depósito no fundo.
+  const back = -1.25;
+  b.add(inner, new THREE.BoxGeometry(W * 2, HT, 0.1), [0, HT / 2, back - 0.05]);
+  for (const sd of [-1, 1]) b.add(inner, new THREE.BoxGeometry(0.1, HT, -back - D), [sd * (W - 0.05), HT / 2, (back - D) / 2]);
+  b.add(inner, new THREE.BoxGeometry(W * 2, 0.1, -back - D), [0, HT - 0.05, (back - D) / 2]);
+  b.add(kit.mat('#4A4038', { rough: 0.8 }), new THREE.BoxGeometry(W * 2 - 0.2, 0.02, -back - D), [0, 0.01, (back - D) / 2]);
+  b.add(kit.mat('#FFE2B0', { glow: true }), new THREE.BoxGeometry(W * 1.5, 0.02, 0.05), [0, HT - 0.11, back + 0.25]);
+  const box = kit.mat('#9AA3AD', { metal: 0.85, rough: 0.35 });
+  for (let r = 0; r < 7; r++)
+    for (let k = 0; k < 7; k++) {
+      const bx = -1.05 + k * 0.35;
+      const by = 0.35 + r * 0.29;
+      b.add(box, new THREE.BoxGeometry(0.32, 0.26, 0.04), [bx, by, back + 0.02]);
+      b.add(brass, new THREE.CylinderGeometry(0.012, 0.012, 0.02, 8), [bx, by, back + 0.045], [Math.PI / 2, 0, 0]);
+    }
+  // Porta: gira na dobradiça; o volante gira antes de ela abrir (e depois de fechar).
+  const hinge = new THREE.Group();
+  hinge.position.set(-HOLE - 0.02, CY, 0.1);
+  const db = new Builder();
+  const cx = HOLE + 0.02;
+  const dz = -0.26;
+  db.add(steel, new THREE.CylinderGeometry(0.95, 0.95, 0.3, 72), [cx, 0, dz], [Math.PI / 2, 0, 0]);
+  for (const [r, w] of [[0.84, 0.02], [0.62, 0.013]] as const) db.add(chrome, new THREE.TorusGeometry(r, w, 8, 72), [cx, 0, dz + 0.15]);
+  db.add(brass, new THREE.CylinderGeometry(0.24, 0.24, 0.03, 48), [cx, 0, dz + 0.16], [Math.PI / 2, 0, 0]);
+  db.add(chrome, new THREE.CylinderGeometry(0.08, 0.08, 0.12, 20), [cx, 0, dz + 0.2], [Math.PI / 2, 0, 0]);
+  for (const dy of [-0.55, 0.55]) db.add(chrome, new THREE.BoxGeometry(0.26, 0.1, 0.06), [0.12, dy, -0.08]);
+  // Ferrolhos na borda e o anel do mecanismo no lado de dentro (aparecem com a porta aberta).
+  for (let k = 0; k < 10; k++) {
+    const a = (k / 10) * Math.PI * 2;
+    db.add(chrome, new THREE.CylinderGeometry(0.028, 0.028, 0.08, 10), [cx + Math.cos(a) * 0.96, Math.sin(a) * 0.96, dz - 0.05], [0, 0, a - Math.PI / 2]);
+  }
+  db.add(brass, new THREE.TorusGeometry(0.7, 0.03, 8, 64), [cx, 0, dz - 0.15]);
+  db.add(steel, new THREE.CylinderGeometry(0.5, 0.5, 0.03, 48), [cx, 0, dz - 0.16], [Math.PI / 2, 0, 0]);
+  hinge.add(db.build());
+  const wheel = new THREE.Group();
+  wheel.position.set(cx, 0, dz + 0.27);
+  const wb = new Builder();
+  wb.add(chrome, new THREE.TorusGeometry(0.36, 0.022, 10, 56));
+  for (let k = 0; k < 3; k++) {
+    const a = (k / 3) * Math.PI * 2 + Math.PI / 2;
+    wb.add(chrome, new THREE.CylinderGeometry(0.014, 0.014, 0.46, 8), [Math.cos(a) * 0.23, Math.sin(a) * 0.23, 0], [0, 0, a - Math.PI / 2]);
+    wb.add(brass, new THREE.SphereGeometry(0.035, 12, 8), [Math.cos(a) * 0.48, Math.sin(a) * 0.48, 0]);
+  }
+  wb.add(brass, new THREE.SphereGeometry(0.06, 16, 10), [0, 0, 0], undefined, [1, 1, 0.6]);
+  wheel.add(wb.build());
+  hinge.add(wheel);
+  // A porta não entra na colisão (quem anda já não passa do limite do salão; aberta, ela não vira parede).
+  hinge.traverse((o) => (o.userData.noCollide = true));
+  g.add(b.build(), pipM, hinge);
+  root.add(g);
+
+  let state: VaultState = 'locked';
+  let p = 0;
+  let target = 0;
+  let last = 0;
+  const paint = () => {
+    const col = state === 'open' ? '#22C55E' : state === 'locked' ? '#F59E0B' : '#3A3F47';
+    pip.color.set(col);
+    pip.emissive.set(state === 'none' ? '#000000' : col);
+    pip.emissiveIntensity = state === 'none' ? 0 : 1.1;
+  };
+  paint();
+  const smooth = (k: number) => k * k * (3 - 2 * k);
+  // Primeiro terço: o volante dá uma volta (recolhe os ferrolhos); depois a porta abre para fora.
+  const pose = () => {
+    wheel.rotation.z = -smooth(Math.min(1, p / 0.32)) * Math.PI * 2;
+    hinge.rotation.y = -smooth(Math.max(0, (p - 0.32) / 0.68)) * 1.95;
+  };
+  return {
+    kind: 'vault',
+    level,
+    x: x + Math.sin(face) * 1.2,
+    z: z + Math.cos(face) * 1.2,
+    face,
+    setVault: (s, instant) => {
+      const to = s === 'open' ? 1 : 0;
+      const moves = to !== target;
+      state = s;
+      target = to;
+      if (instant) {
+        p = to;
+        pose();
+      }
+      paint();
+      return moves;
+    },
+    tick: (t) => {
+      const dt = last ? Math.min(0.1, (t - last) / 1000) : 0;
+      last = t;
+      if (p === target) return;
+      p = target > p ? Math.min(target, p + dt / 2.6) : Math.max(target, p - dt / 2.6);
+      pose();
+    },
+  };
 }

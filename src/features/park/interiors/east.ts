@@ -1,12 +1,13 @@
 /**
  * Interiores da região Leste: Observatório Temporal (Calendar), Centro de Operações (Tasks),
  * Projects e Finanças. A mesa digital do Tasks mostra as tarefas reais de hoje; os estandes do
- * Projects levam o nome e a cor de cada projeto ativo.
+ * Projects levam o nome e a cor de cada projeto ativo; o cofre de Finanças abre com o PIN real.
  */
 import * as THREE from 'three';
 import type { Kit } from '../kit';
 import { canvasPlane, createRoom, finishRoom, pendants, pots, bench, setDetailCommon, wrap, type InteriorScene } from './common';
 import { sectorsFrom, viewOf, type Placed } from './central';
+import { vault, type Thing } from './things';
 
 const ring = <T extends string>(ids: readonly T[], r: number): Record<T, Placed> => {
   const out = {} as Record<T, Placed>;
@@ -319,6 +320,12 @@ export function createFinanceInterior(kit: Kit, labels: Record<FinanceSector, st
     sb.add(kit.mat('#1F2A3A', { metal: 0.5 }), new THREE.BoxGeometry(1.4, 0.8, 0.05), [0, 1.35, -0.3], [-0.3, 0, 0]);
     if (id === 'investments') for (let k = 0; k < 5; k++) sb.add(kit.mat('#FDE68A', { glow: true }), new THREE.BoxGeometry(0.2, 0.3 + k * 0.25, 0.2), [-1.6 + k * 0.4 + 2.6, 0.15 + k * 0.125, 0.3]);
   });
+  // Cofre: porta redonda na parede leste, numa câmara entre as duas faces de vidro desse canto do
+  // hexágono (entre as salas de 60° e 120°, longe da entrada e do lounge dos elevadores). Abre com o
+  // PIN real de Finanças, pelo mesmo bloqueio da tela de Finanças; o motor junta o cofre aos objetos
+  // funcionais do térreo (userData.things).
+  const things: Thing[] = [vault(kit, scene, 0, 12.6, 0, 0, -Math.PI / 2)];
+  scene.userData.things = things;
   finishRoom(room);
   const overview = { cam: new THREE.Vector3(0, 6, R - 2), target: new THREE.Vector3(0, 1.2, -2) };
   return {

@@ -9,7 +9,7 @@ import * as THREE from 'three';
 import type { ModuleId } from '@/app/modules';
 import type { Builder, Kit } from '../kit';
 import type { Obstacle, Seat } from '../camera';
-import { clock, drums, globe, lamp as floorLamp, piano, record, telescope, type Thing } from './things';
+import { clock, drums, globe, guitar, lamp as floorLamp, piano, record, telescope, type Thing } from './things';
 import { extinguisher, recycleStation, waterCooler } from '../props';
 
 interface Ctx {
@@ -126,10 +126,18 @@ const SIGNATURE: Partial<Record<ModuleId, (c: Ctx, x: number, y: number, z: numb
     sofa(c, x + Math.sin(face) * 1.4, y, z + Math.cos(face) * 1.4, face + Math.PI, 1.0);
   },
   music: (c, x, y, z, face) => {
-    // Piano de cauda de verdade no 1º andar, bateria no 2º, toca-discos no 3º.
+    // Os três instrumentos tocáveis: piano de cauda no 1º andar; bateria e violão no 2º; toca-discos num 3º.
     if (c.level === 1) c.things.push(piano(c.kit, c.root, c.seats, c.level, x, y, z, face));
-    else if (c.level === 2) c.things.push(drums(c.kit, c.root, c.level, x, y, z, face));
-    else c.things.push(record(c.kit, c.root, c.level, x, y, z, face));
+    else if (c.level === 2) {
+      c.things.push(drums(c.kit, c.root, c.level, x, y, z, face));
+      // Violão no suporte ao lado da bateria, mais para dentro do andar (longe do elevador, da ponte
+      // e do canto de apoio dos fundos), virado para o mesmo lado: 1,5 m à direita e 1,1 m atrás dela.
+      const rx = Math.cos(face);
+      const rz = -Math.sin(face);
+      const fx = Math.sin(face);
+      const fz = Math.cos(face);
+      c.things.push(guitar(c.kit, c.root, c.level, x + rx * 1.5 - fx * 1.1, y, z + rz * 1.5 - fz * 1.1, face));
+    } else c.things.push(record(c.kit, c.root, c.level, x, y, z, face));
   },
   sports: (c, x, y, z, face) => {
     const m = mats(c);

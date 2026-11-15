@@ -14,7 +14,7 @@ import { createTown } from './town';
 import type { Conditions } from '@/domain/parkPeople';
 import { CLEAR_SKY, createWorld, lightAt, type Quality, type Season, type Sky } from './world';
 import type { ParkAudio } from './audio';
-import { DRUM_PADS, PIANO_KEYS, type Thing, type ThingCtx, type ThingKind } from './interiors/things';
+import { DRUM_PADS, PIANO_KEYS, guitarStrum, type Instrument, type Thing, type ThingCtx, type ThingKind, type VaultState } from './interiors/things';
 import type { ParkSnapshot } from './parkContext';
 import { footprint } from './collision';
 import { entryDoors } from './doors';
@@ -58,8 +58,10 @@ export interface EngineOpts {
   onFloors: (count: number, current: number) => void;
   /** Sala de um andar escolhida (abre o painel real ligado a ela). */
   onZone: (z: { key: string; sector: string | null } | null) => void;
-  /** Piano ou bateria: abrir (ou fechar, null) o teclado/pads na tela. */
-  onInstrument: (k: 'piano' | 'drums' | null) => void;
+  /** Piano, bateria ou violão: abrir (ou fechar, null) o teclado, os pads ou as cordas na tela. */
+  onInstrument: (k: Instrument | null) => void;
+  /** Cofre de Finanças: a pessoa pediu para usar o cofre (a tela mostra o bloqueio real de Finanças). */
+  onVault: () => void;
   startMode: CamMode;
   /** Retomar de onde a pessoa estava (volta da interface 2D): sem abertura. */
   restore?: ParkSnapshot | null;
@@ -106,8 +108,12 @@ export interface Engine {
   focusZone: (i: number) => void;
   /** Andar de elevador até o andar `n` (com cabine e portas). */
   rideTo: (n: number) => void;
-  /** Tocar a tecla/peça `i` do instrumento aberto (piano: PIANO_KEYS; bateria: DRUM_PADS). */
+  /** Tocar a tecla/peça `i` do instrumento aberto (piano: PIANO_KEYS; bateria: DRUM_PADS; violão: guitarStrum). */
   play: (i: number) => void;
+  /** Parou de tocar (painel do instrumento fechado): a vista volta ao normal. */
+  closeInstrument: () => void;
+  /** Cofre de Finanças do prédio aberto: mostra o estado do bloqueio (`instant` = sem animação nem som). */
+  setVault: (s: VaultState, instant?: boolean) => void;
   setData: (id: ModuleId, data: unknown) => void;
   project: () => Array<{ id: ModuleId; x: number; y: number; visible: boolean }>;
   dispose: () => void;
@@ -499,6 +505,9 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
     const swap = () => {
       const ikit = new Kit();
       const scene = factory(ikit);
+      // Objetos funcionais do próprio térreo (o cofre de Finanças) entram na lista dos andares.
+      const own = scene.scene.userData.things as Thing[] | undefined;
+      if (own?.length && scene.floors) scene.floors.things.push(...own);
       // Colisão do térreo pelo desenho (móveis, balcões, paredes), além dos obstáculos do próprio interior.
       scene.obstacles.push(...footprint(scene.scene, () => 0, 0.3, 1.45, 0.5));
       ikit.glowing.forEach((m) => (m.emissiveIntensity = 1));
@@ -822,11 +831,14 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
   const useThing = (th: Thing) => {
     const fl = inside?.scene.floors;
     if (!fl) return;
-    if (th.kind === 'piano' || th.kind === 'drums') {
+    if (th.kind === 'piano' || th.kind === 'drums' || th.kind === 'guitar') {
       instrument = th;
       rig.place(th.x, th.z, th.face);
+      // O violão fica abaixo da linha dos olhos: a vista se volta para ele (as cordas vibram à vista).
+      if (th.focus) rig.observe(new THREE.Vector3(th.focus.x, th.focus.y, th.focus.z));
       return opts.onInstrument(th.kind);
     }
+    if (th.kind === 'vault') return opts.onVault();
     if (th.kind === 'room') {
       const z = fl.zones[th.zone!];
       return z && opts.onZone({ key: z.key, sector: z.sector });
@@ -1346,9 +1358,32 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
       if (instrument.kind === 'piano') {
         const k = PIANO_KEYS[i];
         if (k) audio?.note(k.midi, 'piano');
+      } else if (instrument.kind === 'guitar') {
+        // Uma corda, ou o acorde batido da corda grave para a aguda (as mesmas notas que vibram no 3D).
+        for (const n of guitarStrum(i)) audio?.note(n.midi, 'guitar', n.delay);
       } else {
         const d = DRUM_PADS[i];
         if (d) audio?.note(d === 'kick' ? 36 : d === 'snare' ? 38 : d === 'hat' ? 42 : 45, d);
+      }
+    },
+    closeInstrument: () => {
+      if (instrument?.focus && rig.posture() === 'observe') rig.observe(null);
+      instrument = null;
+    },
+    setVault: (s, instant = false) => {
+      const th = inside?.scene.floors?.things.find((o) => o.kind === 'vault');
+      if (!th?.setVault?.(s, instant) || instant) return;
+      // Abrindo: trava que solta, cliques do volante, a porta pesada saindo. Fechando: a porta
+      // encosta, o volante volta e os ferrolhos entram.
+      if (s === 'open') {
+        audio?.note(50, 'tom');
+        audio?.note(84, 'hat', 0.25);
+        audio?.note(88, 'hat', 0.5);
+        audio?.note(36, 'kick', 0.85);
+      } else {
+        audio?.note(36, 'kick', 1.75);
+        audio?.note(84, 'hat', 2.0);
+        audio?.note(47, 'tom', 2.5);
       }
     },
     rideTo,

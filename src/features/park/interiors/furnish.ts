@@ -11,10 +11,28 @@ import type { Seat } from '../camera';
 
 export type RoomType = 'classroom' | 'lab' | 'booth' | 'gym' | 'archive' | 'gallery' | 'office' | 'dataviz' | 'lounge' | 'studio' | 'stage' | 'observatory' | 'music';
 
+/** Tipo das salas de cada prédio do Campus (as mesmas chaves de FLOOR_PLANS), pelo uso de cada uma. */
+const BY_BUILDING: Record<string, Record<string, RoomType>> = {
+  notes: { organize: 'archive', handwriting: 'studio', versions: 'archive' },
+  library: { collection: 'archive', research: 'office', reading: 'lounge', deep: 'office', documents: 'archive' },
+  inbox: { triage: 'office', tags: 'archive', flow: 'dataviz', pending: 'office' },
+  calendar: { daily: 'dataviz', weekly: 'dataviz', monthly: 'dataviz', events: 'office', timeline: 'dataviz', agenda: 'archive', links: 'office' },
+  tasks: { stations: 'office', organize: 'dataviz', priorities: 'dataviz', review: 'office', done: 'archive', execution: 'dataviz', late: 'dataviz' },
+  projects: { planning: 'office', milestones: 'dataviz', tasks: 'office', tracking: 'dataviz', materials: 'archive', done: 'gallery' },
+  focus: { history: 'dataviz' },
+  academy: { classrooms: 'classroom', individual: 'office', activities: 'classroom', practice: 'lab' },
+  languages: { languageRooms: 'classroom', sessions: 'classroom', grammar: 'classroom', skills: 'lounge', conversation: 'lounge', booths: 'booth' },
+  music: { individual: 'music', study: 'classroom' },
+  sports: { training: 'gym', activities: 'office', records: 'dataviz' },
+  goals: { planning: 'office', links: 'office', tracking: 'dataviz', updates: 'office', history: 'gallery' },
+  insights: { indicators: 'dataviz', charts: 'dataviz', comparisons: 'dataviz', deep: 'dataviz' },
+  finance: { budget: 'office', records: 'archive', history: 'archive', charts: 'dataviz' },
+};
+
 /** Tipo de cada sala pela chave (as mesmas chaves de FLOOR_PLANS). */
 export function roomType(key: string, building: string): RoomType {
-  if (building === 'music' && ['rehearsal', 'composing'].includes(key)) return 'music';
-  if (building === 'sports' && ['gym', 'mobility', 'stretching', 'guided'].includes(key)) return 'gym';
+  const own = BY_BUILDING[building]?.[key];
+  if (own) return own;
   const map: Record<string, RoomType> = {
     math: 'classroom', science: 'classroom', humanities: 'classroom', tech: 'classroom', grammar: 'classroom', exercises: 'classroom', writing: 'classroom',
     labs: 'lab', lab: 'lab', proto: 'lab',
@@ -321,11 +339,13 @@ export function decorate(kit: Kit, b: Builder, key: string, w: number, d: number
   switch (key) {
     case 'humanities':
     case 'culture':
+    case 'skills':
       b.add(dark, new THREE.CylinderGeometry(0.05, 0.12, 0.8, 8), [side, 0.4, 0]);
       b.add(kit.mat('#3B82C4', { rough: 0.5 }), new THREE.SphereGeometry(0.32, 20, 14), [side, 1.1, 0]);
       b.add(kit.mat('#F2E6C9', { rough: 0.9 }), new THREE.BoxGeometry(2.2, 1.3, 0.03), [-side + 0.6, 1.8, back + 0.12]);
       break;
     case 'science':
+    case 'practice':
     case 'labs':
     case 'lab':
       for (let k = 0; k < 2; k++) {
@@ -335,11 +355,16 @@ export function decorate(kit: Kit, b: Builder, key: string, w: number, d: number
       break;
     case 'math':
     case 'exercises':
+    case 'classrooms':
+    case 'activities':
+    case 'study':
       for (let k = 0; k < 10; k++) b.add(white, new THREE.BoxGeometry(0.15 + (k % 4) * 0.1, 0.03, 0.01), [-1.6 + (k % 5) * 0.75, 2.0 - Math.floor(k / 5) * 0.35, back + 0.14]);
       b.add(acc, new THREE.TetrahedronGeometry(0.25), [side, 1.0, 0.6]);
       b.add(acc, new THREE.OctahedronGeometry(0.22), [side - 0.5, 1.0, 0.6]);
       break;
     case 'grammar':
+    case 'languageRooms':
+    case 'sessions':
     case 'pronunciation':
     case 'listening':
     case 'reading':
@@ -358,6 +383,7 @@ export function decorate(kit: Kit, b: Builder, key: string, w: number, d: number
       for (let k = 0; k < 5; k++) b.add(kit.mat('#E5C07B', { metal: 0.9, rough: 0.2 }), new THREE.CylinderGeometry(0.06, 0.1, 0.35, 10), [-0.9 + k * 0.45, 1.6, back + 0.2]);
       break;
     case 'recording':
+    case 'individual':
     case 'booths':
     case 'editing':
     case 'rehearsal':
@@ -367,6 +393,10 @@ export function decorate(kit: Kit, b: Builder, key: string, w: number, d: number
       b.add(kit.mat('#64748B', { metal: 0.5 }), new THREE.CircleGeometry(0.2, 16), [-side, 0.3, back + 0.76]);
       break;
     case 'monthly':
+    case 'events':
+    case 'agenda':
+    case 'timeline':
+    case 'execution':
     case 'weekly':
     case 'daily':
     case 'recurring':
@@ -377,6 +407,10 @@ export function decorate(kit: Kit, b: Builder, key: string, w: number, d: number
       for (let r = 0; r < 4; r++) for (let c = 0; c < 7; c++) b.add((r + c + seed) % 5 === 0 ? acc : white, new THREE.BoxGeometry(0.2, 0.17, 0.01), [-0.75 + c * 0.25, 1.4 + r * 0.22, back + 0.13]);
       break;
     case 'investments':
+    case 'budget':
+    case 'records':
+    case 'tracking':
+    case 'comparisons':
     case 'assets':
     case 'evolution':
     case 'longterm':
@@ -386,6 +420,7 @@ export function decorate(kit: Kit, b: Builder, key: string, w: number, d: number
       for (let k = 0; k < 8; k++) b.add(acc, new THREE.BoxGeometry(0.32, 0.04, 0.01), [-1.2 + k * 0.3, 1.5 + Math.sin(k * 0.9 + seed) * 0.25 + k * 0.06, back + 0.13], [0, 0, Math.cos(k * 0.9 + seed) * 0.5]);
       break;
     case 'gym':
+    case 'training':
     case 'mobility':
     case 'stretching':
     case 'guided':
@@ -393,6 +428,9 @@ export function decorate(kit: Kit, b: Builder, key: string, w: number, d: number
       b.add(kit.mat('#22C55E', { rough: 0.6 }), new THREE.SphereGeometry(0.25, 16, 12), [side - 0.7, 0.25, 1.2]);
       break;
     case 'observatory':
+    case 'indicators':
+    case 'deep':
+    case 'flow':
     case 'integrated':
     case 'trends':
     case 'charts':

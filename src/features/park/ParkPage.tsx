@@ -30,7 +30,9 @@ import { AUDIO_CATS, DEFAULT_MIX, createParkAudio, type AudioMix, type ParkAudio
 import { createInboxInterior, DESTINATIONS, INBOX_SECTORS, type InboxSector } from './interiors/inbox';
 import { InboxPanel } from './panels/InboxPanel';
 import { AcademyPanel, InsightsPanel, LanguagesPanel, LibraryPanel, NotesPanel } from './panels/NorthPanels';
-import { CalendarPanel, FinancePanel, ProjectsPanel, TasksPanel } from './panels/EastPanels';
+import { CalendarPanel, FinancePanel, FinanceVaultPanel, ProjectsPanel, TasksPanel } from './panels/EastPanels';
+import { hasFinancePin } from '@/data/financePlanRepo';
+import { isFinanceUnlocked, lockFinanceNow } from '@/features/finance/FinanceLock';
 import { FocusPanel, GoalsPanel, HabitsPanel, MusicPanel, SportsPanel } from './panels/WestSouthPanels';
 import { FOCUS_SECTORS, GOALS_SECTORS, HABITS_SECTORS, MUSIC_SECTORS, SPORTS_SECTORS, createFocusInterior, createGoalsInterior, createHabitsInterior, createMusicInterior, createSportsInterior, type FocusSector, type GoalsSector, type HabitsSector, type MusicSector, type SportsSector } from './interiors/westsouth';
 import { useHabits } from '@/features/habits/useHabits';
@@ -44,8 +46,8 @@ import { useLanguages } from '@/features/languages/useLanguages';
 import { receptionData } from './receptionData';
 import { ModuleCenter } from './ModuleCenter';
 import { DEFAULT_FAB, FloatingCenterButton, PlacesMenu, type FabPlace } from './ParkUi';
-import { withFloors } from './interiors/floors';
-import { DRUM_PADS, PIANO_KEYS } from './interiors/things';
+import { floorNameKey, withFloors } from './interiors/floors';
+import { DRUM_PADS, GUITAR_CHORDS, GUITAR_STRINGS, PIANO_KEYS, vaultStateOf, type Instrument } from './interiors/things';
 import { clearParkContext, pushRecent, readParkContext, saveParkContext } from './parkContext';
 
 /** Preferências do parque neste aparelho (qualidade é do aparelho; o resto é gosto pessoal). */
@@ -196,7 +198,11 @@ export default function ParkPage() {
   const openPanel = useRef<{ sector: string | null; zone: string | null }>({ sector: null, zone: null });
   openPanel.current = { sector, zone: zoneKey };
   const [elevator, setElevator] = useState(false);
-  const [instrument, setInstrument] = useState<'piano' | 'drums' | null>(null);
+  const [instrument, setInstrument] = useState<Instrument | null>(null);
+  // Cofre de Finanças (térreo do prédio): janela do cofre aberta e chave para recriar os painéis de
+  // Finanças depois de abrir ou trancar pelo cofre (eles leem o bloqueio ao montar).
+  const [vaultPanel, setVaultPanel] = useState(false);
+  const [financeKey, setFinanceKey] = useState(0);
   // Painel no celular: só o título, meia tela ou tela cheia.
   const [sheet, setSheet] = useState<'peek' | 'half' | 'full'>('half');
   const [riding, setRiding] = useState(false);
@@ -268,10 +274,12 @@ export default function ParkPage() {
           setInside(id);
           setSector(null);
           setZoneKey(null);
+          setVaultPanel(false);
         },
         onFloors: (count, current) => setFloors({ count, current }),
         onElevator: () => setElevator(true),
         onInstrument: setInstrument,
+        onVault: () => setVaultPanel(true),
         onRiding: setRiding,
         onTalk: (x) => setTalk({ ...x, at: Date.now() }),
         onZone: (z) => {
@@ -500,6 +508,29 @@ export default function ParkPage() {
     engine.current?.setData('sports', { names: sp ?? [] });
   }, [namesKey]);
 
+  // Cofre de Finanças: segue o bloqueio real de Finanças (o mesmo PIN e o mesmo desbloqueio da tela
+  // de Finanças). Desbloquear ou trancar por um painel do prédio também move a porta (conferido de
+  // tempos em tempos enquanto se está lá dentro).
+  const financePin = useLiveQuery(() => hasFinancePin(), []);
+  const [financeOpen, setFinanceOpen] = useState(isFinanceUnlocked);
+  const vaultState = vaultStateOf(financePin, financeOpen);
+  useEffect(() => {
+    if (inside !== 'finance') return;
+    setFinanceOpen(isFinanceUnlocked());
+    const id = window.setInterval(() => setFinanceOpen(isFinanceUnlocked()), 700);
+    return () => window.clearInterval(id);
+  }, [inside]);
+  const vaultShown = useRef(false);
+  useEffect(() => {
+    if (inside !== 'finance') {
+      vaultShown.current = false;
+      return;
+    }
+    // Ao entrar, a porta já aparece como está; depois, cada mudança abre ou fecha a porta, com som.
+    engine.current?.setVault(vaultState, !vaultShown.current);
+    vaultShown.current = true;
+  }, [inside, vaultState]);
+
   const pick = picked ? buildingById(picked) : null;
   const sectors = inside ? (SECTORS[inside] ?? []) : [];
   const wide = inside && sector ? WIDE.has(`${inside}:${sector}`) : false;
@@ -568,7 +599,7 @@ export default function ParkPage() {
             <PlacesMenu
               title={t(`park.names.${inside}`)}
               floors={Array.from({ length: floors.count }, (_, n) => ({
-                name: t(`park.floorNames.f${n}` as MessageKey),
+                name: t(floorNameKey(inside, n) as MessageKey),
                 current: floors.current === n,
                 onGo: () => (camMode === 'orbit' ? engine.current?.setFloor(n) : engine.current?.rideTo(n)),
                 rooms:
@@ -726,7 +757,7 @@ export default function ParkPage() {
       {/* Andando (primeira e terceira pessoa): controle, botões de correr, pular e interagir, e dica */}
       {camMode !== 'orbit' && !riding && !instrument && !stick.hidden && <Joystick onMove={(x, y) => engine.current?.setMove(x, y)} onRun={(on) => engine.current?.setRun(on, 'stick')} label={t('park.joystick')} size={stick.size} side={stick.side} />}
       {camMode !== 'orbit' && !riding && !instrument && !stick.hidden && <ActionButtons side={stick.side === 'left' ? 'right' : 'left'} engine={engine} canInteract={!!hint || posture !== 'stand' || (!!near && !inside)} />}
-      {camMode !== 'orbit' && !riding && !elevator && !instrument && (hint || posture !== 'stand') && (!near || !!inside) && (
+      {camMode !== 'orbit' && !riding && !elevator && !instrument && !vaultPanel && (hint || posture !== 'stand') && (!near || !!inside) && (
         <InteractPrompt
           kind={posture !== 'stand' ? 'stand' : (hint?.kind ?? 'sit')}
           title={
@@ -739,7 +770,9 @@ export default function ParkPage() {
                     ? t('park.use.room', { name: inside && hint.key ? t(`park.floorRooms.${inside}.${hint.key}` as MessageKey) : '' })
                     : hint.what === 'stairs'
                       ? t(hint.up ? 'park.use.stairsUp' : 'park.use.stairsDown')
-                      : t(`park.use.${hint.what}` as MessageKey)
+                      : hint.what === 'vault'
+                        ? t(vaultState === 'open' ? 'park.use.vaultClose' : 'park.use.vault')
+                        : t(`park.use.${hint.what}` as MessageKey)
                   : hint
                     ? t(`park.hints.${hint.kind}`)
                     : ''
@@ -815,7 +848,7 @@ export default function ParkPage() {
             {inside === 'calendar' && <CalendarPanel id={sector as CalendarSector} />}
             {inside === 'tasks' && <TasksPanel id={sector as TasksSector} />}
             {inside === 'projects' && <ProjectsPanel id={sector as ProjectsSector} />}
-            {inside === 'finance' && <FinancePanel id={sector as FinanceSector} />}
+            {inside === 'finance' && <FinancePanel key={financeKey} id={sector as FinanceSector} />}
             {inside === 'focus' && <FocusPanel id={sector as FocusSector} />}
             {inside === 'habits' && <HabitsPanel id={sector as HabitsSector} />}
             {inside === 'goals' && <GoalsPanel id={sector as GoalsSector} />}
@@ -831,11 +864,46 @@ export default function ParkPage() {
         </div>
       )}
 
-      {instrument && inside && <InstrumentPanel kind={instrument} onPlay={(i) => engine.current?.play(i)} onClose={() => setInstrument(null)} />}
+      {instrument && inside && (
+        <InstrumentPanel
+          kind={instrument}
+          onPlay={(i) => engine.current?.play(i)}
+          onClose={() => {
+            setInstrument(null);
+            engine.current?.closeInstrument();
+          }}
+        />
+      )}
+      {vaultPanel && inside === 'finance' && (
+        <FinanceVaultPanel
+          state={financePin === undefined ? 'loading' : vaultState}
+          onClose={() => setVaultPanel(false)}
+          onOpened={() => {
+            // O bloqueio de Finanças deixou passar: PIN certo (ou o PIN foi removido em "Esqueci o PIN").
+            setVaultPanel(false);
+            setFinanceOpen(isFinanceUnlocked());
+            setFinanceKey((k) => k + 1);
+            void hasFinancePin().then((has) => toast.show(t(has ? 'park.vault.opened' : 'park.vault.pinRemoved'), 'success'));
+          }}
+          onLock={() => {
+            lockFinanceNow();
+            setFinanceOpen(false);
+            setFinanceKey((k) => k + 1);
+            setVaultPanel(false);
+            toast.show(t('park.vault.lockedNow'), 'info');
+          }}
+          onGoToFinance={() => {
+            // O PIN é criado na tela de Finanças (botão "PIN de Finanças"): abre a sala de Finanças aqui mesmo.
+            setVaultPanel(false);
+            setZoneKey(null);
+            setSector('planning');
+          }}
+        />
+      )}
       {elevator && inside && (
         <ElevatorPanel
           floors={Array.from({ length: floors.count }, (_, n) => ({
-            name: t(`park.floorNames.f${n}` as MessageKey),
+            name: t(floorNameKey(inside, n) as MessageKey),
             rooms: n === 0 ? sectors.map((s) => sectorName(inside, s)) : (engine.current?.zones() ?? []).filter((z) => z.level === n).map((z) => t(`park.floorRooms.${inside}.${z.key}` as MessageKey)),
           }))}
           current={floors.current}
@@ -1014,6 +1082,8 @@ const HINT_ICON = { use: Hand, sit: Armchair, view: Mountain, tree: TreePine, wa
 /** Teclas do computador para o piano (Z…M = 1ª oitava, Q…U = 2ª, I = Dó agudo) e para os pads. */
 const PIANO_KEYMAP = 'zsxdcvgbhnjmq2w3er5t6y7ui';
 const DRUM_KEYMAP = 'asdf';
+/** Violão: A…H = as seis cordas (da 6ª, grave, à 1ª, aguda); Z…M = os sete acordes (GUITAR_CHORDS). */
+const GUITAR_KEYMAP = 'asdfghzxcvbnm';
 /** Nome da nota para o leitor de tela (60 = Dó central, C4). */
 const NOTE_NAMES = {
   'pt-BR': ['Dó', 'Dó♯', 'Ré', 'Ré♯', 'Mi', 'Fá', 'Fá♯', 'Sol', 'Sol♯', 'Lá', 'Lá♯', 'Si'],
@@ -1021,8 +1091,11 @@ const NOTE_NAMES = {
 } as const;
 const noteName = (midi: number, locale: keyof typeof NOTE_NAMES) => `${NOTE_NAMES[locale][midi % 12] ?? ''}${Math.floor(midi / 12) - 1}`;
 
-/** Piano (duas oitavas) ou bateria (quatro pads) na tela: cada toque soa e mexe a tecla/peça no 3D. */
-function InstrumentPanel({ kind, onPlay, onClose }: { kind: 'piano' | 'drums'; onPlay: (i: number) => void; onClose: () => void }) {
+/**
+ * Piano (duas oitavas), bateria (quatro pads) ou violão (seis cordas e sete acordes) na tela: cada
+ * toque soa e mexe a tecla/peça no 3D (no violão, a corda tocada vibra).
+ */
+function InstrumentPanel({ kind, onPlay, onClose }: { kind: Instrument; onPlay: (i: number) => void; onClose: () => void }) {
   const { t, settings } = useSettings();
   const [down, setDown] = useState<number | null>(null);
   const hit = (i: number) => {
@@ -1031,7 +1104,7 @@ function InstrumentPanel({ kind, onPlay, onClose }: { kind: 'piano' | 'drums'; o
     window.setTimeout(() => setDown((d) => (d === i ? null : d)), 160);
   };
   useEffect(() => {
-    const map = kind === 'piano' ? PIANO_KEYMAP : DRUM_KEYMAP;
+    const map = kind === 'piano' ? PIANO_KEYMAP : kind === 'drums' ? DRUM_KEYMAP : GUITAR_KEYMAP;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.stopImmediatePropagation();
@@ -1052,7 +1125,7 @@ function InstrumentPanel({ kind, onPlay, onClose }: { kind: 'piano' | 'drums'; o
       <div className="mb-2 flex items-center justify-between gap-2">
         <div className="min-w-0">
           <p className="text-sm font-semibold">{t(`park.instrument.${kind}`)}</p>
-          <p className="hidden truncate text-xs text-white/70 sm:block">{t(kind === 'piano' ? 'park.instrument.pianoHint' : 'park.instrument.drumsHint')}</p>
+          <p className="hidden truncate text-xs text-white/70 sm:block">{t(kind === 'piano' ? 'park.instrument.pianoHint' : kind === 'drums' ? 'park.instrument.drumsHint' : 'park.instrument.guitarHint')}</p>
         </div>
         <button type="button" onClick={onClose} className="flex items-center gap-1 rounded-xl bg-white/15 px-3 py-1.5 text-xs font-semibold ring-1 ring-white/25">
           <X className="h-4 w-4" aria-hidden />
@@ -1094,7 +1167,7 @@ function InstrumentPanel({ kind, onPlay, onClose }: { kind: 'piano' | 'drums'; o
             );
           })}
         </div>
-      ) : (
+      ) : kind === 'drums' ? (
         <div className="grid grid-cols-4 gap-2 select-none touch-none">
           {DRUM_PADS.map((p, i) => (
             <button
@@ -1109,6 +1182,51 @@ function InstrumentPanel({ kind, onPlay, onClose }: { kind: 'piano' | 'drums'; o
               {t(`park.instrument.pads.${p}` as MessageKey)}
             </button>
           ))}
+        </div>
+      ) : (
+        <div className="flex select-none flex-col gap-2 touch-none">
+          {/* As seis cordas como no violão nas mãos: a grave (6ª) em cima, a aguda (1ª) embaixo. */}
+          <div role="group" aria-label={t('park.instrument.strings')} className="rounded-xl bg-[#2A1A10]/90 px-2 py-1 ring-1 ring-white/15">
+            {GUITAR_STRINGS.map((midi, i) => (
+              <button
+                key={i}
+                type="button"
+                aria-label={t('park.instrument.string', { n: GUITAR_STRINGS.length - i, note: noteName(midi, settings.locale) })}
+                onPointerDown={(e) => {
+                  e.preventDefault();
+                  hit(i);
+                }}
+                className="flex h-8 w-full items-center gap-2 rounded-md px-1 hover:bg-white/5"
+              >
+                <span className="w-10 shrink-0 text-left text-[0.7rem] font-semibold tabular-nums text-white/75">{noteName(midi, settings.locale)}</span>
+                <span
+                  aria-hidden
+                  className={cn('block flex-1 rounded-full transition-transform', down === i ? 'translate-y-px bg-amber-200 shadow-[0_0_8px_rgba(253,230,138,0.9)]' : i < 4 ? 'bg-[#C8A26B]' : 'bg-[#DDE2E8]')}
+                  style={{ height: `${3.5 - i * 0.45}px` }}
+                />
+                <kbd className="hidden w-5 shrink-0 text-center text-[0.65rem] text-white/50 sm:block">{GUITAR_KEYMAP[i]?.toUpperCase()}</kbd>
+              </button>
+            ))}
+          </div>
+          <div role="group" aria-label={t('park.instrument.chordsTitle')} className="grid grid-cols-4 gap-1.5 sm:grid-cols-7">
+            {GUITAR_CHORDS.map((c, j) => {
+              const i = GUITAR_STRINGS.length + j;
+              return (
+                <button
+                  key={c.id}
+                  type="button"
+                  onPointerDown={(e) => {
+                    e.preventDefault();
+                    hit(i);
+                  }}
+                  className={cn('flex h-12 flex-col items-center justify-center rounded-xl text-xs font-semibold ring-1 ring-white/30 transition-transform', down === i ? 'scale-95 bg-brand' : 'bg-white/15')}
+                >
+                  {t(`park.instrument.chords.${c.id}`)}
+                  <span className="hidden text-[0.6rem] font-normal text-white/55 sm:block">{GUITAR_KEYMAP[i]?.toUpperCase()}</span>
+                </button>
+              );
+            })}
+          </div>
         </div>
       )}
     </div>

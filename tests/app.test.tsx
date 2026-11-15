@@ -5,6 +5,7 @@ import { App } from '@/App';
 import { RoutigDB, setDbForTests } from '@/data/db';
 import { loadSettings, saveSettings } from '@/data/settingsRepo';
 import { defaultSettings } from '@/domain/settings';
+import { pt } from '@/i18n/pt';
 
 let dbName = '';
 
@@ -198,6 +199,8 @@ describe('ROUTIG Home (V3): a entrada do ecossistema', () => {
     expect(within(nav).getAllByRole('link').map((a) => a.textContent)).toEqual(['Início', 'Control Room', 'Campus', 'District', 'Perfil', 'Configurações', 'Ajuda']);
     expect(await screen.findByRole('heading', { level: 1, name: /^(Bom dia|Boa tarde|Boa noite)!$/ })).toBeInTheDocument();
     for (const name of ['Control Room', 'Campus', 'District']) expect(screen.getByRole('heading', { level: 3, name })).toBeInTheDocument();
+    // A frase do dia aparece embaixo da saudação (uma das frases do Home, sem números).
+    expect(Object.values(pt.home.daily).some((s) => screen.queryByText(s) !== null)).toBe(true);
     // Nada de resumo de tarefas, cobranças ou números de produtividade na entrada.
     expect(screen.queryByText(/atrasad/i)).not.toBeInTheDocument();
     expect(screen.queryByRole('navigation', { name: 'Menu principal' })).not.toBeInTheDocument();

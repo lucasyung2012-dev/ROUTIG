@@ -4,12 +4,15 @@ import { ArrowRight, Compass, LayoutGrid, Star, Trees } from 'lucide-react';
 import { useSettings } from '@/app/SettingsProvider';
 import { CAMPUS_PATH, controlPath, hasControlHistory } from '@/app/experience';
 import { readParkContext } from '@/features/park/parkContext';
+import type { MessageKey } from '@/i18n';
 import { cn } from '@/ui/cn';
 import { usePeriod } from './period';
 
 type Xp = 'control' | 'campus' | 'district';
 const FAV_KEY = 'routig.home.favorite';
 const VISITED_KEY = 'routig.home.visited';
+/** Quantas frases do dia existem em home.daily (d0…d13). */
+const DAILY_COUNT = 14;
 
 function readFav(): Xp | null {
   try {
@@ -62,6 +65,10 @@ export function HomePage() {
   const name = settings.profile.displayName.trim().split(/\s+/)[0] ?? '';
   const hello = t(`home.greeting.${period}`);
   const welcome = returning ? t('home.greeting.back') : t('home.greeting.first');
+  // Frase do dia: muda a cada dia do calendário e é a mesma o dia todo.
+  const now = new Date();
+  const dayIndex = Math.floor((Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()) - Date.UTC(now.getFullYear(), 0, 0)) / 86_400_000) % DAILY_COUNT;
+  const daily = t(`home.daily.d${dayIndex}` as MessageKey);
   const continueControl = hasControlHistory();
   const continueCampus = !!readParkContext();
 
@@ -78,6 +85,7 @@ export function HomePage() {
         <header className="max-w-xl text-center sm:text-left">
           <h1 className="text-3xl font-semibold text-white drop-shadow-[0_2px_10px_rgba(8,11,28,0.6)] sm:text-4xl">{name ? `${hello}, ${name}!` : `${hello}!`}</h1>
           <p className="mt-1.5 text-sm font-medium text-white/90 drop-shadow-[0_1px_8px_rgba(8,11,28,0.7)] sm:text-base">{welcome}</p>
+          <p className="mt-3 inline-block rounded-full bg-[#0B1026]/35 px-3 py-1 text-xs italic text-white/85 ring-1 ring-white/15 backdrop-blur-md sm:text-sm">{daily}</p>
         </header>
 
         <div className="min-h-[4vh] flex-1" />

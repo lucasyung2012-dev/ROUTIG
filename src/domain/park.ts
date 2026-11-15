@@ -304,6 +304,8 @@ function shapedHeight(x: number, z: number): number {
       h = h * (1 - k) + rawHeight(f.x, f.z) * k;
     }
   }
+  // Quanto este ponto já é chão de lote (1 = dentro do lote): o palco não puxa o lote para baixo.
+  let lotK = 0;
   for (const p of PARK_BUILDINGS) {
     const d = Math.hypot(x - p.x, z - p.z);
     // Rampa de 28 m (mais nos lotes grandes) em volta do lote: em encosta, o caminho até a entrada
@@ -312,13 +314,16 @@ function shapedHeight(x: number, z: number): number {
     if (d < p.radius + ramp) {
       const k = 1 - smooth(p.radius * 0.95, p.radius + ramp, d);
       h = h * (1 - k) + lotHeight(p) * k;
+      if (k > lotK) lotK = k;
     }
   }
   // Anfiteatro do palco da música: chão plano num raio de 15 m, voltando ao relevo até 30 m
   // (o palco e a arquibancada ficam no chão, sem afundar, e dá para andar entre eles).
   const dS = Math.hypot(x - STAGE_AT.x, z - STAGE_AT.z);
   if (dS < 30) {
-    const k = 1 - smooth(15, 30, dS);
+    // Vale menos onde já é lote: o lote da Música ficava inclinado e a base e o arco do prédio
+    // ficavam no ar sobre a encosta.
+    const k = (1 - smooth(15, 30, dS)) * (1 - lotK);
     h = h * (1 - k) + rawHeight(STAGE_AT.x, STAGE_AT.z) * k;
   }
   return h;

@@ -1,12 +1,11 @@
-import { useEffect, useState, type ReactElement } from 'react';
+import { useEffect, useState, type CSSProperties, type ReactElement } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowRight, Compass, LayoutGrid, Star, Trees } from 'lucide-react';
 import { useSettings } from '@/app/SettingsProvider';
 import { CAMPUS_PATH, controlPath, hasControlHistory } from '@/app/experience';
 import { readParkContext } from '@/features/park/parkContext';
-import { Logo } from '@/brand/Logo';
 import { cn } from '@/ui/cn';
-import { HomePlaza, type Period } from './HomePlaza';
+import { usePeriod } from './period';
 
 type Xp = 'control' | 'campus' | 'district';
 const FAV_KEY = 'routig.home.favorite';
@@ -21,27 +20,18 @@ function readFav(): Xp | null {
   }
 }
 
-/** Período do dia para a luz da praça e a saudação. */
-function periodOf(h: number): Period {
-  if (h >= 5 && h < 12) return 'morning';
-  if (h >= 12 && h < 18) return 'afternoon';
-  return 'night';
-}
-
-const reducedMotion = () => typeof window !== 'undefined' && (document.documentElement.dataset.motion === 'reduce' || !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches);
-
 /**
- * ROUTIG Home: a tela inicial, como o menu de abertura de um jogo. A praça do ROUTIG (fonte,
- * árvores, gente passando, luz do horário) ocupa a tela como cenário e, por cima, o título, a
- * saudação e as três experiências com a mesma importância. É uma tela 2D; não mostra tarefas,
- * números nem cobranças: produtividade fica no Control Room e no Campus.
+ * ROUTIG Home: a tela inicial, como o menu de abertura de um jogo. O cenário (a praça com a torre de
+ * anéis, a fonte e as letras ROUTIG no canteiro) fica por trás de tudo, desenhado pela moldura
+ * (HomeShell); aqui ficam a saudação e as três experiências, com a mesma importância, em painéis de
+ * vidro. É uma tela 2D; não mostra tarefas, números nem cobranças: produtividade fica no Control Room
+ * e no Campus.
  */
 export function HomePage() {
   const { t, settings } = useSettings();
   const navigate = useNavigate();
   const [fav, setFav] = useState<Xp | null>(readFav);
-  const [period, setPeriod] = useState(() => periodOf(new Date().getHours()));
-  const [still] = useState(reducedMotion);
+  const period = usePeriod();
   const [returning] = useState(() => {
     try {
       return localStorage.getItem(VISITED_KEY) === '1';
@@ -56,8 +46,6 @@ export function HomePage() {
     } catch {
       /* sem armazenamento */
     }
-    const id = window.setInterval(() => setPeriod(periodOf(new Date().getHours())), 60_000);
-    return () => window.clearInterval(id);
   }, []);
 
   const toggleFav = (x: Xp) => {
@@ -77,56 +65,45 @@ export function HomePage() {
   const continueControl = hasControlHistory();
   const continueCampus = !!readParkContext();
 
-  const cards: Array<{ id: Xp; icon: typeof Trees; action: string; go: () => void; badge?: string; accent: string; preview: ReactElement }> = [
-    { id: 'control', icon: LayoutGrid, action: continueControl ? t('home.continue') : t('home.enter'), go: () => navigate(controlPath()), accent: 'from-[#5B5BF7] to-[#8B5CF6]', preview: <ControlPreview /> },
-    { id: 'campus', icon: Trees, action: continueCampus ? t('home.continue') : t('home.enter'), go: () => navigate(CAMPUS_PATH), accent: 'from-[#16A34A] to-[#0EA5E9]', preview: <CampusPreview /> },
-    { id: 'district', icon: Compass, action: t('home.xp.district.action'), go: () => navigate('/district'), badge: t('home.xp.district.badge'), accent: 'from-[#F97316] to-[#DB2777]', preview: <DistrictPreview /> },
+  const cards: Array<{ id: Xp; icon: typeof Trees; action: string; go: () => void; badge?: string; accent: string; glow: string; preview: ReactElement }> = [
+    { id: 'control', icon: LayoutGrid, action: continueControl ? t('home.continue') : t('home.enter'), go: () => navigate(controlPath()), accent: 'from-[#5B5BF7] to-[#8B5CF6]', glow: '139 92 246', preview: <ControlPreview /> },
+    { id: 'campus', icon: Trees, action: continueCampus ? t('home.continue') : t('home.enter'), go: () => navigate(CAMPUS_PATH), accent: 'from-[#16A34A] to-[#0EA5E9]', glow: '45 212 191', preview: <CampusPreview /> },
+    { id: 'district', icon: Compass, action: t('home.xp.district.action'), go: () => navigate('/district'), badge: t('home.xp.district.badge'), accent: 'from-[#F97316] to-[#DB2777]', glow: '251 146 60', preview: <DistrictPreview /> },
   ];
 
   return (
-    <div className="relative isolate min-h-[calc(100dvh-3.5rem)] overflow-hidden md:min-h-[100dvh]">
-      {/* Cenário: a praça cobre a tela; um véu escurece embaixo para o menu ficar legível. */}
-      <div className="absolute inset-0 -z-10">
-        <HomePlaza period={period} still={still} label={t(period === 'night' ? 'home.plazaNight' : 'home.plaza')} className="block h-full w-full" />
-        <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-transparent to-black/55" aria-hidden />
-        <div className="home-dim absolute inset-0 bg-[#0B1026] opacity-0" aria-hidden />
-      </div>
-
-      <div className="mx-auto flex min-h-[calc(100dvh-3.5rem)] w-full max-w-6xl flex-col gap-6 px-4 pb-8 pt-6 sm:px-8 md:min-h-[100dvh] md:pt-10">
-        {/* Título, como na abertura de um jogo, com a saudação. */}
-        <header className="flex flex-col items-center text-center sm:items-start sm:text-left">
-          <div className="flex items-center gap-3 rounded-2xl bg-surface/80 px-4 py-3 shadow-lift ring-1 ring-white/30 backdrop-blur-md">
-            <Logo size={48} className="h-12 w-12 shrink-0" />
-            <div className="min-w-0">
-              <p className="text-lg font-bold tracking-[0.3em] text-fg">{t('app.name')}</p>
-              <p className="text-xs text-muted">{t('app.tagline')}</p>
-            </div>
-          </div>
-          <h1 className="mt-4 text-3xl font-semibold text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.45)] sm:text-4xl">{name ? `${hello}, ${name}!` : `${hello}!`}</h1>
-          <p className="mt-1 text-sm font-medium text-white/90 drop-shadow-[0_1px_6px_rgba(0,0,0,0.5)] sm:text-base">{welcome}</p>
+    <div className="theme-dark relative text-fg">
+      <div className="mx-auto flex min-h-[calc(100dvh-3.5rem)] w-full max-w-6xl flex-col px-4 pb-6 pt-6 sm:px-8 md:min-h-[100dvh] md:pt-10">
+        {/* Saudação, no alto, sobre o céu. */}
+        <header className="max-w-xl text-center sm:text-left">
+          <h1 className="text-3xl font-semibold text-white drop-shadow-[0_2px_10px_rgba(8,11,28,0.6)] sm:text-4xl">{name ? `${hello}, ${name}!` : `${hello}!`}</h1>
+          <p className="mt-1.5 text-sm font-medium text-white/90 drop-shadow-[0_1px_8px_rgba(8,11,28,0.7)] sm:text-base">{welcome}</p>
         </header>
 
-        <div className="flex-1" />
+        <div className="min-h-[4vh] flex-1" />
 
-        {/* Menu: as três experiências. */}
+        {/* Menu: as três experiências, no meio da praça. */}
         <section aria-labelledby="xp-title">
           <h2 id="xp-title" className="sr-only">
             {t('home.xp.title')}
           </h2>
-          <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <ul className="grid gap-3 sm:gap-4 lg:grid-cols-3">
             {cards.map((c, i) => {
               const Icon = c.icon;
               const isFav = fav === c.id;
               return (
                 <li
                   key={c.id}
-                  style={{ animationDelay: `${120 + i * 90}ms` }}
+                  style={{ animationDelay: `${120 + i * 90}ms`, '--card-glow': c.glow } as CSSProperties}
                   className={cn(
-                    'group flex animate-fade-up flex-col overflow-hidden rounded-2xl bg-surface/90 shadow-lift ring-1 backdrop-blur-md transition duration-200 hover:-translate-y-1 hover:shadow-glow motion-reduce:transform-none',
-                    isFav ? 'ring-2 ring-amber/80' : 'ring-white/30',
+                    'group relative flex animate-fade-up overflow-hidden rounded-2xl bg-surface/55 ring-1 backdrop-blur-xl transition duration-300 hover:-translate-y-1 motion-reduce:transform-none lg:flex-col',
+                    'shadow-[0_10px_40px_-12px_rgba(8,11,28,0.7)] hover:shadow-[0_0_36px_-6px_rgb(var(--card-glow)/0.75)]',
+                    isFav ? 'ring-2 ring-amber/80' : 'ring-white/15 hover:ring-[rgb(var(--card-glow)/0.7)]',
                   )}
                 >
-                  <div className={cn('relative h-28 bg-gradient-to-br sm:h-32', c.accent)}>
+                  {/* Borda de luz no alto do painel, na cor da experiência. */}
+                  <span aria-hidden className={cn('pointer-events-none absolute inset-x-0 top-0 z-10 h-px bg-gradient-to-r opacity-90', c.accent)} />
+                  <div className={cn('relative w-28 shrink-0 bg-gradient-to-br sm:w-36 lg:h-28 lg:w-auto', c.accent)}>
                     {c.preview}
                     <button
                       type="button"
@@ -138,16 +115,22 @@ export function HomePage() {
                     >
                       <Star className={cn('h-4 w-4', isFav && 'fill-amber text-amber')} aria-hidden />
                     </button>
-                    {c.badge && <span className="absolute left-3 top-3 rounded-full bg-black/35 px-2.5 py-1 text-[0.7rem] font-semibold text-white backdrop-blur">{c.badge}</span>}
-                    {isFav && !c.badge && <span className="absolute left-3 top-3 rounded-full bg-black/35 px-2.5 py-1 text-[0.7rem] font-semibold text-white backdrop-blur">{t('home.favoriteOn')}</span>}
+                    {c.badge && <span className="absolute bottom-2 left-2 rounded-full bg-black/35 px-2.5 py-1 text-[0.7rem] font-semibold text-white backdrop-blur lg:bottom-auto lg:left-3 lg:top-3">{c.badge}</span>}
+                    {isFav && !c.badge && <span className="absolute left-3 top-3 hidden rounded-full bg-black/35 px-2.5 py-1 text-[0.7rem] font-semibold text-white backdrop-blur lg:inline">{t('home.favoriteOn')}</span>}
                   </div>
-                  <div className="flex flex-1 flex-col gap-2 p-4">
-                    <h3 className="flex items-center gap-2 text-lg font-semibold text-fg">
-                      <Icon className="h-5 w-5 text-accent" aria-hidden />
+                  <div className="flex min-w-0 flex-1 flex-col gap-1.5 p-3.5 sm:p-4">
+                    <h3 className="flex items-center gap-2 text-lg font-semibold text-white">
+                      <span className={cn('flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br text-white shadow-[0_0_14px_-2px_rgb(var(--card-glow)/0.8)]', c.accent)}>
+                        <Icon className="h-4 w-4" aria-hidden />
+                      </span>
                       {t(`home.xp.${c.id}.name`)}
                     </h3>
-                    <p className="flex-1 text-sm text-muted">{t(`home.xp.${c.id}.desc`)}</p>
-                    <button type="button" onClick={c.go} className="mt-1 inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-brand px-4 text-sm font-semibold text-white shadow-glow transition hover:brightness-110 active:scale-[0.98]">
+                    <p className="flex-1 text-sm text-white/75">{t(`home.xp.${c.id}.desc`)}</p>
+                    <button
+                      type="button"
+                      onClick={c.go}
+                      className={cn('mt-1 inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-gradient-to-r px-4 text-sm font-semibold text-white shadow-[0_0_20px_-6px_rgb(var(--card-glow)/0.9)] transition hover:brightness-110 active:scale-[0.98]', c.accent)}
+                    >
                       {c.action}
                       <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" aria-hidden />
                     </button>
@@ -157,6 +140,9 @@ export function HomePage() {
             })}
           </ul>
         </section>
+
+        {/* Espaço livre embaixo: a fonte e as letras ROUTIG no canteiro aparecem por baixo do menu. */}
+        <div aria-hidden className="hidden md:block md:h-[26vh]" />
       </div>
     </div>
   );

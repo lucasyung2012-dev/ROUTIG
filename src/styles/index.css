@@ -59,7 +59,9 @@
   }
 }
 
-:root[data-theme='dark'] {
+/* .theme-dark: o mesmo tema escuro aplicado só a um trecho (a barra e o menu de vidro do Home). */
+:root[data-theme='dark'],
+.theme-dark {
   --bg: 8 11 28;
   --surface: 14 18 40;
   --surface-2: 21 26 52;

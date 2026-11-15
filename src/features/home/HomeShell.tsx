@@ -6,6 +6,7 @@ import { CAMPUS_PATH, controlPath } from '@/app/experience';
 import { Logo } from '@/brand/Logo';
 import { IconButton } from '@/ui/IconButton';
 import { cn } from '@/ui/cn';
+import { HomeBackdrop } from './HomeBackdrop';
 
 interface NavDef {
   to: string;
@@ -25,6 +26,8 @@ export function HomeShell() {
   const [open, setOpen] = useState(false);
   const location = useLocation();
   useEffect(() => setOpen(false), [location.pathname]);
+  // No Início, a praça cobre a tela inteira e a barra lateral vira um painel de vidro escuro por cima.
+  const home = location.pathname === '/';
 
   const main: NavDef[] = [
     { to: '/', label: t('home.nav.home'), icon: <Home className="h-[19px] w-[19px]" />, end: true },
@@ -68,11 +71,12 @@ export function HomeShell() {
   );
 
   return (
-    <div className="ambient flex h-full">
+    <div className={cn('ambient relative isolate flex h-full', home && 'bg-[#0B1026]')}>
+      {home && <HomeBackdrop />}
       <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[70] focus:rounded-lg focus:bg-surface focus:px-4 focus:py-2">
         {t('app.skipToContent')}
       </a>
-      <aside className={cn('relative hidden shrink-0 border-r border-line/70 bg-surface/70 backdrop-blur-xl transition-[width] duration-300 md:block', collapsed ? 'w-[76px]' : 'w-[248px]')}>
+      <aside className={cn('relative hidden shrink-0 border-r transition-[width] duration-300 md:block', home ? 'theme-dark border-white/10 bg-surface/55 text-fg shadow-[8px_0_40px_rgba(8,11,28,0.35)] backdrop-blur-2xl' : 'border-line/70 bg-surface/70 backdrop-blur-xl', collapsed ? 'w-[76px]' : 'w-[248px]')}>
         {content(collapsed)}
         <IconButton
           label={collapsed ? t('nav.expand') : t('nav.collapse')}
@@ -85,15 +89,15 @@ export function HomeShell() {
       {open && (
         <div className="fixed inset-0 z-40 md:hidden">
           <div className="absolute inset-0 bg-bg/70 backdrop-blur-sm" onClick={() => setOpen(false)} aria-hidden />
-          <aside className="absolute inset-y-0 left-0 w-[268px] max-w-[85vw] animate-[fade-up_220ms_ease-out_both] bg-surface shadow-lift safe-top">
+          <aside className={cn('absolute inset-y-0 left-0 w-[268px] max-w-[85vw] animate-[fade-up_220ms_ease-out_both] bg-surface text-fg shadow-lift safe-top', home && 'theme-dark')}>
             <IconButton label={t('nav.closeMenu')} icon={<X className="h-5 w-5" />} onClick={() => setOpen(false)} className="absolute right-2 top-3" />
             {content(false)}
           </aside>
         </div>
       )}
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="relative flex min-w-0 flex-1 flex-col">
         {/* iPhone: barra compacta com o menu e o logo (o logo sempre volta ao Início). */}
-        <header className="flex h-14 shrink-0 items-center gap-2 border-b border-line/60 bg-bg/70 px-3 backdrop-blur-xl safe-top md:hidden">
+        <header className={cn('flex h-14 shrink-0 items-center gap-2 border-b px-3 backdrop-blur-xl safe-top md:hidden', home ? 'theme-dark border-white/10 bg-surface/55 text-fg' : 'border-line/60 bg-bg/70')}>
           <IconButton label={t('nav.openMenu')} icon={<Menu className="h-5 w-5" />} onClick={() => setOpen(true)} />
           <NavLink to="/" end aria-label={t('home.nav.home')} className="flex items-center gap-2">
             <Logo size={26} className="h-[26px] w-[26px]" />
@@ -102,7 +106,7 @@ export function HomeShell() {
         </header>
         <main id="main" tabIndex={-1} className="flex-1 overflow-y-auto focus:outline-none">
           {/* Início: tela de menu com o cenário de ponta a ponta. Demais páginas: conteúdo centralizado. */}
-          {location.pathname === '/' ? (
+          {home ? (
             <Outlet />
           ) : (
             <div key={location.pathname} className="mx-auto w-full max-w-6xl animate-fade-up px-4 pb-16 pt-6 sm:px-8 sm:pt-8">

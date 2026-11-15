@@ -735,6 +735,8 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
         sample: [...found.filter((f) => f.kind === "árvore").slice(0, 15), ...found.filter((f) => f.kind === "arbusto").slice(0, 15), ...found.filter((f) => f.kind === "flor").slice(0, 15)],
       });
     }
+    // 'gardens': onde ficou o jardim de cada prédio, em data-gardens.
+    if (cmd === 'gardens') document.documentElement.dataset.gardens = JSON.stringify(world.gardens.map((g) => ({ ...g, x: Math.round(g.x), z: Math.round(g.z) })));
     // 'cam:x,y,z,tx,ty,tz': câmera livre exatamente nesse ponto, olhando para o alvo.
     if (typeof cmd === 'string' && cmd.startsWith('cam:') && !inside) {
       const v = cmd.slice(4).split(',').map(Number);

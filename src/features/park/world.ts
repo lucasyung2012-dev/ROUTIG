@@ -180,6 +180,8 @@ export interface World {
   obstacles: Obstacle[];
   pickables: THREE.Object3D[];
   seats: Seat[];
+  /** Onde ficou o jardim de cada prédio e quantas peças couberam (para o debug). */
+  gardens: Array<{ id: string; x: number; z: number; pieces: number }>;
   /** Anima o parquinho (balanços e gangorra). */
   play: (s: Array<{ swings: number[]; seesaw: number }>) => void;
   /** Sons da rua deste quadro (ônibus freando, buzina). */
@@ -1073,6 +1075,7 @@ export function createWorld(kit: Kit): World {
     pickables: [...buildings.values()].map((b) => b.group),
     // Todos os bancos do parque servem para sentar (inclusive os da praça).
     seats: [...am.seats, ...plazaSeats(), ...pgs.flatMap((p) => p.seats), ...gd.seats],
+    gardens: gd.sites,
     play: (st) => st.forEach((s, i) => pgs[i]?.tick(s)),
     cityEvents: () => streets?.events() ?? [],
     bus: () => streets?.bus() ?? null,

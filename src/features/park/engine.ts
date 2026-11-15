@@ -682,6 +682,16 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
       rig.place(th.x, th.z + 0.4, Math.PI);
       useThing(th);
     }
+    // 'use:<tipo>' (dentro de um prédio): vai até a coisa desse tipo no andar atual e usa (cofre, violão...).
+    if (typeof cmd === 'string' && cmd.startsWith('use:') && inside) {
+      const kind = cmd.slice(4);
+      const it = inside.scene.floors?.things.find((o) => o.kind === kind && o.level === level);
+      document.documentElement.dataset.use = it ? kind : 'none';
+      if (it) {
+        rig.place(it.x, it.z + 0.4, Math.PI);
+        useThing(it);
+      }
+    }
     // 'probe:x,z': o que existe na vertical desse ponto (de cima para baixo), em data-probe.
     if (typeof cmd === 'string' && cmd.startsWith('probe:')) {
       const [px, pz] = cmd.slice(6).split(',').map(Number);

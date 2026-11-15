@@ -8,7 +8,7 @@ import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment
 import type { ModuleId } from '@/app/modules';
 import { LAKE, PARK_BUILDINGS, PARK_RADIUS, TERRAIN, onBridge, PLAYGROUNDS, PLAZA_RADIUS, PONDS, heightAt, inWater, onPath } from '@/domain/park';
 import { Kit } from './kit';
-import { createCameraRig, type CamMode, type MoveSettings, type Posture } from './camera';
+import { createCameraRig, type CamMode, type MoveSettings, type Posture, type Seat } from './camera';
 import { AVATAR_LOOK, createCrowd, type Figure } from './people';
 import { createTown } from './town';
 import type { Conditions } from '@/domain/parkPeople';
@@ -529,6 +529,9 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
       // Objetos funcionais do próprio térreo (o cofre de Finanças) entram na lista dos andares.
       const own = scene.scene.userData.things as Thing[] | undefined;
       if (own?.length && scene.floors) scene.floors.things.push(...own);
+      // Bancos, sofás e cadeiras do térreo (cada interior anota em userData.seats): dá para sentar.
+      const ownSeats = scene.scene.userData.seats as Seat[] | undefined;
+      if (ownSeats?.length && scene.floors) scene.floors.seats.push(...ownSeats);
       // Colisão do térreo pelo desenho (móveis, balcões, paredes), além dos obstáculos do próprio interior.
       scene.obstacles.push(...footprint(scene.scene, () => 0, 0.3, 1.45, 0.5));
       ikit.glowing.forEach((m) => (m.emissiveIntensity = 1));
@@ -668,8 +671,13 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
   let instrument: Thing | null = null;
   const thingCtx: ThingCtx = { note: (m, tb, delay) => audio?.note(m, tb, delay) };
   const floorSeat = (p: { x: number; z: number }) => {
-    const lv = inside?.scene.floors?.levels[level];
-    return lv ? near2(inside!.scene.floors!.seats.filter((s) => Math.abs(s.y - 0.45 - lv.y) < 0.5), p, 1.8) : null;
+    const sc = inside?.scene;
+    if (!sc) return null;
+    const lv = sc.floors?.levels[level];
+    if (lv) return near2(sc.floors!.seats.filter((s) => Math.abs(s.y - 0.45 - lv.y) < 0.5), p, 1.8);
+    // Prédio só de térreo (Habits): os bancos que o próprio interior anotou.
+    const own = sc.scene.userData.seats as Seat[] | undefined;
+    return level === 0 && own?.length ? near2(own, p, 1.8) : null;
   };
   const findHint = (): Hint | null => {
     if (rig.posture() !== 'stand') return null;

@@ -285,8 +285,27 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
   const fit = (v: { cam: THREE.Vector3; target: THREE.Vector3 }) => {
     // Tela em pé (iPhone) mostra menos na largura: a câmera recua para caber.
     const k = camera.aspect < 0.9 ? 1 + (0.9 - camera.aspect) * 0.9 : 1;
-    return { cam: v.target.clone().add(v.cam.clone().sub(v.target).multiplyScalar(k)), target: v.target };
+    const cam = v.target.clone().add(v.cam.clone().sub(v.target).multiplyScalar(k));
+    // Dentro do prédio: se entre o alvo e a câmera houver laje, galeria ou mezanino (opacos), a
+    // câmera fica logo abaixo dela — senão a vista mostra o piso da galeria e esconde o térreo.
+    if (inside) {
+      const dir = cam.clone().sub(v.target);
+      const len = dir.length();
+      if (len > 0.5) {
+        fitRay.set(v.target, dir.normalize());
+        fitRay.far = len;
+        const hit = fitRay.intersectObjects(inside.scene.scene.children, true).find((h) => {
+          if (h.object.userData.outdoorOnly) return false;
+          for (let o: THREE.Object3D | null = h.object; o; o = o.parent) if (o.userData.outdoorOnly || !o.visible) return false;
+          const m = (h.object as THREE.Mesh).material as THREE.Material | THREE.Material[] | undefined;
+          return !!m && !(Array.isArray(m) ? m.some((x) => x.transparent) : m.transparent);
+        });
+        if (hit) return { cam: v.target.clone().add(dir.multiplyScalar(Math.max(1, hit.distance - 0.6))), target: v.target };
+      }
+    }
+    return { cam, target: v.target };
   };
+  const fitRay = new THREE.Raycaster();
 
   const focusSector = (id: string) => {
     if (!inside) return;

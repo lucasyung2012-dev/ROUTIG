@@ -67,7 +67,9 @@ describe('parque V2.1: arquitetura de cada prédio', () => {
     const plans = new Set(Object.values(FORMS).map((f) => f.plan));
     const facades = new Set(Object.values(FORMS).map((f) => f.facade));
     expect(plans.size).toBe(6);
-    expect(facades.size).toBe(6);
+    // Só os materiais do prompt (seção 11: pedra, madeira, concreto, vidro, metal): sem tijolo.
+    expect(facades.has('brick')).toBe(false);
+    expect(facades.size).toBe(5);
     expect(Object.keys(FORMS).sort()).toEqual(Object.keys(FLOOR_PLANS).sort());
   });
 

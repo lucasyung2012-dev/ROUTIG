@@ -97,7 +97,7 @@ export function HomeShell() {
       )}
       <div className="relative flex min-w-0 flex-1 flex-col">
         {/* iPhone: barra compacta com o menu e o logo (o logo sempre volta ao Início). */}
-        <header className={cn('flex h-14 shrink-0 items-center gap-2 border-b px-3 backdrop-blur-xl safe-top md:hidden', home ? 'theme-dark border-white/10 bg-surface/55 text-fg' : 'border-line/60 bg-bg/70')}>
+        <header className={cn('flex safe-h-14 shrink-0 items-center gap-2 border-b px-3 backdrop-blur-xl safe-top md:hidden', home ? 'theme-dark border-white/10 bg-surface/55 text-fg' : 'border-line/60 bg-bg/70')}>
           <IconButton label={t('nav.openMenu')} icon={<Menu className="h-5 w-5" />} onClick={() => setOpen(true)} />
           <NavLink to="/" end aria-label={t('home.nav.home')} className="flex items-center gap-2">
             <Logo size={26} className="h-[26px] w-[26px]" />

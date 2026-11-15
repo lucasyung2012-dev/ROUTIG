@@ -141,6 +141,10 @@ body {
    precisam valer juntos, use max(): pb-[max(1rem,env(safe-area-inset-bottom))]. */
 @layer components {
   .safe-top { padding-top: env(safe-area-inset-top, 0px); }
+  /* Barra de altura fixa que também reserva a faixa do relógio/câmera do iPhone (app na tela inicial):
+     a altura cresce junto com o recuo, em vez de o recuo espremer o conteúdo. */
+  .safe-h-14 { height: calc(3.5rem + env(safe-area-inset-top, 0px)); }
+  .safe-h-16 { height: calc(4rem + env(safe-area-inset-top, 0px)); }
   .safe-bottom { padding-bottom: env(safe-area-inset-bottom, 0px); }
 }
 

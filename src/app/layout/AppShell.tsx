@@ -107,7 +107,7 @@ function Shell() {
       <Sidebar mobileOpen={menuOpen} onCloseMobile={() => setMenuOpen(false)} />
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-2 border-b border-line/60 bg-bg/70 px-3 backdrop-blur-xl safe-top sm:px-6">
+        <header className="sticky top-0 z-30 flex safe-h-16 shrink-0 items-center gap-2 border-b border-line/60 bg-bg/70 px-3 backdrop-blur-xl safe-top sm:px-6">
           <IconButton label={t('nav.openMenu')} icon={<Menu className="h-5 w-5" />} onClick={() => setMenuOpen(true)} className="md:hidden" />
           <Link to="/" className="hidden items-center gap-2 sm:flex md:hidden" aria-label={t('home.nav.home')}>
             <Logo size={28} className="h-7 w-7" />

@@ -80,7 +80,7 @@ export function HomePage() {
 
   return (
     <div className="theme-dark relative text-fg">
-      <div className="mx-auto flex min-h-[calc(100dvh-3.5rem)] w-full max-w-6xl flex-col px-4 pb-6 pt-6 sm:px-8 md:min-h-[100dvh] md:pt-10">
+      <div className="mx-auto flex min-h-[calc(100dvh-3.5rem-env(safe-area-inset-top,0px))] w-full max-w-6xl flex-col px-4 pb-6 pt-6 sm:px-8 md:min-h-[100dvh] md:pt-10">
         {/* Saudação, no alto, sobre o céu. */}
         <header className="max-w-xl text-center sm:text-left">
           <h1 className="text-3xl font-semibold text-white drop-shadow-[0_2px_10px_rgba(8,11,28,0.6)] sm:text-4xl">{name ? `${hello}, ${name}!` : `${hello}!`}</h1>

@@ -634,7 +634,7 @@ export default function ParkPage() {
 
       {/* Opções do ambiente */}
       {options && (
-        <div className="absolute right-3 top-[4.25rem] z-10 flex max-h-[calc(100%-6rem)] w-72 flex-col gap-3 overflow-y-auto rounded-2xl bg-surface p-4 shadow-lift ring-1 ring-line safe-top" role="dialog" aria-label={t('park.options')}>
+        <div className="absolute right-3 top-[calc(4.25rem+env(safe-area-inset-top,0px))] z-10 flex max-h-[calc(100%-6rem-env(safe-area-inset-top,0px))] w-72 flex-col gap-3 overflow-y-auto rounded-2xl bg-surface p-4 shadow-lift ring-1 ring-line" role="dialog" aria-label={t('park.options')}>
           <div className="-mb-1 flex items-center justify-between gap-2">
             <h2 className="text-sm font-semibold text-fg">{t('park.options')}</h2>
             <IconButton size="sm" label={t('common.close')} icon={<X className="h-4 w-4" />} onClick={() => setOptions(false)} />
@@ -820,7 +820,7 @@ export default function ParkPage() {
           className={cn(
             'absolute inset-x-2 bottom-2 z-20 mx-auto flex flex-col rounded-2xl bg-surface shadow-lift ring-1 ring-line safe-bottom',
             sheet === 'peek' ? 'max-h-[4.5rem]' : sheet === 'full' ? 'max-h-[85vh]' : 'max-h-[42vh]',
-            wide ? 'max-w-4xl md:inset-x-6 md:bottom-4 md:max-h-[calc(100%-10rem)]' : 'max-w-lg sm:bottom-auto sm:left-auto sm:right-3 sm:top-[4.5rem] sm:mx-0 sm:max-h-[calc(100%-6rem)] sm:w-[26rem]',
+            wide ? 'max-w-4xl md:inset-x-6 md:bottom-4 md:max-h-[calc(100%-10rem)]' : 'max-w-lg sm:bottom-auto sm:left-auto sm:right-3 sm:top-[calc(4.5rem+env(safe-area-inset-top,0px))] sm:mx-0 sm:max-h-[calc(100%-6rem)] sm:w-[26rem]',
           )}
           aria-label={sectorName(inside, sector)}
         >
@@ -859,7 +859,7 @@ export default function ParkPage() {
       )}
 
       {minimap && !inside && !options && (
-        <div className="absolute right-3 top-[4.5rem] safe-top">
+        <div className="absolute right-3 top-[calc(4.5rem+env(safe-area-inset-top,0px))]">
           <Minimap engine={engine} onPick={setPicked} />
         </div>
       )}
@@ -1308,7 +1308,7 @@ function FocusParkPill({ onOpen }: { onOpen: () => void }) {
   const clock = formatClock(timer.waiting ? (timer.phaseMs ?? 0) : (remaining ?? phaseElapsed(timer, now)));
   const paused = timer.runningSince === null;
   return (
-    <div className="absolute left-3 top-[4.5rem] z-10 flex max-w-[calc(100%-13rem)] flex-wrap items-center gap-1 rounded-2xl bg-surface/95 p-1.5 pl-3 text-sm shadow-lg ring-1 ring-line safe-top" role="status">
+    <div className="absolute left-3 top-[calc(4.5rem+env(safe-area-inset-top,0px))] z-10 flex max-w-[calc(100%-13rem)] flex-wrap items-center gap-1 rounded-2xl bg-surface/95 p-1.5 pl-3 text-sm shadow-lg ring-1 ring-line" role="status">
       <button type="button" onClick={onOpen} className="font-semibold tabular text-accent" aria-label={t('park.focusOpen')}>
         {t('modules.focus')} {clock}
       </button>

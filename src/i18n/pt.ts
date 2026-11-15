@@ -4480,6 +4480,23 @@ export const pt = {
       confirm: 'Apagar tudo deste aparelho',
       failed: 'Não deu para apagar. Feche o ROUTIG em outras abas e tente de novo.',
     },
+    /** Apagar em todos os aparelhos (com a sincronização ligada). */
+    eraseAll: {
+      title: 'Apagar os dados em todos os aparelhos',
+      intro: 'Deixa o ROUTIG como novo neste aparelho, na cópia sincronizada e em todos os aparelhos conectados. Os aparelhos continuam conectados, só que vazios. Não tem como desfazer.',
+      open: 'Apagar em todos os aparelhos…',
+      whatGoes: 'Vai ser apagado:',
+      items: {
+        records: 'Todos os registros de todos os módulos, neste aparelho',
+        files: 'Todos os arquivos (fotos, PDFs, áudios, partituras)',
+        cloud: 'A cópia sincronizada na nuvem (a pasta do ROUTIG no Dropbox ou no Google Drive)',
+        others: 'Os dados dos outros aparelhos conectados, na próxima vez que cada um sincronizar',
+      },
+      stays: 'Não é apagado: a conexão da sincronização e o código de recuperação (os aparelhos seguem ligados) e os arquivos de backup que você exportou para Arquivos.',
+      understand: 'Entendo que isso apaga tudo em todos os aparelhos conectados e não pode ser desfeito.',
+      confirm: 'Apagar em todos os aparelhos',
+      failed: 'Não deu para apagar. Confira a internet e a conexão da sincronização e tente de novo.',
+    },
     lock: {
       title: 'ROUTIG bloqueado',
       body: 'Digite o PIN para continuar.',

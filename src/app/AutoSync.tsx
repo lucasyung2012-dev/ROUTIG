@@ -31,6 +31,10 @@ export function AutoSync() {
       }
       running = true;
       void syncNow(s, false)
+        .then((r) => {
+          // Outro aparelho apagou tudo: a tela recomeça do zero (os dados daqui já foram apagados).
+          if (r.reset) window.location.reload();
+        })
         .catch(() => undefined)
         .finally(() => {
           running = false;

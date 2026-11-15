@@ -3,7 +3,8 @@ import { webcrypto } from 'node:crypto';
 import { DB_SCHEMA_VERSION, getDb, RoutigDB, setDbForTests } from '@/data/db';
 import { createTask } from '@/data/tasksRepo';
 import { emptyTaskInput } from '@/domain/tasks';
-import { listDevices, loadSyncState, removeDevice, syncNow, type SyncState } from '@/data/syncRepo';
+import { eraseEverywhere, listDevices, loadSyncState, removeDevice, syncNow, type SyncState } from '@/data/syncRepo';
+import { latestReset, mustReset, resetFileName } from '@/domain/sync';
 import { encryptText, exportKey, newDataKey } from '@/services/syncCrypto';
 
 if (!globalThis.crypto?.subtle) Object.defineProperty(globalThis, 'crypto', { value: webcrypto, configurable: true });
@@ -119,5 +120,44 @@ describe('sincronização: só baixa e envia o que mudou', () => {
     expect(dbx.store.has('/routig-device-velho.json')).toBe(false);
     expect((await listDevices(s)).map((d) => d.id)).toEqual(['novo', 'ipad']);
     await expect(removeDevice(s, 'novo')).rejects.toThrow('is-current');
+  });
+  it('apagar em todos os aparelhos: limpa a nuvem e este aparelho; o outro aparelho apaga ao sincronizar', async () => {
+    const dbx = fakeDropbox();
+    vi.stubGlobal('fetch', dbx.fetchMock);
+    const key = await newDataKey();
+    // Aparelho A com dados, já sincronizado.
+    await createTask({ ...emptyTaskInput(), title: 'Teste do A' });
+    let a: SyncState = { ...loadSyncState(), provider: 'dropbox', dbxKey: 'appkey', dbxRefresh: 'refresh-erase', deviceId: 'devA', key: await exportKey(key) };
+    a = (await syncNow(a)).state;
+    dbx.store.set('/routig-file-anexo.bin', { text: 'x', rev: 1 });
+    dbx.store.set('/routig-key.json', { text: 'chave', rev: 1 });
+
+    a = await eraseEverywhere(a);
+    expect(await getDb().tasks.count()).toBe(0);
+    const names = [...dbx.store.keys()].map((n) => n.slice(1));
+    // Fica só a chave (todos seguem conectados) e a marca de apagamento.
+    expect(names.filter((n) => !n.startsWith('routig-reset-'))).toEqual(['routig-key.json']);
+    expect(latestReset(names)).toBe(a.resetSeen);
+
+    // Aparelho B, que ainda tinha dados: na próxima sincronização apaga os dele e não traz nada de volta.
+    setDbForTests(new RoutigDB(`test-syncflow-b-${Math.random().toString(36).slice(2)}`));
+    await createTask({ ...emptyTaskInput(), title: 'Teste do B' });
+    const b: SyncState = { ...a, deviceId: 'devB', resetSeen: 0, seen: {}, sentSeq: 0 };
+    const r = await syncNow(b);
+    expect(r.reset).toBe(true);
+    expect(await getDb().tasks.count()).toBe(0);
+    expect(r.state.resetSeen).toBe(a.resetSeen);
+    // Já cumprida: a mesma marca não apaga de novo.
+    await createTask({ ...emptyTaskInput(), title: 'Novo depois' });
+    expect((await syncNow(r.state)).reset).toBe(false);
+    expect(await getDb().tasks.count()).toBe(1);
+  });
+
+  it('marca de apagamento: só vale a mais nova, e só se este aparelho ainda não cumpriu', () => {
+    expect(latestReset(['routig-key.json', resetFileName(100), resetFileName(250), 'routig-device-a.json'])).toBe(250);
+    expect(latestReset(['routig-key.json'])).toBe(0);
+    expect(mustReset(250, 100)).toBe(true);
+    expect(mustReset(250, 250)).toBe(false);
+    expect(mustReset(0, 0)).toBe(false);
   });
 });

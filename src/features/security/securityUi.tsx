@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { AlertTriangle, Download, Lock, Trash2 } from 'lucide-react';
 import { useSettings } from '@/app/SettingsProvider';
+import { eraseEverywhere, type SyncState } from '@/data/syncRepo';
 import { PinError, eraseAllData, loadSecurity, removeAppPin, setAppPin, setLockAfter } from '@/data/securityRepo';
 import { LOCK_AFTER, isValidPin, type LockAfter } from '@/domain/security';
 import { ExportBackupDialog } from '@/features/backup/BackupPasswordDialogs';
@@ -161,8 +162,10 @@ function AppPinDialog({ has, onClose }: { has: boolean; onClose: () => void }) {
 /**
  * Apagar todos os dados deste aparelho, com confirmação forte: marcar que
  * entendeu e digitar a palavra. Depois, o app recomeça do zero.
+ * Com `everywhere` (sincronização ligada): apaga também a cópia da nuvem e manda os outros
+ * aparelhos apagarem na próxima sincronização; os aparelhos continuam conectados.
  */
-export function EraseForm({ allowExport }: { allowExport: boolean }) {
+export function EraseForm({ allowExport, everywhere }: { allowExport: boolean; everywhere?: SyncState }) {
   const { t } = useSettings();
   const toast = useToast();
   const [understood, setUnderstood] = useState(false);
@@ -174,23 +177,26 @@ export function EraseForm({ allowExport }: { allowExport: boolean }) {
   const erase = async () => {
     setBusy(true);
     try {
-      await eraseAllData();
+      if (everywhere) await eraseEverywhere(everywhere);
+      else await eraseAllData();
       window.location.hash = '#/';
       window.location.reload();
     } catch {
       setBusy(false);
-      toast.show(t('security.erase.failed'), 'error');
+      toast.show(t(everywhere ? 'security.eraseAll.failed' : 'security.erase.failed'), 'error');
     }
   };
+  const items = everywhere ? (['records', 'files', 'cloud', 'others'] as const).map((k) => t(`security.eraseAll.items.${k}`)) : (['records', 'files', 'snapshots', 'settings'] as const).map((k) => t(`security.erase.items.${k}`));
   return (
     <div className="flex flex-col gap-3 text-sm">
-      <p className="font-medium text-fg">{t('security.erase.whatGoes')}</p>
+      {everywhere && <p className="text-fg">{t('security.eraseAll.intro')}</p>}
+      <p className="font-medium text-fg">{t(everywhere ? 'security.eraseAll.whatGoes' : 'security.erase.whatGoes')}</p>
       <ul className="flex list-disc flex-col gap-1 pl-5 text-fg">
-        {(['records', 'files', 'snapshots', 'settings'] as const).map((k) => (
-          <li key={k}>{t(`security.erase.items.${k}`)}</li>
+        {items.map((label) => (
+          <li key={label}>{label}</li>
         ))}
       </ul>
-      <p className="text-muted">{t('security.erase.stays')}</p>
+      <p className="text-muted">{t(everywhere ? 'security.eraseAll.stays' : 'security.erase.stays')}</p>
       {allowExport && (
         <Button
           variant="secondary"
@@ -204,13 +210,13 @@ export function EraseForm({ allowExport }: { allowExport: boolean }) {
       {exporting && <ExportBackupDialog source={{ kind: 'now' }} onClose={() => setExporting(false)} />}
       <label className="flex items-start gap-3 text-fg">
         <input type="checkbox" checked={understood} onChange={(e) => setUnderstood(e.target.checked)} className="mt-0.5 h-4 w-4 accent-[rgb(var(--danger))]" />
-        {t('security.erase.understand')}
+        {t(everywhere ? 'security.eraseAll.understand' : 'security.erase.understand')}
       </label>
       <Field label={t('security.erase.typeWord', { word: t('security.erase.word') })}>
         {(id) => <Input id={id} autoComplete="off" autoCapitalize="characters" value={word} onChange={(e) => setWord(e.target.value)} />}
       </Field>
       <Button variant="danger" icon={<Trash2 className="h-4 w-4" />} loading={busy} disabled={!ready || busy} onClick={() => void erase()}>
-        {t('security.erase.confirm')}
+        {t(everywhere ? 'security.eraseAll.confirm' : 'security.erase.confirm')}
       </Button>
     </div>
   );

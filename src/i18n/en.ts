@@ -4482,6 +4482,23 @@ export const en: Messages = {
       confirm: 'Erase everything on this device',
       failed: 'Could not erase. Close ROUTIG in other tabs and try again.',
     },
+    /** Erase on every device (with sync on). */
+    eraseAll: {
+      title: 'Erase the data on every device',
+      intro: 'Resets ROUTIG on this device, in the synced copy and on every connected device. Devices stay connected, just empty. This cannot be undone.',
+      open: 'Erase on every device…',
+      whatGoes: 'This will be erased:',
+      items: {
+        records: 'Every record of every module, on this device',
+        files: 'Every file (photos, PDFs, audio, sheet music)',
+        cloud: 'The synced copy in the cloud (the ROUTIG folder in Dropbox or Google Drive)',
+        others: 'The data on the other connected devices, the next time each one syncs',
+      },
+      stays: 'Not erased: the sync connection and the recovery code (devices stay connected) and the backup files you exported to Files.',
+      understand: 'I understand this erases everything on every connected device and cannot be undone.',
+      confirm: 'Erase on every device',
+      failed: 'Could not erase. Check the internet and the sync connection and try again.',
+    },
     lock: {
       title: 'ROUTIG is locked',
       body: 'Enter the PIN to continue.',

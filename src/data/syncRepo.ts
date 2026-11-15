@@ -8,7 +8,8 @@
  * do app). Chave, criptografia, código de recuperação e a regra de juntar são os mesmos nos dois.
  */
 import { getDb, DB_SCHEMA_VERSION } from './db';
-import { LOCAL_ONLY_TABLES, mergeRemote, syncable, normalizeRecoveryCode } from '@/domain/sync';
+import { LOCAL_ONLY_TABLES, RESET_PREFIX, latestReset, mergeRemote, mustReset, resetFileName, syncable, normalizeRecoveryCode } from '@/domain/sync';
+import { clearLocalData } from './securityRepo';
 import type { BackupTables } from '@/domain/backup';
 import type { StoredFile } from '@/domain/inbox';
 import { newId, nowIso } from '@/domain/ids';
@@ -39,6 +40,8 @@ export interface SyncState {
   seen: Record<string, string>;
   /** Última alteração local (changelog) já enviada (não envia de novo sem mudança). */
   sentSeq: number;
+  /** Última marca de "apagar em todos os aparelhos" já cumprida aqui (ms; 0 = nenhuma). */
+  resetSeen: number;
 }
 
 const KEY = 'routig.sync';
@@ -82,6 +85,7 @@ export function loadSyncState(): SyncState {
     auto: s.auto ?? true,
     seen: s.seen ?? {},
     sentSeq: s.sentSeq ?? 0,
+    resetSeen: s.resetSeen ?? 0,
   };
 }
 
@@ -174,7 +178,7 @@ export async function createSyncKey(s: SyncState): Promise<{ state: SyncState; c
   const key = await newDataKey();
   const code = newRecoveryCode();
   await r.write(KEY_FILE, await wrapDataKey(key, code));
-  const state = { ...s, key: await exportKey(key), seen: {}, sentSeq: 0 };
+  const state = { ...s, key: await exportKey(key), seen: {}, sentSeq: 0, resetSeen: 0 };
   saveSyncState(state);
   return { state, code };
 }
@@ -184,7 +188,8 @@ export async function joinWithCode(s: SyncState, input: string): Promise<SyncSta
   const code = normalizeRecoveryCode(input);
   if (!code) throw new Error('bad-code');
   const r = await remote(s, false);
-  const file = (await r.list()).find((f) => f.name === KEY_FILE);
+  const listed = await r.list();
+  const file = listed.find((f) => f.name === KEY_FILE);
   if (!file) throw new Error('no-key');
   let key: CryptoKey;
   try {
@@ -192,7 +197,8 @@ export async function joinWithCode(s: SyncState, input: string): Promise<SyncSta
   } catch {
     throw new Error('wrong-code');
   }
-  const state = { ...s, key: await exportKey(key), seen: {}, sentSeq: 0 };
+  // Um apagamento geral que já aconteceu antes de este aparelho entrar não vale para ele.
+  const state = { ...s, key: await exportKey(key), seen: {}, sentSeq: 0, resetSeen: latestReset(listed.map((f) => f.name)) };
   saveSyncState(state);
   return state;
 }
@@ -280,6 +286,8 @@ export interface SyncResult {
   changed: number;
   devices: number;
   state: SyncState;
+  /** Outro aparelho apagou tudo: os dados deste foram apagados agora (recarregar a tela). */
+  reset: boolean;
 }
 
 /** Sincroniza agora: junta os outros aparelhos aqui e envia a cópia deste. */
@@ -288,6 +296,14 @@ export async function syncNow(s: SyncState, interactive = false): Promise<SyncRe
   const r = await remote(s, interactive);
   const key = await importKey(s.key);
   const files = await r.list();
+  // Outro aparelho mandou apagar tudo depois da última vez: apaga aqui antes de juntar.
+  const cloudReset = latestReset(files.map((f) => f.name));
+  const reset = mustReset(cloudReset, s.resetSeen);
+  if (reset) {
+    await clearLocalData();
+    s = { ...s, resetSeen: cloudReset, seen: {}, sentSeq: 0 };
+    saveSyncState(s);
+  }
   const mine = files.find((f) => f.name === deviceFile(s.deviceId));
   const others = files.filter((f) => f.name.startsWith('routig-device-') && f !== mine);
   const remotes: BackupTables[] = [];
@@ -322,7 +338,24 @@ export async function syncNow(s: SyncState, interactive = false): Promise<SyncRe
   }
   const state = { ...s, lastSync: nowIso(), lastChanged: changed, seen, sentSeq: seq };
   saveSyncState(state);
-  return { changed, devices: others.length + 1, state };
+  return { changed, devices: others.length + 1, state, reset };
+}
+
+/**
+ * Apagar em todos os aparelhos: tira da nuvem as cópias de todos os aparelhos e os arquivos, deixa a
+ * marca de apagamento (os outros aparelhos apagam os dados deles na próxima sincronização) e apaga
+ * os dados deste. A chave e a ligação ficam: todos continuam conectados, agora vazios.
+ */
+export async function eraseEverywhere(s: SyncState): Promise<SyncState> {
+  if (!syncReady(s)) throw new Error('not-ready');
+  const r = await remote(s, true);
+  const at = Date.now();
+  for (const f of await r.list()) if (f.name.startsWith('routig-device-') || f.name.startsWith(FILE_PREFIX) || f.name.startsWith(RESET_PREFIX)) await r.remove(f);
+  await r.write(resetFileName(at), '{}');
+  const state = { ...s, resetSeen: at, seen: {}, sentSeq: 0, lastSync: '', lastChanged: 0 };
+  saveSyncState(state);
+  await clearLocalData();
+  return state;
 }
 
 export interface SyncDevice {

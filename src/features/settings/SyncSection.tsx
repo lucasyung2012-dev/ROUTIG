@@ -10,6 +10,8 @@ import { Surface } from '@/ui/Surface';
 import { Switch } from '@/ui/Switch';
 import { useToast } from '@/ui/toast';
 import { connectDropbox, connectGoogle, createSyncKey, disconnect, joinWithCode, listDevices, loadSyncState, removeDevice, saveSyncState, syncNow, type SyncDevice, type SyncProvider, type SyncState } from '@/data/syncRepo';
+import { EraseForm } from '@/features/security/securityUi';
+import { Dialog } from '@/ui/Dialog';
 import { dropboxRedirectUri, startDropboxLogin, takeDropboxReturn } from '@/services/dropbox';
 
 const KNOWN_ERRORS = ['no-client-id', 'no-app-key', 'key-exists', 'bad-code', 'wrong-code', 'no-key', 'popup_closed', 'popup_failed_to_open', 'dbx-state', 'dbx-expired', 'dbx-denied'];
@@ -32,6 +34,7 @@ export function SyncSection() {
   const [dbxCode, setDbxCode] = useState('');
   const [devices, setDevices] = useState<SyncDevice[] | null>(null);
   const [removing, setRemoving] = useState<SyncDevice | null>(null);
+  const [erasing, setErasing] = useState(false);
   const loadDevices = () => run(async () => setDevices(await listDevices(s)));
 
   const fail = (e: unknown) => {
@@ -329,6 +332,23 @@ export function SyncSection() {
           )}
         </Surface>
       )}
+
+      {/* Apagar em todos os aparelhos: aqui, na nuvem e nos outros aparelhos conectados. */}
+      {s.key && (
+        <Surface className="flex flex-col gap-3 ring-1 ring-danger/30">
+          <h2 className="flex items-center gap-2 text-[0.9375rem] font-semibold text-fg">
+            <Trash2 className="h-4 w-4 text-danger" aria-hidden />
+            {t('security.eraseAll.title')}
+          </h2>
+          <p className="text-sm text-muted">{t('security.eraseAll.intro')}</p>
+          <Button variant="danger" icon={<Trash2 className="h-4 w-4" />} disabled={busy} onClick={() => setErasing(true)} className="self-start">
+            {t('security.eraseAll.open')}
+          </Button>
+        </Surface>
+      )}
+      <Dialog open={erasing} onClose={() => setErasing(false)} closeLabel={t('common.close')} title={t('security.eraseAll.title')}>
+        <EraseForm allowExport everywhere={s} />
+      </Dialog>
 
       <ConfirmDialog
         open={!!removing}

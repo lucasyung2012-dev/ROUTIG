@@ -88,6 +88,29 @@ export function mergeRemote(local: BackupTables, remotes: BackupTables[]): Merge
   return { incoming, changed };
 }
 
+/**
+ * "Apagar em todos os aparelhos": o aparelho que apaga deixa na nuvem um arquivo vazio com a hora no
+ * nome (routig-reset-<ms>.json). Cada aparelho guarda a última marca que já cumpriu; ao sincronizar,
+ * uma marca mais nova manda apagar os dados locais antes de juntar. A hora vai no nome para não
+ * precisar baixar nada a cada sincronização.
+ */
+export const RESET_PREFIX = 'routig-reset-';
+export const resetFileName = (at: number) => `${RESET_PREFIX}${at}.json`;
+
+/** A marca mais nova entre os nomes de arquivo da nuvem (0 = nenhuma). */
+export function latestReset(names: readonly string[]): number {
+  let best = 0;
+  for (const n of names) {
+    const m = /^routig-reset-(\d+)\.json$/.exec(n);
+    const at = m ? Number(m[1]) : 0;
+    if (at > best) best = at;
+  }
+  return best;
+}
+
+/** Este aparelho ainda precisa cumprir a marca da nuvem? */
+export const mustReset = (cloud: number, seen: number): boolean => cloud > 0 && cloud > seen;
+
 /** Código de recuperação: 24 letras e números (sem os que se confundem), em grupos de 4. */
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 export function formatRecoveryCode(bytes: Uint8Array): string {

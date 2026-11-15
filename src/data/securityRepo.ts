@@ -85,6 +85,26 @@ export async function tryUnlock(attempt: string, now = new Date()): Promise<Unlo
  * internas de backup e as preferências de tela. Não tem volta. Os arquivos de
  * backup exportados para Arquivos não são tocados.
  */
+/**
+ * Esvazia os dados deste aparelho mas mantém a ligação da sincronização (routig.sync): usado em
+ * "apagar em todos os aparelhos", para o aparelho continuar conectado e já recomeçar vazio.
+ */
+export async function clearLocalData(): Promise<void> {
+  const db = getDb();
+  for (const t of db.tables) await t.clear();
+  const bdb = getBackupDb();
+  for (const t of bdb.tables) await t.clear();
+  for (const store of [localStorage, sessionStorage]) {
+    try {
+      Object.keys(store)
+        .filter((k) => k.startsWith('routig.') && k !== 'routig.sync')
+        .forEach((k) => store.removeItem(k));
+    } catch {
+      /* armazenamento indisponível: nada a apagar */
+    }
+  }
+}
+
 export async function eraseAllData(): Promise<void> {
   await getDb().delete();
   await getBackupDb().delete();

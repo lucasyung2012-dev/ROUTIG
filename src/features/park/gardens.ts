@@ -140,7 +140,7 @@ function groundSquare(x: number, z: number, rot: number, h: number, lift: number
 }
 
 export function gardens(kit: Kit, free: (x: number, z: number, r: number) => boolean): { group: THREE.Group; spots: Array<{ x: number; z: number; r: number }>; seats: Seat[]; sites: Array<{ id: string; x: number; z: number; pieces: number }> } {
-  const sites: Array<{ id: string; x: number; z: number; pieces: number }> = [];
+  const placed: Array<{ id: string; x: number; z: number; pieces: number }> = [];
   const b = new Builder();
   const spots: Array<{ x: number; z: number; r: number }> = [];
   const seats: Seat[] = [];
@@ -792,19 +792,19 @@ export function gardens(kit: Kit, free: (x: number, z: number, r: number) => boo
     if (bd.id === 'focus') {
       const before = spots.length;
       focusGarden(bd);
-      sites.push({ id: bd.id, x: bd.x, z: bd.z, pieces: spots.length - before });
+      placed.push({ id: bd.id, x: bd.x, z: bd.z, pieces: spots.length - before });
       continue;
     }
     const L = LAYOUTS[bd.id];
     if (!L) continue;
     const g = site(bd, L.R);
     if (!g) {
-      sites.push({ id: bd.id, x: NaN, z: NaN, pieces: 0 });
+      placed.push({ id: bd.id, x: NaN, z: NaN, pieces: 0 });
       continue;
     }
     L.build(g);
-    sites.push({ id: bd.id, x: g.cx, z: g.cz, pieces: g.n });
+    placed.push({ id: bd.id, x: g.cx, z: g.cz, pieces: g.n });
     if (g.n > 0) spots.push({ x: g.cx, z: g.cz, r: L.R + 0.5 });
   }
-  return { group: b.build(), spots, seats, sites };
+  return { group: b.build(), spots, seats, sites: placed };
 }

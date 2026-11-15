@@ -72,6 +72,11 @@ function readCollapsed(): boolean {
  * Compacto: fica no canto e acompanha você; dá para recolher num botão. Grande: navegação livre
  * (arrastar com mouse, dedo ou caneta, setas do teclado, roda do mouse); ao arrastar, a vista para
  * de seguir você até tocar em "Recentralizar". O laço de cada quadro só mexe em atributos do SVG.
+ *
+ * Desempenho (iPad e celular): o mapa inteiro é desenhado uma vez no tamanho do zoom e a vista anda
+ * movendo esse desenho com `transform` (a placa de vídeo só desloca a imagem pronta). Mudar o
+ * `viewBox` a cada quadro obrigava o navegador a redesenhar a foto, os caminhos e os nomes em todo
+ * movimento, e o arrasto ficava travado.
  */
 export function Minimap({ engine, onPick }: { engine: MutableRefObject<Engine | null>; onPick: (id: ModuleId) => void }) {
   const { t } = useSettings();
@@ -172,7 +177,7 @@ export function Minimap({ engine, onPick }: { engine: MutableRefObject<Engine | 
     const s = ZOOMS[zoom]!;
     const half = R / s;
     let raf = 0;
-    let lastBox = '';
+    let lastMove = '';
     let lastVis = '';
     const tick = () => {
       raf = requestAnimationFrame(tick);
@@ -192,10 +197,14 @@ export function Minimap({ engine, onPick }: { engine: MutableRefObject<Engine | 
         v.x = clampAbs(v.x, lim);
         v.z = clampAbs(v.z, lim);
       }
-      const vb = `${(v.x - half).toFixed(1)} ${(v.z - half).toFixed(1)} ${(half * 2).toFixed(1)} ${(half * 2).toFixed(1)}`;
-      if (vb !== lastBox) {
-        el.setAttribute('viewBox', vb);
-        lastBox = vb;
+      // O desenho tem (tamanho × zoom) px; desloca para o centro da vista ficar no meio do mapa.
+      const w = (size.current || 1) * s;
+      const tx = (size.current || 1) / 2 - ((v.x + R) / (2 * R)) * w;
+      const ty = (size.current || 1) / 2 - ((v.z + R) / (2 * R)) * w;
+      const mv = `translate3d(${tx.toFixed(1)}px, ${ty.toFixed(1)}px, 0)`;
+      if (mv !== lastMove) {
+        el.style.transform = mv;
+        lastMove = mv;
       }
       const deg = (Math.atan2(Math.cos(info.yaw), Math.sin(info.yaw)) * 180) / Math.PI;
       cam.current.setAttribute('transform', `translate(${info.x.toFixed(1)} ${info.z.toFixed(1)}) rotate(${deg.toFixed(1)}) scale(${u.toFixed(3)})`);
@@ -363,7 +372,7 @@ export function Minimap({ engine, onPick }: { engine: MutableRefObject<Engine | 
         onDragStart={(e) => e.preventDefault()}
         onKeyDown={onKey}
       >
-        <svg ref={svg} viewBox={`${-R} ${-R} ${R * 2} ${R * 2}`} className="h-full w-full" role={big ? undefined : 'img'} aria-label={big ? undefined : t('park.minimap')}>
+        <svg ref={svg} viewBox={`${-R} ${-R} ${R * 2} ${R * 2}`} className="absolute left-0 top-0 max-w-none origin-top-left will-change-transform" style={{ width: `${px * s}px`, height: `${px * s}px` }} role={big ? undefined : 'img'} aria-label={big ? undefined : t('park.minimap')}>
           {photo ? (
             <image href={photo} x={-R} y={-R} width={R * 2} height={R * 2} preserveAspectRatio="none" />
           ) : (

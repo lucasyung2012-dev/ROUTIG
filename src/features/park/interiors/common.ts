@@ -15,6 +15,7 @@ import type { ModuleId } from '@/app/modules';
 import { FORMS, circle, clipZ, facadeMats, slab, upperPlan, volSlab, wallsAlong } from '../forms';
 import { MASSING, groundHeight, groundSpan, sideCut, topLevel, volsAt } from '../massing';
 import { exitAt, inVol, insideAt, tallerInside, volPoly, wallRuns, type Vol, type WallRun } from '../outline';
+import { stairHole, stairOf } from '../stairs';
 
 export interface InteriorScene {
   scene: THREE.Scene;
@@ -68,6 +69,8 @@ export interface Room {
   runs: WallRun[];
   /** O volume principal (o maior que contém o centro). */
   main: Vol;
+  /** Prédio (a escada principal dele atravessa as galerias do térreo). */
+  id: ModuleId;
 }
 
 /** Área do volume (para achar o principal). */
@@ -135,6 +138,10 @@ export function createRoom(kit: Kit, o: RoomOpts): Room {
     const above = v.hi >= 1;
     // Volume mais alto que sobe do meio deste (torre sobre o embasamento): furo no teto.
     const holes: Array<Array<[number, number]>> = tallerInside(g, i, hOf);
+    // Vão da escada principal (stairs.ts) no teto, no volume que a contém inteira (sobe ao 1º andar).
+    const stairUp = stairOf(o.id);
+    const sh = stairHole(stairUp, 1);
+    if (sh && above && stairUp?.vols.includes(v)) holes.push(sh);
     let sky0 = 0;
     if (centre && above && up === 'atrium') holes.push(circle(M.void, 40));
     else if (centre && !above && M.sky) {
@@ -160,7 +167,7 @@ export function createRoom(kit: Kit, o: RoomOpts): Room {
     blocked: (x, z) => !insideAt(g, x, z, 0.45),
     wallAt: (x, z) => Math.hypot(x, z) + (insideAt(g, x, z, 0.35) ? 1 : -1),
   };
-  return { scene, key, b, trees, accentMat, spec, vols: g, runs, main };
+  return { scene, key, b, trees, accentMat, spec, vols: g, runs, main, id: o.id };
 }
 
 /**
@@ -168,7 +175,11 @@ export function createRoom(kit: Kit, o: RoomOpts): Room {
  * principal do térreo, com o vazio redondo de raio `inner` no meio.
  */
 export function gallerySlab(room: Room, y: number, inner: number, thick = 0.25): THREE.BufferGeometry {
-  return slab(volPoly(room.main), [circle(inner, 40)], y, thick);
+  const holes: Array<Array<[number, number]>> = [circle(inner, 40)];
+  // A escada principal (stairs.ts) atravessa a galeria: o vão dela, quando fica fora do vazio do meio.
+  const st = stairOf(room.id);
+  if (st && st.well.every(([x, z]) => Math.hypot(x, z) > inner + 0.1 && inVol(room.main, x, z, 0.05))) holes.push(st.well);
+  return slab(volPoly(room.main), holes, y, thick);
 }
 
 /**

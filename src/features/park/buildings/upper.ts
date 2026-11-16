@@ -16,6 +16,7 @@ import { FORMS, alongGeo, circle, clipZ, facadeAlong, facadeMats, hasRoofTerrace
 import { MASSING, STOREY, liftDist, roofsAt, sideCut, volsAt } from '../massing';
 import { alongRun, deckSpots, inVol, insideAt, inscribed, reachAt, segDist, terraceDoors, volPoly, wallRuns, type DeckSpot, type Vol, type WallRun } from '../outline';
 import { drawDeck, sundial, sundialSpot } from '../interiors/floors';
+import { inWell, liftShaft, stairHole, stairOf, phaseAt } from '../stairs';
 
 /**
  * Onde fica a torre do elevador: `angle` em volta do prédio (0 = frente; π = fundos) e o chão
@@ -153,7 +154,14 @@ export function upperFloors(kit: Kit, id: ModuleId, levels: number, base: number
   // Cobertura do último andar (com o furo do jardim ou do átrio) e das alas que acabam ali.
   const topVols = volsAt(id, levels);
   const top = yOf(levels + 1);
-  for (const v of topVols) b.add(slab, volSlab(v, top, 0.4, holds(v) && fp === 'garden' ? [circle(inner)] : holds(v) && fp === 'atrium' ? [circle(inner * 0.8)] : [], 0.2));
+  // Com terraço, a escada principal chega a ele pelo vão na cobertura (o mesmo de dentro).
+  const st = stairOf(id);
+  const shTop = roofT ? stairHole(st, levels + 1) : null;
+  for (const v of topVols) {
+    const holes: Array<Array<[number, number]>> = holds(v) && fp === 'garden' ? [circle(inner)] : holds(v) && fp === 'atrium' ? [circle(inner * 0.8)] : [];
+    if (shTop && st?.vols.includes(v)) holes.push(shTop);
+    b.add(slab, volSlab(v, top, 0.4, holes, 0.2));
+  }
   const tb = bbox(topVols);
   const rTop = Math.max(4, inscribed(topVols));
   // Casa de máquinas na cobertura (ar-condicionado com ventilador, dutos e antena), só de perto.
@@ -199,9 +207,15 @@ export function upperFloors(kit: Kit, id: ModuleId, levels: number, base: number
   if (roofT) {
     const ring = fp === 'garden' || fp === 'atrium' ? (fp === 'atrium' ? inner * 0.8 : inner) : 0;
     const free = fp === 'core' ? inner + 0.3 : ring ? ring + 0.6 : 0;
-    for (const v of topVols) b.add(deckMat, volSlab(v, top + 0.03, 0.03, ring && holds(v) ? [circle(ring + 0.05)] : []));
+    for (const v of topVols) {
+      const holes: Array<Array<[number, number]>> = ring && holds(v) ? [circle(ring + 0.05)] : [];
+      if (shTop && st?.vols.includes(v)) holes.push(shTop);
+      b.add(deckMat, volSlab(v, top + 0.03, 0.03, holes));
+    }
     const edges = wallRuns(topVols, 1);
     for (const r of edges) rail(r, top);
+    // Guarda-corpo em volta do vão da escada no terraço (aberto no patamar, por onde se entra nela).
+    if (shTop && st) for (const [a, c] of phaseAt(st, levels + 1).rails) rail({ ax: a[0], az: a[1], bx: c[0], bz: c[1] }, top);
     if (ring) {
       const c = circle(ring + (fp === 'atrium' ? 0.35 : 0.1), 40);
       for (let i = 0; i < c.length; i++) {
@@ -211,7 +225,7 @@ export function upperFloors(kit: Kit, id: ModuleId, levels: number, base: number
         bd.add(railGlass, gl.geo, gl.pos, gl.rot);
       }
     }
-    let spots: DeckSpot[] = deckSpots(topVols, edges, free + 0.6, lift.angle);
+    let spots: DeckSpot[] = deckSpots(topVols, edges, free + 0.6, lift.angle).filter((s) => !inWell(st, s.x, s.z, 1.6));
     // Calendar: o relógio de sol do Mirante do Tempo, na frente do terraço (o mesmo de dentro).
     const dial = id === 'calendar' ? sundialSpot(topVols) : null;
     if (dial) {
@@ -225,9 +239,13 @@ export function upperFloors(kit: Kit, id: ModuleId, levels: number, base: number
   // Chão do lounge: nivelado pelo ponto mais alto (com base de pedra até o mais baixo).
   const ry = lift.angle - Math.PI;
   const groundAt = (x: number, z: number) => lift.ground(x * Math.cos(ry) + z * Math.sin(ry), -x * Math.sin(ry) + z * Math.cos(ry));
+  // Poço dos elevadores (o mesmo de dentro: uma ou duas cabines lado a lado) e a meia largura do
+  // pavilhão de vidro em volta da base dele.
+  const shaft = liftShaft(id);
+  const hp = Math.max(2.5, shaft.w / 2 + 1.0);
   let gMax = -Infinity;
   let gMin = Infinity;
-  for (const x of [-4.7, 0, 4.7])
+  for (const x of [-(hp + 2.2), 0, hp + 2.2])
     for (const z of [tz - 4, tz + 1.2, tz + 6.2]) {
       const gy = groundAt(x, z);
       gMax = Math.max(gMax, gy);
@@ -251,22 +269,25 @@ export function upperFloors(kit: Kit, id: ModuleId, levels: number, base: number
   const towerBot = Math.min(0, gMin - 0.2);
   // Com terraço, a torre passa da cobertura: a cabine para no terraço.
   const towerTop = roofT ? top + 3.4 : top + 1;
-  eb.add(glass, new THREE.CylinderGeometry(1.4, 1.4, towerTop - towerBot, 24, 1, true), [0, (towerTop + towerBot) / 2, tz]);
-  for (let k = 0; k < 6; k++) {
-    const a = (k / 6) * Math.PI * 2 + Math.PI / 6;
-    eb.add(metal, new THREE.BoxGeometry(0.12, towerTop - towerBot, 0.12), [Math.sin(a) * 1.4, (towerTop + towerBot) / 2, tz + Math.cos(a) * 1.4]);
-  }
-  eb.add(slab, new THREE.CylinderGeometry(1.7, 1.7, 0.3, 24), [0, towerTop + 0.15, tz]);
-  for (let L = 1; L <= levels; L++) {
-    const yy = yOf(L);
-    const back = reachAt(volsAt(id, L), lift.angle, far);
-    eb.add(slab, new THREE.BoxGeometry(2.4, 0.3, -tz - back + 0.4), [0, yy - 0.15, -(back - tz) / 2]);
-  }
-  // Ponte da cobertura até a torre (terraço).
-  if (roofT) {
-    const back = reachAt(topVols, lift.angle, far);
-    eb.add(slab, new THREE.BoxGeometry(2.4, 0.3, -tz - back + 0.4), [0, top - 0.15, -(back - tz) / 2]);
-  }
+  // Poço fechado de concreto (elevadores convencionais) com uma faixa de luz da cor do prédio no alto.
+  const concrete = kit.mat('#D9D5CD', { rough: 0.85 });
+  eb.add(concrete, new THREE.BoxGeometry(shaft.w + 0.4, towerTop - towerBot, shaft.d + 0.2), [0, (towerTop + towerBot) / 2, tz]);
+  eb.add(slab, new THREE.BoxGeometry(shaft.w + 0.6, 0.3, shaft.d + 0.6), [0, towerTop + 0.15, tz]);
+  eb.add(glow, new THREE.BoxGeometry(shaft.w + 0.42, 0.12, shaft.d + 0.22), [0, towerTop - 0.5, tz]);
+  // Hall de cada pavimento entre a fachada e o poço: laje, vidro dos lados e laje em cima.
+  const hall = (yy: number, back: number) => {
+    const zf = tz + shaft.d / 2;
+    const zIn = -back + 0.3;
+    const len = zIn - zf;
+    if (len <= 0.05) return;
+    const zc = (zIn + zf) / 2;
+    eb.add(slab, new THREE.BoxGeometry(shaft.w, 0.3, len), [0, yy - 0.15, zc]);
+    for (const s of [-1, 1]) eb.add(glass, new THREE.BoxGeometry(0.06, 2.9, len), [s * (shaft.w / 2 - 0.03), yy + 1.45, zc]);
+    eb.add(slab, new THREE.BoxGeometry(shaft.w + 0.2, 0.2, len), [0, yy + 3.0, zc]);
+  };
+  for (let L = 1; L <= levels; L++) hall(yOf(L), reachAt(volsAt(id, L), lift.angle, far));
+  // Hall da cobertura até o poço (terraço).
+  if (roofT) hall(top, reachAt(topVols, lift.angle, far));
   // Lounge do elevador no chão: piso de pedra, pavilhão de vidro em volta da base da torre (porta
   // do lado, banco, plantas, luz), passagem coberta até o prédio e bancos com poste na entrada.
   {
@@ -278,29 +299,30 @@ export function upperFloors(kit: Kit, id: ModuleId, levels: number, base: number
     // Base de pedra do chão mais baixo até o piso (terreno em declive).
     const pBot = gMin - 0.3 - dy;
     const plinth = 0.02 - pBot;
-    if (plinth > 0.05) lb.add(curb, new THREE.BoxGeometry(9.6, plinth, 10.6), [0, (0.02 + pBot) / 2, pz]);
-    lb.add(curb, new THREE.BoxGeometry(9.4, 0.3, 10.4), [0, 0.12, pz]);
-    lb.add(pave, new THREE.BoxGeometry(9, 0.32, 10), [0, 0.14, pz]);
-    for (let k = -4; k <= 4; k++) lb.add(curb, new THREE.BoxGeometry(0.04, 0.01, 10), [k, 0.305, pz]);
-    // Pavilhão 5 × 5 m: vidro com montantes, porta de 1,8 m no lado leste, laje e luz no teto.
+    const bw = 2 * hp + 4;
+    if (plinth > 0.05) lb.add(curb, new THREE.BoxGeometry(bw + 0.6, plinth, 10.6), [0, (0.02 + pBot) / 2, pz]);
+    lb.add(curb, new THREE.BoxGeometry(bw + 0.4, 0.3, 10.4), [0, 0.12, pz]);
+    lb.add(pave, new THREE.BoxGeometry(bw, 0.32, 10), [0, 0.14, pz]);
+    for (let k = -Math.floor(bw / 2); k <= Math.floor(bw / 2); k++) lb.add(curb, new THREE.BoxGeometry(0.04, 0.01, 10), [k, 0.305, pz]);
+    // Pavilhão de vidro em volta da base do poço: montantes, porta de 1,8 m no lado leste, laje e luz no teto.
     const H2 = 3.2;
     const gl = kit.mat('#CFE7F5', { glass: true });
-    lb.add(gl, new THREE.BoxGeometry(5, H2, 0.06), [0, 0.3 + H2 / 2, tz - 2.5]);
-    lb.add(gl, new THREE.BoxGeometry(0.06, H2, 5), [-2.5, 0.3 + H2 / 2, tz]);
-    lb.add(gl, new THREE.BoxGeometry(0.06, H2, 1.6), [2.5, 0.3 + H2 / 2, tz - 1.7]);
-    lb.add(gl, new THREE.BoxGeometry(0.06, H2, 1.6), [2.5, 0.3 + H2 / 2, tz + 1.7]);
-    lb.add(gl, new THREE.BoxGeometry(0.06, H2 - 2.4, 1.8), [2.5, 0.3 + 2.4 + (H2 - 2.4) / 2, tz]);
-    for (const [x, z] of [[-2.5, -2.5], [2.5, -2.5], [-2.5, 2.5], [2.5, 2.5], [2.5, -0.9], [2.5, 0.9], [0, -2.5], [-2.5, 0]] as const) lb.add(dark, new THREE.BoxGeometry(0.1, H2, 0.1), [x, 0.3 + H2 / 2, tz + z]);
-    lb.add(slab, new THREE.BoxGeometry(5.6, 0.25, 5.6), [0, 0.3 + H2 + 0.12, tz]);
-    lb.add(warm, new THREE.CylinderGeometry(0.5, 0.5, 0.03, 20), [1.6, 0.3 + H2 - 0.02, tz + 1.4]);
+    lb.add(gl, new THREE.BoxGeometry(2 * hp, H2, 0.06), [0, 0.3 + H2 / 2, tz - 2.5]);
+    lb.add(gl, new THREE.BoxGeometry(0.06, H2, 5), [-hp, 0.3 + H2 / 2, tz]);
+    lb.add(gl, new THREE.BoxGeometry(0.06, H2, 1.6), [hp, 0.3 + H2 / 2, tz - 1.7]);
+    lb.add(gl, new THREE.BoxGeometry(0.06, H2, 1.6), [hp, 0.3 + H2 / 2, tz + 1.7]);
+    lb.add(gl, new THREE.BoxGeometry(0.06, H2 - 2.4, 1.8), [hp, 0.3 + 2.4 + (H2 - 2.4) / 2, tz]);
+    for (const [x, z] of [[-hp, -2.5], [hp, -2.5], [-hp, 2.5], [hp, 2.5], [hp, -0.9], [hp, 0.9], [0, -2.5], [-hp, 0]] as const) lb.add(dark, new THREE.BoxGeometry(0.1, H2, 0.1), [x, 0.3 + H2 / 2, tz + z]);
+    lb.add(slab, new THREE.BoxGeometry(2 * hp + 0.6, 0.25, 5.6), [0, 0.3 + H2 + 0.12, tz]);
+    lb.add(warm, new THREE.CylinderGeometry(0.5, 0.5, 0.03, 20), [hp - 0.9, 0.3 + H2 - 0.02, tz + 1.9]);
     // Placa luminosa sobre a porta (setas de sobe e desce).
-    lb.add(dark, new THREE.BoxGeometry(0.06, 0.5, 1.0), [2.56, 0.3 + 2.75, tz]);
-    lb.add(glow, new THREE.ConeGeometry(0.12, 0.18, 3), [2.6, 0.3 + 2.86, tz], [0, 0, -Math.PI / 2]);
-    lb.add(glow, new THREE.ConeGeometry(0.12, 0.18, 3), [2.6, 0.3 + 2.64, tz], [Math.PI, 0, -Math.PI / 2]);
+    lb.add(dark, new THREE.BoxGeometry(0.06, 0.5, 1.0), [hp + 0.06, 0.3 + 2.75, tz]);
+    lb.add(glow, new THREE.ConeGeometry(0.12, 0.18, 3), [hp + 0.1, 0.3 + 2.86, tz], [0, 0, -Math.PI / 2]);
+    lb.add(glow, new THREE.ConeGeometry(0.12, 0.18, 3), [hp + 0.1, 0.3 + 2.64, tz], [Math.PI, 0, -Math.PI / 2]);
     // Dentro: banco no fundo e duas plantas.
     lb.add(wood, new THREE.BoxGeometry(1.6, 0.08, 0.45), [-1.6, 0.75, tz - 1.9]);
     lb.add(dark, new THREE.BoxGeometry(1.4, 0.45, 0.35), [-1.6, 0.52, tz - 1.9]);
-    for (const [x, z] of [[-1.9, 1.9], [1.9, -1.9]] as const) {
+    for (const [x, z] of [[-hp + 0.6, 1.9], [hp - 0.6, -1.9]] as const) {
       lb.add(kit.mat('#D9CBB6', { rough: 0.8 }), new THREE.CylinderGeometry(0.3, 0.24, 0.55, 14), [x, 0.58, tz + z]);
       lb.add(leaf, new THREE.IcosahedronGeometry(0.45, 1), [x, 1.25, tz + z], undefined, [1, 1.4, 1]);
     }
@@ -313,11 +335,11 @@ export function upperFloors(kit: Kit, id: ModuleId, levels: number, base: number
     }
     // Lado de fora: dois bancos virados para a porta e um poste de luz.
     for (const sz of [-1, 1]) {
-      lb.add(wood, new THREE.BoxGeometry(0.45, 0.08, 1.6), [3.9, 0.75, tz + sz * 2.6]);
-      lb.add(dark, new THREE.BoxGeometry(0.35, 0.45, 1.4), [3.9, 0.52, tz + sz * 2.6]);
+      lb.add(wood, new THREE.BoxGeometry(0.45, 0.08, 1.6), [hp + 1.4, 0.75, tz + sz * 2.6]);
+      lb.add(dark, new THREE.BoxGeometry(0.35, 0.45, 1.4), [hp + 1.4, 0.52, tz + sz * 2.6]);
     }
-    lb.add(dark, new THREE.CylinderGeometry(0.06, 0.08, 3.6, 8), [4.1, 0.3 + 1.8, tz]);
-    lb.add(warm, new THREE.SphereGeometry(0.2, 12, 8), [4.1, 0.3 + 3.7, tz]);
+    lb.add(dark, new THREE.CylinderGeometry(0.06, 0.08, 3.6, 8), [hp + 1.6, 0.3 + 1.8, tz]);
+    lb.add(warm, new THREE.SphereGeometry(0.2, 12, 8), [hp + 1.6, 0.3 + 3.7, tz]);
   }
   // Elemento de cada prédio (prompt, seção 10), sobre a cobertura do volume mais alto.
   switch (id) {

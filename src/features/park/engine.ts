@@ -21,6 +21,8 @@ import { entryDoors } from './doors';
 import { createExtras } from './extras';
 import { createAnimals } from './animals';
 import type { InteriorScene } from './interiors/common';
+import type { Climb, Floors } from './interiors/floors';
+import { markX, type Lift } from './vertical';
 
 export interface Stats {
   fps: number;
@@ -354,129 +356,228 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
     else rig.glideTo(new THREE.Vector3(lv.arrive.x, lv.y + 3.3, lv.arrive.z - 0.8), new THREE.Vector3(lv.arrive.x, lv.y + 0.6, lv.arrive.z + 9), 900);
   };
   /* ---------- Elevador: entrar, fechar portas, subir/descer, abrir, sair ---------- */
-  type Ride = { from: number; to: number; t0: number; start: THREE.Vector3; startLook: THREE.Vector3; mode: CamMode; dinged: boolean };
+  type Ride = { from: number; to: number; t0: number; start: THREE.Vector3; startLook: THREE.Vector3; mode: CamMode; dinged: boolean; lift: number };
   let ride: Ride | null = null;
   const RIDE = { walkIn: 1800, close: 700, open: 700, walkOut: 900, perFloor: 1700 };
+  // Vetores de trabalho do elevador e da escada (nada é alocado a cada quadro).
+  const vA = new THREE.Vector3();
+  const vB = new THREE.Vector3();
+  const vC = new THREE.Vector3();
+  /** Folhas de uma porta de correr: 0 = fechada, 1 = aberta. Pavimento: x no prédio; cabine: x na cabine. */
+  const setPair = (lf: Lift, pair: readonly [THREE.Object3D, THREE.Object3D], open: number, hall: boolean) => {
+    const off = lf.shut + open * lf.slide;
+    const base = hall ? lf.x : 0;
+    pair[0].position.x = base - off;
+    pair[1].position.x = base + off;
+  };
+  /** Portas da cabine e as do pavimento (quando há) juntas. */
+  const liftDoors = (lf: Lift, open: number, hall: readonly [THREE.Object3D, THREE.Object3D] | undefined) => {
+    setPair(lf, lf.doors, open, false);
+    if (hall) setPair(lf, hall, open, true);
+  };
+  /** Indicadores de pavimento do elevador: acende o nível `n`. */
+  const showFloor = (lf: Lift, n: number, count: number) => {
+    for (const m of lf.marks) m.position.x = markX(n, count);
+  };
   const rideTo = (to: number) => {
     const fl = inside?.scene.floors;
-    if (!inside || !fl || ride || to === level || to < 0 || to >= fl.levels.length) return;
+    if (!inside || !fl || ride || climb || to === level || to < 0 || to >= fl.levels.length || !fl.lifts.length) return;
+    // A cabine mais perto de quem chama (duas lado a lado nos prédios com dois elevadores).
+    const px = rig.body().pos.x;
+    let li = 0;
+    fl.lifts.forEach((l, i) => {
+      if (Math.abs(l.x - px) < Math.abs(fl.lifts[li]!.x - px)) li = i;
+    });
     const look = new THREE.Vector3();
     camera.getWorldDirection(look);
-    ride = { from: level, to, t0: performance.now(), start: camera.position.clone(), startLook: camera.position.clone().add(look.multiplyScalar(5)), mode: rig.mode(), dinged: false };
+    ride = { from: level, to, t0: performance.now(), start: camera.position.clone(), startLook: camera.position.clone().add(look.multiplyScalar(5)), mode: rig.mode(), dinged: false, lift: li };
     // "Ding" da chegada da cabine.
     audio?.note(76, 'bell');
     rig.setMove(0, 0);
-    fl.cabin.position.y = fl.levels[level]!.y;
+    // Todas as portas dos pavimentos fechadas; a cabine escolhida vem ao andar de quem chamou.
+    for (const l of fl.lifts) for (const pair of l.hall) setPair(l, pair, 0, true);
+    const lf = fl.lifts[li]!;
+    lf.cabin.position.y = fl.levels[level]!.y;
+    showFloor(lf, level, fl.levels.length);
     opts.onRiding(true);
   };
   const ease2 = (k: number) => (k < 0.5 ? 2 * k * k : 1 - (-2 * k + 2) ** 2 / 2);
-  /** Subida (ou descida) pela escada em caracol: entra no núcleo, gira subindo degrau a degrau e sai no outro andar. */
-  let climb: { from: number; to: number; t0: number; r: number; mode: CamMode; steps: number } | null = null;
-  const CLIMB_MS = 3600;
+  /**
+   * Subida (ou descida) pela escada: do pé dela, segue o caminho da própria escada (lances, patamares,
+   * a volta do U, do L, da curva ou do caracol do núcleo), um passo por vez, até o patamar de chegada
+   * no outro nível.
+   */
+  type ClimbRun = { c: Climb; t0: number; dur: number; len: Float32Array; total: number; start: THREE.Vector3; steps: number; up: boolean };
+  let climb: ClimbRun | null = null;
+  const EYE_Y = 1.62;
+  /** Velocidade ao longo do caminho (m/s) e o tempo para chegar ao pé da escada. */
+  const CLIMB = { speed: 2.8, lead: 450, stride: 0.6 };
+  /** Ponto (pés) a `s` m do começo do caminho, em `out`. */
+  const pathAt = (path: Float32Array, len: Float32Array, s: number, out: THREE.Vector3) => {
+    const n = len.length;
+    if (n < 2) return out.set(path[0] ?? 0, path[1] ?? 0, path[2] ?? 0);
+    let i = 1;
+    while (i < n - 1 && (len[i] ?? 0) < s) i++;
+    const a = len[i - 1] ?? 0;
+    const b = len[i] ?? a;
+    const t = b > a ? Math.min(1, Math.max(0, (s - a) / (b - a))) : 1;
+    const j = (i - 1) * 3;
+    const k = i * 3;
+    const x0 = path[j] ?? 0;
+    const y0 = path[j + 1] ?? 0;
+    const z0 = path[j + 2] ?? 0;
+    return out.set(x0 + ((path[k] ?? x0) - x0) * t, y0 + ((path[k + 1] ?? y0) - y0) * t, z0 + ((path[k + 2] ?? z0) - z0) * t);
+  };
+  /** A subida ou descida que começa nesta escada (a do nível dela com o pé mais perto). */
+  const climbFor = (fl: Floors, th: Thing): Climb | null => {
+    let best: Climb | null = null;
+    let bd = Infinity;
+    for (const c of fl.climbs) {
+      if (c.from !== th.level) continue;
+      const d = Math.hypot(c.x - th.x, c.z - th.z);
+      if (d < bd) {
+        bd = d;
+        best = c;
+      }
+    }
+    return best;
+  };
+  const startClimb = (c: Climb) => {
+    const n = c.path.length / 3;
+    const len = new Float32Array(Math.max(1, n));
+    for (let i = 1; i < n; i++) {
+      const p = c.path;
+      len[i] = (len[i - 1] ?? 0) + Math.hypot((p[i * 3] ?? 0) - (p[i * 3 - 3] ?? 0), (p[i * 3 + 1] ?? 0) - (p[i * 3 - 2] ?? 0), (p[i * 3 + 2] ?? 0) - (p[i * 3 - 1] ?? 0));
+    }
+    const total = len[n - 1] ?? 0;
+    rig.setMove(0, 0);
+    climb = { c, t0: performance.now(), dur: CLIMB.lead + (total / CLIMB.speed) * 1000, len, total, start: camera.position.clone(), steps: 0, up: c.to > c.from };
+    opts.onRiding(true);
+  };
+  /** Para onde se olha na escada: 1,6 m adiante no caminho (no fim, adiante na direção do último trecho). */
+  const lookAhead = (cl: ClimbRun, s: number) => {
+    pathAt(cl.c.path, cl.len, Math.min(cl.total, s + 1.6), vB);
+    if (s + 1.6 > cl.total) {
+      const p = cl.c.path;
+      const n = p.length / 3;
+      const dx = (p[(n - 1) * 3] ?? 0) - (p[(n - 2) * 3] ?? 0);
+      const dz = (p[(n - 1) * 3 + 2] ?? 0) - (p[(n - 2) * 3 + 2] ?? 0);
+      const l = Math.hypot(dx, dz) || 1;
+      const extra = s + 1.6 - cl.total;
+      vB.x += (dx / l) * extra;
+      vB.z += (dz / l) * extra;
+    }
+    vB.y += EYE_Y + (cl.up ? 0.15 : -0.25);
+  };
   const stepClimb = (now: number) => {
     const fl = inside?.scene.floors;
     if (!climb || !fl) return false;
-    const k = Math.min(1, (now - climb.t0) / CLIMB_MS);
-    const up = climb.to > climb.from;
-    const yFrom = fl.levels[climb.from]!.y;
-    const yTo = fl.levels[climb.to]!.y;
-    const yLow = Math.min(yFrom, yTo);
-    const H = Math.abs(yTo - yFrom);
-    const rr = (climb.r - 0.3) / 2 + 0.1;
-    const turn = Math.PI * 2 * (17 / 18);
-    const EYE_Y = 1.62;
-    const at = (u: number) => {
-      const a = -0.4 - u * turn;
-      return new THREE.Vector3(Math.sin(a) * rr, yLow + u * H + EYE_Y, Math.cos(a) * rr);
-    };
-    const doorAt = (y: number) => new THREE.Vector3(0, y + EYE_Y, climb!.r + 0.7);
-    const uStart = up ? 0 : 1;
-    const uEnd = 1 - uStart;
-    if (k < 0.14) {
-      const q = ease2(k / 0.14);
-      camera.position.lerpVectors(doorAt(yFrom), at(uStart), q);
-      camera.lookAt(at(up ? 0.1 : 0.9).setY(yFrom + EYE_Y + (up ? 0.3 : -0.3)));
-    } else if (k < 0.86) {
-      const s = (k - 0.14) / 0.72;
-      const u = up ? s : 1 - s;
-      // Um degrau por vez: sobe um pouco, assenta (balanço do passo), som de cada pisada.
-      const step = Math.floor(s * 17);
-      if (step > climb.steps) {
-        climb.steps = step;
-        audio?.note(up ? 50 + (step % 2) * 2 : 48, 'tom');
-      }
-      camera.position.copy(at(u)).add(new THREE.Vector3(0, Math.abs(Math.sin(s * 17 * Math.PI)) * 0.04, 0));
-      const ahead = at(Math.max(0, Math.min(1, u + (up ? 0.08 : -0.08))));
-      camera.lookAt(ahead.setY(ahead.y + (up ? 0.25 : -0.35)));
-    } else if (k < 1) {
-      const q = ease2((k - 0.86) / 0.14);
-      camera.position.lerpVectors(at(uEnd), doorAt(yTo), q);
-      camera.lookAt(new THREE.Vector3(0, yTo + 1.5, climb.r + 8));
-    } else {
-      const to = climb.to;
-      climb = null;
-      opts.onRiding(false);
-      const there = fl.things.find((o) => o.kind === 'stairs' && o.level === to);
-      setFloor(to, false);
-      if (there) rig.place(there.x, there.z + 0.4, Math.PI);
-      else setFloor(to);
-      return false;
+    const cl = climb;
+    const el = now - cl.t0;
+    if (el < CLIMB.lead) {
+      // Até o pé da escada, virando para ela.
+      pathAt(cl.c.path, cl.len, 0, vA);
+      vA.y += EYE_Y;
+      camera.position.lerpVectors(cl.start, vA, ease2(el / CLIMB.lead));
+      lookAhead(cl, 0);
+      camera.lookAt(vB);
+      return true;
     }
-    return true;
+    const k = Math.min(1, (el - CLIMB.lead) / Math.max(1, cl.dur - CLIMB.lead));
+    const s = cl.total * k;
+    pathAt(cl.c.path, cl.len, s, vA);
+    // Um passo a cada 0,6 m: o balanço do passo e o som da pisada.
+    const step = Math.floor(s / CLIMB.stride);
+    if (step > cl.steps) {
+      cl.steps = step;
+      audio?.note(cl.up ? 50 + (step % 2) * 2 : 48, 'tom');
+    }
+    camera.position.set(vA.x, vA.y + EYE_Y + Math.abs(Math.sin((s / CLIMB.stride) * Math.PI)) * 0.04, vA.z);
+    lookAhead(cl, s);
+    camera.lookAt(vB);
+    if (k < 1) return true;
+    // Chegou: no patamar do outro nível, olhando para onde vinha andando.
+    climb = null;
+    opts.onRiding(false);
+    const p = cl.c.path;
+    const n = p.length / 3;
+    const ex = p[(n - 1) * 3] ?? 0;
+    const ez = p[(n - 1) * 3 + 2] ?? 0;
+    vC.set(ex - (p[(n - 2) * 3] ?? ex), 0, ez - (p[(n - 2) * 3 + 2] ?? ez));
+    setFloor(cl.c.to, false);
+    rig.place(ex, ez, Math.atan2(-vC.x, -vC.z));
+    return false;
   };
   /** Um quadro da viagem; devolve true enquanto a câmera é do elevador. */
   const stepRide = (now: number) => {
     const fl = inside?.scene.floors;
     if (!ride || !fl) return false;
-    const e = fl.elevator;
+    const lf = fl.lifts[ride.lift] ?? fl.lifts[0];
+    if (!lf) {
+      ride = null;
+      opts.onRiding(false);
+      return false;
+    }
+    const count = fl.levels.length;
     const y0 = fl.levels[ride.from]!.y;
     const y1 = fl.levels[ride.to]!.y;
     const move = RIDE.perFloor * Math.abs(ride.to - ride.from);
     const t = now - ride.t0;
-    const inCab = new THREE.Vector3(e.x, 0, e.z - 0.2);
-    const outLook = (y: number) => new THREE.Vector3(e.x, y + 1.5, e.z + 8);
-    const setDoors = (open: number) => {
-      fl.doors[0].position.x = -0.39 - open * 0.72;
-      fl.doors[1].position.x = 0.39 + open * 0.72;
-    };
+    const hallFrom = lf.hall[ride.from];
+    const hallTo = lf.hall[ride.to];
+    // Dentro da cabine, perto do fundo, de frente para as portas.
+    const cx = lf.x;
+    const cz = lf.z - 0.25;
     let p1 = RIDE.walkIn;
     if (t < p1) {
-      // Entra na cabine, vira de frente para as portas.
       // Primeiro até a frente da porta, depois para dentro, virando de frente para a saída.
       const k = t / p1;
-      const door = new THREE.Vector3(e.x, y0 + 1.6, e.z + 2.6);
-      if (k < 0.6) camera.position.lerpVectors(ride.start, door, ease2(k / 0.6));
-      else camera.position.lerpVectors(door, inCab.clone().setY(y0 + 1.6), ease2((k - 0.6) / 0.4));
-      if (k < 0.6) camera.lookAt(new THREE.Vector3().lerpVectors(ride.startLook, new THREE.Vector3(e.x, y0 + 1.4, e.z - 2), ease2(k / 0.6)));
-      else {
-        // Vira de frente para as portas passando pelo lado (sem girar no próprio eixo de uma vez).
+      vB.set(cx, y0 + 1.6, lf.z + 2.6);
+      if (k < 0.6) {
+        camera.position.lerpVectors(ride.start, vB, ease2(k / 0.6));
+        vC.set(cx, y0 + 1.4, lf.z - 2);
+        camera.lookAt(vA.lerpVectors(ride.startLook, vC, ease2(k / 0.6)));
+      } else {
         const q2 = (k - 0.6) / 0.4;
-        const side = new THREE.Vector3(e.x + 4, y0 + 1.4, e.z);
-        camera.lookAt(q2 < 0.5 ? new THREE.Vector3().lerpVectors(new THREE.Vector3(e.x, y0 + 1.4, e.z - 2), side, ease2(q2 * 2)) : new THREE.Vector3().lerpVectors(side, outLook(y0), ease2(q2 * 2 - 1)));
+        vA.set(cx, y0 + 1.6, cz);
+        camera.position.lerpVectors(vB, vA, ease2(q2));
+        // Vira de frente para as portas passando pelo lado (sem girar no próprio eixo de uma vez).
+        vB.set(cx, y0 + 1.4, lf.z - 2);
+        vC.set(cx + 4, y0 + 1.4, lf.z);
+        if (q2 < 0.5) camera.lookAt(vA.lerpVectors(vB, vC, ease2(q2 * 2)));
+        else {
+          vB.set(cx, y0 + 1.5, lf.z + 8);
+          camera.lookAt(vA.lerpVectors(vC, vB, ease2(q2 * 2 - 1)));
+        }
       }
-      setDoors(1);
+      liftDoors(lf, 1, hallFrom);
       return true;
     }
     let p0 = p1;
     p1 += RIDE.close;
     if (t < p1) {
-      setDoors(1 - ease2((t - p0) / RIDE.close));
+      liftDoors(lf, 1 - ease2((t - p0) / RIDE.close), hallFrom);
       return true;
     }
     p0 = p1;
     p1 += move;
     if (t < p1) {
       const y = y0 + (y1 - y0) * ease2((t - p0) / move);
-      fl.cabin.position.y = y;
-      camera.position.set(inCab.x, y + 1.6, inCab.z);
-      camera.lookAt(outLook(y));
-      setDoors(0);
+      lf.cabin.position.y = y;
+      camera.position.set(cx, y + 1.6, cz);
+      camera.lookAt(vA.set(cx, y + 1.5, lf.z + 8));
+      liftDoors(lf, 0, undefined);
+      // Indicador de pavimento: o andar mais perto da cabine.
+      let near = 0;
+      for (let i = 1; i < count; i++) if (Math.abs(fl.levels[i]!.y - y) < Math.abs(fl.levels[near]!.y - y)) near = i;
+      showFloor(lf, near, count);
       return true;
     }
     p0 = p1;
     p1 += RIDE.open;
-    fl.cabin.position.y = y1;
-    camera.position.set(inCab.x, y1 + 1.6, inCab.z);
+    lf.cabin.position.y = y1;
+    showFloor(lf, ride.to, count);
+    camera.position.set(cx, y1 + 1.6, cz);
     if (t < p1) {
       if (!ride.dinged) {
         // Chegou no andar: dois tons ("ding-dong") ao abrir.
@@ -484,12 +585,12 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
         audio?.note(79, 'bell');
         audio?.note(74, 'bell', 0.25);
       }
-      camera.lookAt(outLook(y1));
-      setDoors(ease2((t - p0) / RIDE.open));
+      camera.lookAt(vA.set(cx, y1 + 1.5, lf.z + 8));
+      liftDoors(lf, ease2((t - p0) / RIDE.open), hallTo);
       return true;
     }
     // Chegou: sai da cabine para o andar, no modo de câmera de antes.
-    setDoors(1);
+    liftDoors(lf, 1, hallTo);
     const to = ride.to;
     const mode = ride.mode;
     ride = null;
@@ -704,7 +805,7 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
       if (th) {
         const fl = inside.scene.floors!;
         if (th.kind === 'room') return { kind: 'use', what: 'room', key: fl.zones[th.zone!]?.key };
-        if (th.kind === 'stairs') return { kind: 'use', what: 'stairs', up: level < fl.levels.length - 1 };
+        if (th.kind === 'stairs') return { kind: 'use', what: 'stairs', up: (climbFor(fl, th)?.to ?? level + 1) > level };
         return { kind: 'use', what: th.kind };
       }
       return floorSeat(p) ? { kind: 'sit' } : null;
@@ -719,14 +820,22 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
     return null;
   };
   // Diagnóstico (só com ?debug): comandos de teste disparados na página, como subir pela escada
-  // do andar atual (document.dispatchEvent(new CustomEvent('park-debug', { detail: 'stairs' }))).
+  // do andar atual (document.dispatchEvent(new CustomEvent('park-debug', { detail: 'stairs' }))),
+  // descer por ela ('stairs:down') ou chamar o elevador até um nível ('ride:<n>').
   const onDebug = (e: Event) => {
     const cmd = (e as CustomEvent<string>).detail;
-    const th = inside?.scene.floors?.things.find((o) => o.kind === 'stairs' && o.level === level);
-    if (cmd === 'stairs' && th) {
-      rig.place(th.x, th.z + 0.4, Math.PI);
-      useThing(th);
+    const fl0 = inside?.scene.floors;
+    if ((cmd === 'stairs' || cmd === 'stairs:down') && fl0) {
+      const want = cmd === 'stairs' ? 1 : -1;
+      const th = fl0.things.find((o) => o.kind === 'stairs' && o.level === level && Math.sign((climbFor(fl0, o)?.to ?? level) - level) === want);
+      document.documentElement.dataset.stairs = th ? `${level}>${level + want}` : 'none';
+      if (th) {
+        rig.place(th.x, th.z, th.face + Math.PI);
+        useThing(th);
+      }
     }
+    if (typeof cmd === 'string' && cmd.startsWith('ride:')) rideTo(Number(cmd.slice(5)));
+    if (cmd === 'stairs:check') document.documentElement.dataset.stairClash = String(inside?.scene.scene.userData.stairClash ?? 'none');
     // 'use:<tipo>' (dentro de um prédio): vai até a coisa desse tipo no andar atual e usa (cofre, violão...).
     if (typeof cmd === 'string' && cmd.startsWith('use:') && inside) {
       const kind = cmd.slice(4);
@@ -901,11 +1010,9 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
       return z && opts.onZone({ key: z.key, sector: z.sector });
     }
     if (th.kind === 'stairs') {
-      // Sobe um andar (no último, desce), saindo da escada do núcleo no outro andar.
-      const to = level < fl.levels.length - 1 ? level + 1 : level - 1;
-      rig.setMove(0, 0);
-      climb = { from: level, to, t0: performance.now(), r: th.z - 1, mode: rig.mode(), steps: 0 };
-      opts.onRiding(true);
+      // Sobe (no pé da escada) ou desce (na chegada dela) um nível, pelo caminho da própria escada.
+      const c = climbFor(fl, th);
+      if (c && !ride && !climb) startClimb(c);
       return;
     }
     if (th.kind === 'telescope') {

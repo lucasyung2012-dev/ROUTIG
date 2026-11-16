@@ -99,9 +99,9 @@ export interface AlertInput {
   goals: Array<{ id: string; name: string; deadline: DateKey }>;
   backupStale: boolean;
   /** Fração usada do armazenamento do aparelho (0 a 1), quando o aparelho informa. */
-  storageUse: number   /** Hoje é sexta e o Relatório da semana ainda não foi enviado (opcional: sem o campo, sem lembrete). */
+  storageUse: number | null;
+  /** Hoje é sexta e o Relatório da semana ainda não foi enviado (opcional: sem o campo, sem lembrete). */
   weeklyReportDue?: boolean;
-| null;
 }
 
 /**

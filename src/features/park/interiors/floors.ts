@@ -24,7 +24,7 @@ import { FORMS, circle, clipZ, facadeAlong, facadeMats, hasRoofTerrace, slab, up
 import { MASSING, STOREY, groundHeight, groundSpan, liftDist, roofsAt, sideCut, volsAt } from '../massing';
 import { alongRun, boundOf, deckSpots, inVol, insideAt, inscribed, nearestRun, segDist, spanZ, terraceDoors, volPoly, wallRuns, type DeckSpot, type Pt, type Vol, type WallRun } from '../outline';
 import type { Thing } from './things';
-import { CIRCULATION, coreFrom, corePath, coreSpots, inWell, liftShaft, ringGap, stairHole, stairOf, stairPath, stairSpots, type Stair } from '../stairs';
+import { CIRCULATION, coreFrom, corePath, coreSpots, corridorBand, inWell, liftShaft, ringGap, stairHole, stairOf, stairPath, stairSpots, type Stair } from '../stairs';
 import { buildLifts, drawStair, type Lift } from '../vertical';
 
 /** Sala de um andar: chave do nome, setor real que ela abre (null = sem tela própria), tipo de mobília. */

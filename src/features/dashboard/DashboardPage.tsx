@@ -1,6 +1,7 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { ArrowDown, ArrowUp, Check, Maximize2, Plus, SlidersHorizontal, Trash2, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, Check, FileText, Maximize2, Plus, SlidersHorizontal, Trash2, X } from 'lucide-react';
 import { useSettings } from '@/app/SettingsProvider';
 import { RoutigMark } from '@/brand/Logo';
 import { loadDashboardConfig, saveDashboardConfig } from '@/data/dashboardRepo';
@@ -147,6 +148,12 @@ export function DashboardPage() {
                 <Button variant="secondary" icon={<SlidersHorizontal className="h-4 w-4" />} onClick={() => setDraft(structuredClone(config))}>
                   {t('dashboard.customize')}
                 </Button>
+              )}
+              {!editing && !settings.nav.hidden.includes('insights') && (
+                <Link to="/insights/weekly" className="inline-flex h-11 items-center gap-2 rounded-xl bg-surface-2 px-4 text-[0.9375rem] font-medium text-fg ring-1 ring-inset ring-line hover:bg-surface-3">
+                  <FileText className="h-4 w-4" aria-hidden />
+                  {t('weeklyReport.title')}
+                </Link>
               )}
             </div>
           )}

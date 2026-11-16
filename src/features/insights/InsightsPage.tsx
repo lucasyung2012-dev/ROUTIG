@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { ChartLine, ChevronLeft, ChevronRight, Printer, Settings2 } from 'lucide-react';
+import { ChartLine, ChevronLeft, ChevronRight, FileText, Printer, Settings2 } from 'lucide-react';
 import { useSettings } from '@/app/SettingsProvider';
 import { addDays, capitalizeFirst, formatDateKey, todayKey, type DateKey } from '@/domain/dates';
 import { FOCUS_KINDS } from '@/domain/focus';
@@ -135,6 +135,10 @@ export function InsightsPage({ initialModule }: { initialModule?: InsightsModule
           className="print:hidden"
           actions={
             <>
+              <Link to="/insights/weekly" className="inline-flex h-11 items-center gap-2 rounded-xl bg-surface-2 px-4 text-[0.9375rem] font-medium text-fg ring-1 ring-inset ring-line hover:bg-surface-3">
+                <FileText className="h-4 w-4" aria-hidden />
+                {t('weeklyReport.title')}
+              </Link>
               <HideButton hide={hide} toggle={toggle} />
               <IconButton label={t('insights.customize')} icon={<Settings2 className="h-4 w-4" />} onClick={() => setCustomizing(true)} />
             </>

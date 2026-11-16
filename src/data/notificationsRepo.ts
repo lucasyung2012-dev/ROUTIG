@@ -9,6 +9,8 @@ import { hasUserData, isBackupStale } from '@/domain/backup';
 import { migrateNotifConfig, pruneKeys, type AlertInput, type NotifConfig } from '@/domain/notifications';
 import { loadTasksConfig } from './tasksRepo';
 import { currentCounts, listExports, loadBackupPrefs } from './backupRepo';
+import { loadReportPrefs } from './weeklyReportRepo';
+import { reportDueToday } from '@/domain/weeklyReport';
 
 const CONFIG_KEY = 'notifications';
 const STATE_KEY = 'notifications.state';
@@ -41,7 +43,7 @@ export async function saveNotifState(s: NotifState): Promise<void> {
 export async function gatherAlertInput(weekStartsOn: 0 | 1, now = new Date()): Promise<AlertInput> {
   const db = getDb();
   const today = todayKey(now);
-  const [tasks, tasksCfg, events, assessments, subjects, habits, habitLogs, goals, backupPrefs, exports, counts] = await Promise.all([
+  const [tasks, tasksCfg, events, assessments, subjects, habits, habitLogs, goals, backupPrefs, exports, counts, reportPrefs] = await Promise.all([
     db.tasks.filter((t) => !t.deletedAt).toArray(),
     loadTasksConfig(),
     db.events.filter((e) => !e.deletedAt).toArray(),
@@ -54,6 +56,7 @@ export async function gatherAlertInput(weekStartsOn: 0 | 1, now = new Date()): P
     loadBackupPrefs(),
     listExports(),
     currentCounts(),
+    loadReportPrefs(),
   ]);
   const subjectName = new Map(subjects.map((s) => [s.id, s.name]));
   const logsByHabit = new Map<string, Map<DateKey, (typeof habitLogs)[number]>>();
@@ -81,6 +84,7 @@ export async function gatherAlertInput(weekStartsOn: 0 | 1, now = new Date()): P
     goals: goals.filter((g) => isOpenGoal(g) && !!g.deadline).map((g) => ({ id: g.id, name: g.name, deadline: g.deadline! })),
     backupStale: isBackupStale(exports[0]?.at ?? null, backupPrefs, hasUserData(counts), now),
     storageUse,
+    weeklyReportDue: reportDueToday(today, reportPrefs),
   };
 }
 

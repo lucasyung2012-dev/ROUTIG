@@ -46,6 +46,7 @@ const FinancePage = lazy(() => import('@/features/finance/FinancePage').then((m)
 const AssetPage = lazy(() => import('@/features/finance/AssetPage').then((m) => ({ default: m.AssetPage })));
 const LibraryPage = lazy(() => import('@/features/library/LibraryPage').then((m) => ({ default: m.LibraryPage })));
 const InsightsPage = lazy(() => import('@/features/insights/InsightsPage').then((m) => ({ default: m.InsightsPage })));
+const WeeklyReportPage = lazy(() => import('@/features/insights/WeeklyReportPage').then((m) => ({ default: m.WeeklyReportPage })));
 const SettingsIndexPage = lazy(() => import('@/features/settings/SettingsPage').then((m) => ({ default: m.SettingsIndexPage })));
 const SettingsSectionPage = lazy(() => import('@/features/settings/SettingsPage').then((m) => ({ default: m.SettingsSectionPage })));
 const LogoComparePage = lazy(() => import('@/features/brand/LogoComparePage').then((m) => ({ default: m.LogoComparePage })));
@@ -180,6 +181,7 @@ function Gate() {
               <Route path="finance/assets/:id" element={<AssetPage />} />
               <Route path="library" element={<LibraryPage />} />
               <Route path="insights" element={<InsightsPage />} />
+              <Route path="insights/weekly" element={<WeeklyReportPage />} />
               <Route path="academy/decks/:id" element={<DeckPage />} />
               {NAV_MODULE_IDS.filter((id) => !['dashboard', 'tasks', 'calendar', 'inbox', 'notes', 'projects', 'academy', 'languages', 'habits', 'goals', 'focus', 'music', 'sports', 'finance', 'library', 'insights'].includes(id)).map((id) => (
                 <Route key={id} path={MODULES[id].path.slice(1)} element={<ModuleRoadmapPage id={id} />} />

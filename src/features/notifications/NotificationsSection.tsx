@@ -37,6 +37,12 @@ export function NotificationsSection() {
             {(id, d) => <Input id={id} aria-describedby={d} type="time" value={c.dailyTime} onChange={(e) => e.target.value && set({ dailyTime: e.target.value })} />}
           </Field>
           <Field label={t('notif.cfg.habitTime')}>{(id) => <Input id={id} type="time" value={c.habitTime} onChange={(e) => e.target.value && set({ habitTime: e.target.value })} />}</Field>
+          <Field label={t('notif.cfg.reportAfternoon')} hint={t('notif.cfg.reportTimeHint')}>
+            {(id, d) => <Input id={id} aria-describedby={d} type="time" value={c.reportAfternoon ?? ''} onChange={(e) => set({ reportAfternoon: e.target.value || null })} />}
+          </Field>
+          <Field label={t('notif.cfg.reportNight')} hint={t('notif.cfg.reportTimeHint')}>
+            {(id, d) => <Input id={id} aria-describedby={d} type="time" value={c.reportNight ?? ''} onChange={(e) => set({ reportNight: e.target.value || null })} />}
+          </Field>
           <Field label={t('notif.cfg.assessmentDays')}>
             {(id) => (
               <Select id={id} value={c.assessmentDays} onChange={(e) => set({ assessmentDays: Number(e.target.value) })}>

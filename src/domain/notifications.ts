@@ -4,7 +4,7 @@ import { addDays, diffDays, toDateKey, type DateKey } from './dates';
 /* ---------- Notificações (Parte 23) ---------- */
 
 /** Categorias (Parte 23.1). Compromissos são os eventos do Calendar; metas são os objetivos do Goals. */
-export const NOTIF_CATEGORIES = ['tasks', 'assessments', 'events', 'habits', 'goals', 'focus', 'backup', 'storage'] as const;
+export const NOTIF_CATEGORIES = ['tasks', 'assessments', 'events', 'habits', 'goals', 'focus', 'backup', 'storage', 'report'] as const;
 export type NotifCategory = (typeof NOTIF_CATEGORIES)[number];
 
 const time = z.string().regex(/^\d{2}:\d{2}$/);
@@ -16,6 +16,9 @@ export const notifConfigSchema = z.object({
   dailyTime: time,
   /** Horário do lembrete dos hábitos que faltam hoje. */
   habitTime: time,
+  /** Lembretes do Relatório da semana na sexta (tarde e noite). null = desligado. */
+  reportAfternoon: time.nullable(),
+  reportNight: time.nullable(),
   /** Avisar provas com quantos dias de antecedência. */
   assessmentDays: z.number().int().min(0).max(30),
   /** Avisar prazos de objetivos com quantos dias de antecedência. */
@@ -36,9 +39,11 @@ export const notifConfigSchema = z.object({
 export type NotifConfig = z.infer<typeof notifConfigSchema>;
 
 export const DEFAULT_NOTIF_CONFIG: NotifConfig = {
-  enabled: { tasks: true, assessments: true, events: true, habits: true, goals: true, focus: true, backup: true, storage: true },
+  enabled: { tasks: true, assessments: true, events: true, habits: true, goals: true, focus: true, backup: true, storage: true, report: true },
   dailyTime: '07:30',
   habitTime: '19:00',
+  reportAfternoon: '16:00',
+  reportNight: '20:00',
   assessmentDays: 3,
   goalDays: 7,
   eventDefaultMin: 0,
@@ -94,7 +99,9 @@ export interface AlertInput {
   goals: Array<{ id: string; name: string; deadline: DateKey }>;
   backupStale: boolean;
   /** Fração usada do armazenamento do aparelho (0 a 1), quando o aparelho informa. */
-  storageUse: number | null;
+  storageUse: number   /** Hoje é sexta e o Relatório da semana ainda não foi enviado (opcional: sem o campo, sem lembrete). */
+  weeklyReportDue?: boolean;
+| null;
 }
 
 /**
@@ -134,6 +141,11 @@ export function computeAlerts(input: AlertInput, cfg: NotifConfig): Alert[] {
   if (on('backup') && input.backupStale) out.push({ key: `backup:${today}`, category: 'backup', title: { key: 'notif.a.backupTitle' }, body: { key: 'notif.a.backupBody' }, at: atTime(today, cfg.dailyTime), path: '/settings/backup' });
   if (on('storage') && input.storageUse !== null && input.storageUse >= 0.8)
     out.push({ key: `storage:${today}`, category: 'storage', title: { key: 'notif.a.storageTitle' }, body: { key: 'notif.a.storageBody', vars: { pct: Math.round(input.storageUse * 100) } }, at: atTime(today, cfg.dailyTime), path: '/library' });
+  if (on('report') && input.weeklyReportDue)
+    for (const [slot, hhmm] of [['afternoon', cfg.reportAfternoon], ['night', cfg.reportNight]] as const) {
+      if (!hhmm) continue;
+      out.push({ key: `report:${slot}:${today}`, category: 'report', title: { key: 'notif.a.reportTitle' }, body: { key: slot === 'afternoon' ? 'notif.a.reportAfternoon' : 'notif.a.reportNight' }, at: atTime(today, hhmm), path: '/insights/weekly' });
+    }
   return out.sort((a, b) => a.at.localeCompare(b.at));
 }
 

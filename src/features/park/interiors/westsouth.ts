@@ -484,9 +484,10 @@ export function createFocusInterior(kit: Kit, labels: Record<FocusSector, string
   sign('booths', 12.9, 0, -Math.PI / 2);
 
   // Mesas por nível de privacidade (bloco dos fundos): mesas abertas perto do jardim; mesas com
-  // divisórias baixas a leste; mesas fechadas com painéis altos a oeste. O meio fica para o lounge.
+  // divisórias baixas a leste, numa fila entre as abertas e a escada (o vão dela, a leste do lounge,
+  // fica livre, com o pé da escada); mesas fechadas com painéis altos a oeste. O meio fica para o lounge.
   for (const sx of [-1, 1]) {
-    const p = spot(b, sx * 5.2, -13.2, 0);
+    const p = spot(b, sx * 5.2, -12.0, 0);
     table(p, m.wood, m.dark, 0, 0, 3.2, 1.0);
     for (const lx of [-1, 0, 1]) {
       chair(p, m.fabric, m.dark, lx, 0.75, Math.PI);
@@ -499,14 +500,16 @@ export function createFocusInterior(kit: Kit, labels: Record<FocusSector, string
     }
     potOn(p, m.white, m.leaf2, 0, 0.75, 0);
   }
-  for (const zc of [-16.2, -18.2, -20.2]) {
-    // Leste: privacidade média.
-    const e = spot(b, 7.4, zc, Math.PI / 2);
+  for (const xc of [3.1, 5.0, 6.9]) {
+    // Leste: privacidade média, de costas para o jardim (fora do vão da escada e da folga em volta).
+    const e = spot(b, xc, -15.0, Math.PI);
     table(e, m.wood, m.dark, 0, 0, 1.5, 0.7);
     chair(e, m.fabric, m.dark, 0, -0.75, 0);
     for (const s of [-1, 1]) e.add(m.fabric2, new THREE.BoxGeometry(0.9, 1.25, 0.04), s * 0.8, 0.625, -0.05, Math.PI / 2);
     e.add(m.fabric2, new THREE.BoxGeometry(1.5, 0.35, 0.03), 0, 0.93, 0.33);
     e.add(m.warm, new THREE.SphereGeometry(0.06, 8, 6), 0.55, 0.85, 0.2);
+  }
+  for (const zc of [-16.2, -18.2, -20.2]) {
     // Oeste: privacidade alta.
     const w = spot(b, -7.4, zc, -Math.PI / 2);
     table(w, m.wood, m.dark, 0, 0, 1.5, 0.7);
@@ -516,7 +519,7 @@ export function createFocusInterior(kit: Kit, labels: Record<FocusSector, string
     w.add(m.wood, new THREE.BoxGeometry(1.5, 0.03, 0.3), 0, 1.45, 0.18);
     w.add(m.warm, new THREE.BoxGeometry(1.3, 0.02, 0.04), 0, 1.43, 0.08);
   }
-  pendants(kit, b, [[7.2, -18.2], [7.2, -20.2], [-7.2, -18.2], [-7.2, -20.2]], 2.9, 7, '#FFE9C2');
+  pendants(kit, b, [[4.0, -15.0], [6.0, -15.0], [-7.2, -18.2], [-7.2, -20.2]], 2.9, 7, '#FFE9C2');
   sign('privacyDesks', 2.4, -11.4, 0, true);
 
   finishRoom(room);
@@ -833,8 +836,9 @@ export function createGoalsInterior(kit: Kit, labels: Record<GoalsSector, string
     }
   });
   b.add(soft, new THREE.TorusGeometry(1.8, 0.02, 6, 6), [0, 7.35, 0], [-Math.PI / 2, 0, 0]);
-  // Vitrine das conquistas (abre as metas concluídas) e mesa de análise, nos cantos do átrio.
-  const achieved: Placed = { x: -7.6, z: -6.4, face: Math.atan2(7.6, 6.4) };
+  // Vitrine das conquistas (abre as metas concluídas) no canto da frente a oeste (o de trás é a
+  // escada) e mesa de análise no canto de trás a leste, virados para o átrio.
+  const achieved: Placed = { x: -7.6, z: 6.4, face: Math.atan2(7.6, -6.4) };
   pick.push(
     sectorAt(scene, 'achieved', achieved.x, achieved.z, achieved.face, (p, g) => {
       p.add(m.wood2, new THREE.BoxGeometry(2.3, 0.5, 0.7), 0, 0.25, 0);
@@ -985,7 +989,8 @@ export function createMusicInterior(kit: Kit, labels: Record<MusicSector, string
   // Instrumentos (oeste, nos fundos): parede de ripas com um plinto por instrumento do usuário
   // (estojo fechado e o nome real), estantes de partitura e cadeiras; abre a lista de instrumentos.
   const boards: Board[] = [];
-  const instruments: Placed = { x: -9.6, z: -7.0, face: Math.PI / 2 };
+  // Mais perto da parede oeste: as cadeiras da frente ficam fora da escada (a leste dela) e do pé dela.
+  const instruments: Placed = { x: -11.0, z: -7.0, face: Math.PI / 2 };
   pick.push(
     sectorAt(scene, 'instruments', instruments.x, instruments.z, instruments.face, (p, g) => {
       p.add(m.wood2, new THREE.BoxGeometry(6.2, 2.6, 0.22), 0, 1.3, -1.6);
@@ -1008,7 +1013,8 @@ export function createMusicInterior(kit: Kit, labels: Record<MusicSector, string
     }),
   );
   sign('instruments', -6.4, -2.6, Math.PI / 2);
-  const study: Placed = { x: -8.2, z: -11.4, face: 0 };
+  // Mesa de estudo/análise logo à frente da parede dos instrumentos (o fundo oeste é a escada).
+  const study: Placed = { x: -10.4, z: -2.0, face: 0 };
   pick.push(
     sectorAt(scene, 'analysis', study.x, study.z, study.face, (p, g) => {
       table(p, m.wood, m.dark, 0, 0, 1.8, 0.8);
@@ -1145,7 +1151,8 @@ export function createSportsInterior(kit: Kit, labels: Record<SportsSector, stri
   b.add(line, new THREE.BoxGeometry(0.08, 0.005, 13), [0, 0.025, 1.0]);
   b.add(line, new THREE.RingGeometry(1.7, 1.78, 48), [0, 0.026, 1.0], [-Math.PI / 2, 0, 0]);
   const boards: Board[] = [];
-  const banners: Placed = { x: 0, z: -7.0, face: 0 };
+  // Um pouco à frente do vão da escada (a oeste do lounge), com a folga em volta dele.
+  const banners: Placed = { x: 0, z: -6.4, face: 0 };
   pick.push(
     sectorAt(scene, 'modalities', banners.x, banners.z, banners.face, (p, g) => {
       for (const lx of [-8.6, -6.1, -3.6, 3.6, 6.1, 8.6]) {
@@ -1215,9 +1222,10 @@ export function createSportsInterior(kit: Kit, labels: Record<SportsSector, stri
   );
   sign('conditioning', 10.8, 8.8, -Math.PI / 2);
 
-  // Atividades individuais (oeste): colchonetes no piso de borracha, suporte de colchonetes
-  // enrolados, espaldar, bolas de equilíbrio e rolos; sacos de pancada pendurados na frente.
-  const solo: Placed = { x: -14.6, z: -6.6, face: Math.PI / 2 };
+  // Atividades individuais (oeste, no meio da lateral: o fundo oeste é a escada, com o pé dela):
+  // colchonetes no piso de borracha, suporte de colchonetes enrolados, espaldar, bolas de equilíbrio
+  // e rolos; sacos de pancada pendurados na frente.
+  const solo: Placed = { x: -14.6, z: 1.0, face: Math.PI / 2 };
   pick.push(
     sectorAt(scene, 'atrium', solo.x, solo.z, solo.face, (p) => {
       p.add(rubber2, new THREE.BoxGeometry(7.0, 0.02, 5.6), 0, 0.01, 0);
@@ -1268,7 +1276,7 @@ export function createSportsInterior(kit: Kit, labels: Record<SportsSector, stri
     b.add(m.metal, new THREE.CylinderGeometry(0.012, 0.012, 0.3, 5), [x, 2.15, 5.66]);
   }
   sign('lockers', -20.2, -1.0, Math.PI / 2);
-  pendants(kit, b, [[-7, 1], [7, 1], [14.6, 3.0], [-14.6, -6.6], [-15.0, 7.2]], 8.2, room.spec.height, '#F0FDF4');
+  pendants(kit, b, [[-7, 1], [7, 1], [14.6, 3.0], [solo.x, solo.z], [-15.0, 7.2]], 8.2, room.spec.height, '#F0FDF4');
   pendants(kit, b, [[-23.5, -2.8], [-23.5, 1.8]], 3.6, 5, '#F0FDF4');
 
   finishRoom(room);

@@ -1105,9 +1105,10 @@ export function createFinanceInterior(kit: Kit, labels: Record<FinanceSector, st
   }
   hangSign(kit, scene, f, zoneLabel('mainFunctions'), ACC, 6.6, 3.6, -7.6, -Math.PI / 2, 2.8, H);
 
-  // Espera ao fundo, a oeste: sofás frente a frente, mesa de centro e plantas.
+  // Espera a oeste, entre a recepção e a visão financeira (o fundo oeste é a escada, com o pé
+  // dela e o caminho até ele): sofás frente a frente, mesa de centro e plantas.
   {
-    const zn = zone(p, -7.6, -8.4, 0);
+    const zn = zone(p, -6.4, 4.1, 0);
     const lf = zn.f;
     rug(lf, 0, 0, 4.4, 2.8);
     sofa(lf, 0, -1.05, 2.2, 0);

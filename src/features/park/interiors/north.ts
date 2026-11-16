@@ -1129,7 +1129,8 @@ export function createLanguagesInterior(kit: Kit, labels: Record<LanguagesSector
   totem(b, scene, M, zoneSign(kit, 'exhibits', accent, 2.6), 2.6, -22.6, 0, Math.PI / 2);
 
   // Mesas de conversação: três mesas redondas de quatro lugares, com pendentes.
-  for (const [x, z] of [[8.4, -7.6], [-8.4, -7.6], [10.6, 2.2]] as const) {
+  // A do oeste fica à frente da escada (o vão dela e o pé ficam livres).
+  for (const [x, z] of [[8.4, -7.6], [-9.8, -2.0], [10.6, 2.2]] as const) {
     roundTable(put, M, x, z, 4, 0.65);
     put(M.pot, C(0.06, 0.05, 0.16, 10), x, 0.86, z);
     put(M.leaf, new THREE.IcosahedronGeometry(0.1, 1), x, 0.98, z);

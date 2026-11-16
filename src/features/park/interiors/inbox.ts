@@ -12,6 +12,7 @@ import * as THREE from 'three';
 import type { Kit } from '../kit';
 import type { Obstacle } from '../camera';
 import { canvasPlane, createRoom, finishRoom, setDetailCommon, wrap, zoneLabel, type InteriorScene } from './common';
+import { inWell, stairOf } from '../stairs';
 import { areaView, at, benchSeat, box, chair, closeZone, counter, credenza, cyl, deskLamp, groundSeats, hangSign as hangSignAt, lightBar, lowTable, palette, pendant, planter, rug, sofa, solid, table, tallPlant, zone, type F, type View } from './east';
 
 export const INBOX_SECTORS = ['atrium', 'triage', 'distribution', 'archive', 'gallery'] as const;
@@ -76,13 +77,28 @@ export function createInboxInterior(kit: Kit, labels: InboxLabels): InteriorScen
   const picks: THREE.Group[] = [];
   const views: Partial<Record<string, View>> = {};
 
-  // Núcleo: anel de colunas até o teto e o lanternim de vidro no alto do pé-direito duplo.
+  // Núcleo: anel de colunas até o teto e o lanternim de vidro no alto do pé-direito duplo. Onde o
+  // anel cruza a escada (o vão sobe do térreo ao 1º andar), ficam de fora as colunas, os panos do
+  // lanternim e o filete do piso: a escada passa ali.
+  const st = stairOf('inbox');
   for (let i = 0; i < 8; i++) {
     const a = (i / 8) * Math.PI * 2 + Math.PI / 8;
-    b.add(silver, new THREE.BoxGeometry(0.5, H, 0.5), [Math.sin(a) * 9.6, H / 2, Math.cos(a) * 9.6]);
+    const x = Math.sin(a) * 9.6;
+    const z = Math.cos(a) * 9.6;
+    if (!inWell(st, x, z, 0.8)) b.add(silver, new THREE.BoxGeometry(0.5, H, 0.5), [x, H / 2, z]);
   }
-  b.add(kit.mat('#B9E6F7', { glass: true }), new THREE.CylinderGeometry(9.2, 9.2, 4.4, 8, 1, true), [0, H - 2.6, 0], [0, Math.PI / 8, 0]);
-  b.add(cyan, new THREE.RingGeometry(9.0, 9.18, 8, 1, Math.PI / 8), [0, 0.012, 0], [-Math.PI / 2, 0, 0]);
+  const lantern = kit.mat('#B9E6F7', { glass: true });
+  for (let i = 0; i < 8; i++) {
+    // Pano entre os vértices a0 e a1 do octógono (os mesmos ângulos das colunas).
+    const a0 = (i / 8) * Math.PI * 2 + Math.PI / 8;
+    const a1 = a0 + Math.PI / 4;
+    const crosses = (r: number) => Array.from({ length: 9 }, (_, k) => k / 8).some((u) => inWell(st, (Math.sin(a0) * (1 - u) + Math.sin(a1) * u) * r, (Math.cos(a0) * (1 - u) + Math.cos(a1) * u) * r, 0.3));
+    const c = a0 + Math.PI / 8;
+    const cos8 = Math.cos(Math.PI / 8);
+    const sin8 = Math.sin(Math.PI / 8);
+    if (!crosses(9.2)) b.add(lantern, new THREE.BoxGeometry(2 * 9.2 * sin8, 4.4, 0.03), [Math.sin(c) * 9.2 * cos8, H - 2.6, Math.cos(c) * 9.2 * cos8], [0, c, 0]);
+    if (!crosses(9.09)) b.add(cyan, new THREE.BoxGeometry(2 * 9.09 * sin8, 0.004, 0.18), [Math.sin(c) * 9.09 * cos8, 0.012, Math.cos(c) * 9.09 * cos8], [0, c, 0]);
+  }
   // Faixa de pedra clara no eixo, da entrada ao núcleo.
   b.add(kit.mat('#DCD6CB', { rough: 0.6 }), new THREE.BoxGeometry(2.4, 0.01, 8.0), [0, 0.008, 15]);
   for (const x of [-6, 6]) pendant(f, x, 12.2, 5.6, LOW, 0.4);
@@ -187,8 +203,9 @@ export function createInboxInterior(kit: Kit, labels: InboxLabels): InteriorScen
     views.distribution = areaView(room, 6.4, 0, -Math.PI / 2, 8, 4.2, 2.4);
   }
 
-  // Revisão inicial (núcleo, lado oeste): quatro mesas de madeira com cadeiras, luminárias e luz linear.
-  const review = zone(p, -6.4, 0, Math.PI / 2, 'triage');
+  // Revisão inicial (núcleo, lado oeste, um pouco à frente: atrás fica a escada): quatro mesas de
+  // madeira com cadeiras, luminárias e luz linear.
+  const review = zone(p, -6.4, 0.4, Math.PI / 2, 'triage');
   {
     const vf = review.f;
     rug(vf, 0, -0.1, 5.8, 3.4);
@@ -202,7 +219,7 @@ export function createInboxInterior(kit: Kit, labels: InboxLabels): InteriorScen
     for (const lz of [0.6, -0.8]) lightBar(vf, 0, lz, 5.0, 0, 3.6, H);
     hangSign(vf, review.g, zoneLabel('firstReview'), 0, 3.0, 1.2, 0, 2.6, H);
     picks.push(closeZone(scene, review));
-    views.triage = areaView(room, -6.4, 0, Math.PI / 2, 8, 5, 0.9);
+    views.triage = areaView(room, -6.4, 0.4, Math.PI / 2, 8, 5, 0.9);
   }
 
   // Arquivo (ala oeste): três estantes abertas com uma caixa por item arquivado e mesa de devolução.

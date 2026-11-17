@@ -132,6 +132,8 @@ no site publicado.
 
 ## 9. Decisões que precisam de nova aprovação
 
+Revisadas com o Lucas em 17/11/2026: as três primeiras foram aprovadas como estão (semana de sábado a sexta, concha da Música mantida, lanterna do Inbox aberta sobre a escada). Segue em aberto só o District.
+
 - **Período do relatório**: ficou sábado a sexta, e não sexta a sexta, para a sexta não contar duas vezes.
 - **Concha acústica ao ar livre da Música**: foi mantida, mas pode duplicar o palco do parque a cerca de 60 m.
 - **Lanterna do Inbox**: ficou aberta sobre a escada (3 painéis a menos).

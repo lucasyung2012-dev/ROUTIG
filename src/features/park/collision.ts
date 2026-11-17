@@ -17,9 +17,15 @@ export function footprint(root: THREE.Object3D, ground: (x: number, z: number) =
   const a = new THREE.Vector3();
   const b = new THREE.Vector3();
   const c = new THREE.Vector3();
+  // Só as células que o triângulo (visto de cima) toca, e não a caixa inteira dele: uma parede na
+  // diagonal (a fachada do tambor, a parede de uma sala do anel, o guarda-corpo de um lance) não
+  // vira uma faixa larga de colisão invisível em volta dela. Uma célula conta quando o centro dela
+  // fica a até meia diagonal (0,71 da célula) do triângulo.
+  const reach = CELL * 0.71;
   const mark = (x0: number, x1: number, z0: number, z1: number, top: number) => {
     for (let i = Math.floor(x0 / CELL); i <= Math.floor(x1 / CELL); i++)
       for (let j = Math.floor(z0 / CELL); j <= Math.floor(z1 / CELL); j++) {
+        if (triDist((i + 0.5) * CELL, (j + 0.5) * CELL, a.x, a.z, b.x, b.z, c.x, c.z) > reach) continue;
         const k = `${i},${j}`;
         const cur = cells.get(k);
         if (!cur || cur.h < top) cells.set(k, { x: (i + 0.5) * CELL, z: (j + 0.5) * CELL, h: top });
@@ -61,6 +67,27 @@ export function footprint(root: THREE.Object3D, ground: (x: number, z: number) =
     }
   });
   return [...cells.values()].map((p) => ({ x: p.x, z: p.z, r: CELL * 0.62, h: p.h }));
+}
+
+/** Distância de um ponto ao segmento (no plano). */
+function seg2(px: number, pz: number, ax: number, az: number, bx: number, bz: number): number {
+  const dx = bx - ax;
+  const dz = bz - az;
+  const l2 = dx * dx + dz * dz;
+  const t = l2 > 1e-12 ? Math.max(0, Math.min(1, ((px - ax) * dx + (pz - az) * dz) / l2)) : 0;
+  return Math.hypot(px - (ax + dx * t), pz - (az + dz * t));
+}
+
+/** Distância de um ponto ao triângulo visto de cima (0 dentro dele; o triângulo em pé vira um segmento). */
+export function triDist(px: number, pz: number, ax: number, az: number, bx: number, bz: number, cx: number, cz: number): number {
+  const d1 = (px - bx) * (az - bz) - (ax - bx) * (pz - bz);
+  const d2 = (px - cx) * (bz - cz) - (bx - cx) * (pz - cz);
+  const d3 = (px - ax) * (cz - az) - (cx - ax) * (pz - az);
+  const neg = d1 < 0 || d2 < 0 || d3 < 0;
+  const pos = d1 > 0 || d2 > 0 || d3 > 0;
+  const area = Math.abs((bx - ax) * (cz - az) - (cx - ax) * (bz - az));
+  if (area > 1e-9 && !(neg && pos)) return 0;
+  return Math.min(seg2(px, pz, ax, az, bx, bz), seg2(px, pz, bx, bz, cx, cz), seg2(px, pz, cx, cz, ax, az));
 }
 
 /** Grade espacial para achar só os obstáculos perto de um ponto. */

@@ -5134,6 +5134,13 @@ export const pt = {
     sheetSize: 'Mudar o tamanho do painel',
     elevatorTitle: 'Elevador',
     youAreHere: 'você está aqui',
+    elevatorUpTitle: 'Elevador · Sobe',
+    elevatorDownTitle: 'Elevador · Desce',
+    elevatorNoneUp: 'Este elevador só sobe e daqui não há andar acima. Use o elevador da direita (Desce).',
+    elevatorNoneDown: 'Este elevador só desce e você já está no térreo. Use o elevador da esquerda (Sobe).',
+    liftUp: 'Sobe',
+    liftDown: 'Desce',
+    liftOff: 'Não para aqui',
     settings3d: {
       intro: 'Ajustes do Campus que ficam neste aparelho. Hora, clima, câmera, som e controles estão nas opções dentro do Campus.',
       stats: 'Mostrar desempenho no Campus',
@@ -5355,6 +5362,9 @@ export const pt = {
     standUp: 'Voltar a andar',
     hints: {
       elevator: 'Chamar o elevador',
+      elevatorUp: 'Chamar o elevador que sobe',
+      elevatorDown: 'Chamar o elevador que desce',
+      elevatorOff: 'Este elevador não para aqui',
       greet: 'Cumprimentar {name}',
       sit: 'Sentar no banco',
       view: 'Apreciar a vista',

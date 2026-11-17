@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type MutableRefObject, type PointerEvent as RPointerEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Armchair, ArrowUpDown, Camera, ChevronsUp, FastForward, Footprints, Hand, LocateFixed, LogIn, Mountain, Smile, TreePine, Waves, LogOut, Monitor, Navigation, RotateCcw, SlidersHorizontal, UserRound, X } from 'lucide-react';
+import { Armchair, ArrowDown, ArrowUp, ArrowUpDown, Camera, ChevronsUp, FastForward, Footprints, Hand, LocateFixed, LogIn, Mountain, Smile, TreePine, Waves, LogOut, Monitor, Navigation, RotateCcw, SlidersHorizontal, UserRound, X } from 'lucide-react';
 import { MODULES, NAV_MODULE_IDS, type ModuleId } from '@/app/modules';
 import { useSettings } from '@/app/SettingsProvider';
 import type { MessageKey } from '@/i18n';
@@ -47,6 +47,7 @@ import { receptionData } from './receptionData';
 import { ModuleCenter } from './ModuleCenter';
 import { DEFAULT_FAB, FloatingCenterButton, PlacesMenu, type FabPlace } from './ParkUi';
 import { floorNameKey, withFloors } from './interiors/floors';
+import { liftTargets, type LiftDir } from './stairs';
 import { setZoneLabels } from './interiors/common';
 import { DRUM_PADS, GUITAR_CHORDS, GUITAR_STRINGS, PIANO_KEYS, vaultStateOf, type Instrument } from './interiors/things';
 import { clearParkContext, pushRecent, readParkContext, saveParkContext } from './parkContext';
@@ -198,7 +199,8 @@ export default function ParkPage() {
   // Painel aberto agora, lido na saída do parque (o efeito do motor só roda uma vez).
   const openPanel = useRef<{ sector: string | null; zone: string | null }>({ sector: null, zone: null });
   openPanel.current = { sector, zone: zoneKey };
-  const [elevator, setElevator] = useState(false);
+  // Elevador chamado (qual e em que sentido: o da esquerda só sobe, o da direita só desce).
+  const [elevator, setElevator] = useState<{ index: number; dir: LiftDir } | null>(null);
   const [instrument, setInstrument] = useState<Instrument | null>(null);
   // Cofre de Finanças (térreo do prédio): janela do cofre aberta e chave para recriar os painéis de
   // Finanças depois de abrir ou trancar pelo cofre (eles leem o bloqueio ao montar).
@@ -261,7 +263,7 @@ export default function ParkPage() {
     };
     // Andares da V2.1 em cima de cada térreo (salas ligadas aos painéis reais).
     for (const [id, make] of Object.entries(base) as Array<[ModuleId, InteriorFactory]>)
-      interiors[id] = (kit) => withFloors(kit, make(kit), id, (key) => t(`park.floorRooms.${id}.${key}` as MessageKey), t('park.terrace'), (n) => t(`park.floorNames.f${n}` as MessageKey), t('park.elevators'));
+      interiors[id] = (kit) => withFloors(kit, make(kit), id, (key) => t(`park.floorRooms.${id}.${key}` as MessageKey), t('park.terrace'), (n) => t(`park.floorNames.f${n}` as MessageKey), t('park.elevators'), { up: t('park.liftUp'), down: t('park.liftDown'), off: t('park.liftOff') });
     try {
       engine.current = createEngine(canvas, {
         quality,
@@ -280,7 +282,7 @@ export default function ParkPage() {
           setVaultPanel(false);
         },
         onFloors: (count, current) => setFloors({ count, current }),
-        onElevator: () => setElevator(true),
+        onElevator: setElevator,
         onInstrument: setInstrument,
         onVault: () => setVaultPanel(true),
         onRiding: setRiding,
@@ -561,7 +563,7 @@ export default function ParkPage() {
       el.blur();
       return;
     }
-    if (elevator) setElevator(false);
+    if (elevator) setElevator(null);
     else if (options) setOptions(false);
     else if (inside && sector) closeSector();
   };
@@ -776,9 +778,11 @@ export default function ParkPage() {
                       : hint.what === 'vault'
                         ? t(vaultState === 'open' ? 'park.use.vaultClose' : 'park.use.vault')
                         : t(`park.use.${hint.what}` as MessageKey)
-                  : hint
-                    ? t(`park.hints.${hint.kind}`)
-                    : ''
+                  : hint?.kind === 'elevator'
+                    ? t(hint.off ? 'park.hints.elevatorOff' : hint.dir === 'up' ? 'park.hints.elevatorUp' : hint.dir === 'down' ? 'park.hints.elevatorDown' : 'park.hints.elevator')
+                    : hint
+                      ? t(`park.hints.${hint.kind}`)
+                      : ''
           }
           detail={posture === 'stand' && hint?.kind === 'person' ? t('park.hints.person', { name: hint.name, activity: t(`park.activities.${hint.activity}` as MessageKey) }) : undefined}
           onAct={() => engine.current?.interact()}
@@ -910,11 +914,13 @@ export default function ParkPage() {
             rooms: n === 0 ? sectors.map((s) => sectorName(inside, s)) : (engine.current?.zones() ?? []).filter((z) => z.level === n).map((z) => t(`park.floorRooms.${inside}.${z.key}` as MessageKey)),
           }))}
           current={floors.current}
+          dir={elevator.dir}
           onPick={(n) => {
-            setElevator(false);
-            engine.current?.rideTo(n);
+            const li = elevator.index;
+            setElevator(null);
+            engine.current?.rideTo(n, li);
           }}
-          onClose={() => setElevator(false)}
+          onClose={() => setElevator(null)}
         />
       )}
       {focus.timer && <FocusParkPill onOpen={() => open2D('focus')} />}
@@ -1020,23 +1026,32 @@ function ActionButtons({ side, engine, canInteract }: { side: 'left' | 'right'; 
   );
 }
 
-/** Painel do elevador: os andares (com as salas de cada um) como botões de um painel de cabine. */
-function ElevatorPanel({ floors, current, onPick, onClose }: { floors: Array<{ name: string; rooms: string[] }>; current: number; onPick: (n: number) => void; onClose: () => void }) {
+/**
+ * Painel do elevador: os andares (com as salas de cada um) como botões de um painel de cabine. O
+ * elevador da esquerda só sobe e o da direita só desce: o painel lista só os andares acima (ou só
+ * os abaixo) do atual, com o sentido no título; sem nenhum (o que sobe no último nível, o que desce
+ * no térreo), diz para usar o outro.
+ */
+function ElevatorPanel({ floors, current, dir, onPick, onClose }: { floors: Array<{ name: string; rooms: string[] }>; current: number; dir: LiftDir; onPick: (n: number) => void; onClose: () => void }) {
   const { t } = useSettings();
+  const targets = new Set(liftTargets(dir, current, floors.length));
+  const title = dir === 'up' ? t('park.elevatorUpTitle') : dir === 'down' ? t('park.elevatorDownTitle') : t('park.elevatorTitle');
+  const Icon = dir === 'up' ? ArrowUp : dir === 'down' ? ArrowDown : ArrowUpDown;
   return (
     <div className="absolute inset-0 z-30 flex items-end justify-center bg-black/30 p-3 sm:items-center" onClick={onClose}>
-      <div role="dialog" aria-label={t('park.elevatorTitle')} onClick={(e) => e.stopPropagation()} className="w-full max-w-sm animate-fade-up overflow-hidden rounded-3xl bg-[#1C2230] text-white shadow-lift ring-1 ring-white/15">
+      <div role="dialog" aria-label={title} onClick={(e) => e.stopPropagation()} className="w-full max-w-sm animate-fade-up overflow-hidden rounded-3xl bg-[#1C2230] text-white shadow-lift ring-1 ring-white/15">
         <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
           <span className="flex items-center gap-2 text-sm font-semibold">
-            <ArrowUpDown className="h-4 w-4 text-accent" aria-hidden />
-            {t('park.elevatorTitle')}
+            <Icon className="h-4 w-4 text-accent" aria-hidden />
+            {title}
           </span>
           <button type="button" aria-label={t('common.close')} onClick={onClose} className="rounded-lg p-1 text-white/70 hover:bg-white/10">
             <X className="h-4 w-4" />
           </button>
         </div>
+        {targets.size === 0 && <p className="px-4 pt-3 text-sm leading-snug text-white/75">{t(dir === 'up' ? 'park.elevatorNoneUp' : 'park.elevatorNoneDown')}</p>}
         <ul className="flex max-h-[55vh] flex-col-reverse gap-2 overflow-y-auto p-3">
-          {floors.map((f, n) => (
+          {floors.map((f, n) => (n === current || targets.has(n)) && (
             <li key={n}>
               <button
                 type="button"

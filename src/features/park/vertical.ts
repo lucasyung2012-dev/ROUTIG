@@ -2,16 +2,17 @@
  * Desenho da circulação vertical (seções 30 a 32): a escada principal de cada prédio (degraus com
  * espelho, laje inclinada por baixo, longarinas, guarda-corpo de vidro com corrimão dos dois lados de
  * cada lance, patamares com guarda-corpo nas bordas livres e o guarda-corpo do vão em cada laje) e
- * os elevadores (núcleo fechado dentro do prédio, nos fundos, uma ou duas cabines lado a lado,
- * portas de correr na cabine e em cada pavimento, botoeira de chamada e indicador de pavimento
- * sobre cada porta, abrindo para o hall de cada nível). Tudo
+ * os elevadores (núcleo fechado dentro do prédio, nos fundos, duas cabines lado a lado: a da esquerda
+ * só sobe e a da direita só desce; portas de correr na cabine e em cada pavimento, a botoeira de
+ * chamada só com o botão do sentido, sobre cada porta o indicador de pavimento e a placa acesa
+ * "Sobe" ou "Desce", e na cabine o painel só com os andares daquele sentido). Tudo
  * numa geometria só por material (Builder); só as cabines, as portas e os indicadores se mexem.
  */
 import * as THREE from 'three';
 import { Builder, type Kit } from './kit';
 import { slab } from './forms';
 import type { Pt } from './outline';
-import { LANE, contourEdges, phaseAt, type Stair } from './stairs';
+import { LANE, contourEdges, liftDir, liftServes, phaseAt, type LiftDir, type Stair } from './stairs';
 
 /** Caixa reta entre dois pontos (x, y, z): `w` de largura (de lado) e `h` de altura, ao longo do segmento. */
 export function beam(b: Builder, m: THREE.Material, ax: number, ay: number, az: number, bx: number, by: number, bz: number, w: number, h: number): void {
@@ -126,6 +127,8 @@ export function drawStair(kit: Kit, b: Builder, st: Stair, warm: boolean): void 
 export interface Lift {
   x: number;
   z: number;
+  /** Sentido: o da esquerda só sobe, o da direita só desce (com um só, os dois). */
+  dir: LiftDir;
   cabin: THREE.Group;
   /** Portas da cabine (filhas dela; x local). */
   doors: [THREE.Object3D, THREE.Object3D];
@@ -133,6 +136,8 @@ export interface Lift {
   hall: Array<[THREE.Object3D, THREE.Object3D]>;
   /** Luz do indicador de cada pavimento (x local = posição do andar da cabine). */
   marks: THREE.Object3D[];
+  /** Botões do painel da cabine, um por nível (aparecem só os do sentido, a partir de onde a cabine está: `showButtons`). */
+  buttons: THREE.Object3D[];
   /** Meia largura da folha fechada e quanto ela corre para abrir. */
   shut: number;
   slide: number;
@@ -141,26 +146,56 @@ export interface Lift {
 /** Posição (x local) da luz do indicador quando a cabine está no nível `n` de `count`. */
 export const markX = (n: number, count: number): number => (n - (count - 1) / 2) * 0.13;
 
+/** Painel da cabine parada no nível `n`: só os botões dos andares do sentido dela (acima, no que sobe; abaixo, no que desce). */
+export function showButtons(lf: Lift, n: number): void {
+  lf.buttons.forEach((b, k) => (b.visible = k !== n && (lf.dir === 'up' ? k > n : lf.dir === 'down' ? k < n : true)));
+}
+
+/** Seta e palavra do sentido do elevador ("▲ Sobe", "▼ Desce"). */
+export const liftLabel = (dir: LiftDir, words: { up: string; down: string }): string => (dir === 'up' ? `▲ ${words.up}` : dir === 'down' ? `▼ ${words.down}` : `▲▼`);
+
 /**
  * Núcleo dos elevadores dentro do prédio, nos fundos (poço com centro em x = 0, z = `tz`; `w` × `d`
- * por dentro, paredes de `t` m), do chão até `topY`: paredes de concreto, em cada pavimento a frente
- * (para o hall) com uma porta de correr por cabine (folhas de 0,56 m), a botoeira de chamada
- * (sobe/desce) e, sobre cada porta, o indicador com uma luz por pavimento (acende a do andar onde a
- * cabine está) e o nome do pavimento; em cima, "Elevadores". Cabines de `cw` m de largura.
+ * por dentro, paredes de `t` m), do chão até `topY`: paredes de concreto e, em cada pavimento, a
+ * frente (para o hall) com uma porta de correr por cabine (folhas de 0,56 m). Sobre cada porta, o
+ * indicador com uma luz por pavimento (acende a do andar onde a cabine está) e a placa acesa do
+ * sentido ("▲ Sobe" no da esquerda, "▼ Desce" no da direita); ao lado de cada porta, a botoeira só
+ * com o botão do sentido. Onde o elevador não para (o que sobe no último nível, o que desce no
+ * térreo), a placa diz que ele não para ali, a botoeira fica sem botão e uma faixa atravessa a
+ * porta. Em cima, o nome do pavimento e "Elevadores". Cabines de `cw` m de largura, com o painel
+ * de andares do sentido dela.
  */
 export function buildLifts(
   kit: Kit,
   root: THREE.Object3D,
   b: Builder,
-  o: { xs: readonly number[]; w: number; d: number; t: number; cw: number; tz: number; ys: readonly number[]; topY: number; accent: string; names: readonly string[]; title: string; sign: (label: string, color: string, w: number) => THREE.Object3D },
+  o: {
+    xs: readonly number[];
+    w: number;
+    d: number;
+    t: number;
+    cw: number;
+    tz: number;
+    ys: readonly number[];
+    topY: number;
+    accent: string;
+    names: readonly string[];
+    title: string;
+    /** Palavras das placas: sobe, desce e "não para aqui". */
+    words?: { up: string; down: string; off: string };
+    sign: (label: string, color: string, w: number) => THREE.Object3D;
+  },
 ): Lift[] {
   const { xs, w, d, t, tz, ys, topY, accent } = o;
+  const words = o.words ?? { up: 'Sobe', down: 'Desce', off: 'Não para aqui' };
   const concrete = kit.mat('#D9D5CD', { rough: 0.85 });
   const steelDoor = kit.mat('#B8C0CA', { metal: 0.8, rough: 0.28 });
   const frame = kit.mat('#5B6573', { metal: 0.6, rough: 0.35 });
   const dark = kit.mat('#1F2733', { rough: 0.5 });
   const glow = kit.mat(accent, { glow: true });
   const dim = kit.mat('#475569', { rough: 0.6 });
+  const stop = kit.mat('#B91C1C', { glow: true });
+  const stripe = kit.mat('#F59E0B', { rough: 0.6 });
   const lightMat = kit.mat('#FFF1D6', { glow: true });
   const cabWall = kit.mat('#E9EDF2', { rough: 0.4, metal: 0.2 });
   const floorMat = kit.mat('#9AA3AE', { rough: 0.6 });
@@ -169,6 +204,7 @@ export function buildLifts(
   const fz = front + t;
   const half = 0.56;
   const doorH = 2.35;
+  const count = ys.length;
   // Poço: fundo, laterais, divisória entre as cabines e a laje de cima.
   b.add(concrete, new THREE.BoxGeometry(w + 2 * t, topY, t), [0, topY / 2, tz - d / 2 - t / 2]);
   for (const s of [-1, 1]) b.add(concrete, new THREE.BoxGeometry(t, topY, d + 2 * t), [s * (w / 2 + t / 2), topY / 2, tz]);
@@ -176,8 +212,18 @@ export function buildLifts(
   b.add(concrete, new THREE.BoxGeometry(w + 2 * t + 0.1, 0.3, d + 2 * t + 0.1), [0, topY + 0.15, tz]);
   // Frente de cada pavimento: paredes entre as portas, vergas, batentes, botoeira, indicadores.
   const cuts = xs.map((x) => [x - half, x + half] as const);
-  const lifts: Lift[] = xs.map((x): Lift => ({ x, z: tz, cabin: new THREE.Group(), doors: [new THREE.Object3D(), new THREE.Object3D()], hall: [], marks: [], shut: half / 2, slide: half - 0.04 }));
+  const lifts: Lift[] = xs.map((x, i): Lift => ({ x, z: tz, dir: liftDir(i, xs.length), cabin: new THREE.Group(), doors: [new THREE.Object3D(), new THREE.Object3D()], hall: [], marks: [], buttons: [], shut: half / 2, slide: half - 0.04 }));
   const panelGeo = new THREE.BoxGeometry(half, doorH - 0.05, 0.04);
+  // Botão de chamada em triângulo (para cima ou para baixo).
+  const arrowGeo = kit.own(new THREE.CircleGeometry(0.045, 3));
+  // Botoeira de cada porta: do lado de fora dela (entre o batente e a quina do núcleo); com um
+  // elevador só, à direita.
+  const panelX = (lf: Lift): number => {
+    if (xs.length < 2) return lf.x + half + 0.3;
+    const s = Math.sign(lf.x) || 1;
+    const inner = Math.abs(lf.x) + half + 0.08;
+    return s * (inner + (w / 2 + t - inner) / 2);
+  };
   ys.forEach((y, n) => {
     const yTop = n + 1 < ys.length ? ys[n + 1]! : topY;
     const band = yTop - y;
@@ -187,7 +233,8 @@ export function buildLifts(
       if (c - a > 0.01 && band > doorH) b.add(concrete, new THREE.BoxGeometry(c - a, band - doorH, t), [(a + c) / 2, y + doorH + (band - doorH) / 2, front + t / 2]);
       x0 = c;
     }
-    lifts.forEach((lf, i) => {
+    lifts.forEach((lf) => {
+      const serves = liftServes(lf.dir, n, count);
       // Batente e soleira.
       for (const s of [-1, 1]) b.add(frame, new THREE.BoxGeometry(0.08, doorH, t + 0.06), [lf.x + s * (half + 0.04), y + doorH / 2, front + t / 2]);
       b.add(frame, new THREE.BoxGeometry(2 * half + 0.16, 0.08, t + 0.06), [lf.x, y + doorH + 0.04, front + t / 2]);
@@ -202,34 +249,48 @@ export function buildLifts(
       });
       lf.hall.push([pair[0]!, pair[1]!]);
       // Indicador de pavimento sobre a porta: uma luz apagada por nível e a acesa no andar da cabine.
+      const iy = y + doorH + 0.2;
       const g = new THREE.Group();
-      g.position.set(lf.x, y + doorH + 0.32, fz + 0.04);
-      b.add(dark, new THREE.BoxGeometry(Math.max(0.5, ys.length * 0.13 + 0.16), 0.2, 0.04), [lf.x, y + doorH + 0.32, fz + 0.02]);
-      ys.forEach((_, k) => b.add(dim, new THREE.BoxGeometry(0.08, 0.05, 0.02), [lf.x + markX(k, ys.length), y + doorH + 0.32, fz + 0.045]));
+      g.position.set(lf.x, iy, fz + 0.04);
+      b.add(dark, new THREE.BoxGeometry(Math.max(0.5, count * 0.13 + 0.16), 0.2, 0.04), [lf.x, iy, fz + 0.02]);
+      ys.forEach((_, k) => b.add(dim, new THREE.BoxGeometry(0.08, 0.05, 0.02), [lf.x + markX(k, count), iy, fz + 0.045]));
       const mark = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.06, 0.02), glow);
       kit.own(mark.geometry);
-      mark.position.x = markX(0, ys.length);
+      mark.position.x = markX(0, count);
       mark.position.z = 0.03;
       g.add(mark);
       g.userData.noCollide = true;
       mark.userData.noCollide = true;
       root.add(g);
       lf.marks.push(mark);
-      // Botoeira de chamada: entre as portas (duas cabines) ou à direita (uma).
-      if (i === lifts.length - 1) {
-        const bx = lifts.length > 1 ? 0 : lf.x + half + 0.3;
-        b.add(dark, new THREE.BoxGeometry(0.16, 0.34, 0.04), [bx, y + 1.15, fz + 0.02]);
-        if (n + 1 < ys.length) b.add(glow, new THREE.CircleGeometry(0.035, 12), [bx, y + 1.22, fz + 0.045]);
-        if (n > 0) b.add(glow, new THREE.CircleGeometry(0.035, 12), [bx, y + 1.08, fz + 0.045]);
+      // Placa acesa do sentido sobre a porta ("▲ Sobe" / "▼ Desce"); onde ele não para, apagada e
+      // dizendo que não para ali, e uma faixa atravessando a porta.
+      if (xs.length > 1) {
+        const ds = o.sign(serves ? liftLabel(lf.dir, words) : `${liftLabel(lf.dir, words)} · ${words.off}`, serves ? accent : '#64748B', 0.95);
+        ds.position.set(lf.x, y + doorH + 0.52, fz + 0.05);
+        ds.userData.noCollide = true;
+        root.add(ds);
+        if (!serves) for (const sy of [0.95, 1.25]) b.add(stripe, new THREE.BoxGeometry(2 * half + 0.1, 0.07, 0.03), [lf.x, y + sy, fz + 0.05]);
+      }
+      // Botoeira: só o botão do sentido do elevador (sem botão onde ele não para).
+      const bx = panelX(lf);
+      b.add(dark, new THREE.BoxGeometry(0.16, 0.34, 0.04), [bx, y + 1.15, fz + 0.02]);
+      const btn = (up: boolean, by: number) => b.add(glow, arrowGeo.clone(), [bx, by, fz + 0.045], [0, 0, up ? Math.PI / 2 : -Math.PI / 2]);
+      if (!serves) b.add(stop, new THREE.CircleGeometry(0.025, 10), [bx, y + 1.15, fz + 0.045]);
+      else if (lf.dir === 'up') btn(true, y + 1.15);
+      else if (lf.dir === 'down') btn(false, y + 1.15);
+      else {
+        if (n + 1 < count) btn(true, y + 1.22);
+        if (n > 0) btn(false, y + 1.08);
       }
     });
     // Nome do pavimento e "Elevadores" sobre as portas.
-    const name = o.sign(o.names[n] ?? '', accent, 1.6);
-    name.position.set(0, y + doorH + 0.75, fz + 0.04);
+    const name = o.sign(o.names[n] ?? '', accent, 1.3);
+    name.position.set(0, y + doorH + 0.86, fz + 0.04);
     root.add(name);
-    if (band > doorH + 1.6) {
+    if (band > doorH + 1.75) {
       const tt = o.sign(o.title, accent, 2.2);
-      tt.position.set(0, y + doorH + 1.3, fz + 0.04);
+      tt.position.set(0, y + doorH + 1.35, fz + 0.04);
       root.add(tt);
     }
   });
@@ -237,6 +298,7 @@ export function buildLifts(
   // Cabines: piso, fundo e laterais, teto com luz, corrimão, painel de andares e as portas de correr.
   const cw = o.cw;
   const cd = d - 0.5;
+  const short = (n: number) => (n === 0 ? (o.names[0] ?? 'T').slice(0, 1) : String(n));
   for (const lf of lifts) {
     const cb = new Builder();
     cb.add(floorMat, new THREE.BoxGeometry(cw, 0.12, cd), [0, -0.06, 0]);
@@ -246,9 +308,32 @@ export function buildLifts(
     cb.add(cabWall, new THREE.BoxGeometry(cw, 0.1, cd), [0, 2.45, 0]);
     cb.add(lightMat, new THREE.BoxGeometry(cw * 0.6, 0.02, cd * 0.6), [0, 2.39, 0]);
     cb.add(frame, new THREE.BoxGeometry(cw - 0.3, 0.04, 0.04), [0, 0.92, -cd / 2 + 0.08]);
-    cb.add(dark, new THREE.BoxGeometry(0.04, 0.5, 0.24), [cw / 2 - 0.05, 1.3, cd / 2 - 0.4]);
-    for (let k = 0; k < ys.length; k++) cb.add(glow, new THREE.CircleGeometry(0.03, 10), [cw / 2 - 0.075, 1.12 + k * 0.09, cd / 2 - 0.4], [0, -Math.PI / 2, 0]);
+    // Painel de andares na parede lateral, perto da porta: um botão (com o número) por nível; só
+    // aparecem os do sentido da cabine, a partir de onde ela está (showButtons).
+    const px = cw / 2 - 0.05;
+    const pz = cd / 2 - 0.4;
+    const ph = 0.16 + count * 0.11;
+    cb.add(dark, new THREE.BoxGeometry(0.04, ph, 0.3), [px, 1.05 + ph / 2, pz]);
     lf.cabin.add(cb.build());
+    for (let k = 0; k < count; k++) {
+      const g = new THREE.Group();
+      const dot = new THREE.Mesh(arrowGeo, glow);
+      dot.scale.setScalar(0.7);
+      dot.rotation.z = lf.dir === 'down' ? -Math.PI / 2 : Math.PI / 2;
+      dot.position.set(0.07, 0, 0.005);
+      const label = o.sign(short(k), '#94A3B8', 0.16);
+      label.position.set(-0.05, 0, 0.005);
+      g.add(dot, label);
+      g.position.set(px - 0.025, 1.13 + k * 0.11, pz);
+      g.rotation.y = -Math.PI / 2;
+      lf.cabin.add(g);
+      lf.buttons.push(g);
+    }
+    // Placa do sentido sobre o painel, dentro da cabine.
+    const inSign = o.sign(liftLabel(lf.dir, words), accent, 0.5);
+    inSign.position.set(px - 0.03, 1.2 + ph + 0.12, pz);
+    inSign.rotation.y = -Math.PI / 2;
+    lf.cabin.add(inSign);
     lf.doors.forEach((dr, k) => {
       const s = k === 0 ? -1 : 1;
       dr.add(new THREE.Mesh(panelGeo, steelDoor));
@@ -257,6 +342,7 @@ export function buildLifts(
     });
     lf.cabin.position.set(lf.x, ys[0] ?? 0, tz);
     lf.cabin.traverse((ob) => (ob.userData.noCollide = true));
+    showButtons(lf, 0);
     root.add(lf.cabin);
   }
   return lifts;

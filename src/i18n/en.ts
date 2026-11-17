@@ -5136,6 +5136,13 @@ export const en: Messages = {
     sheetSize: 'Change the panel size',
     elevatorTitle: 'Elevator',
     youAreHere: 'you are here',
+    elevatorUpTitle: 'Elevator · Up',
+    elevatorDownTitle: 'Elevator · Down',
+    elevatorNoneUp: 'This elevator only goes up and there is no floor above. Use the elevator on the right (Down).',
+    elevatorNoneDown: 'This elevator only goes down and you are on the ground floor. Use the elevator on the left (Up).',
+    liftUp: 'Up',
+    liftDown: 'Down',
+    liftOff: 'No service here',
     settings3d: {
       intro: 'Campus settings kept on this device. Time, weather, camera, sound and controls are in the options inside the Campus.',
       stats: 'Show performance in the Campus',
@@ -5357,6 +5364,9 @@ export const en: Messages = {
     standUp: 'Walk again',
     hints: {
       elevator: 'Call the elevator',
+      elevatorUp: 'Call the up elevator',
+      elevatorDown: 'Call the down elevator',
+      elevatorOff: 'This elevator does not stop here',
       greet: 'Greet {name}',
       sit: 'Sit on the bench',
       view: 'Enjoy the view',

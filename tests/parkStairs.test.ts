@@ -23,11 +23,11 @@ describe('Campus: escadas e elevadores pela circulação de cada prédio', () =>
     const want: Partial<Record<ModuleId, [string | null, number]>> = {
       academy: ['U', 2],
       languages: ['L', 2],
-      notes: ['L', 1],
+      notes: ['L', 2],
       library: ['U', 2],
       inbox: ['L', 2],
       calendar: ['curved', 2],
-      focus: ['L', 1],
+      focus: ['L', 2],
       habits: [null, 0],
       goals: ['U', 2],
       insights: ['core', 2],

@@ -22,7 +22,20 @@ export type StairKind = 'straight' | 'L' | 'U' | 'curved' | 'core';
 export interface Circulation {
   stair: StairKind | null;
   lifts: 0 | 1 | 2;
+  /** Poço estreito de duas cabines (Notes e Focus, que tinham um elevador só): cabe onde cabia o de uma. */
+  narrow?: boolean;
 }
+
+/**
+ * Sentido de cada elevador nos prédios com dois: o da esquerda (x < 0, de quem olha as portas) só
+ * sobe e o da direita só desce; com um elevador só, ele faz os dois sentidos.
+ */
+export type LiftDir = 'up' | 'down' | 'both';
+export const liftDir = (i: number, count: number): LiftDir => (count < 2 ? 'both' : i === 0 ? 'up' : 'down');
+/** O elevador de sentido `dir` para no nível `n` (de `count`): o que sobe não para no último; o que desce, no térreo. */
+export const liftServes = (dir: LiftDir, n: number, count: number): boolean => count > 1 && n >= 0 && n < count && (dir === 'up' ? n < count - 1 : dir === 'down' ? n > 0 : true);
+/** Andares que o elevador de sentido `dir` oferece a quem está no nível `cur`: só os de cima (sobe) ou só os de baixo (desce). */
+export const liftTargets = (dir: LiftDir, cur: number, count: number): number[] => Array.from({ length: count }, (_, n) => n).filter((n) => n !== cur && (dir === 'up' ? n > cur : dir === 'down' ? n < cur : true));
 
 /**
  * Programa de circulação (prompt, seções 13 a 27). Tasks e Projects não dizem a escada: U na torre
@@ -34,13 +47,13 @@ export interface Circulation {
 export const CIRCULATION: Record<ModuleId, Circulation> = {
   academy: { stair: 'U', lifts: 2 },
   languages: { stair: 'L', lifts: 2 },
-  notes: { stair: 'L', lifts: 1 },
+  notes: { stair: 'L', lifts: 2, narrow: true },
   library: { stair: 'U', lifts: 2 },
   inbox: { stair: 'L', lifts: 2 },
   calendar: { stair: 'curved', lifts: 2 },
   tasks: { stair: 'U', lifts: 2 },
   projects: { stair: 'L', lifts: 2 },
-  focus: { stair: 'L', lifts: 1 },
+  focus: { stair: 'L', lifts: 2, narrow: true },
   habits: { stair: null, lifts: 0 },
   goals: { stair: 'U', lifts: 2 },
   insights: { stair: 'core', lifts: 2 },
@@ -279,12 +292,13 @@ export function corridorBand(front: number, back: number): { zb: number; zf: num
 
 /**
  * Poço dos elevadores por dentro: largura, fundo, o x de cada cabine (lado a lado, no eixo dos
- * fundos) e a largura da cabine. Com as paredes, o núcleo de duas cabines tem 3,9 m: fica sempre
- * dentro do eixo, aquém de onde a escada pode ficar (|x| ≥ 2 m).
+ * fundos) e a largura da cabine. Com as paredes, o núcleo de duas cabines tem 3,9 m (o estreito,
+ * 3,2 m; o de uma, 2,9 m): fica sempre dentro do eixo, aquém de onde a escada pode ficar (|x| ≥ 2 m).
  */
 export function liftShaft(id: ModuleId): { w: number; d: number; xs: number[]; cw: number } {
-  const n = CIRCULATION[id].lifts;
-  return n === 2 ? { w: 3.6, d: 1.9, xs: [-0.9, 0.9], cw: 1.55 } : { w: 2.6, d: 1.9, xs: [0], cw: 2.1 };
+  const c = CIRCULATION[id];
+  if (c.lifts === 2 && c.narrow) return { w: 2.9, d: 1.9, xs: [-0.725, 0.725], cw: 1.25 };
+  return c.lifts === 2 ? { w: 3.6, d: 1.9, xs: [-0.9, 0.9], cw: 1.55 } : { w: 2.6, d: 1.9, xs: [0], cw: 2.1 };
 }
 
 /** Espessura das paredes do poço, fundo e meia largura do hall na frente das portas. */
@@ -553,12 +567,27 @@ function build(id: ModuleId): Stair | null {
     return { id, kind, well, phases, ...sg, vols: holding(id, well) };
   }
   const local = kind === 'U' ? shapeU() : kind === 'L' ? shapeL() : shapeStraight();
-  const at = search(id, local, sg, 1.6, 1.7) ?? search(id, local, sg, 0.45, 1.7) ?? search(id, local, sg, 0.45, 0.6);
+  // No mezanino (planta 'side'), a frente da escada dá para o pé-direito alto: o caminho até o
+  // outro lado dela passa entre ela e o núcleo dos elevadores, que precisa de folga (CORE_GAP);
+  // encostada no núcleo, o guarda-corpo e a parede dele fechavam a passagem (no Projects, o 2º
+  // andar ficava sem chegar à escada). Onde não cabe com folga (Focus), mais perto, como antes. Nas
+  // outras plantas a escada fica onde estava (o caminho até ela é pela frente).
+  let at: { cx: number; cz: number; rot: number } | null = null;
+  for (const gap of upperPlan(FORMS[id]) === 'side' ? [CORE_GAP, 0.6, 0] : [0]) {
+    at = search(id, local, sg, 1.6, 1.7, gap) ?? search(id, local, sg, 0.45, 1.7, gap) ?? search(id, local, sg, 0.45, 0.6, gap);
+    if (at) break;
+  }
   if (!at) return null;
   const f = place(at.cx, at.cz, at.rot);
   const well = local.well.map(f);
   return { id, kind, well, phases: local.phases.map((p) => moved(p, f)), ...sg, vols: holding(id, well) };
 }
+
+/**
+ * Folga entre a escada e o núcleo dos elevadores (m): 0,3 m de guarda-corpo, 0,3 m da parede do
+ * núcleo e meio metro de passagem entre os dois.
+ */
+export const CORE_GAP = 1.1;
 
 /** Volumes de qualquer nível que contêm a escada inteira (o vão corta a laje de cada um). */
 function holding(id: ModuleId, well: readonly Pt[]): Vol[] {
@@ -593,9 +622,10 @@ const wrapPi = (a: number) => Math.atan2(Math.sin(a - Math.PI), Math.cos(a - Mat
  * (o vão corta a laje de quem a contém inteira), fora do eixo da entrada e da ponte do elevador, do
  * vazio do meio (e do corredor do meio), do pé-direito alto (mezanino) e da frente, de
  * preferência atrás da faixa das salas (planta em corredor); o pé e a chegada de cada nível no
- * piso livre; nos anéis, nos fundos (na abertura do anel). `clear`: folga do vazio do meio.
+ * piso livre; nos anéis, nos fundos (na abertura do anel). `clear`: folga do vazio do meio; `gap`:
+ * folga do núcleo dos elevadores (passagem entre ele e a escada).
  */
-function search(id: ModuleId, local: { well: Pt[]; phases: StairPhase[] }, sg: { ys: number[]; first: number[] }, wall: number, clear: number): { cx: number; cz: number; rot: number } | null {
+function search(id: ModuleId, local: { well: Pt[]; phases: StairPhase[] }, sg: { ys: number[]; first: number[] }, wall: number, clear: number, gap = 0): { cx: number; cz: number; rot: number } | null {
   const top = topLevel(id);
   const fp = upperPlan(FORMS[id]);
   // Longe do eixo: da ponte do elevador e da entrada (x = 0) e, nas plantas em corredor, do corredor do meio.
@@ -610,7 +640,8 @@ function search(id: ModuleId, local: { well: Pt[]; phases: StairPhase[] }, sg: {
   const core = liftCore(id);
   // Folga do saguão dos elevadores junto à parede dos fundos do térreo (a mesma de antes do núcleo
   // ir para dentro do prédio: a escada de cada prédio fica onde estava).
-  const portal = CIRCULATION[id].lifts > 1 ? 3.2 : 2.05;
+  // (O poço estreito de duas cabines do Notes e do Focus guarda a folga do de uma: a escada não muda.)
+  const portal = CIRCULATION[id].lifts > 1 && !CIRCULATION[id].narrow ? 3.2 : 2.05;
   const zv = Array.from({ length: top + 1 }, (_, L) => (L > 0 && fp === 'side' ? sideCut(id, L) : Infinity));
   const zb = Array.from({ length: top + 1 }, (_, L) => {
     if (L === 0 || (fp !== 'corridor' && fp !== 'open')) return Infinity;
@@ -675,7 +706,7 @@ function search(id: ModuleId, local: { well: Pt[]; phases: StairPhase[] }, sg: {
       if (Math.abs(x) < axis) return false;
       // Junto à parede dos fundos do térreo: livre o saguão dos elevadores; nunca no núcleo deles.
       if (z < -(span0.back - 2.5) && Math.abs(x) < portal) return false;
-      if (inLiftCore(core, x, z)) return false;
+      if (inLiftCore(core, x, z, gap)) return false;
       if (inner && Math.hypot(x, z) < inner + clear) return false;
       for (let L = 1; L <= top; L++) if (z > zv[L]! - 0.45) return false;
     }
@@ -734,6 +765,35 @@ export function contourEdges(pts: readonly Pt[], well: readonly Pt[]): Array<[Pt
     const a = pts[j]!;
     const c = pts[i]!;
     if (polyDist(well, (a[0] + c[0]) / 2, (a[1] + c[1]) / 2) < 0.03) out.push([a, c]);
+  }
+  return out;
+}
+
+/**
+ * Por onde se chega à escada no nível `L`: o pé (subir), a chegada (descer) e, na frente de cada
+ * borda do patamar que dá para o piso (por onde se entra), o ponto a 0,6 m dela. Salas, móveis,
+ * plantas e placas ficam longe destes pontos (floors.ts), para nada travar o caminho até a escada.
+ */
+export function stairApproach(st: Stair, L: number): Pt[] {
+  const s = stairSpots(st, L);
+  const out: Pt[] = [];
+  if (s.up) out.push(s.up);
+  if (s.down) out.push(s.down);
+  const land = phaseAt(st, Math.max(0, Math.min(L, st.ys.length - 1))).land;
+  const cx = land.reduce((a, p) => a + p[0], 0) / land.length;
+  const cz = land.reduce((a, p) => a + p[1], 0) / land.length;
+  for (const [a, c] of contourEdges(land, st.well)) {
+    const l = Math.hypot(c[0] - a[0], c[1] - a[1]);
+    if (l < 0.3) continue;
+    const mx = (a[0] + c[0]) / 2;
+    const mz = (a[1] + c[1]) / 2;
+    let nx = (c[1] - a[1]) / l;
+    let nz = -(c[0] - a[0]) / l;
+    if ((mx - cx) * nx + (mz - cz) * nz < 0) {
+      nx = -nx;
+      nz = -nz;
+    }
+    out.push([mx + nx * 0.6, mz + nz * 0.6]);
   }
   return out;
 }

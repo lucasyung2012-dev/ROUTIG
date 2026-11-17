@@ -22,8 +22,10 @@ import { createExtras } from './extras';
 import { createAnimals } from './animals';
 import type { InteriorScene } from './interiors/common';
 import type { Climb, Floors } from './interiors/floors';
-import { markX, type Lift } from './vertical';
-import { levelAtHeight } from './stairs';
+import { markX, showButtons, type Lift } from './vertical';
+import { CIRCULATION, coreFrom, levelAtHeight, liftServes, stairApproach, stairOf, voidRadius, type LiftDir } from './stairs';
+import { groundSpan } from './massing';
+import { reachSummary, stairReach, walkWorld, type ReachLevel } from './reach';
 
 export interface Stats {
   fps: number;
@@ -51,8 +53,11 @@ export interface EngineOpts {
   /** O que dá para fazer aqui (sentar, observar) e a postura atual. */
   onHint: (h: Hint | null) => void;
   onPosture: (p: Posture) => void;
-  /** Perto do elevador e a pessoa pediu para chamar: mostrar a escolha de andar. */
-  onElevator: () => void;
+  /**
+   * Perto de um elevador e a pessoa pediu para chamar: mostrar a escolha de andar daquele elevador
+   * (índice e sentido: o da esquerda só sobe, o da direita só desce).
+   */
+  onElevator: (lift: { index: number; dir: LiftDir }) => void;
   /** Elevador em movimento (true) ou parado (false). */
   onRiding: (riding: boolean) => void;
   /** Alguém respondeu ao cumprimento (nome, atividade e qual fala). */
@@ -70,7 +75,7 @@ export interface EngineOpts {
   restore?: ParkSnapshot | null;
 }
 
-export type Hint = { kind: 'use'; what: ThingKind; key?: string; up?: boolean } | { kind: 'elevator' } | { kind: 'sit' } | { kind: 'view' } | { kind: 'tree' } | { kind: 'water' } | { kind: 'person'; name: string; activity: string };
+export type Hint = { kind: 'use'; what: ThingKind; key?: string; up?: boolean } | { kind: 'elevator'; dir: LiftDir; off: boolean } | { kind: 'sit' } | { kind: 'view' } | { kind: 'tree' } | { kind: 'water' } | { kind: 'person'; name: string; activity: string };
 
 export interface Engine {
   setQuality: (q: Quality) => void;
@@ -109,8 +114,11 @@ export interface Engine {
   /** Salas dos andares do prédio aberto (índice = posição na lista). */
   zones: () => Array<{ level: number; key: string; sector: string | null }>;
   focusZone: (i: number) => void;
-  /** Andar de elevador até o andar `n` (com cabine e portas). */
-  rideTo: (n: number) => void;
+  /**
+   * Andar de elevador até o andar `n` (com cabine e portas), no elevador `lift` (sem ele, no do
+   * sentido da viagem: o que sobe ou o que desce).
+   */
+  rideTo: (n: number, lift?: number) => void;
   /** Tocar a tecla/peça `i` do instrumento aberto (piano: PIANO_KEYS; bateria: DRUM_PADS; violão: guitarStrum). */
   play: (i: number) => void;
   /** Parou de tocar (painel do instrumento fechado): a vista volta ao normal. */
@@ -336,7 +344,8 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
 
   /* ---------- Andares dos interiores ---------- */
   let level = 0;
-  const levelWorld = (L: number): CameraWorld => {
+  /** O mundo de quem anda no nível `L`; `feet` = altura dos pés (a do corpo, salvo na conferência 'stairs:reach'). */
+  const levelWorld = (L: number, feet: () => number = () => rig.body().pos.y): CameraWorld => {
     const sc = inside!.scene;
     const fl = sc.floors;
     const lv = fl?.levels[L];
@@ -349,31 +358,13 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
         : { ground: () => lv.y, obstacles: lv.obstacles, limit: { x: 0, z: 0, r: lv.walk }, ceiling: lv.ceiling, minDistance: 1.5, maxDistance: sc.room.radius * 1.7, blocked: lv.blocked, wall: lv.wallAt };
     const sw = fl?.walk;
     if (!sw || !lv) return base;
-    // Escada onde se anda (seção 30): dentro dela, o piso é o do degrau ou do patamar mais perto
-    // dos pés (a altura acompanha o lance, subindo ou descendo) e o guarda-corpo segura (onde ela
-    // não tem piso não se passa); fora dela, o piso do nível, e dela só se sai pelo patamar do
-    // nível em que se está (nunca pelo lado do lance nem de um patamar no meio da subida).
-    const y0 = lv.y;
-    const feet = () => rig.body().pos.y;
-    const baseBlocked = base.blocked;
-    return {
-      ...base,
-      maxGrade: 1.4,
-      ground: (x, z) => {
-        const y = feet();
-        return sw.zone(x, z, y) ? (sw.floorAt(x, z, y) ?? y0) : y0;
-      },
-      blocked: (x, z) => {
-        const y = feet();
-        if (sw.zone(x, z, y)) return sw.floorAt(x, z, y) === null;
-        // Fora da escada com os pés longe do piso do nível (num patamar do meio, no alto de um
-        // pulo dá para seguir): não se sai por ali.
-        if (y > y0 + 0.8 || y < y0 - 0.35) return true;
-        return sw.edge(L, x, z) || !!baseBlocked?.(x, z);
-      },
-    };
+    // Escada onde se anda (seção 30, reach.ts): dentro dela, o piso é o do degrau ou do patamar
+    // mais perto dos pés e o guarda-corpo segura; fora dela, o piso do nível, e dela só se sai pelo
+    // patamar do nível em que se está.
+    return walkWorld(base, sw, L, lv.y, feet);
   };
-  const setFloor = (L: number, move = true) => {
+  /** Vai ao nível `L` (com `move`, na chegada do elevador; `ax` = x da porta por onde se sai). */
+  const setFloor = (L: number, move = true, ax?: number) => {
     const levels = inside?.scene.floors?.levels;
     if (!inside || !levels || L < 0 || L >= levels.length) return;
     level = L;
@@ -382,7 +373,7 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
     if (!move) return;
     const lv = levels[L]!;
     // Chega pelo elevador, nos fundos, olhando para dentro do prédio.
-    if (rig.mode() !== 'orbit') rig.place(lv.arrive.x, lv.arrive.z, Math.PI);
+    if (rig.mode() !== 'orbit') rig.place(ax ?? lv.arrive.x, lv.arrive.z, Math.PI);
     else rig.glideTo(new THREE.Vector3(lv.arrive.x, lv.y + 3.3, lv.arrive.z - 0.8), new THREE.Vector3(lv.arrive.x, lv.y + 0.6, lv.arrive.z + 9), 900);
   };
   /* ---------- Elevador: entrar, fechar portas, subir/descer, abrir, sair ---------- */
@@ -408,16 +399,20 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
   /** Indicadores de pavimento do elevador: acende o nível `n`. */
   const showFloor = (lf: Lift, n: number, count: number) => {
     for (const m of lf.marks) m.position.x = markX(n, count);
+    // O painel da cabine mostra só os andares do sentido dela, a partir de onde ela está.
+    showButtons(lf, n);
   };
-  const rideTo = (to: number) => {
+  const rideTo = (to: number, lift?: number) => {
     const fl = inside?.scene.floors;
     if (!inside || !fl || ride || climb || to === level || to < 0 || to >= fl.levels.length || !fl.lifts.length) return;
-    // A cabine mais perto de quem chama (duas lado a lado nos prédios com dois elevadores).
-    const px = rig.body().pos.x;
-    let li = 0;
-    fl.lifts.forEach((l, i) => {
-      if (Math.abs(l.x - px) < Math.abs(fl.lifts[li]!.x - px)) li = i;
-    });
+    // O elevador pedido ou o do sentido da viagem (o da esquerda só sobe, o da direita só desce);
+    // um elevador que não vai para lá (ou não para aqui) não é chamado.
+    const up = to > level;
+    const count = fl.levels.length;
+    const fits = (l: Lift) => liftServes(l.dir, level, count) && (l.dir === 'both' || l.dir === (up ? 'up' : 'down'));
+    const li = lift !== undefined ? lift : fl.lifts.findIndex(fits);
+    const chosen = fl.lifts[li];
+    if (!chosen || !fits(chosen)) return;
     const look = new THREE.Vector3();
     camera.getWorldDirection(look);
     ride = { from: level, to, t0: performance.now(), start: camera.position.clone(), startLook: camera.position.clone().add(look.multiplyScalar(5)), mode: rig.mode(), dinged: false, lift: li };
@@ -640,7 +635,8 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
     const to = ride.to;
     const mode = ride.mode;
     ride = null;
-    setFloor(to);
+    // Sai pela porta da cabine em que veio (a do que sobe à esquerda, a do que desce à direita).
+    setFloor(to, true, lf.x);
     if (mode !== 'orbit') rig.setMode(mode);
     opts.onRiding(false);
     return false;
@@ -809,13 +805,19 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
     const all = [{ x: LAKE.x, z: LAKE.z }, ...PONDS];
     return all.reduce((m, o) => (Math.hypot(o.x - p.x, o.z - p.z) < Math.hypot(m.x - p.x, m.z - p.z) ? o : m), all[0]!);
   };
-  const elevatorNear = () => {
+  /** O elevador em frente de quem está no hall (o da porta mais perto), ou -1 longe dele. */
+  const elevatorNear = (): number => {
     const fl = inside?.scene.floors;
-    if (!fl?.levels[level]) return false;
+    if (!fl?.levels[level] || !fl.lifts.length) return -1;
     const p = rig.body().pos;
     // No hall, na frente das portas do núcleo (o mesmo em todos os níveis, térreo incluído).
     const e = fl.elevator;
-    return Math.hypot(p.x - e.x, p.z - (e.z + 2.6)) < 3.4;
+    if (Math.hypot(p.x - e.x, p.z - (e.z + 2.6)) >= 3.4) return -1;
+    let li = 0;
+    fl.lifts.forEach((l, i) => {
+      if (Math.abs(l.x - p.x) < Math.abs(fl.lifts[li]!.x - p.x)) li = i;
+    });
+    return li;
   };
   /** Objeto funcional mais perto, neste andar. */
   const thingNear = (p: { x: number; z: number }): Thing | null => {
@@ -848,7 +850,10 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
     const p = rig.body().pos;
     if (inside) {
       const th = thingNear(p);
-      if (!th && elevatorNear() && (inside.scene.floors?.levels.length ?? 1) > 1) return { kind: 'elevator' };
+      const li = th ? -1 : elevatorNear();
+      const lf = li >= 0 ? inside.scene.floors?.lifts[li] : undefined;
+      const count = inside.scene.floors?.levels.length ?? 1;
+      if (lf && count > 1) return { kind: 'elevator', dir: lf.dir, off: !liftServes(lf.dir, level, count) };
       if (th) {
         const fl = inside.scene.floors!;
         if (th.kind === 'room') return { kind: 'use', what: 'room', key: fl.zones[th.zone!]?.key };
@@ -883,7 +888,28 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
     }
     if (typeof cmd === 'string' && cmd.startsWith('ride:')) rideTo(Number(cmd.slice(5)));
     if (cmd === 'stairs:check') document.documentElement.dataset.stairClash = String(inside?.scene.scene.userData.stairClash ?? 'none');
+    // 'stairs:reach': em cada nível, a partir da chegada do elevador (e da entrada, no térreo), até
+    // onde se chega a pé com a colisão de verdade (reach.ts): o pé e a chegada da escada, subir e
+    // descer a pé e o que bloqueia o anel em volta dela. Resultado em data-stair-reach.
+    if (cmd === 'stairs:reach' && inside && fl0) {
+      const id = inside.id;
+      const front = groundSpan(id).front - 1.5;
+      const rep = stairReach({
+        ys: fl0.ys,
+        levels: fl0.levels.map((lv, L): ReachLevel => ({ y: lv.y, world: (feet: () => number) => levelWorld(L, feet), starts: L === 0 ? [[lv.arrive.x, lv.arrive.z], [0, front]] : [[lv.arrive.x, lv.arrive.z]] })),
+        stair: stairOf(id),
+        core: CIRCULATION[id].stair === 'core' ? { r: voidRadius(id), from: coreFrom(id) } : null,
+      });
+      document.documentElement.dataset.stairReach = JSON.stringify({ id, levels: reachSummary(rep) });
+    }
     if (cmd === 'stairs:check') document.documentElement.dataset.stairClashAt = JSON.stringify(inside?.scene.scene.userData.stairClashAt ?? []);
+    // E, em todos os níveis, os obstáculos de colisão no caminho até a escada (o pé, a chegada e a
+    // frente do patamar): quem está ali seria empurrado (devia ser []). [nível, x, z, raio, altura].
+    if (cmd === 'stairs:check' && inside && fl0) {
+      const st = stairOf(inside.id);
+      const way = fl0.levels.flatMap((lv, L) => (st ? stairApproach(st, L) : []).flatMap(([x, z]) => lv.obstacles.filter((o) => Math.hypot(o.x - x, o.z - z) < o.r + 0.3).map((o) => [L, +o.x.toFixed(2), +o.z.toFixed(2), +o.r.toFixed(2), +o.h.toFixed(1)])));
+      document.documentElement.dataset.stairWay = JSON.stringify(way);
+    }
     // 'use:<tipo>' (dentro de um prédio): vai até a coisa desse tipo no andar atual e usa (cofre, violão...).
     if (typeof cmd === 'string' && cmd.startsWith('use:') && inside) {
       const kind = cmd.slice(4);
@@ -1087,7 +1113,9 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
       const levels = inside.scene.floors?.levels.length ?? 1;
       const th = thingNear(p);
       if (th) return useThing(th);
-      if (elevatorNear() && levels > 1) return opts.onElevator();
+      const li = elevatorNear();
+      const lf = li >= 0 ? inside.scene.floors?.lifts[li] : undefined;
+      if (lf && levels > 1) return opts.onElevator({ index: li, dir: lf.dir });
       const s = floorSeat(p);
       if (s) rig.sit({ ...s, face: s.face + Math.PI });
       return;

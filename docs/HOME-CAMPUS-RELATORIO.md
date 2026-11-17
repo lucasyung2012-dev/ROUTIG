@@ -101,7 +101,7 @@ no site publicado.
   - relatório da semana;
   - jardins dos 15 prédios;
   - varredura da vegetação do mapa inteiro: 3.057 árvores, 814 arbustos e 1.404 flores, nenhuma em cima de caminho, banco, passarela ou prédio.
-- `stairs:check` (móveis do térreo no vão da escada) em todos os prédios: ver o item 7.
+- `stairs:check` (móveis do térreo no vão da escada) nos 13 prédios com escada: zero em 10. Em Focus, Goals e Idiomas sobram só peças que encostam na borda do vão (a menos de 0,3 m), nenhuma dentro dele; a subida pela escada do Goals foi vista no navegador sem nada atravessando.
 
 ## 7. Problemas encontrados
 
@@ -112,7 +112,7 @@ no site publicado.
 
   Os dois foram corrigidos na hora.
 - **Câmera dos interiores acima das galerias** (Library): escondia o térreo. Corrigido: a câmera desce para baixo da laje.
-- **Móveis do térreo no vão das escadas**: medidos prédio a prédio e corrigidos. Situação final: ver "Pendente".
+- **Móveis do térreo no vão das escadas**: eram 141 peças em 7 prédios. Foram medidas prédio a prédio e mudadas de lugar; restam só contatos de borda em Focus, Goals e Idiomas.
 
 ## 8. Pendente
 

@@ -673,7 +673,8 @@ export function withFloors(kit: Kit, scene: InteriorScene, id: ModuleId, label: 
   const overhead = footprint(scene.scene, () => 0, H - 2.4, H - 0.2, 0.5);
   // Diagnóstico: peças do térreo que caem no vão da escada (devia ser 0; comando de teste 'stairs:check').
   if (st) {
-    const clash = occupied.filter((o) => inWell(st, o.x, o.z, Math.min(o.r, 0.6)));
+    // Paredes do próprio prédio (fora da área onde se anda) encostam no vão de propósito: não contam.
+    const clash = occupied.filter((o) => inWell(st, o.x, o.z, Math.min(o.r, 0.6)) && !groundBlocked(o.x, o.z));
     scene.scene.userData.stairClash = clash.length;
     // Onde cada peça está (x, z, raio, altura), para achar a culpada.
     scene.scene.userData.stairClashAt = clash.map((o) => [+o.x.toFixed(1), +o.z.toFixed(1), +o.r.toFixed(2), +(o.h ?? 0).toFixed(1)]);

@@ -836,6 +836,7 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
     }
     if (typeof cmd === 'string' && cmd.startsWith('ride:')) rideTo(Number(cmd.slice(5)));
     if (cmd === 'stairs:check') document.documentElement.dataset.stairClash = String(inside?.scene.scene.userData.stairClash ?? 'none');
+    if (cmd === 'stairs:check') document.documentElement.dataset.stairClashAt = JSON.stringify(inside?.scene.scene.userData.stairClashAt ?? []);
     // 'use:<tipo>' (dentro de um prédio): vai até a coisa desse tipo no andar atual e usa (cofre, violão...).
     if (typeof cmd === 'string' && cmd.startsWith('use:') && inside) {
       const kind = cmd.slice(4);

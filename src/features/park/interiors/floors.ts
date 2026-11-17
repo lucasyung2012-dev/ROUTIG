@@ -672,7 +672,12 @@ export function withFloors(kit: Kit, scene: InteriorScene, id: ModuleId, label: 
   const occupied = [...scene.obstacles, ...footprint(scene.scene, () => 0, 0.05, 2.6, 0.5)];
   const overhead = footprint(scene.scene, () => 0, H - 2.4, H - 0.2, 0.5);
   // Diagnóstico: peças do térreo que caem no vão da escada (devia ser 0; comando de teste 'stairs:check').
-  if (st) scene.scene.userData.stairClash = occupied.filter((o) => inWell(st, o.x, o.z, Math.min(o.r, 0.6))).length;
+  if (st) {
+    const clash = occupied.filter((o) => inWell(st, o.x, o.z, Math.min(o.r, 0.6)));
+    scene.scene.userData.stairClash = clash.length;
+    // Onde cada peça está (x, z, raio, altura), para achar a culpada.
+    scene.scene.userData.stairClashAt = clash.map((o) => [+o.x.toFixed(1), +o.z.toFixed(1), +o.r.toFixed(2), +(o.h ?? 0).toFixed(1)]);
+  }
   // A escada do térreo ocupa o seu contorno: o lounge e os detalhes desviam dela.
   if (st) for (const [x, z] of wellDots(st)) occupied.push({ x, z, r: 0.8, h: 3 });
   // Meia largura do portal dos elevadores; o quadro dos níveis fica do lado oposto ao da escada.

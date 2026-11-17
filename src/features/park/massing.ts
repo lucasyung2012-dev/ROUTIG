@@ -7,8 +7,9 @@
  * (interiors/floors.ts), onde se pode andar em cada nível e a área das salas de cada andar.
  *
  * Coordenadas locais: frente (entrada) = +z, x para o lado; a entrada fica em x = 0 na fachada da
- * frente, e a torre do elevador nos fundos, em x = 0, atrás da parede do térreo. Os prédios não
- * têm o mesmo tamanho: o tamanho vem de quanto do lote a planta ocupa e de quantos pavimentos sobe.
+ * frente, e o núcleo dos elevadores nos fundos, em x = 0, por dentro do prédio (stairs.ts,
+ * liftCore). Os prédios não têm o mesmo tamanho: o tamanho vem de quanto do lote a planta ocupa e
+ * de quantos pavimentos sobe.
  */
 import type { ModuleId } from '@/app/modules';
 import { boundOf, spanZ, type Vol } from './outline';
@@ -186,14 +187,11 @@ export function roofsAt(id: ModuleId, L: number): Vol[] {
   return M.vols.filter((v) => v.hi === L - 1 && (L > 1 || v.h === undefined || v.h >= M.ground));
 }
 
-/** Frente e fundos do térreo em x = 0, e o raio que cobre a planta (para a câmera e o elevador). */
+/** Frente e fundos do térreo em x = 0, e o raio que cobre a planta (para a câmera). */
 export function groundSpan(id: ModuleId): { front: number; back: number; bound: number } {
   const g = volsAt(id, 0);
   return { ...spanZ(g, 0), bound: boundOf(g) };
 }
-
-/** Distância do centro até o centro da torre do elevador (fora da parede dos fundos do térreo). */
-export const liftDist = (id: ModuleId): number => groundSpan(id).back + 2.8;
 
 /**
  * Mezanino (planta 'side'): até onde vai o piso do nível `L` em z; à frente disso fica o

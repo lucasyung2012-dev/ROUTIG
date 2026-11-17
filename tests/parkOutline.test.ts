@@ -3,7 +3,8 @@ import type { ModuleId } from '@/app/modules';
 import { PARK_BUILDINGS } from '@/domain/park';
 import { FLOOR_PLANS } from '@/features/park/interiors/floors';
 import { FORMS, ROOF_TERRACES, upperPlan } from '@/features/park/forms';
-import { MASSING, STOREY, groundSpan, levelY, liftDist, roofsAt, sideCut, topLevel, volsAt } from '@/features/park/massing';
+import { MASSING, STOREY, groundSpan, levelY, roofsAt, sideCut, topLevel, volsAt } from '@/features/park/massing';
+import { liftCore } from '@/features/park/stairs';
 import { boundOf, deckSpots, entranceRun, exitAt, inVol, insideAt, inscribed, nearestInside, reachAt, spanZ, tallerInside, terraceDoors, volPoly, wallRuns, type Vol } from '@/features/park/outline';
 
 const rect = (cx: number, cz: number, w: number, d: number, hi = 0, rot = 0): Vol => ({ kind: 'rect', cx, cz, w, d, hi, rot });
@@ -181,7 +182,7 @@ describe('Campus: a volumetria de cada prédio (por fora e por dentro)', () => {
     expect(MASSING.projects.vols.some((v) => v.kind === 'rect' && (v.rot ?? 0) !== 0)).toBe(true);
   });
 
-  it('entrada em x = 0 na frente; elevador nos fundos em x = 0; o centro fica dentro do térreo', () => {
+  it('entrada em x = 0 na frente; elevadores nos fundos em x = 0, por dentro; o centro fica dentro do térreo', () => {
     for (const id of Object.keys(MASSING) as ModuleId[]) {
       const g = volsAt(id, 0);
       expect(insideAt(g, 0, 0, 1), id).toBe(true);
@@ -193,11 +194,16 @@ describe('Campus: a volumetria de cada prédio (por fora e por dentro)', () => {
       expect(insideAt(g, 0, -(s.back - 1.6), 0.45), `${id} fundos`).toBe(true);
       expect(insideAt(g, 0, s.front - 1.6, 0.45), `${id} frente`).toBe(true);
       expect(insideAt(g, 0, s.front - 4.6, 0.45), `${id} saguão`).toBe(true);
-      expect(liftDist(id)).toBeCloseTo(s.back + 2.8, 5);
+      // O núcleo dos elevadores fica nos fundos, em x = 0, dentro do térreo (nunca no gramado).
+      const c = liftCore(id);
+      if (!c) continue;
+      expect(c.tz, id).toBeLessThan(0);
+      expect(c.z0, id).toBeGreaterThanOrEqual(-s.back);
+      expect((c.x0 + c.x1) / 2, id).toBeCloseTo(0, 5);
     }
   });
 
-  it('em cada andar: chega-se pela ponte em x = 0, nos fundos; o vazio do meio cabe na planta', () => {
+  it('em cada andar: chega-se pelo hall dos elevadores em x = 0, nos fundos; o vazio do meio cabe na planta', () => {
     for (const id of Object.keys(MASSING) as ModuleId[]) {
       const fp = upperPlan(FORMS[id]);
       const inner = fp === 'atrium' || fp === 'garden' ? Math.max(3.2, MASSING[id].void) : fp === 'core' ? Math.max(2.6, MASSING[id].void) : 0;
@@ -206,9 +212,12 @@ describe('Campus: a volumetria de cada prédio (por fora e por dentro)', () => {
         expect(v.length, `${id} ${L}`).toBeGreaterThan(0);
         const s = spanZ(v, 0);
         expect(s.back, `${id} ${L}`).toBeGreaterThan(4);
-        // A ponte chega à fachada dos fundos (nunca atrás da torre) e quem sai dela pisa dentro.
-        expect(s.back, `${id} ${L}`).toBeLessThan(liftDist(id) - 1.5);
-        expect(insideAt(v, 0, -s.back + 2.4, 0.45), `${id} ${L} chegada`).toBe(true);
+        // O núcleo dos elevadores fica dentro da planta do andar e quem sai deles pisa no hall, dentro.
+        const c = liftCore(id);
+        if (c) {
+          for (const [x, z] of [[c.x0, c.z0], [c.x1, c.z0], [c.x0, c.z1], [c.x1, c.z1]] as const) expect(insideAt(v, x, z, 0.1), `${id} ${L} núcleo`).toBe(true);
+          expect(insideAt(v, 0, c.z1 + 1.6, 0.45), `${id} ${L} chegada`).toBe(true);
+        }
         if (!inner) continue;
         for (let k = 0; k < 16; k++) {
           const a = (k / 16) * Math.PI * 2;

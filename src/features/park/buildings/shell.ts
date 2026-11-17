@@ -23,8 +23,8 @@ export interface Shell {
   /** Altura para o `top` do prédio: o mundo põe o 1º andar em `top − 2` (= H). */
   top: number;
   /**
-   * `core` do prédio para o mundo: ele põe a torre do elevador a max(0,82 · core, parede) + 2,8 m do
-   * centro; com core = fundos ÷ 0,82, a torre fica onde o interior a põe (liftDist, massing.ts).
+   * `core` do prédio para o mundo (fundos ÷ 0,82). Os elevadores ficam por dentro, no núcleo dos
+   * fundos (stairs.ts, liftCore).
    */
   core: number;
   /** Volumes do térreo e as paredes (para os detalhes de cada prédio). */

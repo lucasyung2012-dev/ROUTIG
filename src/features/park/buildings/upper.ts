@@ -5,27 +5,25 @@
  * prédio (vidro, pedra, tijolo, brises, ripas, painéis), as mesmas portas (ponte do elevador e
  * terraços das alas), a cobertura de cada ala que termina mais abaixo (terraço com guarda-corpo,
  * nos prédios com terraço) e o que a planta tem de visível (claraboia do átrio, núcleo que sobe
- * acima da cobertura, jardim a céu aberto). Nos fundos, a torre do elevador envidraçada com as
- * pontes de cada andar. No alto, o elemento de cada prédio; nos prédios com terraço na cobertura
+ * acima da cobertura, jardim a céu aberto). Nos fundos, por dentro, o núcleo dos elevadores (o
+ * mesmo de dentro), que aparece pelo vidro e passa da cobertura. No alto, o elemento de cada prédio; nos prédios com terraço na cobertura
  * (forms.ts), o mesmo terraço de dentro: deque, guarda-corpo, bancos, floreiras e árvores.
  */
 import * as THREE from 'three';
 import type { ModuleId } from '@/app/modules';
 import { Builder, type Kit } from '../kit';
 import { FORMS, alongGeo, circle, clipZ, facadeAlong, facadeMats, hasRoofTerrace, slab as slabGeo, upperPlan, volGeo, volSlab } from '../forms';
-import { MASSING, STOREY, liftDist, roofsAt, sideCut, volsAt } from '../massing';
-import { alongRun, deckSpots, inVol, insideAt, inscribed, reachAt, segDist, terraceDoors, volPoly, wallRuns, type DeckSpot, type Vol, type WallRun } from '../outline';
+import { MASSING, STOREY, roofsAt, sideCut, volsAt } from '../massing';
+import { alongRun, deckSpots, inVol, insideAt, inscribed, segDist, terraceDoors, volPoly, wallRuns, type DeckSpot, type Vol, type WallRun } from '../outline';
 import { drawDeck, sundial, sundialSpot } from '../interiors/floors';
-import { inWell, liftShaft, stairHole, stairOf, phaseAt } from '../stairs';
+import { inLiftCore, inLiftHall, inWell, liftCore, stairHole, stairOf, phaseAt } from '../stairs';
 
 /**
- * Onde fica a torre do elevador: `angle` em volta do prédio (0 = frente; π = fundos) e o chão
- * (altura local) em cada ponto, para o lounge ficar nivelado numa base de pedra, nunca enterrado.
+ * Lado dos elevadores: `angle` em volta do prédio (0 = frente; π = fundos), onde o terraço deixa o
+ * caminho livre até eles, e o chão (altura local) em cada ponto.
  */
 export interface LiftSpot {
   angle: number;
-  /** Distância do centro do prédio ao centro da torre (fora da parede do térreo). */
-  dist?: number;
   ground: (lx: number, lz: number) => number;
 }
 
@@ -81,17 +79,13 @@ export function upperFloors(kit: Kit, id: ModuleId, levels: number, base: number
   const inner = fp === 'atrium' || fp === 'garden' ? Math.max(3.2, M.void) : fp === 'core' ? Math.max(2.6, M.void) : 0;
   const holds = (v: Vol) => inner > 0 && inVol(v, 0, 0, inner + 0.5);
   const yOf = (L: number) => base + (L - 1) * STOREY;
-  const far = lift.dist ?? liftDist(id);
-  const sb = Math.sin(lift.angle);
-  const cb = Math.cos(lift.angle);
-  // Passagem da ponte do elevador (direção da torre): sem guarda-corpo nem floreira.
-  const onBridge = (x: number, z: number) => x * sb + z * cb > 0 && Math.abs(x * cb - z * sb) < 1.25;
-  // Guarda-corpo de vidro ao longo de um trecho, fora da passagem da ponte.
+  // Núcleo dos elevadores (stairs.ts): o mesmo de dentro, nos fundos, por dentro do prédio.
+  const core = liftCore(id);
+  // Guarda-corpo de vidro ao longo de um trecho (em toda a borda: o elevador chega por dentro).
   const rail = (r: { ax: number; az: number; bx: number; bz: number }, y: number) => {
     const n = Math.max(1, Math.ceil(Math.hypot(r.bx - r.ax, r.bz - r.az) / 0.8));
     for (let k = 0; k < n; k++) {
       const p = { ax: r.ax + ((r.bx - r.ax) * k) / n, az: r.az + ((r.bz - r.az) * k) / n, bx: r.ax + ((r.bx - r.ax) * (k + 1)) / n, bz: r.az + ((r.bz - r.az) * (k + 1)) / n };
-      if (onBridge((p.ax + p.bx) / 2, (p.az + p.bz) / 2)) continue;
       const gl = alongGeo(p, y, 1.0, 0.04);
       bd.add(railGlass, gl.geo, gl.pos, gl.rot);
       const hr = alongGeo(p, y + 1.02, 0.06, 0.07);
@@ -131,9 +125,8 @@ export function upperFloors(kit: Kit, id: ModuleId, levels: number, base: number
       if (pts.length >= 3) b.add(slab, slabGeo(pts, [], y, 0.35));
     }
     lowRoofs(L, vols);
-    // Portas: a da ponte do elevador (onde a ponte encosta) e uma em cada trecho de frente para o terraço das alas.
-    const back = reachAt(vols, lift.angle, far);
-    const doorPts: Array<{ x: number; z: number }> = [{ x: sb * back, z: cb * back }, ...(roofT ? terraceDoors(runs, roofsAt(id, L)) : [])];
+    // Portas: uma em cada trecho de frente para o terraço das alas.
+    const doorPts: Array<{ x: number; z: number }> = roofT ? terraceDoors(runs, roofsAt(id, L)) : [];
     // Fachada do andar no tipo do prédio; por trás, as salas acesas à noite.
     const h = STOREY - 0.3;
     for (const r of runs) {
@@ -225,7 +218,7 @@ export function upperFloors(kit: Kit, id: ModuleId, levels: number, base: number
         bd.add(railGlass, gl.geo, gl.pos, gl.rot);
       }
     }
-    let spots: DeckSpot[] = deckSpots(topVols, edges, free + 0.6, lift.angle).filter((s) => !inWell(st, s.x, s.z, 1.6));
+    let spots: DeckSpot[] = deckSpots(topVols, edges, free + 0.6, lift.angle).filter((s) => !inWell(st, s.x, s.z, 1.6) && !inLiftCore(core, s.x, s.z, 1.2) && !inLiftHall(core, s.x, s.z, 0.8));
     // Calendar: o relógio de sol do Mirante do Tempo, na frente do terraço (o mesmo de dentro).
     const dial = id === 'calendar' ? sundialSpot(topVols) : null;
     if (dial) {
@@ -234,112 +227,22 @@ export function upperFloors(kit: Kit, id: ModuleId, levels: number, base: number
     }
     drawDeck(kit, bd, spots, top, warmTone, null, null);
   }
-  // Torre do elevador nos fundos, com as pontes de cada andar.
-  const tz = -far;
-  // Chão do lounge: nivelado pelo ponto mais alto (com base de pedra até o mais baixo).
-  const ry = lift.angle - Math.PI;
-  const groundAt = (x: number, z: number) => lift.ground(x * Math.cos(ry) + z * Math.sin(ry), -x * Math.sin(ry) + z * Math.cos(ry));
-  // Poço dos elevadores (o mesmo de dentro: uma ou duas cabines lado a lado) e a meia largura do
-  // pavilhão de vidro em volta da base dele.
-  const shaft = liftShaft(id);
-  const hp = Math.max(2.5, shaft.w / 2 + 1.0);
-  let gMax = -Infinity;
-  let gMin = Infinity;
-  for (const x of [-(hp + 2.2), 0, hp + 2.2])
-    for (const z of [tz - 4, tz + 1.2, tz + 6.2]) {
-      const gy = groundAt(x, z);
-      gMax = Math.max(gMax, gy);
-      gMin = Math.min(gMin, gy);
+  // Núcleo dos elevadores (o mesmo de dentro): por dentro do prédio, nos fundos; aparece pela
+  // fachada de vidro e passa da cobertura (casa de máquinas; com terraço, o pavilhão dos
+  // elevadores no deque, com as portas viradas para a frente, por onde se chega a ele).
+  if (core) {
+    const concrete = kit.mat('#D9D5CD', { rough: 0.85 });
+    const towerTop = roofT ? top + 3.4 : top + 1;
+    const cz = (core.z0 + core.z1) / 2;
+    const cw = core.x1 - core.x0;
+    const cd = core.z1 - core.z0;
+    b.add(concrete, new THREE.BoxGeometry(cw, towerTop - 0.3, cd), [0, (towerTop + 0.3) / 2, cz]);
+    b.add(slab, new THREE.BoxGeometry(cw + 0.2, 0.3, cd + 0.2), [0, towerTop + 0.15, cz]);
+    b.add(glow, new THREE.BoxGeometry(cw + 0.02, 0.12, cd + 0.02), [0, towerTop - 0.5, cz]);
+    if (roofT) {
+      const steel = kit.mat('#B8C0CA', { metal: 0.8, rough: 0.28 });
+      for (const x of core.xs) bd.add(steel, new THREE.BoxGeometry(1.12, 2.35, 0.04), [x, top + 1.175, core.z1 + 0.03]);
     }
-  // Quanto o lounge sobe (o piso fica 15 cm acima do ponto mais alto do chão de lá).
-  const dy = Math.max(0.3, gMax + 0.15) - 0.3;
-  // Peças da torre e do lounge: giradas para o lado escolhido (e o lounge na altura do chão de lá),
-  // juntas no mesmo desenho do prédio (sem chamadas de desenho a mais).
-  const placed = (rise: number) => ({
-    add: (m: THREE.Material, geo: THREE.BufferGeometry, pos: [number, number, number] = [0, 0, 0], rot?: [number, number, number], sc?: [number, number, number]) => {
-      if (sc) geo.scale(...sc);
-      if (rot) geo.applyQuaternion(new THREE.Quaternion().setFromEuler(new THREE.Euler(...rot)));
-      geo.translate(pos[0], pos[1] + rise, pos[2]);
-      geo.rotateY(ry);
-      b.add(m, geo);
-    },
-  });
-  const eb = placed(0);
-  const lb = placed(dy);
-  const towerBot = Math.min(0, gMin - 0.2);
-  // Com terraço, a torre passa da cobertura: a cabine para no terraço.
-  const towerTop = roofT ? top + 3.4 : top + 1;
-  // Poço fechado de concreto (elevadores convencionais) com uma faixa de luz da cor do prédio no alto.
-  const concrete = kit.mat('#D9D5CD', { rough: 0.85 });
-  eb.add(concrete, new THREE.BoxGeometry(shaft.w + 0.4, towerTop - towerBot, shaft.d + 0.2), [0, (towerTop + towerBot) / 2, tz]);
-  eb.add(slab, new THREE.BoxGeometry(shaft.w + 0.6, 0.3, shaft.d + 0.6), [0, towerTop + 0.15, tz]);
-  eb.add(glow, new THREE.BoxGeometry(shaft.w + 0.42, 0.12, shaft.d + 0.22), [0, towerTop - 0.5, tz]);
-  // Hall de cada pavimento entre a fachada e o poço: laje, vidro dos lados e laje em cima.
-  const hall = (yy: number, back: number) => {
-    const zf = tz + shaft.d / 2;
-    const zIn = -back + 0.3;
-    const len = zIn - zf;
-    if (len <= 0.05) return;
-    const zc = (zIn + zf) / 2;
-    eb.add(slab, new THREE.BoxGeometry(shaft.w, 0.3, len), [0, yy - 0.15, zc]);
-    for (const s of [-1, 1]) eb.add(glass, new THREE.BoxGeometry(0.06, 2.9, len), [s * (shaft.w / 2 - 0.03), yy + 1.45, zc]);
-    eb.add(slab, new THREE.BoxGeometry(shaft.w + 0.2, 0.2, len), [0, yy + 3.0, zc]);
-  };
-  for (let L = 1; L <= levels; L++) hall(yOf(L), reachAt(volsAt(id, L), lift.angle, far));
-  // Hall da cobertura até o poço (terraço).
-  if (roofT) hall(top, reachAt(topVols, lift.angle, far));
-  // Lounge do elevador no chão: piso de pedra, pavilhão de vidro em volta da base da torre (porta
-  // do lado, banco, plantas, luz), passagem coberta até o prédio e bancos com poste na entrada.
-  {
-    const pave = kit.mat('#D8D1C3', { rough: 0.85 });
-    const curb = kit.mat('#B9B1A2', { rough: 0.9 });
-    const wood = kit.mat('#A0714F', { rough: 0.75 });
-    const dark = kit.mat('#2B3442', { metal: 0.5, rough: 0.4 });
-    const pz = tz + 1.2;
-    // Base de pedra do chão mais baixo até o piso (terreno em declive).
-    const pBot = gMin - 0.3 - dy;
-    const plinth = 0.02 - pBot;
-    const bw = 2 * hp + 4;
-    if (plinth > 0.05) lb.add(curb, new THREE.BoxGeometry(bw + 0.6, plinth, 10.6), [0, (0.02 + pBot) / 2, pz]);
-    lb.add(curb, new THREE.BoxGeometry(bw + 0.4, 0.3, 10.4), [0, 0.12, pz]);
-    lb.add(pave, new THREE.BoxGeometry(bw, 0.32, 10), [0, 0.14, pz]);
-    for (let k = -Math.floor(bw / 2); k <= Math.floor(bw / 2); k++) lb.add(curb, new THREE.BoxGeometry(0.04, 0.01, 10), [k, 0.305, pz]);
-    // Pavilhão de vidro em volta da base do poço: montantes, porta de 1,8 m no lado leste, laje e luz no teto.
-    const H2 = 3.2;
-    const gl = kit.mat('#CFE7F5', { glass: true });
-    lb.add(gl, new THREE.BoxGeometry(2 * hp, H2, 0.06), [0, 0.3 + H2 / 2, tz - 2.5]);
-    lb.add(gl, new THREE.BoxGeometry(0.06, H2, 5), [-hp, 0.3 + H2 / 2, tz]);
-    lb.add(gl, new THREE.BoxGeometry(0.06, H2, 1.6), [hp, 0.3 + H2 / 2, tz - 1.7]);
-    lb.add(gl, new THREE.BoxGeometry(0.06, H2, 1.6), [hp, 0.3 + H2 / 2, tz + 1.7]);
-    lb.add(gl, new THREE.BoxGeometry(0.06, H2 - 2.4, 1.8), [hp, 0.3 + 2.4 + (H2 - 2.4) / 2, tz]);
-    for (const [x, z] of [[-hp, -2.5], [hp, -2.5], [-hp, 2.5], [hp, 2.5], [hp, -0.9], [hp, 0.9], [0, -2.5], [-hp, 0]] as const) lb.add(dark, new THREE.BoxGeometry(0.1, H2, 0.1), [x, 0.3 + H2 / 2, tz + z]);
-    lb.add(slab, new THREE.BoxGeometry(2 * hp + 0.6, 0.25, 5.6), [0, 0.3 + H2 + 0.12, tz]);
-    lb.add(warm, new THREE.CylinderGeometry(0.5, 0.5, 0.03, 20), [hp - 0.9, 0.3 + H2 - 0.02, tz + 1.9]);
-    // Placa luminosa sobre a porta (setas de sobe e desce).
-    lb.add(dark, new THREE.BoxGeometry(0.06, 0.5, 1.0), [hp + 0.06, 0.3 + 2.75, tz]);
-    lb.add(glow, new THREE.ConeGeometry(0.12, 0.18, 3), [hp + 0.1, 0.3 + 2.86, tz], [0, 0, -Math.PI / 2]);
-    lb.add(glow, new THREE.ConeGeometry(0.12, 0.18, 3), [hp + 0.1, 0.3 + 2.64, tz], [Math.PI, 0, -Math.PI / 2]);
-    // Dentro: banco no fundo e duas plantas.
-    lb.add(wood, new THREE.BoxGeometry(1.6, 0.08, 0.45), [-1.6, 0.75, tz - 1.9]);
-    lb.add(dark, new THREE.BoxGeometry(1.4, 0.45, 0.35), [-1.6, 0.52, tz - 1.9]);
-    for (const [x, z] of [[-hp + 0.6, 1.9], [hp - 0.6, -1.9]] as const) {
-      lb.add(kit.mat('#D9CBB6', { rough: 0.8 }), new THREE.CylinderGeometry(0.3, 0.24, 0.55, 14), [x, 0.58, tz + z]);
-      lb.add(leaf, new THREE.IcosahedronGeometry(0.45, 1), [x, 1.25, tz + z], undefined, [1, 1.4, 1]);
-    }
-    // Passagem coberta até o prédio: cobertura de vidro sobre pilares finos.
-    const back = reachAt(volsAt(id, 0), lift.angle, far) - 0.3;
-    const len = -back - (tz + 2.5);
-    if (len > 0.6) {
-      lb.add(gl, new THREE.BoxGeometry(3, 0.06, len), [0, 0.3 + H2, (tz + 2.5 - back) / 2]);
-      for (const sx of [-1, 1]) lb.add(dark, new THREE.BoxGeometry(0.1, H2, 0.1), [sx * 1.45, 0.3 + H2 / 2, (tz + 2.5 - back) / 2]);
-    }
-    // Lado de fora: dois bancos virados para a porta e um poste de luz.
-    for (const sz of [-1, 1]) {
-      lb.add(wood, new THREE.BoxGeometry(0.45, 0.08, 1.6), [hp + 1.4, 0.75, tz + sz * 2.6]);
-      lb.add(dark, new THREE.BoxGeometry(0.35, 0.45, 1.4), [hp + 1.4, 0.52, tz + sz * 2.6]);
-    }
-    lb.add(dark, new THREE.CylinderGeometry(0.06, 0.08, 3.6, 8), [hp + 1.6, 0.3 + 1.8, tz]);
-    lb.add(warm, new THREE.SphereGeometry(0.2, 12, 8), [hp + 1.6, 0.3 + 3.7, tz]);
   }
   // Elemento de cada prédio (prompt, seção 10), sobre a cobertura do volume mais alto.
   switch (id) {

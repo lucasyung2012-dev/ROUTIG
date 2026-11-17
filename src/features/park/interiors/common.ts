@@ -14,8 +14,9 @@ import type { Floors } from './floors';
 import type { ModuleId } from '@/app/modules';
 import { FORMS, circle, clipZ, facadeMats, slab, upperPlan, volSlab, wallsAlong } from '../forms';
 import { MASSING, groundHeight, groundSpan, sideCut, topLevel, volsAt } from '../massing';
-import { exitAt, inVol, insideAt, tallerInside, volPoly, wallRuns, type Vol, type WallRun } from '../outline';
-import { stairHole, stairOf } from '../stairs';
+import { exitAt, inVol, insideAt, tallerInside, volPoly, wallRuns, type Pt, type Vol, type WallRun } from '../outline';
+import { carve, liftCore, stairHole, stairOf } from '../stairs';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
 export interface InteriorScene {
   scene: THREE.Scene;
@@ -132,6 +133,8 @@ export function createRoom(kit: Kit, o: RoomOpts): Room {
   const cut = topLevel(o.id) >= 1 && up === 'side' ? sideCut(o.id, 1) : Infinity;
   const ceil = kit.mat('#F3F6FA', { rough: 0.5 });
   const glassTop = kit.mat('#CDEFFB', { glass: true });
+  // Poço dos elevadores (núcleo dentro do prédio, stairs.ts): o teto do térreo tem o furo dele.
+  const lift = liftCore(o.id);
   g.forEach((v, i) => {
     const h = hOf(i);
     const centre = inVol(v, 0, 0, 1);
@@ -151,7 +154,7 @@ export function createRoom(kit: Kit, o: RoomOpts): Room {
     }
     let pts = volPoly(v);
     if (above && Number.isFinite(cut)) pts = clipZ(pts, cut);
-    if (pts.length >= 3) b.add(ceil, slab(pts, holes, h - 0.02, 0.25));
+    if (pts.length >= 3) for (const p of lift ? carve(pts, holes, lift) : [{ pts, holes }]) b.add(ceil, slab(p.pts, p.holes, h - 0.02, 0.25));
     if (sky0) {
       b.add(glassTop, new THREE.CircleGeometry(sky0, 48), [0, h + 0.6, 0], [Math.PI / 2, 0, 0]);
       b.add(frame, new THREE.CylinderGeometry(sky0 + 0.1, sky0 + 0.1, 0.6, 48, 1, true), [0, h + 0.3, 0]);
@@ -179,7 +182,13 @@ export function gallerySlab(room: Room, y: number, inner: number, thick = 0.25):
   // A escada principal (stairs.ts) atravessa a galeria: o vão dela, quando fica fora do vazio do meio.
   const st = stairOf(room.id);
   if (st && st.well.every(([x, z]) => Math.hypot(x, z) > inner + 0.1 && inVol(room.main, x, z, 0.05))) holes.push(st.well);
-  return slab(volPoly(room.main), holes, y, thick);
+  // E o poço dos elevadores (núcleo nos fundos): a cabine passa pela galeria.
+  const lift = liftCore(room.id);
+  const parts: Array<{ pts: Pt[]; holes: Pt[][] }> = lift ? carve(volPoly(room.main), holes, lift) : [{ pts: volPoly(room.main), holes }];
+  const geos = parts.map((p) => slab(p.pts, p.holes, y, thick));
+  if (geos.length === 1) return geos[0]!;
+  const merged = mergeGeometries(geos.map((g) => (g.index ? g.toNonIndexed() : g)), false);
+  return merged ?? geos[0]!;
 }
 
 /**

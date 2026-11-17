@@ -34,6 +34,8 @@ export interface CameraWorld {
   blocked?: (x: number, z: number) => boolean;
   /** Fachada (raio fixo ou raio na direção do ponto): a câmera da 3ª pessoa não a atravessa. */
   wall?: number | ((x: number, z: number) => number);
+  /** Subida mais íngreme que se vence andando (por metro); sem ela, a das encostas do parque. Dentro dos prédios, a da escada. */
+  maxGrade?: number;
 }
 
 export interface MoveSettings {
@@ -71,8 +73,11 @@ export interface CameraRig {
   /** Pés do corpo, direção e velocidade atual (avatar, NPCs, minimapa). */
   body: () => { pos: THREE.Vector3; yaw: number; speed: number; airborne: boolean; running: boolean; heading: number };
   glideTo: (cam: THREE.Vector3 | THREE.Curve<THREE.Vector3>, target: THREE.Vector3, ms: number, done?: () => void) => void;
-  /** Anda sozinho até um ponto (entrar por uma porta); `done` ao chegar ou se algo barrar o caminho. */
-  autoWalk: (x: number, z: number, speed: number, done: () => void) => void;
+  /**
+   * Anda sozinho até um ponto (entrar por uma porta, seguir a escada); `done` ao chegar ou se algo
+   * barrar o caminho. Com `cancelable`, mexer o controle retoma o comando (e `done` não é chamado).
+   */
+  autoWalk: (x: number, z: number, speed: number, done: () => void, cancelable?: boolean) => void;
   gliding: () => boolean;
   update: (dt: number, now: number) => void;
   /** Ponto que a câmera olha (chuva, rótulos). */
@@ -119,7 +124,7 @@ export function createCameraRig(camera: THREE.PerspectiveCamera, canvas: HTMLCan
   let running = false;
   /** Para onde o corpo olha (segue a direção do movimento; parado, fica como estava). */
   let heading = Math.PI;
-  let auto: { x: number; z: number; speed: number; done: () => void; best: number; stall: number } | null = null;
+  let auto: { x: number; z: number; speed: number; done: () => void; best: number; stall: number; cancelable: boolean } | null = null;
   const move = new THREE.Vector2();
   const keys = new Set<string>();
   const focusPt = new THREE.Vector3();
@@ -308,6 +313,8 @@ export function createCameraRig(camera: THREE.PerspectiveCamera, canvas: HTMLCan
     if (keys.has('KeyS') || keys.has('ArrowDown')) fy -= 1;
     if (keys.has('KeyA')) fx -= 1;
     if (keys.has('KeyD')) fx += 1;
+    // Mexer o controle durante um percurso guiado (a escada) devolve o comando a quem joga.
+    if (auto?.cancelable && Math.hypot(fx, fy) > 0.25) auto = null;
     // No piloto automático (entrando ou saindo de um prédio) o controle fica parado.
     if (auto) fx = fy = 0;
     if (keys.has('ArrowLeft')) yaw += dt * 1.8 * settings.sensitivity;
@@ -381,7 +388,7 @@ export function createCameraRig(camera: THREE.PerspectiveCamera, canvas: HTMLCan
     const stepLen = Math.hypot(feet.x - prevX, feet.z - prevZ);
     if (!airborne && stepLen > 1e-4) {
       const g0 = world.ground(prevX, prevZ);
-      if ((g - g0) / stepLen > MAX_GRADE) {
+      if ((g - g0) / stepLen > (world.maxGrade ?? MAX_GRADE)) {
         feet.x = prevX;
         feet.z = prevZ;
         vel.multiplyScalar(0.3);
@@ -503,15 +510,17 @@ export function createCameraRig(camera: THREE.PerspectiveCamera, canvas: HTMLCan
     },
     place: (x, z, y) => {
       setPosture('stand');
+      // Ser colocado num lugar encerra qualquer percurso guiado.
+      auto = null;
       placeBody(x, z, y);
     },
     sit,
     observe,
     posture: () => posture,
     body: () => ({ pos: feet, yaw, speed: vel.length(), airborne, running, heading }),
-    autoWalk: (x, z, speed, done) => {
+    autoWalk: (x, z, speed, done, cancelable = false) => {
       setPosture('stand');
-      auto = { x, z, speed, done, best: Infinity, stall: 0 };
+      auto = { x, z, speed, done, best: Infinity, stall: 0, cancelable };
     },
     glideTo: (cam, target, ms, done) => {
       if (mode !== 'orbit') {

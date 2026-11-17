@@ -2,15 +2,16 @@
  * Desenho da circulação vertical (seções 30 a 32): a escada principal de cada prédio (degraus com
  * espelho, laje inclinada por baixo, longarinas, guarda-corpo de vidro com corrimão dos dois lados de
  * cada lance, patamares com guarda-corpo nas bordas livres e o guarda-corpo do vão em cada laje) e
- * os elevadores (poço fechado nos fundos, uma ou duas cabines lado a lado, portas de correr na
- * cabine e em cada pavimento, botoeira de chamada e indicador de pavimento sobre cada porta). Tudo
+ * os elevadores (núcleo fechado dentro do prédio, nos fundos, uma ou duas cabines lado a lado,
+ * portas de correr na cabine e em cada pavimento, botoeira de chamada e indicador de pavimento
+ * sobre cada porta, abrindo para o hall de cada nível). Tudo
  * numa geometria só por material (Builder); só as cabines, as portas e os indicadores se mexem.
  */
 import * as THREE from 'three';
 import { Builder, type Kit } from './kit';
 import { slab } from './forms';
-import { segDist, type Pt } from './outline';
-import { LANE, phaseAt, type Stair } from './stairs';
+import type { Pt } from './outline';
+import { LANE, contourEdges, phaseAt, type Stair } from './stairs';
 
 /** Caixa reta entre dois pontos (x, y, z): `w` de largura (de lado) e `h` de altura, ao longo do segmento. */
 export function beam(b: Builder, m: THREE.Material, ax: number, ay: number, az: number, bx: number, by: number, bz: number, w: number, h: number): void {
@@ -31,21 +32,6 @@ export function guard(b: Builder, glass: THREE.Material, metal: THREE.Material, 
   beam(b, glass, a[0], y + 0.55, a[1], c[0], y + 0.55, c[1], 0.03, 0.95);
   beam(b, metal, a[0], y + 1.08, a[1], c[0], y + 1.08, c[1], 0.06, 0.05);
   b.add(metal, new THREE.BoxGeometry(0.05, 1.1, 0.05), [a[0], y + 0.55, a[1]]);
-}
-
-/** Bordas de um patamar que caem no contorno da escada (dão para o vazio): levam guarda-corpo. */
-function openEdges(land: readonly Pt[], well: readonly Pt[]): Array<[Pt, Pt]> {
-  const out: Array<[Pt, Pt]> = [];
-  const onWell = (x: number, z: number) => {
-    for (let i = 0, j = well.length - 1; i < well.length; j = i++) if (segDist(x, z, well[j]![0], well[j]![1], well[i]![0], well[i]![1]) < 0.03) return true;
-    return false;
-  };
-  for (let i = 0, j = land.length - 1; i < land.length; j = i++) {
-    const a = land[j]!;
-    const c = land[i]!;
-    if (onWell((a[0] + c[0]) / 2, (a[1] + c[1]) / 2)) out.push([a, c]);
-  }
-  return out;
 }
 
 /**
@@ -118,7 +104,7 @@ export function drawStair(kit: Kit, b: Builder, st: Stair, warm: boolean): void 
   // Patamar solto (no meio da subida): laje e guarda-corpo nas bordas que dão para o vazio.
   const landing = (pts: readonly Pt[], y: number) => {
     b.add(body, slab([...pts], [], y, 0.22));
-    for (const [a, c] of openEdges(pts, st.well)) guard(b, glass, metal, a, c, y);
+    for (const [a, c] of contourEdges(pts, st.well)) guard(b, glass, metal, a, c, y);
   };
 
   for (let L = 0; L + 1 < st.ys.length; L++) {
@@ -156,18 +142,19 @@ export interface Lift {
 export const markX = (n: number, count: number): number => (n - (count - 1) / 2) * 0.13;
 
 /**
- * Poço dos elevadores nos fundos (centro em x = 0, z = `tz`; `w` × `d`), do chão até `topY`: paredes
- * de concreto, em cada pavimento a frente com uma porta de correr por cabine (folhas de 0,56 m),
- * a botoeira de chamada (sobe/desce) e, sobre cada porta, o indicador com uma luz por pavimento
- * (acende a do andar onde a cabine está) e o nome do pavimento; em cima, "Elevadores".
+ * Núcleo dos elevadores dentro do prédio, nos fundos (poço com centro em x = 0, z = `tz`; `w` × `d`
+ * por dentro, paredes de `t` m), do chão até `topY`: paredes de concreto, em cada pavimento a frente
+ * (para o hall) com uma porta de correr por cabine (folhas de 0,56 m), a botoeira de chamada
+ * (sobe/desce) e, sobre cada porta, o indicador com uma luz por pavimento (acende a do andar onde a
+ * cabine está) e o nome do pavimento; em cima, "Elevadores". Cabines de `cw` m de largura.
  */
 export function buildLifts(
   kit: Kit,
   root: THREE.Object3D,
   b: Builder,
-  o: { xs: readonly number[]; w: number; d: number; tz: number; ys: readonly number[]; topY: number; accent: string; names: readonly string[]; title: string; sign: (label: string, color: string, w: number) => THREE.Object3D },
+  o: { xs: readonly number[]; w: number; d: number; t: number; cw: number; tz: number; ys: readonly number[]; topY: number; accent: string; names: readonly string[]; title: string; sign: (label: string, color: string, w: number) => THREE.Object3D },
 ): Lift[] {
-  const { xs, w, d, tz, ys, topY, accent } = o;
+  const { xs, w, d, t, tz, ys, topY, accent } = o;
   const concrete = kit.mat('#D9D5CD', { rough: 0.85 });
   const steelDoor = kit.mat('#B8C0CA', { metal: 0.8, rough: 0.28 });
   const frame = kit.mat('#5B6573', { metal: 0.6, rough: 0.35 });
@@ -178,13 +165,15 @@ export function buildLifts(
   const cabWall = kit.mat('#E9EDF2', { rough: 0.4, metal: 0.2 });
   const floorMat = kit.mat('#9AA3AE', { rough: 0.6 });
   const front = tz + d / 2;
+  // Face da frente do núcleo (para o hall): portas, batentes, botoeira e indicadores encostam nela.
+  const fz = front + t;
   const half = 0.56;
   const doorH = 2.35;
   // Poço: fundo, laterais, divisória entre as cabines e a laje de cima.
-  b.add(concrete, new THREE.BoxGeometry(w + 0.4, topY, 0.2), [0, topY / 2, tz - d / 2 - 0.1]);
-  for (const s of [-1, 1]) b.add(concrete, new THREE.BoxGeometry(0.2, topY, d + 0.2), [s * (w / 2 + 0.1), topY / 2, tz]);
+  b.add(concrete, new THREE.BoxGeometry(w + 2 * t, topY, t), [0, topY / 2, tz - d / 2 - t / 2]);
+  for (const s of [-1, 1]) b.add(concrete, new THREE.BoxGeometry(t, topY, d + 2 * t), [s * (w / 2 + t / 2), topY / 2, tz]);
   if (xs.length > 1) b.add(concrete, new THREE.BoxGeometry(0.12, topY, d), [0, topY / 2, tz]);
-  b.add(concrete, new THREE.BoxGeometry(w + 0.4, 0.3, d + 0.4), [0, topY + 0.15, tz]);
+  b.add(concrete, new THREE.BoxGeometry(w + 2 * t + 0.1, 0.3, d + 2 * t + 0.1), [0, topY + 0.15, tz]);
   // Frente de cada pavimento: paredes entre as portas, vergas, batentes, botoeira, indicadores.
   const cuts = xs.map((x) => [x - half, x + half] as const);
   const lifts: Lift[] = xs.map((x): Lift => ({ x, z: tz, cabin: new THREE.Group(), doors: [new THREE.Object3D(), new THREE.Object3D()], hall: [], marks: [], shut: half / 2, slide: half - 0.04 }));
@@ -192,31 +181,31 @@ export function buildLifts(
   ys.forEach((y, n) => {
     const yTop = n + 1 < ys.length ? ys[n + 1]! : topY;
     const band = yTop - y;
-    let x0 = -w / 2;
-    for (const [a, c] of [...cuts, [w / 2, w / 2] as const]) {
-      if (a - x0 > 0.01) b.add(concrete, new THREE.BoxGeometry(a - x0, band, 0.2), [(x0 + a) / 2, y + band / 2, front + 0.1]);
-      if (c - a > 0.01 && band > doorH) b.add(concrete, new THREE.BoxGeometry(c - a, band - doorH, 0.2), [(a + c) / 2, y + doorH + (band - doorH) / 2, front + 0.1]);
+    let x0 = -w / 2 - t;
+    for (const [a, c] of [...cuts, [w / 2 + t, w / 2 + t] as const]) {
+      if (a - x0 > 0.01) b.add(concrete, new THREE.BoxGeometry(a - x0, band, t), [(x0 + a) / 2, y + band / 2, front + t / 2]);
+      if (c - a > 0.01 && band > doorH) b.add(concrete, new THREE.BoxGeometry(c - a, band - doorH, t), [(a + c) / 2, y + doorH + (band - doorH) / 2, front + t / 2]);
       x0 = c;
     }
     lifts.forEach((lf, i) => {
       // Batente e soleira.
-      for (const s of [-1, 1]) b.add(frame, new THREE.BoxGeometry(0.08, doorH, 0.26), [lf.x + s * (half + 0.04), y + doorH / 2, front + 0.1]);
-      b.add(frame, new THREE.BoxGeometry(2 * half + 0.16, 0.08, 0.26), [lf.x, y + doorH + 0.04, front + 0.1]);
-      b.add(frame, new THREE.BoxGeometry(2 * half, 0.02, 0.3), [lf.x, y + 0.01, front + 0.1]);
-      // Folhas da porta do pavimento.
+      for (const s of [-1, 1]) b.add(frame, new THREE.BoxGeometry(0.08, doorH, t + 0.06), [lf.x + s * (half + 0.04), y + doorH / 2, front + t / 2]);
+      b.add(frame, new THREE.BoxGeometry(2 * half + 0.16, 0.08, t + 0.06), [lf.x, y + doorH + 0.04, front + t / 2]);
+      b.add(frame, new THREE.BoxGeometry(2 * half, 0.02, t + 0.1), [lf.x, y + 0.01, front + t / 2]);
+      // Folhas da porta do pavimento, no plano da parede: abrindo, correm para dentro dela.
       const pair = [-1, 1].map((s) => {
         const m = new THREE.Mesh(panelGeo, steelDoor);
         m.userData.noCollide = true;
-        m.position.set(lf.x + s * lf.shut, y + doorH / 2, front + 0.24);
+        m.position.set(lf.x + s * lf.shut, y + doorH / 2, front + t / 2);
         root.add(m);
         return m;
       });
       lf.hall.push([pair[0]!, pair[1]!]);
       // Indicador de pavimento sobre a porta: uma luz apagada por nível e a acesa no andar da cabine.
       const g = new THREE.Group();
-      g.position.set(lf.x, y + doorH + 0.32, front + 0.24);
-      b.add(dark, new THREE.BoxGeometry(Math.max(0.5, ys.length * 0.13 + 0.16), 0.2, 0.04), [lf.x, y + doorH + 0.32, front + 0.22]);
-      ys.forEach((_, k) => b.add(dim, new THREE.BoxGeometry(0.08, 0.05, 0.02), [lf.x + markX(k, ys.length), y + doorH + 0.32, front + 0.245]));
+      g.position.set(lf.x, y + doorH + 0.32, fz + 0.04);
+      b.add(dark, new THREE.BoxGeometry(Math.max(0.5, ys.length * 0.13 + 0.16), 0.2, 0.04), [lf.x, y + doorH + 0.32, fz + 0.02]);
+      ys.forEach((_, k) => b.add(dim, new THREE.BoxGeometry(0.08, 0.05, 0.02), [lf.x + markX(k, ys.length), y + doorH + 0.32, fz + 0.045]));
       const mark = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.06, 0.02), glow);
       kit.own(mark.geometry);
       mark.position.x = markX(0, ys.length);
@@ -228,25 +217,25 @@ export function buildLifts(
       lf.marks.push(mark);
       // Botoeira de chamada: entre as portas (duas cabines) ou à direita (uma).
       if (i === lifts.length - 1) {
-        const bx = lifts.length > 1 ? 0 : lf.x + half + 0.45;
-        b.add(dark, new THREE.BoxGeometry(0.16, 0.34, 0.04), [bx, y + 1.15, front + 0.22]);
-        if (n + 1 < ys.length) b.add(glow, new THREE.CircleGeometry(0.035, 12), [bx, y + 1.22, front + 0.245]);
-        if (n > 0) b.add(glow, new THREE.CircleGeometry(0.035, 12), [bx, y + 1.08, front + 0.245]);
+        const bx = lifts.length > 1 ? 0 : lf.x + half + 0.3;
+        b.add(dark, new THREE.BoxGeometry(0.16, 0.34, 0.04), [bx, y + 1.15, fz + 0.02]);
+        if (n + 1 < ys.length) b.add(glow, new THREE.CircleGeometry(0.035, 12), [bx, y + 1.22, fz + 0.045]);
+        if (n > 0) b.add(glow, new THREE.CircleGeometry(0.035, 12), [bx, y + 1.08, fz + 0.045]);
       }
     });
     // Nome do pavimento e "Elevadores" sobre as portas.
     const name = o.sign(o.names[n] ?? '', accent, 1.6);
-    name.position.set(0, y + doorH + 0.75, front + 0.24);
+    name.position.set(0, y + doorH + 0.75, fz + 0.04);
     root.add(name);
     if (band > doorH + 1.6) {
-      const t = o.sign(o.title, accent, 2.2);
-      t.position.set(0, y + doorH + 1.3, front + 0.24);
-      root.add(t);
+      const tt = o.sign(o.title, accent, 2.2);
+      tt.position.set(0, y + doorH + 1.3, fz + 0.04);
+      root.add(tt);
     }
   });
   kit.own(panelGeo);
   // Cabines: piso, fundo e laterais, teto com luz, corrimão, painel de andares e as portas de correr.
-  const cw = 2.1;
+  const cw = o.cw;
   const cd = d - 0.5;
   for (const lf of lifts) {
     const cb = new Builder();

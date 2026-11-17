@@ -6,6 +6,9 @@
  * laje e os trechos de guarda-corpo em volta dele; e o caminho de quem sobe ou desce, do pé da
  * escada num nível ao patamar de chegada no outro. O térreo alto (7 a 14 m) é vencido em trechos
  * de até 4,7 m, com patamares intermediários, sempre no mesmo desenho da escada.
+ * Também: o núcleo dos elevadores (dentro do prédio, nos fundos, com o hall na frente das portas),
+ * o recorte das lajes em volta do poço, e onde se pisa na escada (altura dos degraus e patamares
+ * em cada ponto, o guarda-corpo e a troca de nível), para andar nela de verdade.
  * Só geometria pura (sem three.js): testável. Coordenadas locais do prédio (frente = +z).
  */
 import type { ModuleId } from '@/app/modules';
@@ -274,10 +277,149 @@ export function corridorBand(front: number, back: number): { zb: number; zf: num
   return { zb, zf };
 }
 
-/** Poço dos elevadores: largura e o x de cada cabine (lado a lado, no eixo dos fundos). */
-export function liftShaft(id: ModuleId): { w: number; d: number; xs: number[] } {
+/**
+ * Poço dos elevadores por dentro: largura, fundo, o x de cada cabine (lado a lado, no eixo dos
+ * fundos) e a largura da cabine. Com as paredes, o núcleo de duas cabines tem 3,9 m: fica sempre
+ * dentro do eixo, aquém de onde a escada pode ficar (|x| ≥ 2 m).
+ */
+export function liftShaft(id: ModuleId): { w: number; d: number; xs: number[]; cw: number } {
   const n = CIRCULATION[id].lifts;
-  return n === 2 ? { w: 5.0, d: 2.7, xs: [-1.25, 1.25] } : { w: 2.7, d: 2.7, xs: [0] };
+  return n === 2 ? { w: 3.6, d: 1.9, xs: [-0.9, 0.9], cw: 1.55 } : { w: 2.6, d: 1.9, xs: [0], cw: 2.1 };
+}
+
+/** Espessura das paredes do poço, fundo e meia largura do hall na frente das portas. */
+export const CORE_WALL = 0.15;
+export const HALL_DEPTH = 2.0;
+export const HALL_HALF = 1.9;
+
+/**
+ * Núcleo dos elevadores, dentro do prédio: o poço (paredes incluídas) de x0 a x1 e de z0 (fundos)
+ * a z1 (frente, com as portas), encostado na parede dos fundos em x = 0, e o hall na frente das
+ * portas até `hall`. O mesmo em todos os níveis (do térreo ao terraço).
+ */
+export interface LiftCore {
+  w: number;
+  d: number;
+  xs: number[];
+  cw: number;
+  t: number;
+  x0: number;
+  x1: number;
+  z0: number;
+  z1: number;
+  /** Centro do poço (z), onde ficam as cabines. */
+  tz: number;
+  /** Até onde vai o hall na frente das portas (z). */
+  hall: number;
+}
+
+const cores = new Map<ModuleId, LiftCore | null>();
+
+/** O núcleo dos elevadores do prédio (null: sem elevador, Habits, ou sem andar em cima). */
+export function liftCore(id: ModuleId): LiftCore | null {
+  if (cores.has(id)) return cores.get(id) ?? null;
+  const c = placeCore(id);
+  cores.set(id, c);
+  return c;
+}
+
+/**
+ * O mais nos fundos possível em x = 0 em que o núcleo cabe na planta de todos os níveis (12 cm
+ * da fachada) e o hall na frente das portas também (30 cm): onde o andar de cima é mais raso que
+ * o térreo (Inbox, Goals, Projects), o núcleo sobe por dentro do volume mais alto.
+ */
+function placeCore(id: ModuleId): LiftCore | null {
+  const top = topLevel(id);
+  if (CIRCULATION[id].lifts === 0 || top < 1) return null;
+  const s = liftShaft(id);
+  const t = CORE_WALL;
+  const x1 = s.w / 2 + t;
+  const D = s.d + 2 * t;
+  const levels = Array.from({ length: top + 1 }, (_, L) => volsAt(id, L));
+  const fits = (z0: number): boolean => {
+    const z1 = z0 + D;
+    const box: Pt[] = [[-x1, z0], [x1, z0], [0, z0], [-x1, z1], [x1, z1], [-x1, (z0 + z1) / 2], [x1, (z0 + z1) / 2]];
+    const hall: Pt[] = [[-HALL_HALF, z1 + HALL_DEPTH], [HALL_HALF, z1 + HALL_DEPTH], [0, z1 + HALL_DEPTH], [-HALL_HALF, z1 + 1], [HALL_HALF, z1 + 1]];
+    return levels.every((v) => box.every(([x, z]) => insideAt(v, x, z, 0.12)) && hall.every(([x, z]) => insideAt(v, x, z, 0.3)));
+  };
+  const B = Math.ceil(boundOf(levels[0] ?? []) * 20) / 20;
+  let z0 = NaN;
+  for (let k = 0; -B + k * 0.05 < 0; k++) {
+    if (!fits(-B + k * 0.05)) continue;
+    z0 = -B + k * 0.05;
+    break;
+  }
+  if (!Number.isFinite(z0)) z0 = -spanZ(levels[top] ?? [], 0).back + 0.12;
+  z0 = Math.round(z0 * 100) / 100;
+  const z1 = z0 + D;
+  return { w: s.w, d: s.d, xs: s.xs, cw: s.cw, t, x0: -x1, x1, z0, z1, tz: z0 + t + s.d / 2, hall: z1 + HALL_DEPTH };
+}
+
+/** Dentro do núcleo dos elevadores (paredes incluídas), ou a menos de `m` m dele. */
+export const inLiftCore = (c: LiftCore | null, x: number, z: number, m = 0): boolean => !!c && x > c.x0 - m && x < c.x1 + m && z > c.z0 - m && z < c.z1 + m;
+/** No hall na frente das portas (ou a menos de `m` m dele). */
+export const inLiftHall = (c: LiftCore | null, x: number, z: number, m = 0): boolean => !!c && Math.abs(x) < HALL_HALF + m && z >= c.z1 && z < c.hall + m;
+
+/** Retângulo no plano (o núcleo, para recortar as lajes). */
+export interface Box {
+  x0: number;
+  x1: number;
+  z0: number;
+  z1: number;
+}
+
+/** Parte de um polígono convexo onde a·x + b·z ≤ c. */
+function cutHalf(pts: readonly Pt[], a: number, b: number, c: number): Pt[] {
+  const out: Pt[] = [];
+  for (let i = 0; i < pts.length; i++) {
+    const p = pts[i]!;
+    const q = pts[(i + 1) % pts.length]!;
+    const fp = a * p[0] + b * p[1] - c;
+    const fq = a * q[0] + b * q[1] - c;
+    if (fp <= 0) out.push(p);
+    if (fp <= 0 !== fq <= 0) {
+      const k = fp / (fp - fq);
+      out.push([p[0] + (q[0] - p[0]) * k, p[1] + (q[1] - p[1]) * k]);
+    }
+  }
+  return out;
+}
+
+/** Área de um polígono. */
+export function polyArea(pts: readonly Pt[]): number {
+  let s = 0;
+  for (let i = 0; i < pts.length; i++) {
+    const p = pts[i]!;
+    const q = pts[(i + 1) % pts.length]!;
+    s += p[0] * q[1] - q[0] * p[1];
+  }
+  return Math.abs(s) / 2;
+}
+
+/**
+ * Laje de um volume (polígono convexo, com os seus furos) sem o retângulo `box` (o poço dos
+ * elevadores, por onde a cabine passa): o retângulo inteiro dentro vira mais um furo; cortando a
+ * borda do volume, a laje vira pedaços em volta dele (à esquerda, à direita, na frente e atrás),
+ * cada furo no pedaço que o contém; sem tocar, fica como está.
+ */
+export function carve(poly: Pt[], holes: Pt[][], box: Box): Array<{ pts: Pt[]; holes: Pt[][] }> {
+  const whole = [{ pts: poly, holes }];
+  const mid = cutHalf(cutHalf(poly, -1, 0, -box.x0), 1, 0, box.x1);
+  const inner = cutHalf(cutHalf(mid, 0, -1, -box.z0), 0, 1, box.z1);
+  if (inner.length < 3 || polyArea(inner) < 1e-3) return whole;
+  const rect: Pt[] = [[box.x0, box.z0], [box.x1, box.z0], [box.x1, box.z1], [box.x0, box.z1]];
+  // Já dentro de um furo (a torre que sobe do meio do embasamento): nada a recortar.
+  if (holes.some((h) => rect.every(([x, z]) => inPoly(h, x, z)))) return whole;
+  if (polyArea(inner) > polyArea(rect) - 1e-3) return [{ pts: poly, holes: [...holes, rect] }];
+  const pieces = [cutHalf(poly, 1, 0, box.x0), cutHalf(poly, -1, 0, -box.x1), cutHalf(mid, 0, -1, -box.z1), cutHalf(mid, 0, 1, box.z0)]
+    .filter((p) => p.length >= 3 && polyArea(p) > 1e-3)
+    .map((pts) => ({ pts, holes: [] as Pt[][] }));
+  for (const h of holes) {
+    const home = pieces.find((p) => h.every(([x, z]) => inPoly(p.pts, x, z) || polyDist(p.pts, x, z) < 1e-6));
+    if (!home) return whole;
+    home.holes.push(h);
+  }
+  return pieces;
 }
 
 /** Número de níveis servidos (térreo, andares e o terraço da cobertura, quando há). */
@@ -462,9 +604,13 @@ function search(id: ModuleId, local: { well: Pt[]; phases: StairPhase[] }, sg: {
   const g0 = volsAt(id, 0);
   const span0 = groundSpan(id);
   const back1 = spanZ(volsAt(id, 1), 0).back;
-  const shaftW = liftShaft(id).w;
   const levels = Array.from({ length: top + 1 }, (_, L) => volsAt(id, L));
   const H = MASSING[id].ground;
+  // Núcleo dos elevadores (dentro do prédio): nem a escada nem o pé e a chegada dela caem nele.
+  const core = liftCore(id);
+  // Folga do saguão dos elevadores junto à parede dos fundos do térreo (a mesma de antes do núcleo
+  // ir para dentro do prédio: a escada de cada prédio fica onde estava).
+  const portal = CIRCULATION[id].lifts > 1 ? 3.2 : 2.05;
   const zv = Array.from({ length: top + 1 }, (_, L) => (L > 0 && fp === 'side' ? sideCut(id, L) : Infinity));
   const zb = Array.from({ length: top + 1 }, (_, L) => {
     if (L === 0 || (fp !== 'corridor' && fp !== 'open')) return Infinity;
@@ -527,8 +673,9 @@ function search(id: ModuleId, local: { well: Pt[]; phases: StairPhase[] }, sg: {
     for (const [x, z] of pts) {
       if (!inVol(v, x, z, wall)) return false;
       if (Math.abs(x) < axis) return false;
-      // Junto à parede dos fundos do térreo: livre o portal dos elevadores e o botão de chamada.
-      if (z < -(span0.back - 2.5) && Math.abs(x) < shaftW / 2 + 0.7) return false;
+      // Junto à parede dos fundos do térreo: livre o saguão dos elevadores; nunca no núcleo deles.
+      if (z < -(span0.back - 2.5) && Math.abs(x) < portal) return false;
+      if (inLiftCore(core, x, z)) return false;
       if (inner && Math.hypot(x, z) < inner + clear) return false;
       for (let L = 1; L <= top; L++) if (z > zv[L]! - 0.45) return false;
     }
@@ -548,6 +695,7 @@ function search(id: ModuleId, local: { well: Pt[]; phases: StairPhase[] }, sg: {
   function spotOk(L: number, [x, z]: Pt): boolean {
     const Lv = Math.min(L, top);
     if (!insideAt(levels[Lv]!, x, z, 0.5)) return false;
+    if (inLiftCore(core, x, z, 0.4)) return false;
     if (inner && Math.hypot(x, z) < inner + Math.min(0.8, clear)) return false;
     if (L >= 1 && L <= top && z > zv[L]! - 0.6) return false;
     return true;
@@ -575,4 +723,202 @@ export function ringGap(st: Stair | null): [number, number] {
     }
   }
   return [Math.PI + lo, Math.PI + hi];
+}
+
+/* ---------- Andar na escada (seção 30): onde se pisa, o guarda-corpo e a troca de nível ---------- */
+
+/** Bordas do polígono `pts` que caem no contorno da escada (dão para fora dela). */
+export function contourEdges(pts: readonly Pt[], well: readonly Pt[]): Array<[Pt, Pt]> {
+  const out: Array<[Pt, Pt]> = [];
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+    const a = pts[j]!;
+    const c = pts[i]!;
+    if (polyDist(well, (a[0] + c[0]) / 2, (a[1] + c[1]) / 2) < 0.03) out.push([a, c]);
+  }
+  return out;
+}
+
+/** Meia largura do lance onde cabe o centro do corpo (o resto é o corpo até o guarda-corpo). */
+export const TREAD_HALF = LANE / 2 - 0.2;
+/** Folga do corpo até o guarda-corpo de um patamar no meio da subida. */
+const PAD = 0.2;
+/** Quanto o piso da escada pode estar acima ou abaixo dos pés para ser alcançado num passo. */
+export const STEP_REACH = 0.6;
+
+/**
+ * Onde se pisa na escada: o lance (faixa ao longo da linha do meio, subindo de `ya` a `yb`) ou o
+ * patamar (polígono na altura `y`). O patamar de cada nível (`open`) faz parte da laje: as bordas
+ * dele no contorno da escada dão para o piso; os patamares do meio da subida têm guarda-corpo.
+ */
+export type Tread = { kind: 'flight'; pts: Pt[]; ya: number; yb: number } | { kind: 'pad'; pts: Pt[]; y: number; open: boolean };
+
+/** Lances e patamares da escada inteira, do térreo ao último nível (o mesmo desenho de vertical.ts). */
+export function stairTreads(st: Stair): Tread[] {
+  const out: Tread[] = [];
+  const P = st.phases.length;
+  for (let L = 0; L + 1 < st.ys.length; L++) {
+    const y0 = st.ys[L]!;
+    const k = st.segs[L] ?? 1;
+    const r = (st.ys[L + 1]! - y0) / k;
+    for (let j = 0; j < k; j++) {
+      const ph = st.phases[((st.first[L] ?? 0) + j) % P]!;
+      const ys = y0 + j * r;
+      for (const f of ph.flights) out.push({ kind: 'flight', pts: f.pts, ya: ys + f.h0 * r, yb: ys + f.h1 * r });
+      for (const m of ph.mids) out.push({ kind: 'pad', pts: m, y: ys + 0.5 * r, open: false });
+      if (j > 0) out.push({ kind: 'pad', pts: ph.land, y: ys, open: false });
+    }
+  }
+  for (let L = 0; L < st.ys.length; L++) out.push({ kind: 'pad', pts: phaseAt(st, L).land, y: st.ys[L]!, open: true });
+  return out;
+}
+
+/** Ponto de uma linha mais perto de (x, z): a distância e a fração do comprimento até ele (0 a 1). */
+export function alongLine(pts: readonly Pt[], x: number, z: number): { d: number; t: number } {
+  let best = Infinity;
+  let at = 0;
+  let acc = 0;
+  for (let i = 0; i + 1 < pts.length; i++) {
+    const a = pts[i]!;
+    const c = pts[i + 1]!;
+    const dx = c[0] - a[0];
+    const dz = c[1] - a[1];
+    const l2 = dx * dx + dz * dz;
+    const l = Math.sqrt(l2);
+    const u = l2 > 1e-9 ? Math.max(0, Math.min(1, ((x - a[0]) * dx + (z - a[1]) * dz) / l2)) : 0;
+    const d = Math.hypot(a[0] + dx * u - x, a[1] + dz * u - z);
+    if (d < best) {
+      best = d;
+      at = acc + u * l;
+    }
+    acc += l;
+  }
+  return { d: best, t: acc > 0 ? at / acc : 0 };
+}
+
+/**
+ * Altura do piso da escada em (x, z) para quem está com os pés em `y`: dos lances e patamares que
+ * passam por ali (em cada pavimento há um em cima do outro), o mais perto dos pés, se dá para
+ * alcançá-lo num passo. null: ali não se pisa (vão, guarda-corpo, debaixo do lance).
+ */
+export function treadY(st: Stair, treads: readonly Tread[], x: number, z: number, y: number): number | null {
+  let best: number | null = null;
+  let bd = STEP_REACH;
+  for (const t of treads) {
+    let h: number;
+    if (t.kind === 'flight') {
+      const a = alongLine(t.pts, x, z);
+      if (a.d > TREAD_HALF) continue;
+      h = t.ya + (t.yb - t.ya) * a.t;
+    } else {
+      if (!inPoly(t.pts, x, z)) continue;
+      if (!t.open && polyDist(st.well, x, z) < PAD) continue;
+      h = t.y;
+    }
+    const dd = Math.abs(h - y);
+    if (dd <= bd) {
+      bd = dd;
+      best = h;
+    }
+  }
+  return best;
+}
+
+/**
+ * Fora da escada, junto do contorno dela (a menos de `m` m), no nível `L`: só se passa de frente
+ * para uma borda do patamar daquele nível que dá para o piso (por onde se entra na escada); o resto
+ * é guarda-corpo (do vão na laje, ou dos lados do lance no térreo).
+ */
+export function stairEdge(st: Stair, L: number, x: number, z: number, m = 0.3): boolean {
+  if (inPoly(st.well, x, z) || polyDist(st.well, x, z) >= m) return false;
+  const land = phaseAt(st, Math.max(0, Math.min(L, st.ys.length - 1))).land;
+  return !contourEdges(land, st.well).some(([a, c]) => {
+    const dx = c[0] - a[0];
+    const dz = c[1] - a[1];
+    const l = Math.hypot(dx, dz);
+    if (l < 1e-6) return false;
+    const s = ((x - a[0]) * dx + (z - a[1]) * dz) / l;
+    return s >= -0.05 && s <= l + 0.05 && segDist(x, z, a[0], a[1], c[0], c[1]) < m + 0.05;
+  });
+}
+
+/** Escada em caracol do núcleo: começa no ângulo CORE_START e sobe o andar inteiro em CORE_SWEEP. */
+export const CORE_START = -0.4;
+export const CORE_SWEEP = Math.PI * 2 - 0.75;
+/** Meia abertura (rad) da porta do núcleo, na frente (ângulo 0). */
+export const CORE_DOOR = 0.35;
+const TAU = Math.PI * 2;
+
+/**
+ * Altura do piso do caracol (núcleo de raio `r`; `ys` = níveis servidos, de baixo para cima) em
+ * (x, z) para quem está com os pés em `y`. Entre a porta e o começo da volta fica o patamar de
+ * cada nível (onde a volta de baixo chega e a de cima começa); na volta, a altura sobe com o
+ * ângulo. null: no pilar, na parede (fora da porta) ou longe demais dos pés.
+ */
+export function coreY(r: number, ys: readonly number[], x: number, z: number, y: number): number | null {
+  const rho = Math.hypot(x, z);
+  if (rho >= r || rho < 0.45) return null;
+  const a = Math.atan2(x, z);
+  const door = Math.abs(a) < CORE_DOOR - 0.12;
+  if (rho > r - 0.5 && !door) return null;
+  const s = (((CORE_START - a) % TAU) + TAU) % TAU;
+  const flat = rho > r - 0.5 || s > CORE_SWEEP;
+  let best: number | null = null;
+  let bd = STEP_REACH;
+  const n = flat ? ys.length : ys.length - 1;
+  for (let k = 0; k < n; k++) {
+    const h = flat ? ys[k]! : ys[k]! + (s / CORE_SWEEP) * (ys[k + 1]! - ys[k]!);
+    const dd = Math.abs(h - y);
+    if (dd <= bd) {
+      bd = dd;
+      best = h;
+    }
+  }
+  return best;
+}
+
+/** Na porta do núcleo (por onde se entra no caracol), no ângulo. */
+export const coreDoor = (x: number, z: number): boolean => Math.abs(Math.atan2(x, z)) < CORE_DOOR - 0.12;
+
+/**
+ * Escada onde se anda: `zone` diz se o ponto é da escada (aí ela decide tudo); `floorAt` dá a
+ * altura do piso dela perto dos pés (null: não se pisa ali); `edge` diz, fora dela e no nível
+ * `L`, se o ponto é guarda-corpo (só se entra pelo patamar).
+ */
+export interface StairWalk {
+  zone: (x: number, z: number, y: number) => boolean;
+  floorAt: (x: number, z: number, y: number) => number | null;
+  edge: (L: number, x: number, z: number) => boolean;
+}
+
+/** A escada principal como lugar onde se anda. */
+export function stairWalk(st: Stair): StairWalk {
+  const treads = stairTreads(st);
+  return {
+    zone: (x, z) => inPoly(st.well, x, z),
+    floorAt: (x, z, y) => treadY(st, treads, x, z, y),
+    edge: (L, x, z) => stairEdge(st, L, x, z),
+  };
+}
+
+/** O caracol do núcleo (raio `r`) como lugar onde se anda, nos níveis `ys` (do primeiro servido ao último). */
+export function coreWalk(r: number, ys: readonly number[]): StairWalk {
+  const lo = (ys[0] ?? 0) - 0.6;
+  return {
+    zone: (x, z, y) => y > lo && Math.hypot(x, z) < r,
+    floorAt: (x, z, y) => coreY(r, ys, x, z, y),
+    edge: () => false,
+  };
+}
+
+/**
+ * Nível em que se está pela altura dos pés (`ys` = piso de cada nível), a partir do atual: troca
+ * ao passar da metade da subida entre dois níveis (com `hyst` m de folga, para não ficar trocando
+ * para lá e para cá parado no meio do lance).
+ */
+export function levelAtHeight(ys: readonly number[], y: number, cur: number, hyst = 0.15): number {
+  if (!ys.length) return 0;
+  let L = Math.max(0, Math.min(ys.length - 1, cur));
+  while (L + 1 < ys.length && y > (ys[L]! + ys[L + 1]!) / 2 + hyst) L++;
+  while (L > 0 && y < (ys[L - 1]! + ys[L]!) / 2 - hyst) L--;
+  return L;
 }

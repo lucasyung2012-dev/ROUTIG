@@ -8,7 +8,7 @@ import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment
 import type { ModuleId } from '@/app/modules';
 import { LAKE, PARK_BUILDINGS, PARK_RADIUS, TERRAIN, onBridge, PLAYGROUNDS, PLAZA_RADIUS, PONDS, heightAt, inWater, onPath } from '@/domain/park';
 import { Kit } from './kit';
-import { createCameraRig, type CamMode, type MoveSettings, type Posture, type Seat } from './camera';
+import { createCameraRig, type CameraWorld, type CamMode, type MoveSettings, type Posture, type Seat } from './camera';
 import { AVATAR_LOOK, createCrowd, type Figure } from './people';
 import { createTown } from './town';
 import type { Conditions } from '@/domain/parkPeople';
@@ -23,6 +23,7 @@ import { createAnimals } from './animals';
 import type { InteriorScene } from './interiors/common';
 import type { Climb, Floors } from './interiors/floors';
 import { markX, type Lift } from './vertical';
+import { levelAtHeight } from './stairs';
 
 export interface Stats {
   fps: number;
@@ -213,6 +214,8 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
   };
   let walkPhase = 0;
   let lastStep = 0;
+  /** Altura dos pés no último passo (o degrau soa mais agudo subindo). */
+  let lastStepY = 0;
   /** Quanto de árvore há em volta de quem ouve (0 a 1), recalculado de vez em quando. */
   let treeNear = 0.4;
   let treeFrame = 0;
@@ -333,15 +336,42 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
 
   /* ---------- Andares dos interiores ---------- */
   let level = 0;
-  const levelWorld = (L: number) => {
+  const levelWorld = (L: number): CameraWorld => {
     const sc = inside!.scene;
-    const lv = sc.floors?.levels[L];
+    const fl = sc.floors;
+    const lv = fl?.levels[L];
     // Térreo: anda-se dentro da planta do prédio (massing.ts), não num círculo; a câmera da 3ª
-    // pessoa não atravessa a fachada.
-    if (!lv || L === 0) return { ground: () => 0, obstacles: sc.obstacles, limit: { x: 0, z: 0, r: sc.room.radius + 1 }, ceiling: lv?.ceiling ?? sc.room.height, minDistance: 1.5, maxDistance: sc.room.radius * 1.7, blocked: sc.room.blocked, wall: sc.room.wallAt };
-    // Cada planta diz onde não se pisa (vazios, núcleo, fachada fora das portas, borda do terraço).
-    return { ground: () => lv.y, obstacles: lv.obstacles, limit: { x: 0, z: 0, r: lv.walk }, ceiling: lv.ceiling, minDistance: 1.5, maxDistance: sc.room.radius * 1.7, blocked: lv.blocked, wall: lv.wallAt };
-
+    // pessoa não atravessa a fachada. Nos andares, cada planta diz onde não se pisa (vazios,
+    // núcleo, fachada fora das portas, borda do terraço).
+    const base: CameraWorld =
+      !lv || L === 0
+        ? { ground: () => 0, obstacles: sc.obstacles, limit: { x: 0, z: 0, r: sc.room.radius + 1 }, ceiling: lv?.ceiling ?? sc.room.height, minDistance: 1.5, maxDistance: sc.room.radius * 1.7, blocked: sc.room.blocked, wall: sc.room.wallAt }
+        : { ground: () => lv.y, obstacles: lv.obstacles, limit: { x: 0, z: 0, r: lv.walk }, ceiling: lv.ceiling, minDistance: 1.5, maxDistance: sc.room.radius * 1.7, blocked: lv.blocked, wall: lv.wallAt };
+    const sw = fl?.walk;
+    if (!sw || !lv) return base;
+    // Escada onde se anda (seção 30): dentro dela, o piso é o do degrau ou do patamar mais perto
+    // dos pés (a altura acompanha o lance, subindo ou descendo) e o guarda-corpo segura (onde ela
+    // não tem piso não se passa); fora dela, o piso do nível, e dela só se sai pelo patamar do
+    // nível em que se está (nunca pelo lado do lance nem de um patamar no meio da subida).
+    const y0 = lv.y;
+    const feet = () => rig.body().pos.y;
+    const baseBlocked = base.blocked;
+    return {
+      ...base,
+      maxGrade: 1.4,
+      ground: (x, z) => {
+        const y = feet();
+        return sw.zone(x, z, y) ? (sw.floorAt(x, z, y) ?? y0) : y0;
+      },
+      blocked: (x, z) => {
+        const y = feet();
+        if (sw.zone(x, z, y)) return sw.floorAt(x, z, y) === null;
+        // Fora da escada com os pés longe do piso do nível (num patamar do meio, no alto de um
+        // pulo dá para seguir): não se sai por ali.
+        if (y > y0 + 0.8 || y < y0 - 0.35) return true;
+        return sw.edge(L, x, z) || !!baseBlocked?.(x, z);
+      },
+    };
   };
   const setFloor = (L: number, move = true) => {
     const levels = inside?.scene.floors?.levels;
@@ -441,6 +471,22 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
       }
     }
     return best;
+  };
+  /**
+   * Andando (1ª ou 3ª pessoa): segue a pé o caminho da escada, ponto a ponto, como quem anda (a
+   * altura vem dos degraus e o nível troca sozinho); mexer o controle devolve o comando.
+   */
+  const guideAlong = (path: Float32Array) => {
+    const n = Math.floor(path.length / 3);
+    let i = 0;
+    const next = () => {
+      if (i >= n || !inside) return;
+      const x = path[i * 3] ?? 0;
+      const z = path[i * 3 + 2] ?? 0;
+      i++;
+      rig.autoWalk(x, z, 2.0, next, true);
+    };
+    next();
   };
   const startClimb = (c: Climb) => {
     const n = c.path.length / 3;
@@ -650,7 +696,8 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
       const ownSeats = scene.scene.userData.seats as Seat[] | undefined;
       if (ownSeats?.length && scene.floors) scene.floors.seats.push(...ownSeats);
       // Colisão do térreo pelo desenho (móveis, balcões, paredes), além dos obstáculos do próprio interior.
-      scene.obstacles.push(...footprint(scene.scene, () => 0, 0.3, 1.45, 0.5));
+      // Dentro da escada quem decide onde se pisa é ela (stairs.ts): os degraus não são parede.
+      scene.obstacles.push(...footprint(scene.scene, () => 0, 0.3, 1.45, 0.5).filter((o) => !scene.floors?.walk?.zone(o.x, o.z, 0)));
       ikit.glowing.forEach((m) => (m.emissiveIntensity = 1));
       scene.scene.environment = QUALITY[quality].env ? envTex : null;
       scene.scene.environmentIntensity = 0.55;
@@ -763,11 +810,11 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
     return all.reduce((m, o) => (Math.hypot(o.x - p.x, o.z - p.z) < Math.hypot(m.x - p.x, m.z - p.z) ? o : m), all[0]!);
   };
   const elevatorNear = () => {
-    const lv = inside?.scene.floors?.levels[level];
-    if (!lv) return false;
+    const fl = inside?.scene.floors;
+    if (!fl?.levels[level]) return false;
     const p = rig.body().pos;
-    if (level === 0) return Math.hypot(p.x, p.z + lv.walk) < 5.5;
-    const e = inside!.scene.floors!.elevator;
+    // No hall, na frente das portas do núcleo (o mesmo em todos os níveis, térreo incluído).
+    const e = fl.elevator;
     return Math.hypot(p.x - e.x, p.z - (e.z + 2.6)) < 3.4;
   };
   /** Objeto funcional mais perto, neste andar. */
@@ -1011,10 +1058,12 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
       return z && opts.onZone({ key: z.key, sector: z.sector });
     }
     if (th.kind === 'stairs') {
-      // Sobe (no pé da escada) ou desce (na chegada dela) um nível, pelo caminho da própria escada.
+      // Sobe (no pé da escada) ou desce (na chegada dela) um nível, pelo caminho da própria escada:
+      // andando, a pé (guiado, com a altura dos degraus); na câmera livre, a subida acompanhada.
       const c = climbFor(fl, th);
-      if (c && !ride && !climb) startClimb(c);
-      return;
+      if (!c || ride || climb) return;
+      if (rig.mode() === 'orbit') return startClimb(c);
+      return guideAlong(c.path);
     }
     if (th.kind === 'telescope') {
       const lv = fl.levels[level]!;
@@ -1193,6 +1242,15 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
     stepEnv(dt);
     const riding = stepRide(now) || stepClimb(now);
     if (!riding) rig.update(dt, now);
+    // Andando na escada: o nível muda sozinho quando os pés passam da metade da subida (sem
+    // teletransporte nem corte), e com ele a colisão, o teto e o nome do andar.
+    if (!riding && inside && rig.mode() !== 'orbit') {
+      const fl = inside.scene.floors;
+      if (fl?.walk) {
+        const L = levelAtHeight(fl.ys, rig.body().pos.y, level);
+        if (L !== level) setFloor(L, false);
+      }
+    }
     if (riding || rig.gliding() || camera.position.distanceToSquared(camPrev) > 1e-6 || camera.quaternion.angleTo(camQPrev) > 5e-4) movedAt = now;
     camPrev.copy(camera.position);
     camQPrev.copy(camera.quaternion);
@@ -1216,6 +1274,10 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
         const paved = onPath(p.x, p.z) || Math.hypot(p.x, p.z) < PLAZA_RADIUS + 0.5 || PARK_BUILDINGS.some((b) => Math.hypot(p.x - b.x, p.z - b.z) < b.radius * 0.8);
         const surface = inside ? 'floor' : onBridge(p.x, p.z) || inWater(p.x, p.z, 0) ? 'wood' : weather.rain > 0.25 && paved ? 'wet' : paved ? 'stone' : 'grass';
         audio?.footstep(surface, Math.min(0.55, 0.25 + body.speed * 0.05) * (body.running ? 1.3 : 1));
+        // Na escada, cada degrau soa (mais agudo subindo), como na subida de antes.
+        const fl = inside?.scene.floors;
+        if (fl?.walk && fl.walk.zone(p.x, p.z, p.y) && Math.abs(p.y - (fl.ys[level] ?? 0)) > 0.05) audio?.note(p.y > lastStepY + 0.02 ? 50 + (stepIdx % 2) * 2 : 48, 'tom');
+        lastStepY = p.y;
       }
     }
     avatar.group.visible = mode === 'third' && !rig.gliding() && !riding;

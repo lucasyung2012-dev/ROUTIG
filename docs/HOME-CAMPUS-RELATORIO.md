@@ -31,8 +31,8 @@ no site publicado.
   - em U, em L, reta ou curva;
   - Insights pelo núcleo em espiral;
   - lances com patamares, corrimão e guarda-corpo, e vão aberto em cada laje.
-  - Subir e descer seguem o caminho da escada.
-- **Elevadores em hall próprio**: 1 ou 2 cabines conforme o prompt, portas que abrem e fecham, painel de chamada e indicador de andar.
+  - Sobe-se e desce-se andando, com controle de direção e câmera e troca de andar sem teletransporte.
+- **Elevadores em hall próprio dentro do prédio** (sem torre na grama): 1 ou 2 cabines conforme o prompt, portas que abrem e fecham, painel de chamada e indicador de andar.
 - **Entrar e sair sem tela preta**: a imagem da porta se dissolve sobre a cena nova. Medido no navegador: a tela não escurece em nenhum quadro.
 - **Estações próprias do Campus nos 15 prédios** no lugar das páginas do Control Room embutidas.
   - Cada área abre uma interface do lugar, com as ações reais do módulo: criar tarefa, check-in de hábito, sessão de foco compartilhada, notas, agenda, objetivos, prática e outras.
@@ -116,8 +116,7 @@ no site publicado.
 
 ## 8. Pendente
 
-- **Subir pela escada é uma animação**: o jogador não controla a direção durante a subida.
-- **No térreo, a viagem de elevador atravessa a parede do fundo**: não há uma abertura de verdade no portal.
+- **Elevador dentro do prédio e escada percorrida andando** (17/11, commit f57f310): passaram no CI, com testes que sobem e descem as 13 escadas e a espiral do Insights e conferem o núcleo do elevador dentro do contorno em todos os andares. Ainda falta conferir no navegador: o `stairs:check` com o hall novo e a espiral do Insights perto do topo do primeiro lance, onde os pés podem ficar até uns 0,5 m acima do degrau desenhado.
 - **Algumas áreas grandes ainda abrem a tela do módulo**:
   - backup e transferência (Library);
   - escrita à mão (Notes), pelo Apple Pencil;

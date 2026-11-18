@@ -137,3 +137,44 @@ Revisadas com o Lucas em 17/11/2026: as três primeiras foram aprovadas como est
 - **Concha acústica ao ar livre da Música**: foi mantida, mas pode duplicar o palco do parque a cerca de 60 m.
 - **Lanterna do Inbox**: ficou aberta sobre a escada (3 painéis a menos).
 - **Prompt Master V3 (District)**: ainda não recebido. O District segue como página de planejamento.
+
+## 10. Depois do relatório (17 e 18/11/2026)
+
+- **Andares com dados de verdade** em todos os prédios, com os andares vazios preenchidos pela opção A aprovada:
+  - Academy 3º: provas e notas;
+  - Idiomas 3º: biblioteca de vocabulário;
+  - Música 2º: estúdio com piano, bateria e violão.
+- **3D de verdade (piloto)**:
+  - Habits: canteiros com os hábitos do dia;
+  - Tasks: quadro Atrasadas, Hoje e Feitas hoje;
+  - Calendar: parede do dia com a linha da hora.
+- **3D de verdade nos outros prédios**: uma parede com dados reais em cada um. Em Goals, Projects, Focus, Inbox, Academy, Notes e Library, tocar faz a ação ou abre o item; em Idiomas, Música, Esportes e Insights, a parede só mostra os dados e o toque abre a estação. O que cada parede faz:
+
+  | Prédio | Parede | Ao tocar |
+  |---|---|---|
+  | Goals | objetivos com o progresso | check-in |
+  | Projects | projetos ativos | conclui o próximo marco, com desfazer |
+  | Focus | relógio da sessão compartilhada | pausa, retoma ou inicia |
+  | Inbox | chegadas para triar | arquiva, com desfazer |
+  | Academy | estudo do dia | marca como feito |
+  | Notes | notas recentes | abre no editor |
+  | Library | itens recentes | abre o item |
+  | Idiomas | palavras para revisar e minutos da semana | abre a estação |
+  | Música | prática por instrumento | abre a estação |
+  | Esportes | atividades do dia | abre a estação |
+  | Insights | indicadores da semana | abre a estação |
+
+  Finanças segue só com o cofre e o PIN.
+- **Prédios mais vivos**:
+  - pessoas conforme a hora: recepção, gente sentada digitando ou lendo, nos quadros, nas estantes, treinando e praticando, e alguns andando;
+  - luz da hora por dentro e janelas acesas por fora nos andares ocupados;
+  - som de ambiente por prédio, só com "Sons do parque" ligado;
+  - objetos em uso: notebooks, livros, xícaras, casacos, ventiladores e relógios que andam.
+- **Conferido no navegador em 18/11/2026:**
+  - em todos os andares dos 14 prédios com andares, dá para chegar à escada e ao elevador, e nada fica no vão (`stairs:reach` ok e `stairs:check` 0);
+  - Library: 23 pessoas distribuídas pelos andares (recepcionista digitando, gente nas estantes, sentada no 1º andar);
+  - paredes do Inbox e de Goals: mostram o estado vazio verdadeiro, porque não há chegadas abertas nem objetivos ativos.
+- **Não testado:**
+  - tocar nas paredes, porque mexeria nos dados do Lucas;
+  - a luz e o som à noite;
+  - as paredes que têm dados, como Library e Notes.

@@ -81,7 +81,9 @@ export const FLOOR_PLANS: Record<ModuleId, FloorRoom[][]> = {
   projects: [
     // Uma sala por projeto ativo (nome, cor, próximo marco).
     [['proj1', 'gallery', 'studio'], ['proj2', 'gallery', 'studio'], ['proj3', 'gallery', 'studio']],
-    [['tracking', 'studio', 'screen'], ['materials', 'gallery', 'shelf'], ['done', 'studio', 'shelf']],
+    // O mezanino só tem largura para duas salas (a escada fica ao lado do núcleo) e a primeira da
+    // lista é a que não cabe: o acompanhamento (parede e maquete dos projetos) vem por último.
+    [['materials', 'gallery', 'shelf'], ['done', 'studio', 'shelf'], ['tracking', 'studio', 'screen']],
   ],
   // Salas de prática por instrumento; o 2º andar é o Estúdio (piano, bateria e violão tocáveis e os
   // murais do repertório e do tempo de prática na parede, WALL_BOARDS), sem salas.

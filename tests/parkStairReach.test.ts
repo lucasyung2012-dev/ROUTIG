@@ -224,7 +224,15 @@ describe('Campus: salas dos andares fora do núcleo, do hall e do caminho até a
         const route = stairRoute(id, L);
         if (!way.length) continue;
         expect(route.length, `${id} ${L}`).toBeGreaterThan(0);
-        for (const [x, z] of way) expect(Math.min(...route.map(([px, pz]) => Math.hypot(px - x, pz - z))), `${id} ${L} (${x.toFixed(2)}, ${z.toFixed(2)})`).toBeLessThan(1.25);
+        const dist = ([x, z]: readonly [number, number]) => Math.min(...route.map(([px, pz]) => Math.hypot(px - x, pz - z)));
+        // Pé e topo dos lances (os primeiros pontos) sempre; das bordas do patamar, basta uma — uma
+        // borda pode dar para um canto fechado atrás da escada (corrimão, núcleo e fachada).
+        const st = stairOf(id);
+        const s = st ? stairSpots(st, L) : null;
+        const ends = s ? (s.up ? 1 : 0) + (s.down ? 1 : 0) : way.length;
+        for (const p of way.slice(0, ends)) expect(dist(p), `${id} ${L} (${p[0].toFixed(2)}, ${p[1].toFixed(2)})`).toBeLessThan(1.25);
+        const edges = way.slice(ends);
+        if (edges.length) expect(Math.min(...edges.map(dist)), `${id} ${L} bordas`).toBeLessThan(1.25);
       }
     }
   });

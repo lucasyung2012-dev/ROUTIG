@@ -24,7 +24,7 @@ import { FORMS, circle, clipZ, facadeAlong, facadeMats, hasRoofTerrace, slab, up
 import { MASSING, STOREY, groundHeight, groundSpan, roofsAt, sideCut, volsAt } from '../massing';
 import { alongRun, boundOf, deckSpots, inVol, insideAt, inscribed, nearestRun, segDist, spanZ, terraceDoors, volPoly, wallRuns, type DeckSpot, type Pt, type Vol, type WallRun } from '../outline';
 import type { Thing } from './things';
-import { CIRCULATION, CORE_START, CORE_SWEEP, carve, coreDoor, coreFrom, corePath, coreSpots, coreWalk, corridorBand, inLiftCore, inLiftHall, inPoly, inWell, liftCore, ringGap, stairApproach, stairEdge, stairHole, stairOf, stairPath, stairSpots, stairWalk, voidRadius, type Stair, type StairWalk } from '../stairs';
+import { CIRCULATION, CORE_START, CORE_SWEEP, carve, coreDoor, coreFrom, corePath, coreSpots, coreWalk, corridorBand, inLiftCore, inLiftHall, inPoly, inWell, liftCore, liftKeep, ringGap, stairApproach, stairEdge, stairHole, stairOf, stairPath, stairSpots, stairWalk, voidRadius, type Box, type Stair, type StairWalk } from '../stairs';
 import { buildLifts, drawStair, type Lift } from '../vertical';
 
 /** Sala de um andar: chave do nome, setor real que ela abre (null = sem tela própria), tipo de mobília. */
@@ -203,7 +203,9 @@ export interface Floors {
 }
 
 /** Vaga de uma sala no andar: centro, frente (para onde abre a porta), largura e fundo. */
-interface Slot {
+export interface Slot {
+  /** Índice da sala no programa do andar (FLOOR_PLANS): sala que não cabe livre fica de fora. */
+  k: number;
   x: number;
   z: number;
   face: number;
@@ -346,18 +348,12 @@ export function withFloors(kit: Kit, scene: InteriorScene, id: ModuleId, label: 
   // Escada principal (stairs.ts) ou a do núcleo; os anéis de salas abrem onde ela fica.
   const st = stairOf(id);
   const coreStair = CIRCULATION[id].stair === 'core';
-  const gap = ringGap(st);
   /**
    * Por onde se chega à escada no nível `L` (o pé, a chegada e a frente das bordas do patamar; no
    * caracol do núcleo, a porta): salas, móveis, plantas e placas ficam longe, para nenhum objeto
    * travar o caminho até ela (a "barreira invisível" de antes).
    */
-  const ways = (L: number): Pt[] => {
-    if (st) return stairApproach(st, L);
-    if (!coreStair || L < coreFrom(id)) return [];
-    const cs = coreSpots(voidRadius(id));
-    return [cs.up, cs.down];
-  };
+  const ways = (L: number): Pt[] => stairWays(id, L);
   /** Longe (pelo menos `m` m) do caminho até a escada no nível `L`. */
   const offWay = (L: number, x: number, z: number, m: number) => ways(L).every(([px, pz]) => Math.hypot(x - px, z - pz) >= m);
   /** A escada no nível `L` para quem não está nela: o vão inteiro e o guarda-corpo em volta (menos a entrada pelo patamar). */
@@ -473,9 +469,17 @@ export function withFloors(kit: Kit, scene: InteriorScene, id: ModuleId, label: 
     if (terr.length) drawDeck(kit, b, deckSpots(terr, edges, 0, Math.PI, false), y, style.warm, seats, obstacles);
 
     // Salas: cada planta distribui do seu jeito, dentro da planta deste andar.
-    const slots = layout(fp, rooms.length, free, inner, zv, sp.front, backR, gap, stairBox(st), ways(L));
-    const lobby = clearLobby(lobbyOf(fp, free, inner, zv, backR), (x, z, m) => inside(x, z, 0.4) && !inWell(st, x, z, m) && !inLiftCore(core, x, z, 0.6) && !inLiftHall(core, x, z, 0.3) && offWay(L, x, z, m + 0.6));
-    slots.forEach((sl, k) => {
+    // (roomSlots: fora do núcleo e do hall, do vão e do caminho até a escada; a que não cabe fica de fora.)
+    const slots = roomSlots(id, L);
+    // Rota a pé da chegada do elevador até a escada, só pela planta (stairRoute): o saguão, os bancos
+    // e as floreiras desviam dela, e nenhum móvel fecha o hall, a passagem entre o núcleo e a escada
+    // ou a do lado do vazio (antes, a mesa do saguão caía na chegada do Inbox e da Música).
+    const route = routeOn(rules[L], ways(L));
+    const onRoute = (x: number, z: number, m: number) => route.some(([px, pz]) => Math.hypot(x - px, z - pz) < m);
+    const blockedHere = rules[L]?.blocked ?? (() => false);
+    const lobby = clearLobby(lobbyOf(fp, free, inner, zv, backR), (x, z, m) => inside(x, z, 0.4) && !inWell(st, x, z, m) && !inLiftCore(core, x, z, 0.6 + m) && !inLiftHall(core, x, z, 0.3 + m) && offWay(L, x, z, m + 0.6) && Math.hypot(x, z - (core.z1 + 1.6)) > m + 1.0 && !blockedHere(x, z) && !onRoute(x, z, m + 0.6));
+    slots.forEach((sl) => {
+      const k = sl.k;
       const [key, sector] = rooms[k]!;
       const type = roomType(key, id);
       const front = { x: Math.sin(sl.face), z: Math.cos(sl.face) };
@@ -557,7 +561,7 @@ export function withFloors(kit: Kit, scene: InteriorScene, id: ModuleId, label: 
 
     const ceiling = y + STOREY - 0.35;
     const apo = Math.max(4, inscribed(vols));
-    enrichLevel(kit, b, seats, id, L, top, y, lobby, hole ? inner : 0, apo, ceiling, accent, style.warm, thingRoot, things, (x, z) => free(x, z, 0.8) && offWay(L, x, z, 1.5));
+    enrichLevel(kit, b, seats, id, L, top, y, lobby, hole ? inner : 0, apo, ceiling, accent, style.warm, thingRoot, things, (x, z) => free(x, z, 0.8) && offWay(L, x, z, 1.5), (x, z) => !onRoute(x, z, 1.2));
 
     {
       // Placa verde de saída de emergência acesa, pendurada no teto do hall dos elevadores (o nome
@@ -623,8 +627,9 @@ export function withFloors(kit: Kit, scene: InteriorScene, id: ModuleId, label: 
       } else b.add(stone, new THREE.CylinderGeometry(inner, inner, h, 40), [0, y + h / 2, 0]);
       b.add(stone, new THREE.CylinderGeometry(inner + 0.25, inner + 0.25, 0.3, 40), [0, y + h + 0.15, 0]);
     }
-    // Floreiras, bancos e mesas fora da escada e do caminho até ela.
-    let spots = deckSpots(vols, edges, free + 0.6, Math.PI).filter((s) => !inWell(st, s.x, s.z, 1.6) && !inLiftCore(core, s.x, s.z, 1.2) && !inLiftHall(core, s.x, s.z, 0.8) && offWay(L, s.x, s.z, 1.8));
+    // Floreiras, bancos e mesas fora da escada, do caminho até ela e da rota a pé do elevador à escada.
+    const route = routeOn(rules[L], ways(L));
+    let spots = deckSpots(vols, edges, free + 0.6, Math.PI).filter((s) => !inWell(st, s.x, s.z, 1.6) && !inLiftCore(core, s.x, s.z, 1.2) && !inLiftHall(core, s.x, s.z, 0.8) && offWay(L, s.x, s.z, 1.8) && route.every(([px, pz]) => Math.hypot(s.x - px, s.z - pz) >= 1.6));
     // Calendar: o relógio de sol do Mirante do Tempo, na frente do terraço (o mesmo de fora).
     const dial = id === 'calendar' ? sundialSpot(vols) : null;
     if (dial) {
@@ -632,13 +637,16 @@ export function withFloors(kit: Kit, scene: InteriorScene, id: ModuleId, label: 
       sundial(kit, b, dial.x, y, dial.z);
     }
     drawDeck(kit, b, spots, y, style.warm, seats, null);
-    // Pórtico com o nome do terraço na frente das portas dos elevadores (o núcleo sobe acima do deque).
+    // Marquise em balanço sobre as portas dos elevadores (o núcleo sobe acima do deque), com o nome
+    // do terraço pendurado na frente dela. Sem pilares: os do pórtico de antes, a 1,4 m do núcleo,
+    // caíam junto da chegada da escada (no Languages, na frente da chegada ao terraço).
     const gw = 1.7;
     const gz = core.z1 + 1.4;
-    for (const s of [-1, 1]) b.add(dark, new THREE.BoxGeometry(0.12, 3.0, 0.12), [s * gw, y + 1.5, gz]);
-    b.add(dark, new THREE.BoxGeometry(2 * gw + 0.12, 0.12, 0.12), [0, y + 3.0, gz]);
+    b.add(dark, new THREE.BoxGeometry(2 * gw + 0.12, 0.08, gz - core.z1), [0, y + 3.35, (core.z1 + 0.1 + gz + 0.1) / 2]);
+    b.add(metal, new THREE.BoxGeometry(2 * gw + 0.16, 0.12, 0.05), [0, y + 3.33, gz + 0.1]);
+    for (const s of [-1, 1]) b.add(metal, new THREE.BoxGeometry(0.03, 0.4, 0.03), [s * 1.0, y + 3.11, gz]);
     const gate = sectorSign(kit, label('terrace'), accent, 2.6);
-    gate.position.set(0, y + 2.6, gz);
+    gate.position.set(0, y + 2.75, gz);
     scene.scene.add(gate);
     levels.push({
       y,
@@ -829,6 +837,158 @@ export function withFloors(kit: Kit, scene: InteriorScene, id: ModuleId, label: 
   return scene;
 }
 
+/**
+ * Por onde se chega à escada no nível `L`: o pé, a chegada e a frente das bordas do patamar
+ * (stairApproach); no caracol do núcleo, os dois lados da porta. Salas, móveis e placas ficam longe.
+ */
+export function stairWays(id: ModuleId, L: number): Pt[] {
+  const st = stairOf(id);
+  if (st) return stairApproach(st, L);
+  if (CIRCULATION[id].stair !== 'core' || L < coreFrom(id)) return [];
+  const cs = coreSpots(voidRadius(id));
+  return [cs.up, cs.down];
+}
+
+/** Grade da rota a pé até a escada (m) e a folga do corpo para cada lado. */
+const ROUTE_CELL = 0.25;
+const BODY = [[0, 0], [0.3, 0], [-0.3, 0], [0, 0.3], [0, -0.3]] as const;
+const STEPS = [[1, 0], [-1, 0], [0, 1], [0, -1]] as const;
+
+/**
+ * Rota a pé, só pela planta do nível (`rule`: fachada, núcleo, vão e guarda-corpo da escada, vazio
+ * do meio), da chegada do elevador até cada ponto de `to` (o caminho até a escada): a mais curta
+ * numa grade de 0,25 m em que o corpo cabe (0,3 m para cada lado). Pontos a cada 0,5 m (sem
+ * repetir). O saguão, os bancos do vazio e o deque do terraço desviam dela.
+ */
+export function routeOn(rule: LevelRule | undefined, to: readonly Pt[]): Pt[] {
+  if (!rule || !to.length) return [];
+  const lv: LevelRule = rule;
+  const G = ROUTE_CELL;
+  const pass = (x: number, z: number) => Math.hypot(x, z) <= lv.walk && BODY.every(([dx, dz]) => !lv.blocked(x + dx, z + dz));
+  const key = (i: number, j: number) => `${i},${j}`;
+  const i0 = Math.round(lv.arrive.x / G);
+  const j0 = Math.round(lv.arrive.z / G);
+  const prev = new Map<string, string>([[key(i0, j0), '']]);
+  const bad = new Set<string>();
+  // Cada alvo vale a até duas células dele (o ponto pode cair junto do guarda-corpo).
+  const goals = to.map(([x, z]) => ({ i: Math.round(x / G), j: Math.round(z / G), at: '' }));
+  let left = goals.length;
+  const q: Array<[number, number]> = [[i0, j0]];
+  for (let h = 0; h < q.length && left > 0; h++) {
+    const [i, j] = q[h]!;
+    for (const g of goals)
+      if (!g.at && Math.abs(i - g.i) <= 2 && Math.abs(j - g.j) <= 2) {
+        g.at = key(i, j);
+        left--;
+      }
+    for (const [di, dj] of STEPS) {
+      const a = i + di;
+      const c = j + dj;
+      const k = key(a, c);
+      if (prev.has(k) || bad.has(k)) continue;
+      if (!pass(a * G, c * G)) {
+        bad.add(k);
+        continue;
+      }
+      prev.set(k, key(i, j));
+      q.push([a, c]);
+    }
+  }
+  const out: Pt[] = [];
+  const seen = new Set<string>();
+  for (const g of goals)
+    for (let k = g.at; k; k = prev.get(k) ?? '') {
+      const [i = 0, j = 0] = k.split(',').map(Number);
+      const s = `${Math.round(i / 2)},${Math.round(j / 2)}`;
+      if (seen.has(s)) continue;
+      seen.add(s);
+      out.push([i * G, j * G]);
+    }
+  return out;
+}
+
+/** A rota a pé da chegada do elevador até a escada no nível `L` (veja routeOn). */
+export function stairRoute(id: ModuleId, L: number): Pt[] {
+  return routeOn(levelRules(id)?.[L], stairWays(id, L));
+}
+
+/**
+ * Salas do nível `L` (L ≥ 1) do prédio, como withFloors as desenha (sem three.js: testável): a
+ * planta distribui (layout) e cada sala fica fora do núcleo dos elevadores e do hall (liftKeep), a
+ * mais de 0,6 m do vão da escada e a mais de 0,9 m de cada ponto do caminho até ela; encolhe até
+ * caber e, se nem assim, fica de fora.
+ */
+export function roomSlots(id: ModuleId, L: number): Slot[] {
+  const rooms = FLOOR_PLANS[id]?.[L - 1];
+  const core = liftCore(id);
+  if (!rooms?.length || !core) return [];
+  const fp = upperPlan(FORMS[id]);
+  const st = stairOf(id);
+  const vols = volsAt(id, L);
+  const sp = spanZ(vols, 0);
+  const zv = fp === 'side' ? sideCut(id, L) : Infinity;
+  const free = (x: number, z: number, m: number) => insideAt(vols, x, z, m) && !inWell(st, x, z, m) && !inLiftCore(core, x, z, Math.min(m, 0.1));
+  const keep = liftKeep(core);
+  return layout(fp, rooms.length, free, voidRadius(id), zv, sp.front, sp.back, ringGap(st), stairBox(st), stairWays(id, L), (cx, cz, face, w, d) => roomClear(keep, st, cx, cz, face, w, d), keep.x1);
+}
+
+/**
+ * A sala (centro, giro, largura e fundo; paredes incluídas) não entra no retângulo `keep` (o núcleo
+ * e o hall; teste exato de dois retângulos) nem chega a menos de 0,6 m do vão da escada (amostra de
+ * 0,4 m da sala e os cantos do vão dentro dela).
+ */
+export function roomClear(keep: Box, st: Stair | null, cx: number, cz: number, face: number, w: number, d: number): boolean {
+  const c = Math.cos(face);
+  const s = Math.sin(face);
+  const hw = w / 2 + 0.08;
+  const hd = d / 2 + 0.08;
+  const room = ([[-hw, -hd], [hw, -hd], [hw, hd], [-hw, hd]] as const).map(([lx, lz]): Pt => [cx + lx * c + lz * s, cz - lx * s + lz * c]);
+  if (convexOverlap(room, [[keep.x0, keep.z0], [keep.x1, keep.z0], [keep.x1, keep.z1], [keep.x0, keep.z1]])) return false;
+  if (!st) return true;
+  const inRoom = (x: number, z: number, m: number) => {
+    const dx = x - cx;
+    const dz = z - cz;
+    return Math.abs(dx * c - dz * s) < hw + m && Math.abs(dx * s + dz * c) < hd + m;
+  };
+  if (st.well.some(([x, z]) => inRoom(x, z, 0.6))) return false;
+  const nx = Math.max(2, Math.ceil((2 * hw) / 0.4));
+  const nz = Math.max(2, Math.ceil((2 * hd) / 0.4));
+  for (let i = 0; i <= nx; i++)
+    for (let j = 0; j <= nz; j++) {
+      const lx = -hw + (2 * hw * i) / nx;
+      const lz = -hd + (2 * hd * j) / nz;
+      if (inWell(st, cx + lx * c + lz * s, cz - lx * s + lz * c, 0.6)) return false;
+    }
+  return true;
+}
+
+/** Dois polígonos convexos se sobrepõem (eixos separadores; só encostar não conta). */
+function convexOverlap(a: readonly Pt[], b: readonly Pt[]): boolean {
+  for (const poly of [a, b])
+    for (let i = 0; i < poly.length; i++) {
+      const p = poly[i]!;
+      const q = poly[(i + 1) % poly.length]!;
+      const nx = q[1] - p[1];
+      const nz = p[0] - q[0];
+      let a0 = Infinity;
+      let a1 = -Infinity;
+      let b0 = Infinity;
+      let b1 = -Infinity;
+      for (const [x, z] of a) {
+        const t = x * nx + z * nz;
+        a0 = Math.min(a0, t);
+        a1 = Math.max(a1, t);
+      }
+      for (const [x, z] of b) {
+        const t = x * nx + z * nz;
+        b0 = Math.min(b0, t);
+        b1 = Math.max(b1, t);
+      }
+      if (a1 <= b0 + 1e-9 || b1 <= a0 + 1e-9) return false;
+    }
+  return true;
+}
+
 /** Onde não se pisa num nível do prédio, e de onde se parte nele (a chegada do elevador). */
 export interface LevelRule {
   y: number;
@@ -935,17 +1095,25 @@ function railing(b: Builder, glass: THREE.Material, metal: THREE.Material, pts: 
  * reto da frente aos fundos; ou atrás da galeria do mezanino. Cada sala encolhe até caber. No anel,
  * a abertura dos fundos (`gap`, ângulos) fica livre para o saguão e a escada; no mezanino, as salas
  * param antes da coluna da escada (`box`, com 1,6 m de passagem), deixando o caminho da galeria até
- * ela; no corredor, as salas do lado da escada começam depois dela (o pé fica livre).
+ * ela; no corredor, as salas do lado da escada começam depois dela (o pé fica livre). Toda sala
+ * passa por `clear` (fora do núcleo e do hall, longe do vão: roomClear) e pelo caminho até a escada
+ * (`keep`): encolhe até caber e, se nem no menor tamanho, fica de fora. No mezanino, a passagem do
+ * meio vai até `mid` (a largura do núcleo e do hall); um lado sem largura para uma sala passa as
+ * salas dele para o outro.
  */
-function layout(plan: Plan, n: number, inside: (x: number, z: number, m: number) => boolean, inner: number, zv: number, front: number, back: number, gap: [number, number], box: StairBox | null, keep: readonly Pt[] = []): Slot[] {
+function layout(plan: Plan, n: number, inside: (x: number, z: number, m: number) => boolean, inner: number, zv: number, front: number, back: number, gap: [number, number], box: StairBox | null, keep: readonly Pt[] = [], clear: (cx: number, cz: number, face: number, w: number, d: number) => boolean = () => true, mid = 1.5): Slot[] {
   const avoid = (x: number) => !!box && x > box.x0 - 1.6 && x < box.x1 + 1.6;
   const out: Slot[] = [];
   // A caixa cabe na planta (cantos com folga das paredes).
   const fits = (cx: number, cz: number, face: number, w: number, d: number) => {
     const c = Math.cos(face);
     const s = Math.sin(face);
-    if (!clearOf(cx, cz, face, w, d)) return false;
+    if (!clearOf(cx, cz, face, w, d) || !clear(cx, cz, face, w, d)) return false;
     return [[-w / 2, -d / 2], [w / 2, -d / 2], [-w / 2, d / 2], [w / 2, d / 2], [0, -d / 2], [-w / 2, 0], [w / 2, 0]].every(([lx, lz]) => inside(cx + lx! * c + lz! * s, cz - lx! * s + lz! * c, 0.35));
+  };
+  /** Guarda a sala só se ela fica livre do núcleo, do hall, do vão e do caminho até a escada. */
+  const put = (sl: Slot) => {
+    if (clearOf(sl.x, sl.z, sl.face, sl.w, sl.d) && clear(sl.x, sl.z, sl.face, sl.w, sl.d)) out.push(sl);
   };
   /** Nenhum ponto do caminho até a escada (`keep`) a menos de 0,9 m da sala. */
   function clearOf(cx: number, cz: number, face: number, w: number, d: number): boolean {
@@ -977,7 +1145,7 @@ function layout(plan: Plan, n: number, inside: (x: number, z: number, m: number)
         if (w > 2.4) w -= 0.25;
         if (d > 2.4) d -= 0.25;
       }
-      out.push({ x: s * mid(d), z: c * mid(d), face: a + Math.PI, w, d, kind: 'box' });
+      put({ k, x: s * mid(d), z: c * mid(d), face: a + Math.PI, w, d, kind: 'box' });
     }
     return out;
   }
@@ -1003,29 +1171,34 @@ function layout(plan: Plan, n: number, inside: (x: number, z: number, m: number)
       const w = Math.max(2.4, Math.min(8, len - (plan === 'open' ? 0.8 : 0.15)));
       let d = 2.5;
       while (d < 12 && fits(s * (half + (d + 0.25) / 2), z, face, w, d + 0.25)) d += 0.25;
-      out.push({ x: s * (half + d / 2), z, face, w, d, kind: plan === 'corridor' ? 'box' : 'island' });
+      put({ k, x: s * (half + d / 2), z, face, w, d, kind: plan === 'corridor' ? 'box' : 'island' });
     }
     return out;
   }
   // Mezanino: salas lado a lado no fundo, de frente para a galeria sobre o pé-direito alto;
-  // passagem no meio até o elevador.
+  // passagem no meio até o elevador, da largura do hall (as salas não encostam no núcleo).
   const zr1 = zv - 2.8;
-  const nL = Math.ceil(n / 2);
-  let xr = 1.5;
+  const x0 = Math.max(1.5, mid + 0.1);
+  let xr = x0;
   while (xr < 60 && inside(xr + 0.25, zr1, 0.4) && !avoid(xr + 0.25)) xr += 0.25;
-  let xl = 1.5;
+  let xl = x0;
   while (xl < 60 && inside(-(xl + 0.25), zr1, 0.4) && !avoid(-(xl + 0.25))) xl += 0.25;
+  // Lado sem largura para uma sala (a escada ao lado do núcleo, no Projects): as salas vão para o outro.
+  const okL = xl - x0 >= 2.55;
+  const okR = xr - x0 >= 2.55;
+  if (!okL && !okR) return out;
+  const nL = okL ? (okR ? Math.ceil(n / 2) : n) : 0;
   for (let k = 0; k < n; k++) {
     const left = k < nL;
     const m = left ? nL : n - nL;
     const j = left ? k : k - nL;
-    const wAll = (left ? xl : xr) - 1.5;
+    const wAll = (left ? xl : xr) - x0;
     // Sala sozinha num lado do mezanino: no máximo 7 m de frente, no meio da sua vaga.
     const w = Math.max(2.4, Math.min(7, wAll / m - 0.15));
-    const cx = (left ? -1 : 1) * (1.5 + (j + 0.5) * (wAll / m));
+    const cx = (left ? -1 : 1) * (x0 + (j + 0.5) * (wAll / m));
     let d = 2.5;
     while (d < 30 && fits(cx, zr1 - (d + 0.25) / 2, 0, w, d + 0.25)) d += 0.25;
-    out.push({ x: cx, z: zr1 - d / 2, face: 0, w, d, kind: 'box' });
+    put({ k, x: cx, z: zr1 - d / 2, face: 0, w, d, kind: 'box' });
   }
   return out;
 }
@@ -1118,23 +1291,39 @@ function stairBox(st: Stair | null): StairBox | null {
 }
 
 /**
- * O saguão sai de cima da escada: cada peça que cai nela (a menos de `m` m) vai para o outro lado ou
- * mais para dentro. A peça-assinatura do prédio (com o violão da Música ao lado) pede mais folga.
+ * O saguão sai da escada, do núcleo, do hall e da rota a pé até a escada (`ok` diz se o ponto serve
+ * para uma peça de meia largura `m`): cada peça fica onde está, no espelho (o outro lado do eixo)
+ * ou no primeiro lugar livre em anéis de 0,5 m em volta dela (até 10 m). O canto de apoio é uma
+ * fileira (bebedouro, reciclagem e extintor, de x a x + 2,75 m): vale a fileira inteira. A
+ * peça-assinatura do prédio (com o violão da Música ao lado) pede mais folga. Sem lugar livre,
+ * a peça fica onde estava.
  */
 function clearLobby(l: Lobby, ok: (x: number, z: number, m: number) => boolean): Lobby {
-  const fix = (x: number, z: number, m = 1.0): [number, number] => {
-    if (ok(x, z, m)) return [x, z];
-    if (ok(-x, z, m)) return [-x, z];
-    for (let d = 0.5; d <= 8; d += 0.5) for (const s of [1, -1]) if (ok(x, z + s * d, m)) return [x, z + s * d];
+  const around = function* (x: number, z: number): Generator<[number, number]> {
+    yield [x, z];
+    yield [-x, z];
+    for (let r = 0.5; r <= 10; r += 0.5) for (let k = 0; k < 16; k++) yield [x + Math.sin((k / 16) * Math.PI * 2) * r, z - Math.cos((k / 16) * Math.PI * 2) * r];
+  };
+  const fix = (x: number, z: number, m: number): [number, number] => {
+    for (const p of around(x, z)) if (ok(p[0], p[1], m)) return p;
     return [x, z];
   };
-  const pt = (p: [number, number]) => fix(p[0], p[1]);
-  const po = (p: { x: number; z: number; face: number }, m = 1.0) => {
+  const pt = (p: [number, number], m: number) => fix(p[0], p[1], m);
+  const po = (p: { x: number; z: number; face: number }, m: number) => {
     const [x, z] = fix(p.x, p.z, m);
-    return { x, z, face: x !== p.x ? -p.face : p.face };
+    return { x, z, face: x === -p.x && z === p.z && x !== p.x ? -p.face : p.face };
   };
-  const out: Lobby = { sofa: po(l.sofa), table: pt(l.table), plant: pt(l.plant), lamp: pt(l.lamp), sig: po(l.sig, 2.8) };
-  if (l.service) out.service = pt(l.service);
+  const out: Lobby = { sofa: po(l.sofa, 1.0), table: pt(l.table, 0.6), plant: pt(l.plant, 0.6), lamp: pt(l.lamp, 0.5), sig: po(l.sig, 2.0) };
+  if (l.service) {
+    const [sx, sz] = l.service;
+    let at: [number, number] = [sx, sz];
+    for (const p of around(sx, sz))
+      if ([0, 1.45, 2.75].every((dx) => ok(p[0] + dx, p[1], 0.5))) {
+        at = p;
+        break;
+      }
+    out.service = at;
+  }
   return out;
 }
 

@@ -247,7 +247,7 @@ function service(c: Ctx, x: number, y: number, z: number) {
  * saguão do elevador e a marca do prédio; nas plantas com vazio no meio, bancos e floreiras ao
  * longo do guarda-corpo.
  */
-export function enrichLevel(kit: Kit, b: Builder, seats: Seat[], id: ModuleId, L: number, top: boolean, y: number, lobby: Lobby, ring: number, apo: number, ceiling: number, accent: string, warm: boolean, root: THREE.Object3D, things: Thing[], ok: (x: number, z: number) => boolean = () => true) {
+export function enrichLevel(kit: Kit, b: Builder, seats: Seat[], id: ModuleId, L: number, top: boolean, y: number, lobby: Lobby, ring: number, apo: number, ceiling: number, accent: string, warm: boolean, root: THREE.Object3D, things: Thing[], ok: (x: number, z: number) => boolean = () => true, clear: (x: number, z: number) => boolean = () => true) {
   const c: Ctx = { kit, b, seats, accent, warm, root, things, level: L, top };
   const m = mats(c);
   const variant = L % 3;
@@ -281,7 +281,8 @@ export function enrichLevel(kit: Kit, b: Builder, seats: Seat[], id: ModuleId, L
       const r = ring + 0.75;
       const x = Math.sin(a) * r;
       const z = Math.cos(a) * r;
-      if (!ok(x, z)) continue;
+      // (`clear`: fora da rota a pé do elevador até a escada, floors.ts.)
+      if (!ok(x, z) || !clear(x, z)) continue;
       if (k % 2) bench(c, x, y, z, a, 1.4);
       else {
         b.add(m.pot, new THREE.BoxGeometry(1.1, 0.45, 0.4), [x, y + 0.22, z], [0, a + Math.PI / 2, 0]);

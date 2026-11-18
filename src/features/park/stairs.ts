@@ -382,6 +382,19 @@ export interface Box {
   z1: number;
 }
 
+/** Folga (m) em volta do núcleo e do hall que nenhuma sala ocupa. */
+export const LIFT_KEEP = 0.4;
+
+/**
+ * O que fica sempre livre em cada andar: o núcleo dos elevadores e o hall na frente das duas
+ * portas (com a chegada), com `LIFT_KEEP` m de folga dos lados, atrás e na frente. Nenhuma sala
+ * entra nesse retângulo (floors.ts, roomSlots); o saguão e os móveis desviam dele com mais folga.
+ */
+export function liftKeep(c: LiftCore): Box {
+  const hx = Math.max(c.x1, HALL_HALF) + LIFT_KEEP;
+  return { x0: -hx, x1: hx, z0: c.z0 - LIFT_KEEP, z1: c.hall + LIFT_KEEP };
+}
+
 /** Parte de um polígono convexo onde a·x + b·z ≤ c. */
 function cutHalf(pts: readonly Pt[], a: number, b: number, c: number): Pt[] {
   const out: Pt[] = [];

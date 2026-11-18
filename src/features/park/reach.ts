@@ -5,7 +5,10 @@
  * 0,25 m, a partir da chegada do elevador (e da entrada, no térreo), anda como o corpo anda
  * (camera.ts: limite, obstáculos com a folga do corpo, `blocked`, subida máxima por passo, troca de
  * nível pela altura dos pés) e diz se o pé de cada lance e a chegada de cada patamar são
- * alcançados, se dá para subir e descer a pé, e o que bloqueia o anel em volta da escada.
+ * alcançados, se dá para subir e descer a pé, e o que bloqueia o anel em volta da escada. Para
+ * cada ponto não alcançado (a chegada do elevador, o pé ou a chegada da escada, ou o do outro
+ * nível na subida e na descida), os obstáculos mais perto dele e os que fecham a área livre em
+ * volta dele, com o nível: dá para achar no navegador o que trava o caminho.
  * Sem three.js: testável.
  */
 import type { CameraWorld, Obstacle } from './camera';
@@ -56,6 +59,30 @@ export interface ReachLevel {
 /** O que bloqueia um ponto para quem anda no nível (vazio = livre). */
 export type Why = '' | 'limit' | 'obstacle' | 'stair' | 'height' | 'blocked';
 
+/** Obstáculo que trava um ponto: o nível, o obstáculo e quanto a borda dele fica do ponto (m; negativo: o ponto está dentro). */
+export interface Blocker {
+  level: number;
+  o: Obstacle;
+  d: number;
+}
+
+/**
+ * Ponto não alcançado e o que o trava: a chegada do elevador ('arrival'), o pé ('foot') ou a chegada
+ * ('head') da escada neste nível, ou o do nível de cima ('up') ou de baixo ('down') que não se
+ * alcança a pé por ela.
+ */
+export interface ReachMiss {
+  what: 'arrival' | 'foot' | 'head' | 'up' | 'down';
+  level: number;
+  at: Pt;
+  /** O que impede de pisar no próprio ponto ('': nada, ele só não é alcançado). */
+  why: Why;
+  /** Obstáculos a até 2 m do ponto, do mais perto ao mais longe. */
+  near: Blocker[];
+  /** Obstáculos na borda da área livre em volta do ponto (os que fecham o caminho até ele), do mais perto ao mais longe. */
+  walls: Blocker[];
+}
+
 /** Ponto de interesse da escada num nível e se foi alcançado a pé. */
 export interface ReachSpot {
   kind: 'foot' | 'head';
@@ -78,10 +105,14 @@ export interface ReachReport {
    * regra do nível (fachada, núcleo, vazio). O guarda-corpo (a menos de 0,3 m) não entra.
    */
   ring: { ok: number; isolated: Pt[]; obstacles: Array<{ at: Pt; o: Obstacle }>; rule: number };
+  /** Pontos não alcançados neste nível (ou, na subida e na descida, no nível de cima e de baixo) e o que os trava. */
+  misses: ReachMiss[];
 }
 
 /** Grade da conferência (m). */
 export const REACH_CELL = 0.25;
+/** Passos da grade (as quatro vizinhas). */
+const D4 = [[1, 0], [-1, 0], [0, 1], [0, -1]] as const;
 
 /**
  * Até onde se chega a pé, nível a nível (veja o cabeçalho). `stair`: a escada principal (pés e
@@ -149,11 +180,10 @@ export function stairReach(o: { ys: readonly number[]; levels: readonly ReachLev
       const j = Math.round(z / G);
       if (why(L0, i * G, j * G, ys[L0]!).w === '') push(i, j, L0, ys[L0]!);
     }
-    const D = [[1, 0], [-1, 0], [0, 1], [0, -1]] as const;
     for (let h = 0; h < q.length; h++) {
       const [i, j, L, y] = q[h]!;
       const w = worlds[L]!;
-      for (const [di, dj] of D) {
+      for (const [di, dj] of D4) {
         const x = (i + di) * G;
         const z = (j + dj) * G;
         if (why(L, x, z, y).w !== '') continue;
@@ -173,6 +203,34 @@ export function stairReach(o: { ys: readonly number[]; levels: readonly ReachLev
     const j0 = Math.round(p[1] / G);
     for (let di = -1; di <= 1; di++) for (let dj = -1; dj <= 1; dj++) if (R.has(key(i0 + di, j0 + dj, L))) return true;
     return false;
+  };
+  /** Obstáculos do nível `L` a até `m` m (da borda) do ponto, do mais perto ao mais longe (no máximo 6). */
+  const nearOf = (L: number, p: Pt, m = 2): Blocker[] =>
+    worlds[L]!.obstacles
+      .map((ob) => ({ level: L, o: ob, d: Math.hypot(p[0] - ob.x, p[1] - ob.z) - ob.r }))
+      .filter((b) => b.d < m)
+      .sort((a, b) => a.d - b.d)
+      .slice(0, 6);
+  /**
+   * Obstáculos que fecham a área livre em volta do ponto, no piso do nível `L`: os que travam uma
+   * célula vizinha de uma célula alcançada a partir dele, do mais perto ao mais longe do ponto (no
+   * máximo 8). Se o ponto está numa ilha (cercado por móveis, paredes de sala), são as peças da cerca.
+   */
+  const wallsOf = (L: number, p: Pt): Blocker[] => {
+    const R = flood(L, [p]);
+    const w = worlds[L]!;
+    const pd = pad(w);
+    const found = new Map<Obstacle, number>();
+    for (const k of R) {
+      const [i = 0, j = 0, l = -1] = k.split(',').map(Number);
+      if (l !== L) continue;
+      for (const [di, dj] of D4) {
+        const x = (i + di) * G;
+        const z = (j + dj) * G;
+        for (const ob of near[L]!(x, z)) if (!found.has(ob) && Math.hypot(x - ob.x, z - ob.z) < ob.r + pd) found.set(ob, Math.hypot(p[0] - ob.x, p[1] - ob.z) - ob.r);
+      }
+    }
+    return [...found].map(([ob, d]) => ({ level: L, o: ob, d })).sort((a, b) => a.d - b.d).slice(0, 8);
   };
 
   return o.levels.map((lv, L) => {
@@ -201,14 +259,20 @@ export function stairReach(o: { ys: readonly number[]; levels: readonly ReachLev
         }
     }
     const a = lv.starts[0];
-    return {
-      level: L,
-      arrival: !!a && why(L, a[0], a[1], ys[L]!).w === '',
-      spots,
-      up: above && (o.stair || o.core) ? hit(R, above.at, L + 1) : null,
-      down: below && (o.stair || o.core) ? hit(R, below.at, L - 1) : null,
-      ring,
+    const arrival = !!a && why(L, a[0], a[1], ys[L]!).w === '';
+    const up = above && (o.stair || o.core) ? hit(R, above.at, L + 1) : null;
+    const down = below && (o.stair || o.core) ? hit(R, below.at, L - 1) : null;
+    // O que trava cada ponto não alcançado (diagnóstico no navegador: 'stairs:reach').
+    const misses: ReachMiss[] = [];
+    const miss = (what: ReachMiss['what'], level: number, at: Pt) => {
+      const w = why(level, at[0], at[1], ys[level]!).w;
+      misses.push({ what, level, at, why: w, near: nearOf(level, at), walls: w === '' ? wallsOf(level, at) : [] });
     };
+    if (a && !arrival) miss('arrival', L, a);
+    for (const s of spots) if (!s.reached) miss(s.kind, L, s.at);
+    if (up === false && above) miss('up', L + 1, above.at);
+    if (down === false && below) miss('down', L - 1, below.at);
+    return { level: L, arrival, spots, up, down, ring, misses };
   });
 }
 
@@ -254,5 +318,11 @@ export function reachSummary(rep: readonly ReachReport[]): Array<Record<string, 
     ring: { ok: r.ring.ok, rule: r.ring.rule, isolated: r.ring.isolated.length, obstacles: r.ring.obstacles.length },
     isolated: r.ring.isolated.slice(0, 12).map(f),
     obstacles: r.ring.obstacles.slice(0, 12).map(({ at, o }) => ({ at: f(at), o: [+o.x.toFixed(2), +o.z.toFixed(2), +o.r.toFixed(2), +o.h.toFixed(1)] })),
+    // Cada ponto não alcançado: o que é, o nível, onde, por que não se pisa nele e os obstáculos
+    // [nível, x, z, raio, altura do topo, distância da borda ao ponto] perto dele e na cerca em volta.
+    misses: r.misses.map((m) => ({ what: m.what, level: m.level, at: f(m.at), why: m.why, near: m.near.map(blocker), walls: m.walls.map(blocker) })),
   }));
 }
+
+/** Obstáculo de um ponto não alcançado, para o resumo: [nível, x, z, raio, altura do topo, distância]. */
+const blocker = (b: Blocker): number[] => [b.level, +b.o.x.toFixed(2), +b.o.z.toFixed(2), +b.o.r.toFixed(2), +b.o.h.toFixed(1), +b.d.toFixed(2)];

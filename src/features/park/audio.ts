@@ -12,6 +12,7 @@ import { LAKE, PLAYGROUNDS, POIS, PONDS, ROAD_RADIUS, lakeRadiusAt } from '@/dom
 import { sound } from '@/features/focus/sound';
 import type { Sky } from './world';
 import type { Timbre } from './interiors/things';
+import type { RoomTone } from './interiors/indoorLife';
 
 export const AUDIO_CATS = ['nature', 'water', 'weather', 'music', 'steps'] as const;
 export type AudioCat = (typeof AUDIO_CATS)[number];
@@ -32,6 +33,11 @@ export interface AudioInfo {
   season?: 'spring' | 'summer' | 'autumn' | 'winter';
   /** Skatistas perto (som das rodinhas). */
   skaters?: Array<{ x: number; z: number }>;
+  /**
+   * Dentro de um prédio: o som do ambiente (o tom do prédio, quantas pessoas há e onde estão, no
+   * sistema do interior, o mesmo de quem ouve). Sem gente, só o ar do prédio (e o relógio).
+   */
+  room?: { tone: RoomTone; people: number; floor: number; sources: ReadonlyArray<{ x: number; y: number; z: number }> } | null;
 }
 
 export interface ParkAudio {
@@ -638,7 +644,129 @@ export function createParkAudio(mix: AudioMix): ParkAudio | null {
     }, (delay + 4) * 1000);
   };
 
+  /* ---------- Som de cada prédio por dentro (interior aberto) ---------- */
+  // Barramento próprio, sem o abafador de fora, no volume da natureza (ambiente) e no geral.
+  const roomBus = keep(ctx.createGain());
+  roomBus.gain.value = 0;
+  roomBus.connect(master);
+  let roomVol = mix.nature;
+  // O ar do prédio: um sopro grave e baixo (ventilação), um pouco mais cheio com mais gente.
+  const humG = loop(brown, roomBus, (f) => ((f.type = 'lowpass'), (f.frequency.value = 170)));
+  let roomAt = 0;
+  let tickAt = 0;
+  /** Intervalo médio (ms) entre os sons de cada prédio, com o prédio cheio. */
+  const ROOM_GAP: Record<RoomTone, number> = { library: 4200, study: 2800, office: 1900, clock: 2600, chime: 2400, music: 2600, gym: 1100, calm: 6000 };
+  /** Folha de papel virando: sopro de ruído que sobe, e o assentar da folha. */
+  const page = (out: AudioNode, t0: number, v: number) => {
+    burst(out, t0, pink, 'bandpass', 1600, 0.9, 0.05 * v, 0.3, 4200);
+    burst(out, t0 + 0.22, white, 'highpass', 3000, 0.5, 0.018 * v, 0.1);
+  };
+  /** Teclado: sequência de toques curtos (com a barra de espaço mais grave de vez em quando). */
+  const typing = (out: AudioNode, t0: number, v: number) => {
+    let t = t0;
+    const n = 6 + Math.floor(Math.random() * 10);
+    for (let k = 0; k < n; k++) {
+      const space = Math.random() < 0.15;
+      burst(out, t, white, 'bandpass', space ? 1400 : 2400 + Math.random() * 1600, space ? 2 : 3, (space ? 0.03 : 0.022) * v, space ? 0.05 : 0.03);
+      t += 0.08 + Math.random() * 0.1 + (Math.random() < 0.1 ? 0.3 : 0);
+    }
+  };
+  /** Caneta no papel: arranhados curtos. */
+  const scribble = (out: AudioNode, t0: number, v: number) => {
+    for (let k = 0; k < 5 + Math.floor(Math.random() * 5); k++) burst(out, t0 + k * (0.09 + Math.random() * 0.06), white, 'bandpass', 3200 + Math.random() * 900, 4, 0.012 * v, 0.07);
+  };
+  /** Um som do ambiente de cada prédio, saindo de onde está a pessoa (ou do salão, sem `pos`). */
+  const roomEvent = (kind: RoomTone, pos: { x: number; y: number; z: number } | null) => {
+    const out = pos ? panner(pos.x, pos.y + 1, pos.z, 2.5, roomBus, false) : roomBus;
+    const t0 = now() + 0.02;
+    const r = Math.random();
+    switch (kind) {
+      case 'library':
+        if (r < 0.75) page(out, t0, 0.8);
+        else tone(out, t0, 'sine', 180, 0.012, 0.25, 150);
+        break;
+      case 'study':
+        if (r < 0.45) page(out, t0, 1);
+        else if (r < 0.85) scribble(out, t0, 1);
+        else typing(out, t0, 0.7);
+        break;
+      case 'office':
+        if (r < 0.6) typing(out, t0, 1);
+        else if (r < 0.8) page(out, t0, 0.8);
+        else if (r < 0.93) burst(out, t0, white, 'bandpass', 1800, 6, 0.03, 0.04);
+        else {
+          tone(out, t0, 'sine', 1046, 0.02, 0.7);
+          tone(out, t0 + 0.12, 'sine', 1568, 0.016, 0.9);
+        }
+        break;
+      case 'clock':
+        if (r < 0.6) typing(out, t0, 0.8);
+        else page(out, t0, 0.8);
+        break;
+      case 'chime':
+        if (r < 0.45) {
+          // Notificação macia: duas notas de sino, baixinho.
+          tone(out, t0, 'sine', 1318.5, 0.028, 0.9);
+          tone(out, t0 + 0.14, 'sine', 1760, 0.024, 1.1);
+        } else typing(out, t0, 0.9);
+        break;
+      case 'music': {
+        // Ensaio ao longe: uma frase curta de piano ou um dedilhado, baixinho.
+        const scale = [60, 62, 64, 67, 69, 72, 74];
+        const n = 3 + Math.floor(Math.random() * 4);
+        const start = Math.floor(Math.random() * 3);
+        const pluck2 = r < 0.4;
+        for (let k = 0; k < n; k++) {
+          const f = hz(scale[(start + k * (r < 0.7 ? 1 : 2)) % scale.length]!);
+          tone(out, t0 + k * (pluck2 ? 0.22 : 0.34), 'triangle', f, pluck2 ? 0.02 : 0.026, pluck2 ? 0.9 : 1.3);
+          if (!pluck2) tone(out, t0 + k * 0.34, 'sine', f * 2, 0.008, 0.6);
+        }
+        break;
+      }
+      case 'gym':
+        if (r < 0.35) {
+          // Bola quicando no piso.
+          [0, 0.42, 0.74, 0.98].forEach((dt, k) => tone(out, t0 + dt, 'sine', 95, 0.09 * (1 - k * 0.22), 0.14, 60));
+        } else if (r < 0.65) {
+          // Anilhas batendo.
+          tone(out, t0, 'triangle', 1150, 0.025, 0.35);
+          tone(out, t0, 'sine', 2870, 0.012, 0.25);
+        } else if (r < 0.9) tone(out, t0, 'sine', 1900, 0.014, 0.14, 2700);
+        else tone(out, t0, 'sine', 2900, 0.01, 0.3);
+        break;
+      case 'calm':
+        if (r < 0.5) tone(out, t0, 'sine', 700 + Math.random() * 400, 0.018, 0.14, 1500);
+        else page(out, t0, 0.5);
+        break;
+    }
+    if (pos) window.setTimeout(() => out.disconnect(), 4000);
+  };
+  /** Som do prédio aberto: o ar, os sons de quem está lá (mais gente, mais sons) e o tique do relógio. */
+  const updateRoom = (info: AudioInfo) => {
+    const room = info.inside ? (info.room ?? null) : null;
+    ramp(roomBus.gain, room ? roomVol : 0, 0.5);
+    ramp(humG.gain, room ? 0.035 + Math.min(0.03, room.people * 0.0015) : 0, 1);
+    if (!room) return;
+    const t = performance.now();
+    if (room.tone === 'clock' && t > tickAt) {
+      tickAt = t + 1000;
+      burst(roomBus, now() + 0.01, white, 'bandpass', 4200, 8, 0.008, 0.02);
+    }
+    if (room.people <= 0 || t < roomAt) return;
+    roomAt = t + (ROOM_GAP[room.tone] * (0.6 + Math.random() * 0.8)) / Math.min(1.5, 0.35 + room.people / 10);
+    // De quem está no andar onde se está (o piso `floor`), sorteado.
+    let pick: { x: number; y: number; z: number } | null = null;
+    let seen = 0;
+    for (const s of room.sources) {
+      if (Math.abs(s.y - room.floor) > 1) continue;
+      seen++;
+      if (Math.random() * seen < 1) pick = s;
+    }
+    if (pick || room.tone === 'gym' || room.tone === 'music') roomEvent(room.tone, pick);
+  };
+
   const setMix = (m: AudioMix) => {
+    roomVol = m.nature;
     ramp(master.gain, m.muted ? 0 : m.master, 0.1);
     AUDIO_CATS.forEach((c) => ramp(cat[c].gain, m[c], 0.1));
     ramp(inst.gain, Math.max(0.15, m.music), 0.1);
@@ -679,6 +807,7 @@ export function createParkAudio(mix: AudioMix): ParkAudio | null {
     const sky = info.sky;
     const trees = info.trees ?? 0.4;
     ramp(muffle.frequency, info.inside ? 650 : 20000, 0.2);
+    updateRoom(info);
     ramp(lakeG.gain, 0.5 + sky.wind * 0.4);
     pondGs.forEach((g) => ramp(g.gain, 0.25));
     ramp(fountainG.gain, 0.22);

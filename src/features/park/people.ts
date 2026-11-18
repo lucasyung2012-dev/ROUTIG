@@ -19,7 +19,7 @@ function smooth(g: THREE.BufferGeometry): THREE.BufferGeometry {
   return m;
 }
 
-export type Pose = 'stand' | 'walk' | 'sit' | 'read' | 'play' | 'wave' | 'exercise' | 'draw' | 'photo' | 'tennis' | 'kick' | 'cheer' | 'keeper' | 'run' | 'bike' | 'skate' | 'water' | 'swing';
+export type Pose = 'stand' | 'walk' | 'sit' | 'read' | 'play' | 'wave' | 'exercise' | 'draw' | 'photo' | 'tennis' | 'kick' | 'cheer' | 'keeper' | 'run' | 'bike' | 'skate' | 'water' | 'swing' | 'type' | 'board' | 'browse' | 'stretch';
 export type Outfit = 'tee' | 'shirt' | 'jacket' | 'hoodie' | 'dress' | 'sport';
 export type Expr = 'neutral' | 'smile' | 'talk' | 'surprised' | 'laugh';
 
@@ -635,7 +635,8 @@ function joints(f: Figure): Joints {
     case 'sit':
     case 'read':
     case 'play':
-    case 'draw': {
+    case 'draw':
+    case 'type': {
       j.hip = SIT_HIP;
       j.hf = [1.5, 1.42];
       j.kf = [1.32, 1.22];
@@ -680,6 +681,13 @@ function joints(f: Figure): Joints {
         j.abd = [0.15, 0.15];
         j.headPitch = 0.45;
         j.prop = 'sketch';
+      } else if (f.pose === 'type') {
+        // Digitando: antebraços à frente sobre a mesa, dedos batendo (o antebraço treme de leve).
+        j.sf = [0.62, 0.62];
+        j.ef = [1.05 + Math.sin(p * 9) * 0.04, 1.05 + Math.sin(p * 9 + 1.7) * 0.04];
+        j.abd = [0.22, 0.22];
+        j.lean = 0.12 + breathe;
+        j.headPitch = 0.22;
       }
       break;
     }
@@ -824,6 +832,34 @@ function joints(f: Figure): Joints {
       j.abd = [0.12, 0.12];
       j.lean = -0.15 - w * 0.15;
       j.headPitch = -0.1;
+      break;
+    }
+    case 'board': {
+      // Escrevendo no quadro: braço direito erguido à frente, a mão desenhando devagar; cabeça um pouco erguida.
+      const w = Math.sin(p * 1.4);
+      j.sf = [0.1, 1.75 + w * 0.12];
+      j.ef = [0.2, 0.55 + Math.sin(p * 2.3) * 0.12];
+      j.abd = [0.08, 0.25 + w * 0.08];
+      j.headPitch = -0.12;
+      j.lean = 0.02;
+      break;
+    }
+    case 'browse': {
+      // Olhando a estante: um braço à frente na altura dos livros, a cabeça acompanhando.
+      j.sf = [0.15, 1.05 + Math.sin(p * 0.6) * 0.15];
+      j.ef = [0.25, 0.45];
+      j.abd = [0.08, 0.12];
+      j.headPitch = 0.05 + Math.sin(p * 0.35) * 0.12;
+      break;
+    }
+    case 'stretch': {
+      // Alongando: braços para o alto e o tronco gira devagar para um lado e para o outro.
+      const k = Math.sin(p * 0.8);
+      j.abd = [2.75 + k * 0.15, 2.75 - k * 0.15];
+      j.ef = [0.15, 0.15];
+      j.twist = k * 0.12;
+      j.legOut = 0.12;
+      j.headPitch = -0.15;
       break;
     }
     case 'exercise': {
@@ -1079,7 +1115,7 @@ export function createCrowd(kit: Kit, capacity: number, shadows = true): Crowd {
 }
 
 /** Poses com os pés no chão (sentado, pedalando ou no balanço não dependem da encosta). */
-const ON_FEET = new Set<Pose>(['stand', 'walk', 'run', 'wave', 'photo', 'cheer', 'exercise', 'tennis', 'kick', 'keeper']);
+const ON_FEET = new Set<Pose>(['stand', 'walk', 'run', 'wave', 'photo', 'cheer', 'exercise', 'tennis', 'kick', 'keeper', 'board', 'browse', 'stretch']);
 
 /**
  * Quanto subir o corpo numa encosta: a posição de cada pé (para a frente ou para trás do quadril,

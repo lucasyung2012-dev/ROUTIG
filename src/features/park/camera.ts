@@ -51,6 +51,8 @@ export interface Seat {
   y: number;
   z: number;
   face: number;
+  /** 'staff': cadeira de quem trabalha ali (atrás do balcão da recepção): a recepcionista senta nela. */
+  tag?: 'staff';
 }
 
 export interface CameraRig {

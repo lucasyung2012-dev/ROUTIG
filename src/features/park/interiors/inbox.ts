@@ -13,7 +13,7 @@ import type { Kit } from '../kit';
 import type { Obstacle } from '../camera';
 import { canvasPlane, createRoom, finishRoom, setDetailCommon, wrap, zoneLabel, type InteriorScene } from './common';
 import { inWell, stairOf } from '../stairs';
-import { areaView, at, benchSeat, box, chair, closeZone, counter, credenza, cyl, deskLamp, groundSeats, hangSign as hangSignAt, lightBar, lowTable, palette, pendant, planter, rug, sofa, solid, table, tallPlant, zone, type F, type View } from './east';
+import { areaView, at, benchSeat, box, chair, closeZone, counter, credenza, cyl, deskLamp, groundSeats, hangSign as hangSignAt, lightBar, lowTable, palette, pendant, planter, rug, sofa, solid, staffSeats, table, tallPlant, zone, type F, type View } from './east';
 
 export const INBOX_SECTORS = ['atrium', 'triage', 'distribution', 'archive', 'gallery'] as const;
 export type InboxSector = (typeof INBOX_SECTORS)[number];
@@ -108,7 +108,8 @@ export function createInboxInterior(kit: Kit, labels: InboxLabels): InteriorScen
     const zn = zone(p, 5.6, 15.2, -Math.PI / 2);
     const rf = zn.f;
     counter(rf, 0, 0, 3.4, 0.8, 0, p.stone, p.wood);
-    for (const lx of [-0.7, 0.7]) chair(rf, lx, -0.9, 0);
+    staffSeats(() => chair(rf, -0.7, -0.9, 0));
+    chair(rf, 0.7, -0.9, 0);
     credenza(rf, 0, -1.75, 3.2, 0, p.wood, 0.8);
     at(rf, p.pot, cyl(0.16, 0.12, 0.26, 12), 1.2, 0.93, -1.75);
     at(rf, p.leaf, new THREE.IcosahedronGeometry(0.24, 1), 1.2, 1.22, -1.75);

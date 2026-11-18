@@ -12,7 +12,9 @@ import { createCameraRig, type CameraWorld, type CamMode, type MoveSettings, typ
 import { AVATAR_LOOK, createCrowd, type Figure } from './people';
 import { createTown } from './town';
 import type { Conditions } from '@/domain/parkPeople';
-import { CLEAR_SKY, createWorld, lightAt, type Quality, type Season, type Sky } from './world';
+import { CLEAR_SKY, createWorld, lightAt, type Light, type Quality, type Season, type Sky } from './world';
+import { LIFE, createIndoorLife, floorLight, lifeRooms, lifeSpots, type IndoorLife, type LifeLevel, type RoomTone } from './interiors/indoorLife';
+import { inUseProps, type InUse } from './interiors/inUse';
 import type { ParkAudio } from './audio';
 import { DRUM_PADS, PIANO_KEYS, guitarStrum, type Instrument, type Thing, type ThingCtx, type ThingKind, type VaultState } from './interiors/things';
 import type { ParkSnapshot } from './parkContext';
@@ -236,6 +238,41 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
   // Interior aberto (um por vez).
   let inside: { id: ModuleId; kit: Kit; scene: InteriorScene } | null = null;
   const dataCache = new Map<ModuleId, unknown>();
+  // Vida do interior aberto (indoorLife.ts): quem está em cada andar, os objetos em uso e a luz da hora.
+  let life: IndoorLife | null = null;
+  let props: InUse | null = null;
+  let residents: Figure[] = [];
+  let residentsAt = 0;
+  const hideAt = { x: 0, z: 0 };
+  /** Som do prédio aberto (o mesmo objeto a cada quadro). */
+  const roomInfo: { tone: RoomTone; people: number; floor: number; sources: readonly Figure[] } = { tone: 'calm', people: 0, floor: 0, sources: [] };
+  /** Quanto é noite agora (0 a 1), da última luz aplicada. */
+  let glowNow = 0;
+  type InLights = { hemi: Array<{ l: THREE.HemisphereLight; i: number; sky: THREE.Color; ground: THREE.Color }>; keys: Array<{ l: THREE.DirectionalLight; i: number }> };
+  let lightsIn: InLights | null = null;
+  const WARM_KEY = new THREE.Color('#FFD7A8');
+  const WARM_SKY = new THREE.Color('#FFE6C4');
+  const DUSK_GROUND = new THREE.Color('#6B5A48');
+  /**
+   * Luz de dentro pela hora do parque: de dia, a luz do sol entra pelo vidro (forte e neutra); no
+   * fim da tarde e à noite, a luz das luminárias (mais quente) e as luminárias, telas e faixas de
+   * luz mais vivas no escuro.
+   */
+  const applyInside = (l: Light) => {
+    if (!inside || !lightsIn) return;
+    const night = l.glow;
+    const sun = l.sunI / 1.9;
+    for (const k of lightsIn.keys) {
+      k.l.intensity = k.i * (0.25 + 0.75 * sun);
+      k.l.color.set(l.sun).lerp(WARM_KEY, 0.35 + night * 0.4);
+    }
+    for (const h of lightsIn.hemi) {
+      h.l.intensity = h.i * (0.7 + 0.3 * Math.min(1, l.hemiI / 0.78));
+      h.l.color.copy(h.sky).lerp(WARM_SKY, night * 0.85);
+      h.l.groundColor.copy(h.ground).lerp(DUSK_GROUND, night * 0.6);
+    }
+    inside.kit.glowing.forEach((m) => (m.emissiveIntensity = 0.8 + night * 0.7));
+  };
 
   camera.position.copy(HOME.cam);
   rig.controls.target.copy(HOME.target);
@@ -719,6 +756,10 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
     });
     inside.kit.dispose();
     inside = null;
+    life = null;
+    props = null;
+    lightsIn = null;
+    residents = [];
   };
 
   const enter = (id: ModuleId, instant?: () => void) => {
@@ -747,6 +788,30 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
       const cached = dataCache.get(id);
       if (cached !== undefined) scene.setData(cached);
       inside = { id, kit: ikit, scene };
+      // Luzes do interior (para a luz da hora) e a vida dele: quem está em cada andar e os objetos em uso.
+      const li: InLights = { hemi: [], keys: [] };
+      scene.scene.traverse((o) => {
+        if ((o as THREE.HemisphereLight).isHemisphereLight) {
+          const h = o as THREE.HemisphereLight;
+          li.hemi.push({ l: h, i: h.intensity, sky: h.color.clone(), ground: h.groundColor.clone() });
+        } else if ((o as THREE.DirectionalLight).isDirectionalLight) {
+          const k = o as THREE.DirectionalLight;
+          li.keys.push({ l: k, i: k.intensity });
+        }
+      });
+      lightsIn = li;
+      applyInside(lightAt(shownHour));
+      {
+        const fl = scene.floors;
+        const lvls: LifeLevel[] = fl ? fl.levels.map((lv) => ({ y: lv.y, blocked: lv.blocked, obstacles: lv.obstacles })) : [{ y: 0, blocked: scene.room.blocked, obstacles: scene.obstacles }];
+        const seats = fl?.seats ?? (scene.scene.userData.seats as Seat[] | undefined) ?? [];
+        const spots = lifeSpots(id, lvls, seats);
+        life = createIndoorLife(id, spots);
+        residentsAt = 0;
+        props = inUseProps(ikit, id, spots, lvls.flatMap((_, L) => lifeRooms(id, L)), (L) => lvls[L]?.y ?? 0);
+        props.setDetail(quality);
+        scene.scene.add(props.group);
+      }
       scene.scene.traverse((o) => o.userData.outdoorOnly && (o.visible = false));
       level = 0;
       rig.setWorld(levelWorld(0));
@@ -1273,6 +1338,7 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
     if (inside) {
       inside.scene.scene.environment = cfg.env ? envTex : null;
       inside.scene.setDetail(q);
+      props?.setDetail(q);
       recompile(inside.scene.scene);
     }
     fpsCap = cfg.fpsCap;
@@ -1292,6 +1358,13 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
   const applyLight = () => {
     const l = lightAt(shownHour);
     world.setLight(l);
+    glowNow = l.glow;
+    // Por fora, cada andar acende conforme a ocupação da hora (o mesmo que decide quem está dentro).
+    world.buildings.forEach((bd, bid) => {
+      const lit = bd.floorLit;
+      if (lit) for (let L = 1; L < lit.length; L++) lit[L] = 0.1 + 0.9 * floorLight(bid, L, shownHour);
+    });
+    applyInside(l);
     const fog = outside.fog as THREE.Fog;
     fog.color.set(l.skyBottom);
     const grey = Math.min(0.8, Math.max(weather.cloud * 0.4, weather.rain * 0.65, weather.fog * 0.75));
@@ -1482,29 +1555,24 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
       inside.scene.tick(t, camera);
       const tn = performance.now();
       inside.scene.floors?.things.forEach((th) => th.tick?.(tn));
-      // Quem está neste prédio: sentados nas cadeiras das salas (estudando, trabalhando, lendo),
-      // treinando ou tocando perto das salas do seu tipo. Lugares fixos por pessoa.
-      {
-        const fl = inside.scene.floors;
-        const here = town.insideOf(inside.id).sort((u, v) => u.key - v.key);
-        const seats = fl?.seats ?? [];
-        const zones = fl?.zones ?? [];
-        const figs: Figure[] = [];
-        here.forEach((h, i) => {
-          const f = h.figure;
-          const standing = h.activity === 'gym';
-          if (!standing && seats.length) {
-            const st = seats[(i * 7 + inside!.id.length) % seats.length]!;
-            figs.push({ ...f, x: st.x, y: st.y - 0.44, z: st.z, yaw: st.face, pose: h.activity === 'music' ? 'play' : h.activity === 'work' ? 'sit' : 'read' });
-          } else if (zones.length) {
-            const z = zones[i % zones.length]!;
-            const lv = fl!.levels[z.level]!;
-            const a = i * 2.3;
-            figs.push({ ...f, x: z.x + Math.cos(a) * 1.4, y: lv.y, z: z.z + Math.sin(a) * 1.4, yaw: z.face, pose: standing ? 'exercise' : 'stand' });
-          }
-        });
+      // Quem está neste prédio agora (indoorLife.ts): nas cadeiras, nas mesas, na recepção, nas
+      // salas e andando, pela hora; os moradores do parque que estão aqui ocupam os primeiros lugares.
+      if (life) {
+        if (now - residentsAt > 1000) {
+          residentsAt = now;
+          residents = town.insideOf(inside.id).sort((u, v) => u.key - v.key).map((h) => h.figure);
+        }
+        const sitting = mode !== 'orbit' && rig.posture() === 'sit';
+        hideAt.x = body.pos.x;
+        hideAt.z = body.pos.z;
+        const figs = life.figures(shownHour, t, quality, residents, sitting ? hideAt : null);
         indoorCrowd.set(figs);
+        roomInfo.tone = LIFE[inside.id].tone;
+        roomInfo.people = figs.length;
+        roomInfo.floor = inside.scene.floors?.ys[level] ?? 0;
+        roomInfo.sources = figs;
       }
+      props?.tick(t, glowNow, shownHour);
       // Primeiro o parque (visto da posição real dentro do prédio), depois o interior por cima:
       // pelas janelas aparecem o parque, os outros prédios, as pessoas e o céu de verdade.
       const bd = world.buildings.get(inside.id)!;
@@ -1545,7 +1613,7 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
       for (const tr of world.treeSpots) if (Math.abs(tr.x - c.x) < 30 && Math.abs(tr.z - c.z) < 30) n++;
       treeNear = Math.min(1, n / 18);
     }
-    audio?.update({ listener: camera, inside: !!inside, hour: shownHour, sky: weather, steps: mode === 'orbit' || rig.gliding() ? 0 : body.airborne ? 0 : body.speed, trees: treeNear, season, skaters: inside ? [] : extras.skaters() }, dt);
+    audio?.update({ listener: camera, inside: !!inside, hour: shownHour, sky: weather, steps: mode === 'orbit' || rig.gliding() ? 0 : body.airborne ? 0 : body.speed, trees: treeNear, season, skaters: inside ? [] : extras.skaters(), room: inside && life ? roomInfo : null }, dt);
     if (now - statsAt >= 1000) {
       opts.onStats({ fps: Math.round((frames * 1000) / (now - statsAt)), calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, idle: now - movedAt > 2500 });
       frames = 0;

@@ -171,6 +171,8 @@ export interface PlacedBuilding {
   detailed: boolean;
   entrance: Point;
   facing: number;
+  /** Luz das salas de cada andar visto de fora (0 a 1, índice = andar; upper.ts): o motor acende pela ocupação da hora. */
+  floorLit?: number[];
 }
 
 export interface World {
@@ -844,6 +846,7 @@ export function createWorld(kit: Kit): World {
     let group: THREE.Group;
     let top: number;
     let core: number;
+    let floorLit: number[] | undefined;
     if (make) {
       const d = make(kit);
       group = d.group;
@@ -866,6 +869,7 @@ export function createWorld(kit: Kit): World {
         },
       });
       d.group.add(up.group);
+      floorLit = up.lit;
       // Fachada peça a peça de perto; de longe, o mesmo volume e as mesmas cores, mais leve.
       if (up.near && up.far) lodItems.push({ obj: up.near, x: def.x, z: def.z, far: 240, base: 240 }, { obj: up.far, x: def.x, z: def.z, far: 240, base: 240, invert: true });
       top = up.top;
@@ -889,7 +893,7 @@ export function createWorld(kit: Kit): World {
     group.rotation.y = facing;
     group.traverse((o) => (o.userData.building = def.id));
     root.add(group);
-    buildings.set(def.id, { def, group, top: top + group.position.y, detailed: !!make, entrance: entranceOf(def), facing });
+    buildings.set(def.id, { def, group, top: top + group.position.y, detailed: !!make, entrance: entranceOf(def), facing, floorLit });
     // Colisão pelo desenho do prédio (paredes, vidros, pilares), não por um círculo só.
     obstacles.push(...footprint(group, heightAt));
     void core;

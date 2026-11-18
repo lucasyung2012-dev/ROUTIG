@@ -46,11 +46,39 @@ function bbox(vols: readonly Vol[]) {
 /** Posições (metros a partir de a) dos pontos pedidos que caem neste trecho de parede. */
 const doorsOn = (r: WallRun, pts: ReadonlyArray<{ x: number; z: number }>) => pts.filter((p) => segDist(p.x, p.z, r.ax, r.az, r.bx, r.bz) < 0.6).map((p) => alongRun(r, p.x, p.z));
 
+/** Andares que a luz das salas distingue (térreo + até 7 acima). */
+export const LIT_FLOORS = 8;
+
+/**
+ * Luz das salas por trás do vidro, andar por andar: o mesmo brilho noturno dos outros materiais
+ * (kit.glowing), vezes a luz daquele andar (`lit[L]`, 0 a 1, que o motor muda com a ocupação da
+ * hora: indoorLife.floorLight). O andar sai da altura local da peça (base + (L − 1) × STOREY);
+ * uma malha só por prédio, sem chamada de desenho a mais.
+ */
+function floorLitMaterial(kit: Kit, base: number, lit: number[]): THREE.MeshStandardMaterial {
+  const m = kit.own(new THREE.MeshStandardMaterial({ color: '#FFE7B0', emissive: new THREE.Color('#FFE7B0'), emissiveIntensity: 0, roughness: 0.75, metalness: 0.05 }));
+  kit.glowing.push(m);
+  m.onBeforeCompile = (sh) => {
+    sh.uniforms.uLit = { value: lit };
+    sh.uniforms.uBase = { value: base };
+    sh.uniforms.uStorey = { value: STOREY };
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying float vLitY;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvLitY = position.y;');
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', `#include <common>\nvarying float vLitY;\nuniform float uLit[${LIT_FLOORS}];\nuniform float uBase;\nuniform float uStorey;`)
+      .replace(
+        '#include <emissivemap_fragment>',
+        `#include <emissivemap_fragment>\n{ float fl = clamp(floor((vLitY - uBase) / uStorey) + 1.0, 0.0, ${LIT_FLOORS - 1}.0); float k = uLit[0]; for (int i = 1; i < ${LIT_FLOORS}; i++) { if (float(i) == fl) k = uLit[i]; } totalEmissiveRadiance *= k; }`,
+      );
+  };
+  m.customProgramCacheKey = () => 'floor-lit';
+  return m;
+}
+
 /**
  * Andares de cima e terraço por fora. `base` é o topo do térreo (o 1º andar começa nele, igual
  * por dentro); `lift` diz para que lado ficam a torre do elevador e as pontes.
  */
-export function upperFloors(kit: Kit, id: ModuleId, levels: number, base: number, _core: number, accent: string, _body = Infinity, _clear: (lx: number, lz: number) => boolean = () => true, lift: LiftSpot = { angle: Math.PI, ground: () => 0 }): { group: THREE.Group; top: number; near: THREE.Object3D | null; far: THREE.Object3D | null } {
+export function upperFloors(kit: Kit, id: ModuleId, levels: number, base: number, _core: number, accent: string, _body = Infinity, _clear: (lx: number, lz: number) => boolean = () => true, lift: LiftSpot = { angle: Math.PI, ground: () => 0 }): { group: THREE.Group; top: number; near: THREE.Object3D | null; far: THREE.Object3D | null; lit?: number[] } {
   const g = new THREE.Group();
   const b = new Builder();
   // Detalhe de perto (fachada peça a peça, guarda-corpos, floreiras, frisos) e versão de longe.
@@ -72,6 +100,9 @@ export function upperFloors(kit: Kit, id: ModuleId, levels: number, base: number
   const leaf = kit.mat('#4C9A4F', { rough: 0.9 });
   const glow = kit.mat(accent, { glow: true });
   const warm = kit.mat('#FFE7B0', { glow: true });
+  // Luz das salas de cada andar (acende conforme a ocupação da hora; o motor muda `lit`).
+  const lit = new Array<number>(LIT_FLOORS).fill(1);
+  const roomsLit = floorLitMaterial(kit, base, lit);
   const fm = facadeMats(kit, form);
   const solid = form.facade === 'stone' || form.facade === 'brick' || form.facade === 'panel';
   const warmTone = form.facade === 'stone' || form.facade === 'brick' || form.facade === 'wood';
@@ -142,7 +173,7 @@ export function upperFloors(kit: Kit, id: ModuleId, levels: number, base: number
       const fz = alongGeo(r, y + STOREY - 0.08, 0.06, 0.06, 0.05, r.nx, r.nz);
       bd.add(glow, fz.geo, fz.pos, fz.rot);
     }
-    for (const v of vols) b.add(warm, volGeo(v, 0.9, 2.0, true), [0, y + 1.0, 0]);
+    for (const v of vols) b.add(roomsLit, volGeo(v, 0.9, 2.0, true), [0, y + 1.0, 0]);
   }
   // Cobertura do último andar (com o furo do jardim ou do átrio) e das alas que acabam ali.
   const topVols = volsAt(id, levels);
@@ -308,5 +339,5 @@ export function upperFloors(kit: Kit, id: ModuleId, levels: number, base: number
   const farG = bf.build(false);
   farG.visible = false;
   g.add(b.build(), near, farG);
-  return { group: g, top: top + 6, near, far: farG };
+  return { group: g, top: top + 6, near, far: farG, lit };
 }

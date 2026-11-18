@@ -86,9 +86,21 @@ export function seatsOf(b: Builder): Seat[] {
   return list;
 }
 
+/** Os assentos anotados dentro de `staffSeats` são de quem trabalha ali (recepção). */
+let staffNext = false;
+/** Assentos criados dentro de `fn` levam a marca 'staff': o motor põe a recepcionista neles. */
+export function staffSeats(fn: () => void): void {
+  staffNext = true;
+  try {
+    fn();
+  } finally {
+    staffNext = false;
+  }
+}
+
 /** Anota um assento no sistema do montador: (x, z), altura do assento `y` e para onde olha quem senta (`face`). */
 export function seatAt(b: Builder, x: number, y: number, z: number, face: number): void {
-  seatsOf(b).push({ x, y, z, face });
+  seatsOf(b).push(staffNext ? { x, y, z, face, tag: 'staff' } : { x, y, z, face });
 }
 
 /** Leva os assentos do montador `b` de um grupo em (x, z), virado `face`, para o salão da cena. */
@@ -100,7 +112,7 @@ export function placeSeats(scene: THREE.Object3D, b: Builder, x: number, z: numb
   }
   const c = Math.cos(face);
   const s = Math.sin(face);
-  for (const st of seatsOf(b)) list.push({ x: x + st.x * c + st.z * s, y: st.y, z: z - st.x * s + st.z * c, face: st.face + face });
+  for (const st of seatsOf(b)) list.push({ ...st, x: x + st.x * c + st.z * s, y: st.y, z: z - st.x * s + st.z * c, face: st.face + face });
 }
 
 /** Todos os assentos do térreo: os dos grupos mais os do montador do salão (`b`, já no sistema da cena). */
@@ -399,7 +411,7 @@ export function createCalendarInterior(kit: Kit, labels: Record<CalendarSector, 
   {
     const zn = zone(p, -2.7, 17.4, Math.PI / 2);
     counter(zn.f, 0, 0, 2.6, 0.7, 0, p.concrete, p.wood);
-    chair(zn.f, 0, -0.75, 0);
+    staffSeats(() => chair(zn.f, 0, -0.75, 0));
     deskLamp(zn.f, 0.85, 1.1, 0.05, brass);
     at(zn.f, p.pot, cyl(0.14, 0.11, 0.22, 12), -0.95, 1.21, 0.05);
     at(zn.f, p.leaf, new THREE.IcosahedronGeometry(0.2, 1), -0.95, 1.45, 0.05);
@@ -617,7 +629,7 @@ export function createTasksInterior(kit: Kit, labels: Record<TasksSector, string
   {
     const zn = zone(p, -6.6, 10.6, Math.PI / 2);
     counter(zn.f, 0, 0, 3.0, 0.75, 0, p.concrete, p.wood);
-    chair(zn.f, 0, -0.8, 0);
+    staffSeats(() => chair(zn.f, 0, -0.8, 0));
     credenza(zn.f, 0, -1.65, 2.8, 0, p.wood, 0.8);
     deskLamp(zn.f, 1.0, 1.1, 0.05);
     for (const lx of [-0.7, 0.7]) pendant(zn.f, lx, -0.2, 3.4, H, 0.3);
@@ -815,7 +827,7 @@ export function createProjectsInterior(kit: Kit, labels: Record<ProjectsSector, 
   {
     const zn = zone(p, -6.5, 10.4, Math.PI / 2);
     counter(zn.f, 0, 0, 3.0, 0.75, 0, p.concrete, p.wood);
-    chair(zn.f, 0, -0.8, 0);
+    staffSeats(() => chair(zn.f, 0, -0.8, 0));
     credenza(zn.f, 0, -1.65, 2.8, 0, p.wood, 0.8);
     deskLamp(zn.f, -1.0, 1.1, 0.05);
     for (const lx of [-0.7, 0.7]) pendant(zn.f, lx, -0.2, 3.4, TALL, 0.3);
@@ -1018,7 +1030,7 @@ export function createFinanceInterior(kit: Kit, labels: Record<FinanceSector, st
     const rf = zn.f;
     counter(rf, 0, 0, 3.0, 0.75, 0, p.stone, p.wood);
     at(rf, gold, box(3.0, 0.03, 0.02), 0, 0.95, 0.39);
-    chair(rf, 0, -0.8, 0);
+    staffSeats(() => chair(rf, 0, -0.8, 0));
     at(rf, p.stone, box(2.8, 2.6, 0.12), 0, 1.3, -1.8);
     for (let k = 0; k < 3; k++) at(rf, gold, box(2.6, 0.02, 0.02), 0, 0.9 + k * 0.7, -1.735);
     deskLamp(rf, 1.0, 1.1, 0.05, gold);

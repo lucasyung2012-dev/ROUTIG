@@ -87,6 +87,9 @@ export interface GroundPlan {
   back: number;
   /** Altura do teto no ponto (alas mais baixas têm teto mais baixo). */
   ceilAt: (x: number, z: number) => number;
+  /** Chegada à escada (stairWays) e a rota a pé até ela: a cadeira da recepção fica longe. */
+  ways?: ReadonlyArray<readonly [number, number]>;
+  route?: ReadonlyArray<readonly [number, number]>;
 }
 
 /** Térreo: detalhes junto às paredes, pendentes e recepção, sem invadir o que já existe. */
@@ -134,6 +137,16 @@ export function enrichGround(kit: Kit, b: Builder, seats: Seat[], obstacles: Obs
     b.add(m.white, new THREE.BoxGeometry(2.7, 0.05, 0.8), [rx, 1.07, rz]);
     b.add(m.accGlow, new THREE.BoxGeometry(2.6, 0.08, 0.02), [rx, 0.3, rz + 0.36]);
     tallPlant(c, rx + 1.8, 0, rz, 0.8);
+    // Cadeira da recepcionista atrás do balcão, de frente para quem chega (longe da escada e da rota até ela).
+    const sz = rz - 0.85;
+    const away = (pts: ReadonlyArray<readonly [number, number]> | undefined, r: number) => (pts ?? []).every(([wx, wz]) => Math.hypot(wx - rx, wz - sz) > r);
+    if (away(g.ways, 1.6) && away(g.route, 1.6)) {
+      b.add(m.dark, new THREE.BoxGeometry(0.44, 0.05, 0.44), [rx, 0.46, sz]);
+      b.add(m.dark, new THREE.BoxGeometry(0.44, 0.42, 0.05), [rx, 0.72, sz - 0.21]);
+      b.add(m.metal, new THREE.CylinderGeometry(0.03, 0.03, 0.44, 6), [rx, 0.22, sz]);
+      b.add(m.metal, new THREE.CylinderGeometry(0.22, 0.22, 0.03, 12), [rx, 0.015, sz]);
+      seats.push({ x: rx, y: 0.45, z: sz, face: 0, tag: 'staff' });
+    }
   }
 }
 

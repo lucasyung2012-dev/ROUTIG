@@ -875,7 +875,7 @@ export function withFloors(kit: Kit, scene: InteriorScene, id: ModuleId, label: 
   }
   const hOf0 = (i: number) => groundHeight(id, g0[i]!);
   const ceilAt = (x: number, z: number) => g0.reduce((m, v, i) => (inVol(v, x, z) ? Math.max(m, hOf0(i)) : m), 0);
-  enrichGround(kit, b, seats, occupied, overhead, { vols: g0, runs: wallRuns(g0, 1, hOf0), front: span0.front, back: back0, ceilAt }, accent, style.warm, thingRoot, things);
+  enrichGround(kit, b, seats, occupied, overhead, { vols: g0, runs: wallRuns(g0, 1, hOf0), front: span0.front, back: back0, ceilAt, ways: stairWays(id, 0), route: stairRoute(id, 0) }, accent, style.warm, thingRoot, things);
   // O núcleo dos elevadores (do térreo ao alto, dentro do prédio): uma ou duas cabines lado a lado,
   // com as portas, a botoeira e o indicador de cada pavimento abrindo para o hall. Com terraço, o
   // núcleo passa da cobertura (a cabine para no terraço).

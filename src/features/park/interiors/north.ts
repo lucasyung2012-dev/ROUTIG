@@ -14,7 +14,7 @@ import { canvasPlane, createRoom, finishRoom, gallerySlab, markSector, pendants,
 import type { Placed } from './central';
 import { MASSING } from '../massing';
 import type { Thing } from './things';
-import { groundSeats, placeSeats, seatAt } from './east';
+import { groundSeats, placeSeats, seatAt, staffSeats } from './east';
 
 /** Placa com texto que muda com os dados (nome de disciplina, idioma). */
 export function nameBoard(kit: Kit, w: number, accent: string) {
@@ -318,7 +318,8 @@ function receptionDesk(put: Put, M: Mats, body: THREE.Material, top: THREE.Mater
   put(M.accGlow, B(4.0, 0.04, 0.02), -0.3, 0.16, 0.36);
   put(top, B(4.1, 0.04, 0.62), -0.3, 0.74, -0.72);
   for (const x of [-2.25, 1.65]) put(M.dark, B(0.05, 0.72, 0.55), x, 0.36, -0.72);
-  for (const x of [-0.9, 0.7]) chair(put, M, x, -1.35, 0);
+  staffSeats(() => chair(put, M, -0.9, -1.35, 0));
+  chair(put, M, 0.7, -1.35, 0);
   deskLamp(put, M, 1.4, 1.1, -0.1);
   put(M.paper, B(0.3, 0.02, 0.22), -0.4, 1.11, 0.15, 0.2);
   plant(put, M, 2.25, 0.05, 0.8);

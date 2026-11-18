@@ -862,9 +862,15 @@ const STEPS = [[1, 0], [-1, 0], [0, 1], [0, -1]] as const;
  */
 export function routeOn(rule: LevelRule | undefined, to: readonly Pt[]): Pt[] {
   if (!rule || !to.length) return [];
+  // Passagens estreitas (entre escada e núcleo): se o corpo de 0,3 m não passa, tenta com 0,15 m.
+  const wide = routeWith(rule, to, 1);
+  return wide.length ? wide : routeWith(rule, to, 0.5);
+}
+
+function routeWith(rule: LevelRule, to: readonly Pt[], body: number): Pt[] {
   const lv: LevelRule = rule;
   const G = ROUTE_CELL;
-  const pass = (x: number, z: number) => Math.hypot(x, z) <= lv.walk && BODY.every(([dx, dz]) => !lv.blocked(x + dx, z + dz));
+  const pass = (x: number, z: number) => Math.hypot(x, z) <= lv.walk && BODY.every(([dx, dz]) => !lv.blocked(x + dx * body, z + dz * body));
   const key = (i: number, j: number) => `${i},${j}`;
   const i0 = Math.round(lv.arrive.x / G);
   const j0 = Math.round(lv.arrive.z / G);

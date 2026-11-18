@@ -173,6 +173,12 @@ export interface FloorZone {
   /** Ponto em frente à porta da sala (de onde se entra). */
   ex: number;
   ez: number;
+  /**
+   * Parede de telas do fundo (salas de dados, furnish.ts 'dataviz'), no sistema da sala (centro no
+   * piso, frente = +z): largura, altura, centro (y) e o plano da frente das telas (z). Os objetos de
+   * ação dos andares (live3d.ts) se apoiam nela.
+   */
+  screen?: { w: number; h: number; y: number; z: number };
 }
 
 export interface FloorLevel {
@@ -540,7 +546,10 @@ export function withFloors(kit: Kit, scene: InteriorScene, id: ModuleId, label: 
       const front = { x: Math.sin(sl.face), z: Math.cos(sl.face) };
       const ex = sl.x + front.x * (sl.d / 2 + 0.9);
       const ez = sl.z + front.z * (sl.d / 2 + 0.9);
-      zones.push({ level: L, key, sector, x: sl.x, z: sl.z, face: sl.face, ex, ez });
+      // A parede de telas da sala de dados (furnish.ts: w × 0,62 por 1,7 m, centro a 1,65 m, no fundo).
+      const fw = sl.w * (sl.kind === 'island' ? 0.75 : 1);
+      const screen = type === 'dataviz' ? { w: fw * 0.62, h: 1.7, y: 1.65, z: -sl.d / 2 + 0.35 + 0.04 } : undefined;
+      zones.push({ level: L, key, sector, x: sl.x, z: sl.z, face: sl.face, ex, ez, screen });
       const zi = zones.length - 1;
       const g = new THREE.Group();
       g.position.set(sl.x, y, sl.z);

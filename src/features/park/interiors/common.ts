@@ -32,6 +32,36 @@ export interface InteriorScene {
   setDetail: (q: Quality) => void;
   /** Andares acima do térreo (V2.1, seção 11), quando o prédio tem. */
   floors?: Floors;
+  /**
+   * Objetos de ação (seção 28: a ação do dia acontece no próprio 3D): canteiros, cartões, itens da
+   * parede do dia. Tocar no objeto (ou, andando, olhar para ele ou chegar perto e apertar E) chama
+   * a ação real que o ParkPage liga pelo `id`.
+   */
+  actions?: ActionSpot[];
+}
+
+/**
+ * Um objeto de ação. A malha `obj` (o próprio cartão, ou uma caixa invisível com
+ * `userData.hitbox`) leva `userData.action = id`; malha com `userData.action = ''` só segura o
+ * toque (parede do dia sem nada naquela hora: tocar não faz nada). `id` e `active` mudam com os
+ * dados (cada interior atualiza); o motor só lê.
+ */
+export interface ActionSpot {
+  id: string;
+  /** Nível do prédio onde ele está (0 = térreo). */
+  level: number;
+  obj: THREE.Object3D;
+  /** Onde fica quem usa andando (E por perto) e o raio; r = 0: só olhando para ele ou tocando. */
+  x: number;
+  z: number;
+  r: number;
+  /** Sem dado (canteiro sem hábito, vaga vazia): não faz nada. */
+  active: boolean;
+}
+
+/** Marca a malha de uma ação (e os filhos): o toque e o olhar chegam ao `id` atual do lugar. */
+export function markAction(o: THREE.Object3D, id: string): void {
+  o.traverse((c) => (c.userData.action = id));
 }
 
 /** O térreo pela planta do prédio (massing.ts): onde se anda, a fachada e o tamanho. */

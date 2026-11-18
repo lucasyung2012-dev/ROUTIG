@@ -6,10 +6,17 @@ import { MODULES, NAV_MODULE_IDS, type ModuleId } from '@/app/modules';
 import { useSettings } from '@/app/SettingsProvider';
 import type { MessageKey } from '@/i18n';
 import { getDb } from '@/data/db';
-import { todayKey } from '@/domain/dates';
-import { isClosedKind, statusKind } from '@/domain/tasks';
+import { capitalizeFirst, formatDateKey, todayKey, toDateKey } from '@/domain/dates';
+import { blockers, isClosedKind, statusKind } from '@/domain/tasks';
+import type { Habit } from '@/domain/habits';
+import { HabitRuleError, restoreHabitLog, setHabitLog as saveHabitLog, softDeleteHabitLog } from '@/data/habitsRepo';
+import { toggleDone } from '@/data/tasksRepo';
+import { LogDialog } from '@/features/habits/habitsUi';
+import { useTaskActions } from '@/features/tasks/useTaskActions';
+import { useTaskEditor } from '@/features/tasks/TaskEditor';
+import { useEventEditor } from '@/features/calendar/EventEditor';
 import { PARK_BUILDINGS, buildingById } from '@/domain/park';
-import { useCalendarData } from '@/features/calendar/useCalendarData';
+import { useCalendarData, type CalendarItem } from '@/features/calendar/useCalendarData';
 import { Button } from '@/ui/Button';
 import { Logo } from '@/brand/Logo';
 import { ExperienceSwitch } from '@/app/layout/ExperienceSwitch';
@@ -34,7 +41,7 @@ import { CalendarPanel, FinancePanel, FinanceVaultPanel, ProjectsPanel, TasksPan
 import { hasFinancePin } from '@/data/financePlanRepo';
 import { isFinanceUnlocked, lockFinanceNow } from '@/features/finance/FinanceLock';
 import { FocusPanel, GoalsPanel, HabitsPanel, MusicPanel, SportsPanel } from './panels/WestSouthPanels';
-import { FOCUS_SECTORS, GOALS_SECTORS, HABITS_SECTORS, MUSIC_SECTORS, SPORTS_SECTORS, createFocusInterior, createGoalsInterior, createHabitsInterior, createMusicInterior, createSportsInterior, type FocusSector, type GoalsSector, type HabitsSector, type MusicSector, type SportsSector } from './interiors/westsouth';
+import { FOCUS_SECTORS, GOALS_SECTORS, HABITS_SECTORS, MUSIC_SECTORS, SPORTS_SECTORS, createFocusInterior, createGoalsInterior, createHabitsInterior, createMusicInterior, createSportsInterior, type FocusSector, type GoalsSector, type HabitBedView, type HabitsSector, type MusicSector, type SportsSector } from './interiors/westsouth';
 import { useHabits } from '@/features/habits/useHabits';
 import { useGoals } from '@/features/goals/useGoals';
 import { useMusic } from '@/features/music/useMusic';
@@ -48,6 +55,8 @@ import { ModuleCenter } from './ModuleCenter';
 import { FloorFeed } from './FloorFeed';
 import { DEFAULT_FAB, FloatingCenterButton, PlacesMenu, type FabPlace } from './ParkUi';
 import { floorNameKey, withFloors } from './interiors/floors';
+import { withLive, type CalendarLive, type TasksLive } from './interiors/live3d';
+import { habitBeds, taskBoard, type DayItem } from './live';
 import { liftTargets, type LiftDir } from './stairs';
 import { setZoneLabels } from './interiors/common';
 import { DRUM_PADS, GUITAR_CHORDS, GUITAR_STRINGS, PIANO_KEYS, vaultStateOf, type Instrument } from './interiors/things';
@@ -264,7 +273,7 @@ export default function ParkPage() {
     };
     // Andares da V2.1 em cima de cada térreo (salas ligadas aos painéis reais).
     for (const [id, make] of Object.entries(base) as Array<[ModuleId, InteriorFactory]>)
-      interiors[id] = (kit) => withFloors(kit, make(kit), id, (key) => t(`park.floorRooms.${id}.${key}` as MessageKey), t('park.terrace'), (n) => t(`park.floorNames.f${n}` as MessageKey), t('park.elevators'), { up: t('park.liftUp'), down: t('park.liftDown'), off: t('park.liftOff') });
+      interiors[id] = (kit) => withLive(kit, withFloors(kit, make(kit), id, (key) => t(`park.floorRooms.${id}.${key}` as MessageKey), t('park.terrace'), (n) => t(`park.floorNames.f${n}` as MessageKey), t('park.elevators'), { up: t('park.liftUp'), down: t('park.liftDown'), off: t('park.liftOff') }), id);
     try {
       engine.current = createEngine(canvas, {
         quality,
@@ -286,6 +295,8 @@ export default function ParkPage() {
         onElevator: setElevator,
         onInstrument: setInstrument,
         onVault: () => setVaultPanel(true),
+        // Objeto de ação tocado no 3D (seção 28): a ação real, ligada abaixo (actionRef).
+        onAction: (a) => actionRef.current(a),
         onRiding: setRiding,
         onTalk: (x) => setTalk({ ...x, at: Date.now() }),
         onZone: (z) => {
@@ -394,7 +405,8 @@ export default function ParkPage() {
     const onKey = (e: KeyboardEvent) => {
       const el = e.target as HTMLElement | null;
       if (el && (el.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName))) return;
-      if (e.code === 'KeyE') engine.current?.interact();
+      // Com uma janela modal aberta (registro de hábito, tarefa bloqueada, editor), o E não age no 3D por trás dela.
+      if (e.code === 'KeyE' && !document.querySelector('[role="dialog"][aria-modal="true"]')) engine.current?.interact();
       if (e.code === 'KeyV' && !e.ctrlKey && !e.metaKey) setCamMode((m) => CAM_ORDER[(CAM_ORDER.indexOf(m) + 1) % CAM_ORDER.length]!);
     };
     window.addEventListener('keydown', onKey);
@@ -503,24 +515,167 @@ export default function ParkPage() {
     if (projects) sendData('projects', { projects });
   }, [projectsKey]);
 
-  // Placas com os nomes reais: hábitos, metas ativas, instrumentos e modalidades.
+  // Placas com os nomes reais: metas ativas, instrumentos e modalidades (os canteiros da Estufa vêm abaixo).
   const habitsData = useHabits();
   const goalsData = useGoals();
   const musicData = useMusic();
   const sportsData = useSports();
   const namesKey = JSON.stringify([
-    habitsData.habits.map((h) => h.name),
     goalsData.goals.filter((g) => g.status !== 'done' && g.status !== 'cancelled' && g.status !== 'archived').map((g) => g.name),
     musicData.instruments.filter((i) => !i.deletedAt).map((i) => i.name),
     sportsData.sports.map((s) => s.name),
   ]);
   useEffect(() => {
-    const [h, g, m, sp] = JSON.parse(namesKey) as string[][];
-    sendData('habits', { names: h ?? [] });
+    const [g, m, sp] = JSON.parse(namesKey) as string[][];
     sendData('goals', { names: g ?? [] });
     sendData('music', { names: m ?? [] });
     sendData('sports', { names: sp ?? [] });
   }, [namesKey]);
+
+  /* ---------- "3D de verdade" (seção 28): a ação do dia no próprio objeto ---------- */
+  // Estufa: um canteiro por hábito de hoje (as mesmas regras da estação de hoje), feito ou não.
+  const bedsNow = useMemo(() => habitBeds(habitsData.habits, habitsData.logsOf, today, settings.weekStartsOn), [habitsData, today, settings.weekStartsOn]);
+  const bedViews: HabitBedView[] = bedsNow.beds.map((b) => ({
+    id: b.habitId,
+    name: b.name,
+    color: b.color,
+    done: b.done,
+    line: t(b.done ? 'park.live.bedDone' : b.needsValue ? 'park.live.bedValue' : 'park.live.bedDue'),
+  }));
+  if (bedsNow.more > 0) bedViews.push({ id: 'more', name: t('park.live.bedMore', { count: bedsNow.more }), line: t('park.live.openStation'), done: false, color: '#E6B450' });
+  const bedsKey = JSON.stringify(habitsData.loading ? null : bedViews);
+  useEffect(() => {
+    const beds = JSON.parse(bedsKey) as HabitBedView[] | null;
+    if (beds) sendData('habits', { beds, still: settings.reduceMotion });
+  }, [bedsKey, settings.reduceMotion]);
+  // Tasks (sala Kanban, 1º andar): cartões reais de atrasadas, hoje e feitas hoje.
+  const board = useMemo(() => (cal.loading ? null : taskBoard(cal.tasks.active, cal.tasks.config, today, (iso) => toDateKey(new Date(iso)))), [cal.loading, cal.tasks, today]);
+  const tasksLive: TasksLive | null = board
+    ? {
+        board,
+        heads: {
+          late: t('park.live.colLate', { count: board.cols.late.length + board.more.late }),
+          today: t('park.live.colToday', { count: board.cols.today.length + board.more.today }),
+          done: t('park.live.colDone', { count: board.cols.done.length + board.more.done }),
+        },
+        more: { late: t('park.live.more', { count: board.more.late }), today: t('park.live.more', { count: board.more.today }), done: t('park.live.more', { count: board.more.done }) },
+        empty: t('park.live.noTasks'),
+        still: settings.reduceMotion,
+      }
+    : null;
+  const tasksLiveKey = JSON.stringify(tasksLive);
+  useEffect(() => {
+    const live = JSON.parse(tasksLiveKey) as TasksLive | null;
+    if (live) sendData('tasks', { live });
+  }, [tasksLiveKey]);
+  // Calendar (Sala Diária, 1º andar): os itens de hoje (os mesmos do calendário: eventos, tarefas com prazo…).
+  const todayItems = useMemo(() => (cal.loading ? [] : cal.itemsInRange(today, today, { showTasks: true, categoryId: null })), [cal, today]);
+  const calLive: CalendarLive | null = cal.loading
+    ? null
+    : {
+        items: todayItems.map((i): DayItem => {
+          const timed = !(i.allDay || i.start === null);
+          return {
+            key: i.key,
+            title: i.title,
+            // Item de vários dias: hoje vai do começo do dia (começou antes) ao fim do dia (termina depois).
+            start: timed ? (i.date < today ? 0 : i.start) : null,
+            end: timed ? (i.endDate > today ? 1440 : i.end) : null,
+            allDay: !timed,
+            color: i.color ?? KIND_COLOR[i.kind],
+            done: i.done,
+            open: (i.kind === 'event' && !!i.occurrence) || !!i.task,
+          };
+        }),
+        title: capitalizeFirst(formatDateKey(today, settings.locale, { weekday: 'long', day: 'numeric', month: 'long' })),
+        empty: t('park.live.dayEmpty'),
+        allDay: t('park.live.noAllDay'),
+        more: '+{n}',
+        still: settings.reduceMotion,
+      };
+  const calLiveKey = JSON.stringify(calLive);
+  useEffect(() => {
+    const live = JSON.parse(calLiveKey) as CalendarLive | null;
+    if (live) sendData('calendar', { live });
+  }, [calLiveKey]);
+
+  // As ações reais de cada objeto (as mesmas das estações): registro de hábito, concluir tarefa, abrir evento.
+  const taskActions = useTaskActions(cal.tasks);
+  const taskEditor = useTaskEditor();
+  const eventEditor = useEventEditor();
+  const [habitLogFor, setHabitLogFor] = useState<Habit | null>(null);
+  const splitId = (id: string): [string, string] => {
+    const i = id.indexOf(':');
+    return i < 0 ? [id, ''] : [id.slice(0, i), id.slice(i + 1)];
+  };
+  /** Abre o painel de uma sala (estação inteira) sem mexer na câmera. */
+  const openRoom = (s: string, zone: string | null) => {
+    setZoneKey(zone);
+    setSector(s);
+  };
+  const actionRef = useRef<(a: { building: ModuleId; id: string; long: boolean }) => void>(() => undefined);
+  actionRef.current = ({ building, id, long }) => {
+    const [kind, ref] = splitId(id);
+    if (building === 'habits' && kind === 'bed') {
+      const h = habitsData.byId.get(ref);
+      // Toque longo ou o canteiro do "+N": a estação de hoje inteira.
+      if (long || !h) return openRoom('atrium', null);
+      // Quantidade, duração ou escala: o registro do próprio módulo (pede o valor).
+      if (h.method !== 'check') return setHabitLogFor(h);
+      // Conclusão: o mesmo registro rápido da estação (marca; com registro, desfaz e oferece voltar).
+      const log = habitsData.logsOf(h.id).get(today);
+      if (log) {
+        const lid = log.id;
+        void softDeleteHabitLog(lid).then(() => toast.show(t('habits.unchecked'), 'success', { label: t('notes.undo'), run: () => void restoreHabitLog(lid) }));
+      } else
+        void saveHabitLog(h.id, today, 1, '').then(
+          (l) => toast.show(t('park.live.habitDone', { name: h.name }), 'success', { label: t('notes.undo'), run: () => void softDeleteHabitLog(l.id) }),
+          (e: unknown) => toast.show(e instanceof HabitRuleError && e.code === 'future' ? t('habits.errors.future') : t('errors.saveFailed'), 'error'),
+        );
+      return;
+    }
+    if (building === 'tasks' && (kind === 'card' || kind === 'more')) {
+      const task = kind === 'card' ? cal.tasks.byId.get(ref) : undefined;
+      if (long || !task) return openRoom('kanban', 'organize');
+      // O mesmo "concluir" das estações (com o aviso de tarefa bloqueada e o aviso da recorrente).
+      const closed = isClosedKind(statusKind(cal.tasks.config, task.statusId));
+      const quick = !closed && !task.recurrence && blockers(task, cal.tasks.byId, cal.tasks.config).length === 0;
+      taskActions.toggle(task);
+      if (quick) toast.show(t('park.live.taskDone', { title: task.title }), 'success', { label: t('notes.undo'), run: () => void toggleDone(task.id).catch(taskActions.reportError) });
+      return;
+    }
+    if (building === 'calendar' && kind === 'ev') {
+      const it = todayItems.find((i) => i.key === ref);
+      if (long || !it) return openRoom('daily', 'daily');
+      if (it.kind === 'event' && it.occurrence) eventEditor.openEvent(it.occurrence.event.id, it.occurrence.seriesDate);
+      else if (it.task) taskEditor.openTask(it.task.id);
+    }
+  };
+  /** Texto da dica de um objeto de ação (o nome e o que o toque faz agora). */
+  const actTitle = (id: string): string => {
+    const [kind, ref] = splitId(id);
+    if (kind === 'bed') {
+      const b = bedsNow.beds.find((x) => x.habitId === ref);
+      return b ? t(b.done ? 'park.live.hintBedUndo' : b.needsValue ? 'park.live.hintBedValue' : 'park.live.hintBedCheck', { name: b.name }) : t('park.live.openStation');
+    }
+    if (kind === 'card') {
+      const x = cal.tasks.byId.get(ref);
+      return x ? t(isClosedKind(statusKind(cal.tasks.config, x.statusId)) ? 'park.live.hintTaskReopen' : 'park.live.hintTaskDone', { title: x.title }) : '';
+    }
+    if (kind === 'more') return t('park.live.openStation');
+    if (kind === 'ev') {
+      const it = todayItems.find((i) => i.key === ref);
+      return it ? t('park.live.hintEvent', { title: it.title }) : '';
+    }
+    return '';
+  };
+  /** Estação inteira do objeto de ação (o "abrir estação" ao lado da dica). */
+  const actStation = (id: string) => {
+    const [kind] = splitId(id);
+    if (kind === 'bed') openRoom('atrium', null);
+    else if (kind === 'card' || kind === 'more') openRoom('kanban', 'organize');
+    else if (kind === 'ev') openRoom('daily', 'daily');
+  };
 
   // Cofre de Finanças: segue o bloqueio real de Finanças (o mesmo PIN e o mesmo desbloqueio da tela
   // de Finanças). Desbloquear ou trancar por um painel do prédio também move a porta (conferido de
@@ -779,24 +934,27 @@ export default function ParkPage() {
           title={
             posture !== 'stand'
               ? t('park.standUp')
-              : hint?.kind === 'person'
-                ? t('park.hints.greet', { name: hint.name })
-                : hint?.kind === 'use'
-                  ? hint.what === 'room'
-                    ? t('park.use.room', { name: inside && hint.key ? t(`park.floorRooms.${inside}.${hint.key}` as MessageKey) : '' })
-                    : hint.what === 'stairs'
-                      ? t(hint.up ? 'park.use.stairsUp' : 'park.use.stairsDown')
-                      : hint.what === 'vault'
-                        ? t(vaultState === 'open' ? 'park.use.vaultClose' : 'park.use.vault')
-                        : t(`park.use.${hint.what}` as MessageKey)
-                  : hint?.kind === 'elevator'
-                    ? t(hint.off ? 'park.hints.elevatorOff' : hint.dir === 'up' ? 'park.hints.elevatorUp' : hint.dir === 'down' ? 'park.hints.elevatorDown' : 'park.hints.elevator')
-                    : hint
-                      ? t(`park.hints.${hint.kind}`)
-                      : ''
+              : hint?.kind === 'act'
+                ? actTitle(hint.id)
+                : hint?.kind === 'person'
+                  ? t('park.hints.greet', { name: hint.name })
+                  : hint?.kind === 'use'
+                    ? hint.what === 'room'
+                      ? t('park.use.room', { name: inside && hint.key ? t(`park.floorRooms.${inside}.${hint.key}` as MessageKey) : '' })
+                      : hint.what === 'stairs'
+                        ? t(hint.up ? 'park.use.stairsUp' : 'park.use.stairsDown')
+                        : hint.what === 'vault'
+                          ? t(vaultState === 'open' ? 'park.use.vaultClose' : 'park.use.vault')
+                          : t(`park.use.${hint.what}` as MessageKey)
+                    : hint?.kind === 'elevator'
+                      ? t(hint.off ? 'park.hints.elevatorOff' : hint.dir === 'up' ? 'park.hints.elevatorUp' : hint.dir === 'down' ? 'park.hints.elevatorDown' : 'park.hints.elevator')
+                      : hint
+                        ? t(`park.hints.${hint.kind}`)
+                        : ''
           }
           detail={posture === 'stand' && hint?.kind === 'person' ? t('park.hints.person', { name: hint.name, activity: t(`park.activities.${hint.activity}` as MessageKey) }) : undefined}
           onAct={() => engine.current?.interact()}
+          alt={posture === 'stand' && hint?.kind === 'act' ? { label: t('park.live.openStation'), onClick: () => actStation(hint.id) } : undefined}
         />
       )}
       {camMode !== 'orbit' && !near && !hint && <p className="pointer-events-none absolute bottom-24 right-3 hidden max-w-xs rounded-xl bg-black/50 px-3 py-2 text-[0.7rem] text-white md:block">{t('park.walkHint')}</p>}
@@ -936,6 +1094,9 @@ export default function ParkPage() {
           onClose={() => setElevator(null)}
         />
       )}
+      {/* Diálogos das ações feitas no 3D: o registro de hábito com valor e o aviso de tarefa bloqueada (os dos módulos). */}
+      {habitLogFor && <LogDialog habit={habitLogFor} date={today} log={habitsData.logsOf(habitLogFor.id).get(today)} logs={habitsData.logsOf(habitLogFor.id)} onClose={() => setHabitLogFor(null)} />}
+      {taskActions.dialogs}
       {focus.timer && <FocusParkPill onOpen={() => open2D('focus')} />}
       {talk && <TalkBubble key={talk.at} name={talk.name} text={`${t(`park.talk.hi${talk.line}` as MessageKey)} ${t(`park.talk.${talk.activity}` as MessageKey)}`} onDone={() => setTalk(null)} />}
       {/* Central de Módulos: botão flutuante (arraste para mudar de lugar) */}
@@ -1108,7 +1269,21 @@ function TalkBubble({ name, text, onDone }: { name: string; text: string; onDone
   );
 }
 
-const HINT_ICON = { use: Hand, sit: Armchair, view: Mountain, tree: TreePine, water: Waves, person: Smile, elevator: ArrowUpDown, enter: LogIn, stand: Footprints } as const;
+/** Cor de cada tipo de item do calendário na parede do dia (o item com cor própria usa a dele). */
+const KIND_COLOR: Record<CalendarItem['kind'], string> = {
+  event: '#60A5FA',
+  task: '#22D3EE',
+  milestone: '#A78BFA',
+  assessment: '#F59E0B',
+  study: '#34D399',
+  habit: '#E6B450',
+  goal: '#F472B6',
+  sport: '#FB923C',
+  language: '#2DD4BF',
+  focus: '#818CF8',
+};
+
+const HINT_ICON = { use: Hand, act: Hand, sit: Armchair, view: Mountain, tree: TreePine, water: Waves, person: Smile, elevator: ArrowUpDown, enter: LogIn, stand: Footprints } as const;
 
 /** Teclas do computador para o piano (Z…M = 1ª oitava, Q…U = 2ª, I = Dó agudo) e para os pads. */
 const PIANO_KEYMAP = 'zsxdcvgbhnjmq2w3er5t6y7ui';
@@ -1265,10 +1440,10 @@ function InstrumentPanel({ kind, onPlay, onClose }: { kind: Instrument; onPlay: 
 }
 
 /** Cartão "o que dá para fazer aqui": ícone, ação e quem/onde; tocar no cartão faz a ação. */
-function InteractPrompt({ kind, title, detail, onAct }: { kind: keyof typeof HINT_ICON; title: string; detail?: string; onAct: () => void }) {
+function InteractPrompt({ kind, title, detail, onAct, alt }: { kind: keyof typeof HINT_ICON; title: string; detail?: string; onAct: () => void; alt?: { label: string; onClick: () => void } }) {
   const Icon = HINT_ICON[kind];
   return (
-    <div className="pointer-events-none absolute inset-x-0 bottom-32 flex justify-center px-3 sm:bottom-36">
+    <div className="pointer-events-none absolute inset-x-0 bottom-32 flex items-center justify-center gap-2 px-3 sm:bottom-36">
       <button
         type="button"
         onClick={onAct}
@@ -1283,6 +1458,12 @@ function InteractPrompt({ kind, title, detail, onAct }: { kind: keyof typeof HIN
         </span>
         <kbd className="ml-1 hidden rounded-md bg-white/15 px-1.5 py-0.5 text-[0.7rem] font-semibold ring-1 ring-white/30 md:block">E</kbd>
       </button>
+      {/* Objeto de ação: a estação inteira continua a um toque (a ação rápida é a do botão principal). */}
+      {alt && (
+        <button type="button" onClick={alt.onClick} className="pointer-events-auto shrink-0 rounded-xl bg-black/55 px-3 py-2 text-xs font-semibold text-white ring-1 ring-white/25 backdrop-blur-md">
+          {alt.label}
+        </button>
+      )}
     </div>
   );
 }

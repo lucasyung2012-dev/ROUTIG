@@ -34,6 +34,11 @@ export type LiftDir = 'up' | 'down' | 'both';
 export const liftDir = (i: number, count: number): LiftDir => (count < 2 ? 'both' : i === 0 ? 'up' : 'down');
 /** O elevador de sentido `dir` para no nível `n` (de `count`): o que sobe não para no último; o que desce, no térreo. */
 export const liftServes = (dir: LiftDir, n: number, count: number): boolean => count > 1 && n >= 0 && n < count && (dir === 'up' ? n < count - 1 : dir === 'down' ? n > 0 : true);
+/**
+ * Dica de quem está no hall em frente ao elevador de sentido `dir`, no nível `n` (de `count`): o
+ * sentido dele e se ele não para aqui (o que desce, no térreo; o que sobe, no último nível).
+ */
+export const liftHint = (dir: LiftDir, n: number, count: number): { dir: LiftDir; off: boolean } => ({ dir, off: !liftServes(dir, n, count) });
 /** Andares que o elevador de sentido `dir` oferece a quem está no nível `cur`: só os de cima (sobe) ou só os de baixo (desce). */
 export const liftTargets = (dir: LiftDir, cur: number, count: number): number[] => Array.from({ length: count }, (_, n) => n).filter((n) => n !== cur && (dir === 'up' ? n > cur : dir === 'down' ? n < cur : true));
 

@@ -10,7 +10,7 @@
 import * as THREE from 'three';
 import type { ModuleId } from '@/app/modules';
 import { Builder, type Kit } from '../kit';
-import { createRoom, finishRoom, markSector, pendants, sectorGroup, sectorSign, sectorView, setDetailCommon, wallSpots, zoneLabel, type InteriorScene, type Room, type ZoneKey } from './common';
+import { canvasPlane, createRoom, finishRoom, markAction, markSector, pendants, sectorGroup, sectorSign, sectorView, setDetailCommon, wallSpots, zoneLabel, type ActionSpot, type InteriorScene, type Room, type ZoneKey } from './common';
 import { MASSING, groundHeight } from '../massing';
 import { inVol } from '../outline';
 import type { Placed } from './central';
@@ -19,6 +19,24 @@ import { groundSeats, placeSeats, seatAt } from './east';
 
 export interface NamesData {
   names: string[];
+}
+
+/**
+ * Canteiro da Estufa (seção 28), já traduzido pelo ParkPage: o hábito de hoje (`id` do hábito, ou
+ * 'more' no canteiro do "+N"), o nome, a linha de estado, feito hoje e a cor do hábito.
+ */
+export interface HabitBedView {
+  id: string;
+  name: string;
+  line: string;
+  done: boolean;
+  color: string;
+}
+
+export interface HabitsRoomData {
+  beds?: HabitBedView[];
+  /** Movimento reduzido: o canteiro floresce sem animação. */
+  still?: boolean;
 }
 
 type V3 = [number, number, number];
@@ -562,7 +580,7 @@ export function createHabitsInterior(kit: Kit, labels: Record<HabitsSector, stri
   const grass = kit.mat('#7DA65E', { rough: 1 });
   const grow = kit.mat('#E9D5FF', { glow: true });
   const flowers = ['#FBBF24', '#F472B6', '#FFFFFF', '#A78BFA'].map((c) => kit.mat(c, { rough: 0.7 }));
-  const pick: THREE.Group[] = [];
+  const pick: THREE.Object3D[] = [];
 
   // Arcos da estufa (as mesmas linhas de fora), fora do vão da entrada; a nave do meio fica aberta
   // sob a claraboia redonda.
@@ -592,7 +610,14 @@ export function createHabitsInterior(kit: Kit, labels: Record<HabitsSector, stri
   // Jardim central: caminho de pedra no eixo, oito canteiros elevados (um por hábito, com o nome
   // real na placa), plantas penduradas e a fonte com duas árvores no fim do eixo.
   b.add(m.stone, new THREE.BoxGeometry(2.4, 0.012, 16.9), [0, 0.006, 0.25]);
-  const boards: Board[] = [];
+  // Cada canteiro é um hábito de hoje (seção 28): tocar nele (ou, andando, olhar para ele ou chegar
+  // perto e apertar E) registra ou desfaz o de hoje, como o registro rápido da estação; feito, ele
+  // floresce (flores acesas e o halo na cor do hábito). Sem hábito: sem placa, e tocar não faz nada.
+  const beds: Bed[] = [];
+  const actions: ActionSpot[] = [];
+  const bloomMats = ['#FDE047', '#F9A8D4', '#FFFFFF', '#C4B5FD'].map((c) => kit.mat(c, { glow: true, rough: 0.5 }));
+  const hitGeo = kit.own(new THREE.BoxGeometry(2.5, 1.6, 2.7));
+  const hitMat = kit.own(new THREE.MeshBasicMaterial({ visible: false }));
   const bedZ = [3.2, 0, -3.2, -6.4];
   for (const sx of [-1, 1])
     bedZ.forEach((zc, i) => {
@@ -607,12 +632,47 @@ export function createHabitsInterior(kit: Kit, labels: Record<HabitsSector, stri
       spots.forEach(([a, w, s], k) => p.add([m.leaf, m.leaf2, m.leaf3][(i + k) % 3]!, new THREE.IcosahedronGeometry(s, 1), a, 0.6 + s * 0.7, w));
       for (let k = 0; k < 4; k++) p.add(flowers[(i + k) % 4]!, new THREE.SphereGeometry(0.06, 6, 4), -0.8 + k * 0.5, 0.95, 0.9 - (k % 2) * 0.25);
       for (const s of [-1, 1]) p.add(m.wood, new THREE.BoxGeometry(0.04, 0.4, 0.04), s * 0.8, 0.78, 1.25);
-      const board = nameBoard(kit, 2.0, acc);
+      const ry = (-sx * Math.PI) / 2;
+      const [cx, , cz] = p.at(0, 0, 0);
+      // Flores abertas (acendem) e o halo na cor do hábito; fechado = escala quase zero (o material
+      // já fica compilado na entrada, sem engasgo quando floresce).
+      const bb = new Builder();
+      const halo = kit.own(new THREE.MeshBasicMaterial({ color: acc, transparent: true, opacity: 0.6, depthWrite: false }));
+      bb.add(halo, new THREE.TorusGeometry(1.0, 0.04, 6, 40), [0, 0.64, 0], [Math.PI / 2, 0, 0]);
+      for (let k = 0; k < 12; k++) {
+        const a = (k / 12) * Math.PI * 2 + i;
+        const rr = 0.3 + (k % 3) * 0.24;
+        const fx = Math.cos(a) * rr;
+        const fz = Math.sin(a) * rr * 1.05;
+        const fy = 0.88 + ((k * 7) % 5) * 0.07;
+        bb.add(m.leaf2, new THREE.CylinderGeometry(0.012, 0.012, fy - 0.58, 4), [fx, (fy + 0.58) / 2, fz]);
+        bb.add(bloomMats[k % 4]!, new THREE.IcosahedronGeometry(0.11, 0), [fx, fy, fz]);
+      }
+      const bloom = bb.build(false);
+      bloom.position.set(cx, 0, cz);
+      bloom.rotation.y = ry;
+      bloom.scale.setScalar(0.001);
+      scene.add(bloom);
+      // Placa do canteiro: nome do hábito e o estado de hoje.
+      const sign = canvasPlane(kit, 2.0, 0.62, 120);
       const [x, , z] = p.at(0, 0, 1.25);
-      board.mesh.position.set(x, 1.2, z);
-      board.mesh.rotation.y = (-sx * Math.PI) / 2;
-      scene.add(board.mesh);
-      boards.push(board);
+      sign.mesh.position.set(x, 1.22, z);
+      sign.mesh.rotation.y = ry;
+      sign.mesh.visible = false;
+      scene.add(sign.mesh);
+      // Caixa invisível do toque (o canteiro inteiro e a placa); andando, vale chegar ao caminho em frente.
+      const hit = new THREE.Mesh(hitGeo, hitMat);
+      hit.visible = false;
+      hit.userData.hitbox = false;
+      hit.position.set(cx, 0.8, cz);
+      hit.rotation.y = ry;
+      markAction(hit, '');
+      scene.add(hit);
+      pick.push(hit);
+      const [wx, , wz] = p.at(0, 0, 2.15);
+      const act: ActionSpot = { id: '', level: 0, obj: hit, x: wx, z: wz, r: 1.5, active: false };
+      actions.push(act);
+      beds.push({ sign, bloom, halo, spot: act, drawn: '', on: false, grow: 0, from: 0, t0: 0, moving: false });
     });
   for (const [x, z] of [[-4.4, 1.6], [4.4, 1.6], [-4.4, -4.8], [4.4, -4.8]] as const) {
     b.add(m.metal, new THREE.CylinderGeometry(0.008, 0.008, H - 5.4, 4), [x, (H + 5.4) / 2, z]);
@@ -760,10 +820,89 @@ export function createHabitsInterior(kit: Kit, labels: Record<HabitsSector, stri
     room: room.spec,
     obstacles: [],
     view: viewer(room, plan, overview),
-    setData: (d) => boards.forEach((bd, i) => bd.draw((d as NamesData).names[i] ?? '')),
-    tick: (t) => room.trees.tick(t),
+    actions,
+    setData: (d) => {
+      const x = (d ?? {}) as HabitsRoomData;
+      beds.forEach((bd, i) => drawBed(bd, x.beds?.[i], !!x.still));
+    },
+    tick: (t) => {
+      room.trees.tick(t);
+      tickBeds(beds, performance.now());
+    },
     setDetail: (q) => setDetailCommon(room, q),
   };
+}
+
+/** Um canteiro da Estufa: placa, flores do "feito", halo e o lugar de ação. */
+interface Bed {
+  sign: ReturnType<typeof canvasPlane>;
+  bloom: THREE.Object3D;
+  halo: THREE.MeshBasicMaterial;
+  spot: ActionSpot;
+  drawn: string;
+  /** Feito hoje (alvo) e quanto está aberto agora (0 a 1), animando de `from` desde `t0`. */
+  on: boolean;
+  grow: number;
+  from: number;
+  t0: number;
+  moving: boolean;
+}
+
+/** Placa, ação e flores de um canteiro pelo hábito `v` (sem hábito: plano, sem placa, sem ação). */
+function drawBed(bd: Bed, v: HabitBedView | undefined, still: boolean): void {
+  const key = v ? `${v.id}|${v.name}|${v.line}|${v.done ? 1 : 0}|${v.color}` : '';
+  if (key !== bd.drawn) {
+    bd.drawn = key;
+    const ctx = bd.sign.ctx;
+    const c = ctx.canvas;
+    ctx.clearRect(0, 0, c.width, c.height);
+    if (v) {
+      ctx.fillStyle = 'rgba(12,24,44,0.92)';
+      ctx.fillRect(0, 0, c.width, c.height);
+      ctx.fillStyle = v.color;
+      ctx.fillRect(0, c.height - 8, c.width, 8);
+      ctx.fillStyle = '#F1FAFF';
+      ctx.font = '700 44px Inter, system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(v.name, c.width / 2, c.height * 0.36, c.width - 24);
+      ctx.fillStyle = v.done ? '#86EFAC' : '#FCD34D';
+      ctx.font = '600 28px Inter, system-ui, sans-serif';
+      ctx.fillText(v.done ? `\u2713 ${v.line}` : v.line, c.width / 2, c.height * 0.74, c.width - 24);
+    }
+    bd.sign.tex.needsUpdate = true;
+    if (v) bd.halo.color.set(v.color);
+  }
+  bd.sign.mesh.visible = !!v;
+  const id = v ? `bed:${v.id}` : '';
+  bd.spot.id = id;
+  bd.spot.active = !!v;
+  bd.spot.obj.userData.hitbox = !!v;
+  markAction(bd.spot.obj, id);
+  const on = !!v?.done;
+  if (on === bd.on) return;
+  bd.on = on;
+  if (still) {
+    bd.grow = on ? 1 : 0;
+    bd.moving = false;
+    bd.bloom.scale.setScalar(Math.max(0.001, bd.grow));
+    return;
+  }
+  bd.from = bd.grow;
+  bd.t0 = performance.now();
+  bd.moving = true;
+}
+
+/** Floresce (ou fecha) devagar: abre em 0,7 s passando um pouco do ponto; fecha em 0,35 s. Sem alocar nada. */
+function tickBeds(beds: readonly Bed[], now: number): void {
+  for (const bd of beds) {
+    if (!bd.moving) continue;
+    const k = Math.min(1, (now - bd.t0) / (bd.on ? 700 : 350));
+    const e = bd.on ? 1 + 2.2 * (k - 1) ** 3 + 1.2 * (k - 1) ** 2 : 1 - (1 - k) * (1 - k);
+    bd.grow = bd.from + ((bd.on ? 1 : 0) - bd.from) * e;
+    bd.bloom.scale.setScalar(Math.max(0.001, bd.grow));
+    if (k >= 1) bd.moving = false;
+  }
 }
 
 /* =====================================================================

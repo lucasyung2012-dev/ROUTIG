@@ -20,10 +20,10 @@ import { footprint } from './collision';
 import { entryDoors } from './doors';
 import { createExtras } from './extras';
 import { createAnimals } from './animals';
-import type { InteriorScene } from './interiors/common';
+import type { ActionSpot, InteriorScene } from './interiors/common';
 import type { Climb, Floors } from './interiors/floors';
 import { markX, showButtons, type Lift } from './vertical';
-import { CIRCULATION, coreFrom, levelAtHeight, liftServes, stairApproach, stairOf, voidRadius, type LiftDir } from './stairs';
+import { CIRCULATION, coreFrom, levelAtHeight, liftHint, liftServes, stairApproach, stairOf, voidRadius, type LiftDir } from './stairs';
 import { groundSpan } from './massing';
 import { reachSummary, stairReach, walkWorld, type ReachLevel } from './reach';
 
@@ -70,12 +70,17 @@ export interface EngineOpts {
   onInstrument: (k: Instrument | null) => void;
   /** Cofre de Finanças: a pessoa pediu para usar o cofre (a tela mostra o bloqueio real de Finanças). */
   onVault: () => void;
+  /**
+   * Objeto de ação tocado (ou usado andando, com E): `id` do lugar no interior aberto (seção 28).
+   * `long` = toque longo (abre a estação inteira em vez da ação rápida).
+   */
+  onAction: (a: { building: ModuleId; id: string; long: boolean }) => void;
   startMode: CamMode;
   /** Retomar de onde a pessoa estava (volta da interface 2D): sem abertura. */
   restore?: ParkSnapshot | null;
 }
 
-export type Hint = { kind: 'use'; what: ThingKind; key?: string; up?: boolean } | { kind: 'elevator'; dir: LiftDir; off: boolean } | { kind: 'sit' } | { kind: 'view' } | { kind: 'tree' } | { kind: 'water' } | { kind: 'person'; name: string; activity: string };
+export type Hint = { kind: 'use'; what: ThingKind; key?: string; up?: boolean } | { kind: 'act'; id: string } | { kind: 'elevator'; dir: LiftDir; off: boolean } | { kind: 'sit' } | { kind: 'view' } | { kind: 'tree' } | { kind: 'water' } | { kind: 'person'; name: string; activity: string };
 
 export interface Engine {
   setQuality: (q: Quality) => void;
@@ -264,15 +269,36 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
   const ray = new THREE.Raycaster();
   let down: { x: number; y: number; t: number } | null = null;
   const onDown = (e: PointerEvent) => (down = { x: e.clientX, y: e.clientY, t: performance.now() });
+  /** Pode ser tocado: visível (com os pais), ou caixa de ação invisível ligada (userData.hitbox = true). */
+  const tappable = (o: THREE.Object3D): boolean => {
+    if (o.userData.hitbox !== undefined) return o.userData.hitbox === true;
+    for (let p: THREE.Object3D | null = o; p; p = p.parent) if (!p.visible) return false;
+    return true;
+  };
+  /** O objeto de ação `id` no nível em que se está, se ele faz algo agora (seção 28). */
+  const spotOf = (id: string): ActionSpot | null => inside?.scene.actions?.find((s) => s.id === id && s.active && s.level === level) ?? null;
   const onUp = (e: PointerEvent) => {
-    if (!down || Math.hypot(e.clientX - down.x, e.clientY - down.y) > 8 || performance.now() - down.t > 400) return;
+    if (!down) return;
+    // Toque curto escolhe; toque longo (0,45 a 1,5 s, sem arrastar) só vale num objeto de ação: abre a estação.
+    const held = performance.now() - down.t;
+    if (Math.hypot(e.clientX - down.x, e.clientY - down.y) > 8 || held > 1500) return;
+    const long = held > 450;
+    if (long && !inside) return;
     const rect = canvas.getBoundingClientRect();
     ray.setFromCamera(new THREE.Vector2(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1), camera);
     if (!inside) {
       const hit = ray.intersectObjects(world.pickables, true)[0];
       opts.onPick((hit?.object.userData.building as ModuleId | undefined) ?? null);
     } else {
-      const hit = ray.intersectObjects(inside.scene.pickables, true)[0];
+      const hit = ray.intersectObjects(inside.scene.pickables, true).find((h) => tappable(h.object));
+      // Objeto de ação: a ação real (ou nada, na parede do dia sem item naquela hora).
+      const act = hit?.object.userData.action as string | undefined;
+      if (act !== undefined) {
+        const sp = act ? spotOf(act) : null;
+        if (sp) opts.onAction({ building: inside.id, id: sp.id, long });
+        return;
+      }
+      if (long) return;
       const zone = hit?.object.userData.zone as number | undefined;
       if (zone !== undefined) return focusZone(zone);
       const id = (hit?.object.userData.sector as string | undefined) ?? null;
@@ -638,6 +664,9 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
     // Sai pela porta da cabine em que veio (a do que sobe à esquerda, a do que desce à direita).
     setFloor(to, true, lf.x);
     if (mode !== 'orbit') rig.setMode(mode);
+    // A dica é refeita já no próximo quadro, com o nível de chegada (no térreo, o elevador que
+    // desce "não para aqui"), em vez de esperar a volta normal.
+    hintFrame = 7;
     opts.onRiding(false);
     return false;
   };
@@ -647,12 +676,29 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
     if (!z) return;
     if (z.level !== level) setFloor(z.level, false);
     const lv = inside!.scene.floors!.levels[z.level]!;
-    // Em frente à porta da sala, olhando para dentro dela.
+    // Em frente à porta da sala, olhando para dentro dela. (z.ex, z.ez) fica 0,9 m à frente da
+    // parede da porta; a placa com o nome está a 0,25 m dela, a 2,6 m de altura, e o quadro acima.
     const dx = z.ex - z.x;
     const dz = z.ez - z.z;
     const r = Math.hypot(dx, dz) || 1;
-    if (rig.mode() !== 'orbit') rig.place(z.ex, z.ez, Math.atan2(dx, dz));
-    else rig.glideTo(new THREE.Vector3(z.x + (dx / r) * 5.5, lv.y + 2.8, z.z + (dz / r) * 5.5), new THREE.Vector3(z.x, lv.y + 1.4, z.z), 1000);
+    const ux = dx / r;
+    const uz = dz / r;
+    if (rig.mode() !== 'orbit') {
+      // Andando: um passo atrás da frente da porta (se der para pisar ali), para a sala e a placa
+      // aparecerem inteiras em vez de a placa encher a tela.
+      const bx = z.ex + ux * 1.2;
+      const bz = z.ez + uz * 1.2;
+      const free = !lv.blocked(bx, bz) && !lv.obstacles.some((o) => Math.hypot(o.x - bx, o.z - bz) < o.r + 0.35);
+      rig.place(free ? bx : z.ex, free ? bz : z.ez, Math.atan2(dx, dz));
+    } else {
+      // Câmera livre: a uns 4 m da porta (a distância conta da frente da sala, não do centro: salas
+      // fundas punham a câmera colada na placa), abaixo da placa e do quadro, olhando para dentro;
+      // parede no caminho (sala da frente, corredor estreito) segura a câmera antes dela (fit).
+      const front = r - 0.9;
+      vA.set(z.x + ux * (front + 0.3), lv.y + 1.6, z.z + uz * (front + 0.3));
+      const v = fit({ cam: new THREE.Vector3(z.x + ux * (front + 4.2), lv.y + 2.0, z.z + uz * (front + 4.2)), target: vA });
+      rig.glideTo(v.cam, new THREE.Vector3(z.x, lv.y + 1.5, z.z), 1000);
+    }
     opts.onZone({ key: z.key, sector: z.sector });
   };
 
@@ -845,15 +891,56 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
     const own = sc.scene.userData.seats as Seat[] | undefined;
     return level === 0 && own?.length ? near2(own, p, 1.8) : null;
   };
+  /* ---------- Objetos de ação (seção 28): o que se olha ou o que está perto ---------- */
+  const aimRay = new THREE.Raycaster();
+  const aimHits: THREE.Intersection[] = [];
+  const aimObjs: THREE.Object3D[] = [];
+  const CENTER = new THREE.Vector2(0, 0);
+  /**
+   * Objeto de ação no centro da vista (até 3,5 m à frente do corpo; na 3ª pessoa conta a distância
+   * da câmera) ou, sem isso, o mais perto de quem anda (dentro do raio de cada um), neste nível.
+   */
+  const actionAhead = (): ActionSpot | null => {
+    const list = inside?.scene.actions;
+    if (!list?.length) return null;
+    const p = rig.body().pos;
+    aimObjs.length = 0;
+    for (const s of list) if (s.active && s.level === level) aimObjs.push(s.obj);
+    if (!aimObjs.length) return null;
+    aimRay.setFromCamera(CENTER, camera);
+    aimRay.far = 3.5 + Math.hypot(camera.position.x - p.x, camera.position.z - p.z);
+    aimHits.length = 0;
+    aimRay.intersectObjects(aimObjs, true, aimHits);
+    for (const h of aimHits) {
+      const id = h.object.userData.action as string | undefined;
+      const sp = id ? spotOf(id) : null;
+      if (sp) return sp;
+    }
+    let best: ActionSpot | null = null;
+    let bd = Infinity;
+    for (const s of list) {
+      if (!s.active || s.level !== level || s.r <= 0) continue;
+      const d = Math.hypot(s.x - p.x, s.z - p.z);
+      if (d < s.r && d < bd) {
+        bd = d;
+        best = s;
+      }
+    }
+    return best;
+  };
   const findHint = (): Hint | null => {
-    if (rig.posture() !== 'stand') return null;
+    // No elevador ou na escada guiada não há dica (e a do andar de partida não fica para a chegada).
+    if (rig.posture() !== 'stand' || ride || climb) return null;
     const p = rig.body().pos;
     if (inside) {
+      const act = actionAhead();
+      if (act) return { kind: 'act', id: act.id };
       const th = thingNear(p);
       const li = th ? -1 : elevatorNear();
       const lf = li >= 0 ? inside.scene.floors?.lifts[li] : undefined;
       const count = inside.scene.floors?.levels.length ?? 1;
-      if (lf && count > 1) return { kind: 'elevator', dir: lf.dir, off: !liftServes(lf.dir, level, count) };
+      // O que desce não para no térreo; o que sobe não para no último nível: lá a dica diz isso.
+      if (lf && count > 1) return { kind: 'elevator', ...liftHint(lf.dir, level, count) };
       if (th) {
         const fl = inside.scene.floors!;
         if (th.kind === 'room') return { kind: 'use', what: 'room', key: fl.zones[th.zone!]?.key };
@@ -1110,6 +1197,9 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
     if (near && !inside) return enter(near);
     const p = rig.body().pos;
     if (inside) {
+      // Objeto de ação olhado ou por perto (canteiro, cartão, item da parede do dia): a ação real.
+      const act = actionAhead();
+      if (act) return opts.onAction({ building: inside.id, id: act.id, long: false });
       const levels = inside.scene.floors?.levels.length ?? 1;
       const th = thingNear(p);
       if (th) return useThing(th);

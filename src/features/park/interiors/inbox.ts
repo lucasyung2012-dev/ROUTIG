@@ -11,7 +11,7 @@
 import * as THREE from 'three';
 import type { Kit } from '../kit';
 import type { Obstacle } from '../camera';
-import { canvasPlane, createRoom, finishRoom, setDetailCommon, wrap, zoneLabel, type InteriorScene } from './common';
+import { canvasPlane, createRoom, finishRoom, setAnchor, setDetailCommon, wrap, zoneLabel, type InteriorScene } from './common';
 import { inWell, stairOf } from '../stairs';
 import { areaView, at, benchSeat, box, chair, closeZone, counter, credenza, cyl, deskLamp, groundSeats, hangSign as hangSignAt, lightBar, lowTable, palette, pendant, planter, rug, sofa, solid, staffSeats, table, tallPlant, zone, type F, type View } from './east';
 
@@ -200,6 +200,9 @@ export function createInboxInterior(kit: Kit, labels: InboxLabels): InteriorScen
     });
     hangSign(af, arrivals.g, zoneLabel('arrivals'), 0, 4.9, 0, 0, 3.0, H);
     for (const lx of [-1.6, 0, 1.6]) solid(obstacles, arrivals, lx, 0.25, 0.55);
+    // Bandeja de chegadas (objects3d.ts) no tampo do balcão, inclinada para quem chega.
+    const [tx, tz] = arrivals.w(0, 0.25);
+    setAnchor(scene, 'tray', { x: tx, y: 1.1, z: tz, face: -Math.PI / 2, tilt: -Math.PI / 2 + 0.3 });
     picks.push(closeZone(scene, arrivals));
     views.distribution = areaView(room, 6.4, 0, -Math.PI / 2, 8, 4.2, 2.4);
   }

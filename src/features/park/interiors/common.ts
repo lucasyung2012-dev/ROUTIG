@@ -59,6 +59,27 @@ export interface ActionSpot {
   active: boolean;
 }
 
+/**
+ * Apoio de um objeto de ação do térreo (objects3d.ts), no sistema do prédio: o ponto, para onde a
+ * frente do objeto olha (`face`, ângulo y), a inclinação (`tilt`, ângulo x: -π/2 = deitado no
+ * tampo) e, conforme o objeto, um raio (`r`) ou uma marca (`flag`).
+ */
+export interface Anchor {
+  x: number;
+  y: number;
+  z: number;
+  face: number;
+  tilt?: number;
+  r?: number;
+  flag?: boolean;
+}
+
+/** Anota um apoio (o interior marca onde fica o objeto; quem desenha e liga é o objects3d.ts). */
+export function setAnchor(scene: THREE.Object3D, key: string, a: Anchor): void {
+  const all = (scene.userData.anchors ??= {}) as Record<string, Anchor>;
+  all[key] = a;
+}
+
 /** Marca a malha de uma ação (e os filhos): o toque e o olhar chegam ao `id` atual do lugar. */
 export function markAction(o: THREE.Object3D, id: string): void {
   o.traverse((c) => (c.userData.action = id));

@@ -12,9 +12,10 @@ import { phaseElapsed, phaseRemaining, type FocusTimer } from '@/domain/focus';
 import { compareGoals, goalProgress, isGoalOverdue, isOpenGoal, type Goal, type GoalCheckin, type GoalProgress } from '@/domain/goals';
 import { logMeets, openPause, scheduleAt, todayStatus, type Habit, type HabitLog } from '@/domain/habits';
 import type { InboxItem } from '@/domain/inbox';
-import { sessionStats, type Language, type LanguageSession } from '@/domain/languages';
+import { sessionStats, type Language, type LanguageSession, type VocabEntry } from '@/domain/languages';
 import type { LibraryItem } from '@/domain/library';
 import type { Instrument, PracticeSession } from '@/domain/music';
+import type { Currency, FinAsset, Position } from '@/domain/finance';
 import type { Note } from '@/domain/notes';
 import { isClosedProject, type Milestone, type Project, type ProjectProgress } from '@/domain/projects';
 import type { Sport, SportActivity } from '@/domain/sports';
@@ -468,4 +469,174 @@ export function sportsToday(sports: readonly Sport[], activitiesOf: (sportId: st
     for (const a of activitiesOf(s.id)) if (!a.deletedAt && a.date === today) rows.push({ id: a.id, sport: s.name, color: s.color, title: a.title, type: a.type, min: a.durationMin, outcome: a.outcome });
   }
   return capList(rows, cap);
+}
+
+/* =====================================================================
+ * Objetos de ação no próprio 3D (sem parede): o balcão de criação rápida do Tasks, a placa "Novo
+ * objetivo", a maquete dos projetos, a luminária das cabines do Focus, a bandeja de chegadas do
+ * Inbox, o caderno aberto do Notes, as lombadas dos novos da Library, o baralho do Idiomas, as
+ * faixas das modalidades do Sports, as esferas do Insights e o quadro de saldos dentro do cofre.
+ * Aqui só os prefixos dos ids, a estação de cada um (toque longo) e as contas puras de cada objeto.
+ * ===================================================================== */
+
+/** Prédio de cada prefixo de objeto ("tnew:new", "maq:<projeto>"…). */
+export const OBJECT_KIND: Readonly<Record<string, ModuleId>> = {
+  tnew: 'tasks',
+  hour: 'calendar',
+  gnew: 'goals',
+  maq: 'projects',
+  lamp: 'focus',
+  tray: 'inbox',
+  nb: 'notes',
+  spine: 'library',
+  deck: 'languages',
+  court: 'sports',
+  orb: 'insights',
+  bal: 'finance',
+};
+
+/** Prédio de um prefixo de objeto (null: não é objeto). */
+export function objectBuilding(kind: string): ModuleId | null {
+  return Object.prototype.hasOwnProperty.call(OBJECT_KIND, kind) ? (OBJECT_KIND[kind] ?? null) : null;
+}
+
+/** Estação que o toque longo (ou o "abrir a estação" da dica) abre: setor e sala do andar (null = térreo). */
+export const OBJECT_STATION: Readonly<Record<string, { sector: string; key: string | null }>> = {
+  tnew: { sector: 'capture', key: null },
+  hour: { sector: 'daily', key: 'daily' },
+  gnew: { sector: 'analysis', key: 'tracking' },
+  maq: { sector: 'studio', key: 'tracking' },
+  lamp: { sector: 'garden', key: null },
+  tray: { sector: 'distribution', key: null },
+  nb: { sector: 'writing', key: null },
+  spine: { sector: 'collections', key: null },
+  deck: { sector: 'spaces', key: null },
+  court: { sector: 'modalities', key: null },
+  orb: { sector: 'overview', key: null },
+  bal: { sector: 'investments', key: null },
+};
+
+/* ---------- Calendar: as horas da parede do dia (tocar numa hora vazia cria um evento) ---------- */
+
+export interface HourRow {
+  /** Hora cheia (0 a 23). */
+  hour: number;
+  /** Faixa da hora na parede (0 = início da janela, 1 = fim). */
+  y0: number;
+  y1: number;
+}
+
+/** As horas cheias inteiras dentro da janela [from, to) (minutos) e onde cada uma cai na parede. */
+export function hourRows(from: number, to: number): HourRow[] {
+  const span = to - from;
+  if (span <= 0) return [];
+  const out: HourRow[] = [];
+  for (let m = Math.ceil(from / 60) * 60; m + 60 <= to && m < 1440; m += 60) out.push({ hour: m / 60, y0: (m - from) / span, y1: (m + 60 - from) / span });
+  return out;
+}
+
+/** "HH:00" de uma hora cheia (o início do evento criado na parede). */
+export const hourLabel = (hour: number): string => `${String(Math.max(0, Math.min(23, Math.floor(hour)))).padStart(2, '0')}:00`;
+
+/* ---------- Projects: a maquete (a altura de cada bloco é o progresso real) ---------- */
+
+/** Altura (m) do bloco de um projeto na maquete: sem como medir, uma base baixa; senão, pelo progresso. */
+export function blockHeight(percent: number | null): number {
+  if (percent === null) return 0.03;
+  return 0.05 + 0.35 * Math.max(0, Math.min(100, percent)) / 100;
+}
+
+/** Marcos de um projeto na ordem da maquete: os em aberto (pela data; sem data, no fim) e depois os feitos. */
+export function milestoneList(p: Pick<Project, 'milestones'>): Milestone[] {
+  const open = p.milestones.filter((m) => !m.done).sort((a, b) => (a.date ?? '9999').localeCompare(b.date ?? '9999'));
+  return [...open, ...p.milestones.filter((m) => m.done)];
+}
+
+/* ---------- Focus: a luminária da cabine segue a sessão compartilhada ---------- */
+
+export type LampState = 'off' | 'on' | 'paused';
+export type LampTap = 'start' | FocusTap;
+
+/** Luminária acesa com a sessão correndo, meio acesa pausada ou entre fases, apagada sem sessão. */
+export function lampState(timer: Pick<FocusTimer, 'waiting' | 'runningSince'> | null): LampState {
+  if (!timer) return 'off';
+  return timer.runningSince !== null && !timer.waiting ? 'on' : 'paused';
+}
+
+/** O que o toque na luminária faz: sem sessão começa uma; com sessão, o mesmo que o relógio da parede. */
+export function lampTap(timer: Pick<FocusTimer, 'waiting' | 'runningSince'> | null, ended: boolean): LampTap {
+  return !timer ? 'start' : focusTap(timer, ended);
+}
+
+/* ---------- Idiomas: o baralho de hoje (as palavras com revisão vencida) ---------- */
+
+/**
+ * As palavras de hoje, na ordem em que o baralho mostra: vencidas até hoje (as mais atrasadas
+ * primeiro), dos idiomas estudados que existem; apagadas e de idioma apagado ficam fora.
+ */
+export function deckQueue(vocab: readonly VocabEntry[], languages: readonly Pick<Language, 'id' | 'deletedAt'>[], today: DateKey): VocabEntry[] {
+  const live = new Set(languages.filter((l) => !l.deletedAt).map((l) => l.id));
+  return vocab
+    .filter((v) => !v.deletedAt && live.has(v.languageId) && v.srs.due !== null && v.srs.due <= today)
+    .sort((a, b) => (a.srs.due ?? '').localeCompare(b.srs.due ?? '') || a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id));
+}
+
+/* ---------- Música: quanto se tocou de verdade no instrumento ---------- */
+
+/** Minutos tocados entre a primeira e a última nota (arredondados); menos de meio minuto: null (nada a registrar). */
+export function practiceMinutes(firstMs: number, lastMs: number): number | null {
+  const ms = lastMs - firstMs;
+  if (!Number.isFinite(ms) || ms < 30_000) return null;
+  return Math.min(1440, Math.max(1, Math.round(ms / 60_000)));
+}
+
+/** Instrumento do módulo que já vem escolhido para a prática do instrumento do Estúdio (o usuário confirma). */
+export function practiceInstrument(kind: 'piano' | 'drums' | 'guitar', instruments: readonly Pick<Instrument, 'id' | 'name' | 'kind' | 'deletedAt'>[]): string | null {
+  const live = instruments.filter((i) => !i.deletedAt);
+  const byName = (re: RegExp) => live.find((i) => re.test(i.name))?.id ?? null;
+  if (kind === 'guitar') return live.find((i) => i.kind === 'guitar')?.id ?? byName(/viol|guitar/i);
+  if (kind === 'piano') return byName(/piano|teclado|keyboard|synth/i);
+  return byName(/bateria|drum|percuss/i);
+}
+
+/* ---------- Insights: as esferas do núcleo ---------- */
+
+/** Ângulos (rad) de `n` esferas em volta do núcleo, deixando livre a frente (a porta da escada e as placas). */
+export function orbAngles(n: number, gap = 0.75): number[] {
+  if (n <= 0) return [];
+  const span = Math.PI * 2 - gap * 2;
+  return Array.from({ length: n }, (_, i) => gap + (n === 1 ? span / 2 : (i * span) / (n - 1)));
+}
+
+/* ---------- Finance: os saldos dentro do cofre (só leitura) ---------- */
+
+export interface VaultLine {
+  currency: Currency;
+  /** Custo do que está na carteira. */
+  invested: number;
+  /** Valor atual dos ativos com valor informado (null: nenhum informado). */
+  value: number | null;
+  /** Ativos com posição e quantos têm valor informado. */
+  held: number;
+  quoted: number;
+}
+
+/** As mesmas contas do resumo de Finanças por moeda: o valor atual só soma o que tem valor informado. */
+export function vaultLines(assets: readonly Pick<FinAsset, 'id' | 'currency' | 'archived' | 'deletedAt'>[], positionOf: (id: string) => Pick<Position, 'quantity' | 'invested' | 'currentValue'>, order: readonly Currency[]): VaultLine[] {
+  const live = assets.filter((a) => !a.deletedAt && !a.archived);
+  const out: VaultLine[] = [];
+  for (const cur of order) {
+    const pos = live.filter((a) => a.currency === cur).map((a) => positionOf(a.id));
+    if (!pos.length) continue;
+    const held = pos.filter((p) => p.quantity > 0);
+    const quoted = held.filter((p) => p.currentValue !== null);
+    out.push({
+      currency: cur,
+      invested: pos.reduce((s, p) => s + p.invested, 0),
+      value: quoted.length ? quoted.reduce((s, p) => s + (p.currentValue ?? 0), 0) : null,
+      held: held.length,
+      quoted: quoted.length,
+    });
+  }
+  return out;
 }

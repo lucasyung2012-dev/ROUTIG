@@ -10,7 +10,7 @@
 import * as THREE from 'three';
 import { Builder, type Kit } from '../kit';
 import type { Obstacle } from '../camera';
-import { canvasPlane, createRoom, finishRoom, gallerySlab, markSector, pendants, sectorGroup, sectorSign, sectorView, setDetailCommon, wallSpots, zoneLabel, type InteriorScene, type ZoneKey } from './common';
+import { canvasPlane, createRoom, finishRoom, gallerySlab, markSector, pendants, sectorGroup, sectorSign, sectorView, setAnchor, setDetailCommon, wallSpots, zoneLabel, type InteriorScene, type ZoneKey } from './common';
 import type { Placed } from './central';
 import { MASSING } from '../massing';
 import type { Thing } from './things';
@@ -613,6 +613,12 @@ export function createLibraryInterior(kit: Kit, labels: Record<LibrarySector, st
   );
   solid(obstacles, P.collections, 0, 0, 3.1, 1.3, 1);
   solid(obstacles, P.collections, 0, -2.2, 4.4, 0.4, 2.2);
+  // Prateleira dos novos (objects3d.ts): a terceira fileira da parede de capas vira as lombadas dos
+  // materiais adicionados por último, na frente das capas.
+  {
+    const [sx, sz] = toWorld(P.collections, 0, -1.9);
+    setAnchor(scene, 'spines', { x: sx, y: 1.555, z: sz, face: P.collections.face });
+  }
   for (const sx of [-1, 1]) solid(obstacles, P.collections, sx * 2.4, 0, 0.9, 0.5, 1.2);
   pendant(put, M, 10.6, 0.6, under, 3.3);
 
@@ -726,12 +732,17 @@ export function createNotesInterior(kit: Kit, labels: Record<NotesSector, string
         p(M.page, B(0.34, 0.24, 0.01), sx * 0.65, 1.28, 0.04, 0, -0.5);
         stool(p, M, sx * 0.65, 0.75, 0.72, Math.PI);
       }
-      for (let k = 0; k < 3; k++) p(notes[k]!, B(0.2, 0.012, 0.2), -0.1 + k * 0.05, 1.11 + k * 0.012, 0.12, k * 0.3);
+      // Os blocos de lembretes ficam no canto esquerdo: o meio do tampo é do caderno aberto (objects3d.ts).
+      for (let k = 0; k < 3; k++) p(notes[k]!, B(0.2, 0.012, 0.2), -1.1 + k * 0.05, 1.11 + k * 0.012, 0.12, k * 0.3);
       p(M.dark, C(0.05, 0.05, 0.12, 10), 0.15, 1.16, -0.15);
       for (const sx of [-1, 1]) p(M.dark, C(0.02, 0.02, 1.85, 6), sx * 1.2, 2.0, -0.2);
     }, null, [at(zoneSign(kit, 'capture', accent, 2.3), 0, 2.75, -0.2)]),
   );
   solid(obstacles, capture, 0, 0, 2.7, 0.75, 1.1);
+  {
+    const [nx, nz] = toWorld(capture, 0, 0.24);
+    setAnchor(scene, 'notebook', { x: nx, y: 1.102, z: nz, face: capture.face, tilt: -Math.PI / 2 });
+  }
 
   // Espaço de ideias (Sala de Organização): dois quadros de cortiça em V cheios de lembretes, mesa
   // redonda com cadeiras e lembretes soltos, vasos e tapete.
@@ -1139,6 +1150,8 @@ export function createLanguagesInterior(kit: Kit, labels: Record<LanguagesSector
     obstacles.push({ x, z, r: 0.7, h: 0.8 });
   }
   totem(b, scene, M, zoneSign(kit, 'conversation', accent, 2.4), 2.4, 10.9, -4.6, Math.PI / 2);
+  // Baralho de revisão (objects3d.ts) na mesa de conversação do leste, ao lado do vaso, virado para o jardim.
+  setAnchor(scene, 'deck', { x: 10.6 - 0.34, y: 0.775, z: 2.2, face: -Math.PI / 2 });
 
   // Imersão (ala leste): sala circular de ripas de madeira, aberta para o tambor, com banco
   // estofado em volta, pufes e tapete redondo e a luz de sanca.
@@ -1231,6 +1244,8 @@ export function createInsightsInterior(kit: Kit, labels: Record<InsightsSector, 
   obstacles.push({ x: 0, z: 0, r: R + 0.1, h: H });
   const stairs: Thing = { kind: 'stairs', level: 0, x: 0, z: R + 1.0, face: 0 };
   scene.userData.things = [stairs];
+  // Esferas dos indicadores (objects3d.ts) em volta do núcleo, acima das cabeças (sem atrapalhar a passagem).
+  setAnchor(scene, 'core', { x: 0, y: 4.0, z: 0, face: 0, r: R + 1.15 });
   // Pendentes em anel sobre o átrio.
   for (let k = 0; k < 8; k++) {
     const a = (k / 8) * Math.PI * 2 + Math.PI / 8;

@@ -4,7 +4,8 @@
  * e feitas hoje; tocar num cartão conclui (ou reabre) a tarefa e ele vai, virando, para a outra
  * coluna. No Calendar, o dia de hoje na parede de telas da Sala Diária (1º andar), pela hora, com a
  * linha de agora andando; tocar num evento abre o editor do próprio módulo, tocar num horário vazio
- * não faz nada. Os dados chegam prontos do ParkPage (`live`, os mesmos repositórios das estações);
+ * cria um evento naquela hora (o título é pedido ao lado da parede; LiveFeed.tsx, CalendarObjects).
+ * Os dados chegam prontos do ParkPage (`live`, os mesmos repositórios das estações);
  * cada canvas só é redesenhado quando o conteúdo (ou o minuto, na parede do dia) muda, e nada é
  * alocado a cada quadro.
  */
@@ -14,7 +15,7 @@ import type { Kit } from '../kit';
 import { canvasPlane, markAction, wrap, type ActionSpot, type InteriorScene } from './common';
 import type { Floors, FloorZone } from './floors';
 import { formatClock, type FocusTimer } from '@/domain/focus';
-import { dayLayout, focusFace, LIVE_WALL_ROOMS, TASK_COLS, type DayItem, type DayLayout, type FocusFace, type TaskBoard, type TaskCol } from '../live';
+import { dayLayout, focusFace, hourRows, LIVE_WALL_ROOMS, TASK_COLS, type DayItem, type DayLayout, type FocusFace, type TaskBoard, type TaskCol } from '../live';
 
 /** Dados do quadro de tarefas (já traduzidos): os cartões, o cabeçalho e o "+N" de cada coluna. */
 export interface TasksLive {
@@ -49,6 +50,8 @@ export interface WallRowView {
   check: boolean | null;
   /** Linha do "+N" (mais apagada; o toque abre a estação). */
   more: boolean;
+  /** Ação própria do título (ex.: abrir a disciplina na Academy); sem isso, o título é parte da linha. */
+  nameId?: string;
 }
 
 /** O relógio do Focus no alto da parede: o mostrador anda sozinho (conferido a cada segundo). */
@@ -371,6 +374,8 @@ function tasksWall(kit: Kit, scene: InteriorScene, fl: Floors, key: string): Liv
  * ===================================================================== */
 
 const HITS = 14;
+/** Faixas de hora da parede do dia (uma por hora cheia da janela; atrás das caixas dos itens). */
+const HOUR_HITS = 24;
 
 function dayWall(kit: Kit, scene: InteriorScene, fl: Floors, key: string): Live | null {
   const room = screenRoom(scene, fl, key);
@@ -408,6 +413,39 @@ function dayWall(kit: Kit, scene: InteriorScene, fl: Floors, key: string): Live 
     actions.push(spot);
     hits.push(spot);
   }
+  // Uma faixa por hora (mais perto da tela que a parede e mais longe que os itens: o item ganha o toque).
+  const hours: ActionSpot[] = [];
+  for (let i = 0; i < HOUR_HITS; i++) {
+    const m = new THREE.Mesh(hitGeo, hitMat);
+    m.visible = false;
+    m.userData.hitbox = false;
+    m.position.set(0, screen.y, z0 + 0.005);
+    markAction(m, '');
+    root.add(m);
+    scene.pickables.push(m);
+    const spot: ActionSpot = { id: '', level: zone.level, obj: m, x: 0, z: 0, r: 0, active: false };
+    actions.push(spot);
+    hours.push(spot);
+  }
+  /** Faixa `i` sobre a hora `hour` (de py0 a py1 no canvas, na largura da grade). */
+  const hourAt = (i: number, hour: number, px: number, py0: number, py1: number) => {
+    const sp = hours[i];
+    if (!sp) return;
+    const m = sp.obj;
+    const lx = -W / 2 + ((px + (PW - px - 10) / 2) / PW) * W;
+    const ly = screen.y + H / 2 - ((py0 + py1) / 2 / PH) * H;
+    m.position.x = lx;
+    m.position.y = ly;
+    m.scale.set(Math.max(0.05, ((PW - px - 10) / PW) * W), Math.max(0.03, ((py1 - py0) / PH) * H), 1);
+    const id = `hour:${hour}`;
+    sp.id = id;
+    sp.active = true;
+    m.userData.hitbox = true;
+    markAction(m, id);
+    const [bx, bz] = toBuilding(lx, z0 + 1.3);
+    sp.x = bx;
+    sp.z = bz;
+  };
   /** Caixa `i` sobre o retângulo (px, py, pw, ph) do canvas, ligada ao item `item`. */
   const hitAt = (i: number, item: DayItem, px: number, py: number, pw: number, ph: number) => {
     const sp = hits[i];
@@ -485,6 +523,16 @@ function dayWall(kit: Kit, scene: InteriorScene, fl: Floors, key: string): Live 
       ctx.fillRect(AXIS, y, PW - AXIS - 10, 1);
       ctx.fillStyle = '#94A3B8';
       ctx.fillText(`${String(Math.floor(m / 60) % 24).padStart(2, '0')}:00`, 10, y, AXIS - 14);
+    }
+    // Cada hora cheia da janela é tocável (cria um evento ali); as que sobram ficam desligadas.
+    const rows = hourRows(L.from, L.to).slice(0, HOUR_HITS);
+    rows.forEach((r, i) => hourAt(i, r.hour, AXIS, yOf(r.y0), yOf(r.y1)));
+    for (let i = rows.length; i < HOUR_HITS; i++) {
+      const sp = hours[i]!;
+      sp.active = false;
+      sp.id = '';
+      sp.obj.userData.hitbox = false;
+      markAction(sp.obj, '');
     }
     // Itens com hora: largura dividida entre os que se sobrepõem.
     const areaW = PW - AXIS - 14;
@@ -575,7 +623,8 @@ function dayWall(kit: Kit, scene: InteriorScene, fl: Floors, key: string): Live 
  * ação (o mesmo jeito da parede do dia). Tocar fora das linhas abre a sala.
  * ===================================================================== */
 
-const WALL_HITS = 7;
+/** Caixas da parede: uma por linha e, nas linhas com ação no título, mais uma sobre ele. */
+const WALL_HITS = 12;
 
 /** A sala `key` com superfície para a parede (telas ou fundo livre), o grupo dela e o sistema do prédio. */
 function wallRoom(scene: InteriorScene, fl: Floors, key: string) {
@@ -630,8 +679,8 @@ function listWall(kit: Kit, scene: InteriorScene, fl: Floors, key: string): Live
     actions.push(spot);
     hits.push(spot);
   }
-  /** Caixa `i` sobre o retângulo (px, py, pw, ph) do canvas, ligada à ação `id`. */
-  const hitAt = (i: number, id: string, px: number, py: number, pw: number, ph: number) => {
+  /** Caixa `i` sobre o retângulo (px, py, pw, ph) do canvas, ligada à ação `id` (`front`: na frente das outras). */
+  const hitAt = (i: number, id: string, px: number, py: number, pw: number, ph: number, front = false) => {
     const sp = hits[i];
     if (!sp) return;
     const m = sp.obj;
@@ -639,6 +688,7 @@ function listWall(kit: Kit, scene: InteriorScene, fl: Floors, key: string): Live
     const ly = mount.y + H / 2 - ((py + ph / 2) / PH) * H;
     m.position.x = lx;
     m.position.y = ly;
+    m.position.z = z0 + (front ? 0.016 : 0.01);
     m.scale.set(Math.max(0.05, (pw / PW) * W), Math.max(0.05, (ph / PH) * H), 1);
     sp.id = id;
     sp.active = true;
@@ -749,7 +799,14 @@ function listWall(kit: Kit, scene: InteriorScene, fl: Floors, key: string): Live
       ctx.font = `600 ${fs}px ${FONT}`;
       const ty = r.sub ? y + h * 0.34 : y + h / 2;
       ctx.fillText(r.title, tx, ty, textW);
-      if (r.check) ctx.fillRect(tx, ty, Math.min(textW, ctx.measureText(r.title).width), 2);
+      const titleW = Math.min(textW, ctx.measureText(r.title).width);
+      if (r.check) ctx.fillRect(tx, ty, titleW, 2);
+      if (r.nameId) {
+        // Título com ação própria: sublinhado na cor da linha e uma caixa só sobre ele.
+        ctx.fillStyle = r.color;
+        ctx.fillRect(tx, ty + fs * 0.55, titleW, 2);
+        hitAt(hi++, r.nameId, tx - 6, ty - fs * 0.7, titleW + 12, fs * 1.4, true);
+      }
       if (r.sub) {
         ctx.fillStyle = '#94A3B8';
         ctx.font = `500 ${Math.round(h * 0.25)}px ${FONT}`;

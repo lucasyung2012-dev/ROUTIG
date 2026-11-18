@@ -134,6 +134,11 @@ export interface Engine {
   setVault: (s: VaultState, instant?: boolean) => void;
   setData: (id: ModuleId, data: unknown) => void;
   project: () => Array<{ id: ModuleId; x: number; y: number; visible: boolean }>;
+  /**
+   * Onde o objeto de ação `id` aparece na tela agora (pixels do canvas), para o que se digita ao lado
+   * dele (objects3d.ts); null: não há esse objeto ligado no nível em que se está.
+   */
+  projectAction: (id: string) => { x: number; y: number; visible: boolean } | null;
   dispose: () => void;
 }
 
@@ -1814,6 +1819,12 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
         out.push({ id, x: ((v.x + 1) / 2) * canvas.clientWidth, y: ((1 - v.y) / 2) * canvas.clientHeight, visible: !inside && v.z < 1 && d < 430 });
       });
       return out;
+    },
+    projectAction: (id) => {
+      const sp = inside?.scene.actions?.find((s) => s.id === id && s.active && s.level === level);
+      if (!sp) return null;
+      const p = sp.obj.getWorldPosition(new THREE.Vector3()).project(camera);
+      return { x: ((p.x + 1) / 2) * canvas.clientWidth, y: ((1 - p.y) / 2) * canvas.clientHeight, visible: p.z < 1 && Math.abs(p.x) <= 1.05 && Math.abs(p.y) <= 1.05 };
     },
     dispose: () => {
       cancelAnimationFrame(raf);

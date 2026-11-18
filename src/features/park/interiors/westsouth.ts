@@ -10,7 +10,7 @@
 import * as THREE from 'three';
 import type { ModuleId } from '@/app/modules';
 import { Builder, type Kit } from '../kit';
-import { canvasPlane, createRoom, finishRoom, markAction, markSector, pendants, sectorGroup, sectorSign, sectorView, setDetailCommon, wallSpots, zoneLabel, type ActionSpot, type InteriorScene, type Room, type ZoneKey } from './common';
+import { canvasPlane, createRoom, finishRoom, markAction, markSector, pendants, sectorGroup, sectorSign, sectorView, setAnchor, setDetailCommon, wallSpots, zoneLabel, type ActionSpot, type InteriorScene, type Room, type ZoneKey } from './common';
 import { MASSING, groundHeight } from '../massing';
 import { inVol } from '../outline';
 import type { Placed } from './central';
@@ -459,6 +459,9 @@ export function createFocusInterior(kit: Kit, labels: Record<FocusSector, string
   // Ripas de madeira nas paredes do pavilhão do jardim (madeira e vidro).
   wallSpots(room, 44, 0.28, () => false, room.vols[0]).forEach(({ x, z, face }) => b.add(m.wood, new THREE.BoxGeometry(0.08, 3.4, 0.4), [x, 1.9, z], [0, face, 0]));
 
+  // Luminárias de ação (objects3d.ts): acesas com a sessão de foco correndo. Nas salas individuais,
+  // a própria luminária da mesa; nas cabines, uma luminária nova no canto do tampo (`flag`: com pé).
+  let lampN = 0;
   // Salas individuais (ala oeste): duas salas de vidro com mesa, cadeira, luminária e prateleira.
   for (const zc of [-2.16, 2.16]) {
     const p = spot(b, -15.16, zc, Math.PI / 2);
@@ -477,6 +480,10 @@ export function createFocusInterior(kit: Kit, labels: Record<FocusSector, string
     p.add(m.dark, new THREE.CylinderGeometry(0.08, 0.1, 0.03, 10), 0.5, 0.765, -1.3);
     p.add(m.dark, new THREE.CylinderGeometry(0.01, 0.01, 0.35, 4), 0.5, 0.95, -1.3);
     p.add(m.warm, new THREE.SphereGeometry(0.08, 10, 6), 0.5, 1.13, -1.3);
+    {
+      const [lx, ly, lz] = p.at(0.5, 1.13, -1.3);
+      setAnchor(scene, `lamp${lampN++}`, { x: lx, y: ly, z: lz, face: Math.PI / 2 });
+    }
     p.add(m.wood, new THREE.BoxGeometry(0.25, 0.04, 1.2), -1.45, 1.5, -0.4);
     for (let k = 0; k < 6; k++) p.add([m.fabric, m.wood2, m.paper][k % 3]!, new THREE.BoxGeometry(0.18, 0.22, 0.05), -1.45, 1.63, -0.85 + k * 0.08);
     plant(p, m.white, m.leaf, 1.15, -1.15, 0.8);
@@ -498,6 +505,10 @@ export function createFocusInterior(kit: Kit, labels: Record<FocusSector, string
     p.add(m.wood, new THREE.BoxGeometry(1.6, 0.04, 0.42), 0, 0.74, -0.6);
     stool(p, m.fabric2, m.metal, 0, 0.1, 0.62, Math.PI);
     p.add(m.warm, new THREE.BoxGeometry(1.5, 0.02, 0.06), 0, 2.28, 0.6);
+    {
+      const [lx, ly, lz] = p.at(0.55, 0.76, -0.66);
+      setAnchor(scene, `lamp${lampN++}`, { x: lx, y: ly, z: lz, face: -Math.PI / 2, flag: true });
+    }
   }
   sign('booths', 12.9, 0, -Math.PI / 2);
 
@@ -1303,6 +1314,8 @@ export function createSportsInterior(kit: Kit, labels: Record<SportsSector, stri
         const board = nameBoard(kit, 1.5, acc);
         board.mesh.position.set(lx, 2.2, 0.03);
         g.add(board.mesh);
+        // A faixa de cada modalidade real é um objeto de ação (objects3d.ts): registra a atividade de hoje.
+        setAnchor(scene, `court${boards.length}`, { x: banners.x + lx, y: 2.2, z: banners.z + 0.05, face: banners.face });
         boards.push(board);
       }
     }),

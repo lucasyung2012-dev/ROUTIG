@@ -13,7 +13,7 @@ import { Builder, type Kit } from '../kit';
 import type { Obstacle, Seat } from '../camera';
 import { STOREY } from '../massing';
 import { insideAt } from '../outline';
-import { canvasPlane, createRoom, finishRoom, gallerySlab, markSector, sectorGroup, sectorSign, setDetailCommon, wrap, zoneLabel, type InteriorScene, type Room } from './common';
+import { canvasPlane, createRoom, finishRoom, gallerySlab, markSector, sectorGroup, sectorSign, setAnchor, setDetailCommon, wrap, zoneLabel, type InteriorScene, type Room } from './common';
 import { vault, type Thing } from './things';
 
 /* =====================================================================
@@ -652,6 +652,11 @@ export function createTasksInterior(kit: Kit, labels: Record<TasksSector, string
       stool(cf, lx, 0.75, Math.PI);
     }
     shelf(cf, 0, -1.2, 3.0, 1.2, 0, 2, p.wood, [p.white, p.acc, silver]);
+    // Objeto de ação (objects3d.ts): a tela do terminal do meio, um pouco à frente do vidro aceso.
+    {
+      const [ax, az] = zn.w(0, -0.025 + 0.878 * 0.008);
+      setAnchor(scene, 'desk', { x: ax, y: 1.335 + 0.479 * 0.008, z: az, face: -Math.PI / 2, tilt: -0.5 });
+    }
     hangSign(kit, zn.g, cf, zoneLabel('quickCreate'), ACC, 0, 3.0, 0, Math.PI / 2, 2.4, H);
     for (const lx of [-1.2, 1.2]) solid(obstacles, zn, lx, 0, 0.7);
     picks.push(closeZone(scene, zn));
@@ -1138,6 +1143,9 @@ export function createFinanceInterior(kit: Kit, labels: Record<FinanceSector, st
   // (userData.things). Na frente, o medalhão de latão no piso e a placa.
   const things: Thing[] = [vault(kit, scene, 0, 13.5, 0, 0, -Math.PI / 2)];
   scene.userData.things = things;
+  // Quadro dos saldos (objects3d.ts) dentro da câmara, na frente das caixas de depósito (1,17 m atrás
+  // da frente da parede): só se vê com a porta aberta, e só tem números com Finanças desbloqueado.
+  setAnchor(scene, 'vault', { x: 13.5 + 1.17, y: 1.3, z: 0, face: -Math.PI / 2 });
   b.add(kit.mat('#E2DACB', { rough: 0.4 }), new THREE.CircleGeometry(1.15, 48), [11.9, 0.011, 0], [-Math.PI / 2, 0, 0]);
   b.add(gold, new THREE.RingGeometry(1.1, 1.18, 48), [11.9, 0.014, 0], [-Math.PI / 2, 0, 0]);
   hangSign(kit, scene, f, zoneLabel('vault'), ACC, 12.6, 4.6, 0, -Math.PI / 2, 2.0, H);

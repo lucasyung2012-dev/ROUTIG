@@ -432,7 +432,8 @@ function ItemCard({ item, openItems }: { item: InboxItem; openItems: InboxItem[]
 
 /* ---------- Conversão com prévia e confirmação (Parte 20.2) ---------- */
 
-function ConvertDialog({ item, suggestion, type, openItems, onClose }: { item: InboxItem; suggestion: Suggestion; type: 'task' | 'event' | 'note'; openItems: InboxItem[]; onClose: () => void }) {
+/** Também usado pela bandeja de chegadas do Campus (park/LiveFeed.tsx): a mesma conversão, com prévia. */
+export function ConvertDialog({ item, suggestion, type, openItems, onClose }: { item: InboxItem; suggestion: Suggestion; type: 'task' | 'event' | 'note'; openItems: InboxItem[]; onClose: () => void }) {
   const { t, settings } = useSettings();
   const navigate = useNavigate();
   const toast = useToast();

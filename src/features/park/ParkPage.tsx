@@ -57,7 +57,9 @@ import { LiveFeed, type WallHandler } from './LiveFeed';
 import { DEFAULT_FAB, FloatingCenterButton, PlacesMenu, type FabPlace } from './ParkUi';
 import { floorNameKey, withFloors } from './interiors/floors';
 import { withLive, type CalendarLive, type TasksLive } from './interiors/live3d';
-import { habitBeds, LIVE_WALL_ROOMS, taskBoard, wallBuilding, type DayItem } from './live';
+import { withObjects } from './interiors/objects3d';
+import { habitBeds, LIVE_WALL_ROOMS, OBJECT_STATION, objectBuilding, practiceMinutes, taskBoard, wallBuilding, type DayItem } from './live';
+import { PracticeOffer, type ObjHandler } from './ObjectFeed';
 import { liftTargets, type LiftDir } from './stairs';
 import { setZoneLabels } from './interiors/common';
 import { DRUM_PADS, GUITAR_CHORDS, GUITAR_STRINGS, PIANO_KEYS, vaultStateOf, type Instrument } from './interiors/things';
@@ -213,6 +215,11 @@ export default function ParkPage() {
   // Elevador chamado (qual e em que sentido: o da esquerda só sobe, o da direita só desce).
   const [elevator, setElevator] = useState<{ index: number; dir: LiftDir } | null>(null);
   const [instrument, setInstrument] = useState<Instrument | null>(null);
+  // Prática no Estúdio da Música: a primeira e a última nota tocadas no instrumento aberto; ao sair
+  // dele (com pelo menos meio minuto tocado), oferece registrar a prática com os minutos de verdade.
+  const playRef = useRef<{ kind: Instrument; first: number; last: number } | null>(null);
+  const lastInstrument = useRef<Instrument | null>(null);
+  const [practice, setPractice] = useState<{ kind: Instrument; minutes: number } | null>(null);
   // Cofre de Finanças (térreo do prédio): janela do cofre aberta e chave para recriar os painéis de
   // Finanças depois de abrir ou trancar pelo cofre (eles leem o bloqueio ao montar).
   const [vaultPanel, setVaultPanel] = useState(false);
@@ -274,7 +281,7 @@ export default function ParkPage() {
     };
     // Andares da V2.1 em cima de cada térreo (salas ligadas aos painéis reais).
     for (const [id, make] of Object.entries(base) as Array<[ModuleId, InteriorFactory]>)
-      interiors[id] = (kit) => withLive(kit, withFloors(kit, make(kit), id, (key) => t(`park.floorRooms.${id}.${key}` as MessageKey), t('park.terrace'), (n) => t(`park.floorNames.f${n}` as MessageKey), t('park.elevators'), { up: t('park.liftUp'), down: t('park.liftDown'), off: t('park.liftOff') }), id);
+      interiors[id] = (kit) => withObjects(kit, withLive(kit, withFloors(kit, make(kit), id, (key) => t(`park.floorRooms.${id}.${key}` as MessageKey), t('park.terrace'), (n) => t(`park.floorNames.f${n}` as MessageKey), t('park.elevators'), { up: t('park.liftUp'), down: t('park.liftDown'), off: t('park.liftOff') }), id), id);
     try {
       engine.current = createEngine(canvas, {
         quality,
@@ -631,9 +638,17 @@ export default function ParkPage() {
     const b = wallBuilding(kind);
     return b ? (LIVE_WALL_ROOMS[b] ?? null) : null;
   };
+  // Objetos de ação no próprio 3D (objects3d.ts): a ação é do objeto do prédio aberto (LiveFeed/ObjectFeed).
+  const objHandler = useRef<ObjHandler | null>(null);
   const actionRef = useRef<(a: { building: ModuleId; id: string; long: boolean }) => void>(() => undefined);
   actionRef.current = ({ building, id, long }) => {
     const [kind, ref] = splitId(id);
+    if (objectBuilding(kind) === building) {
+      // Toque longo, o "+N" ou um objeto sem o que fazer agora: a estação do objeto.
+      const st = OBJECT_STATION[kind];
+      if ((long || !ref || !objHandler.current?.act(kind, ref)) && st) openRoom(st.sector, st.key);
+      return;
+    }
     if (wallBuilding(kind) === building) {
       // Toque longo, o "+N" ou uma linha sem ação própria: a estação da sala da parede.
       const room = wallRoomOf(kind);
@@ -691,6 +706,7 @@ export default function ParkPage() {
       const it = todayItems.find((i) => i.key === ref);
       return it ? t('park.live.hintEvent', { title: it.title }) : '';
     }
+    if (objectBuilding(kind)) return (ref ? objHandler.current?.title(kind, ref) : null) ?? t('park.live.openStation');
     if (wallBuilding(kind)) return (ref ? wallHandler.current?.title(kind, ref) : null) ?? t('park.live.openStation');
     return '';
   };
@@ -700,11 +716,25 @@ export default function ParkPage() {
     if (kind === 'bed') openRoom('atrium', null);
     else if (kind === 'card' || kind === 'more') openRoom('kanban', 'organize');
     else if (kind === 'ev') openRoom('daily', 'daily');
+    else if (OBJECT_STATION[kind]) openRoom(OBJECT_STATION[kind]!.sector, OBJECT_STATION[kind]!.key);
     else {
       const room = wallRoomOf(kind);
       if (room) openRoom(room.sector, room.key);
     }
   };
+  // Saiu do instrumento (fechou o painel, saiu do prédio): oferece registrar o que tocou de verdade.
+  useEffect(() => {
+    const was = lastInstrument.current;
+    lastInstrument.current = instrument;
+    if (!was || was === instrument) return;
+    const p = playRef.current;
+    playRef.current = null;
+    const minutes = p && p.kind === was ? practiceMinutes(p.first, p.last) : null;
+    if (minutes) setPractice({ kind: was, minutes });
+  }, [instrument]);
+  useEffect(() => {
+    if (inside !== 'music') setPractice(null);
+  }, [inside]);
 
   // Cofre de Finanças: segue o bloqueio real de Finanças (o mesmo PIN e o mesmo desbloqueio da tela
   // de Finanças). Desbloquear ou trancar por um painel do prédio também move a porta (conferido de
@@ -1072,11 +1102,30 @@ export default function ParkPage() {
       {/* Dados reais dos quadros dos andares do prédio aberto (só ele lê os dados dele). */}
       {inside && <FloorFeed id={inside} financeLocked={financeLocked} onBoards={(fb) => sendData(inside, { floors: fb })} />}
       {/* Paredes de ação dos outros prédios (seção 28): dados reais, ações e os diálogos delas. */}
-      {inside && <LiveFeed id={inside} financeLocked={financeLocked} onWall={(w) => sendData(inside, { wall: w })} handler={wallHandler} openRoom={openRoom} />}
+      {inside && (
+        <LiveFeed
+          id={inside}
+          financeLocked={financeLocked}
+          vaultOpen={vaultState === 'open'}
+          onWall={(w) => sendData(inside, { wall: w })}
+          handler={wallHandler}
+          openRoom={openRoom}
+          onObj={(o) => sendData(inside, { obj: o })}
+          objHandler={objHandler}
+          project={(aid) => engine.current?.projectAction(aid) ?? null}
+        />
+      )}
+      {practice && inside === 'music' && !instrument && <PracticeOffer kind={practice.kind} minutes={practice.minutes} onClose={() => setPractice(null)} />}
       {instrument && inside && (
         <InstrumentPanel
           kind={instrument}
-          onPlay={(i) => engine.current?.play(i)}
+          onPlay={(i) => {
+            const now = Date.now();
+            const p = playRef.current;
+            if (p && p.kind === instrument) p.last = now;
+            else playRef.current = { kind: instrument, first: now, last: now };
+            engine.current?.play(i);
+          }}
           onClose={() => {
             setInstrument(null);
             engine.current?.closeInstrument();

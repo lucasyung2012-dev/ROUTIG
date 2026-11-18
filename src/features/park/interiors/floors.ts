@@ -628,7 +628,7 @@ export function withFloors(kit: Kit, scene: InteriorScene, id: ModuleId, label: 
 
     const ceiling = y + STOREY - 0.35;
     const apo = Math.max(4, inscribed(vols));
-    enrichLevel(kit, b, seats, id, L, top, y, lobby, hole ? inner : 0, apo, ceiling, accent, style.warm, thingRoot, things, (x, z) => free(x, z, 0.8) && offWay(L, x, z, 1.5), (x, z) => !onRoute(x, z, 1.2), findSpot);
+    enrichLevel(kit, b, seats, id, L, top, y, lobby, hole ? inner : 0, apo, ceiling, accent, style.warm, thingRoot, things, (x, z) => free(x, z, 0.8) && offWay(L, x, z, 1.5), (x, z) => !onRoute(x, z, 1.2) && offWay(L, x, z, 4), findSpot);
 
     // Murais na parede (WALL_BOARDS): rentes à fachada, de 1,55 m a 2,75 m de altura (acima da faixa
     // de colisão), num trecho reto longe das portas do terraço, do núcleo e da escada, com um lugar

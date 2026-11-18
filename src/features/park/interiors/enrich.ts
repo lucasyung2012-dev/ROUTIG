@@ -290,7 +290,8 @@ export function enrichLevel(kit: Kit, b: Builder, seats: Seat[], id: ModuleId, L
       const r = ring + 0.75;
       const x = Math.sin(a) * r;
       const z = Math.cos(a) * r;
-      // (`clear`: fora da rota a pé do elevador até a escada, floors.ts.)
+      // (`clear`: fora da rota a pé do elevador até a escada e a 4 m do pé, do topo e das bordas do
+      // patamar — um banco ou floreira na beira do vazio fechava o bolsão do pé da escada, floors.ts.)
       if (!ok(x, z) || !clear(x, z)) continue;
       if (k % 2) bench(c, x, y, z, a, 1.4);
       else {

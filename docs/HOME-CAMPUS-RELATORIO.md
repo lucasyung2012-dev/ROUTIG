@@ -226,3 +226,22 @@ Não testado:
 - **Não testado**:
   - a parede do dia do Calendar com as horas tocáveis e o quadro de saldos no cofre (precisa do PIN);
   - concluir qualquer ação, para não mexer nos dados do Lucas.
+
+### Pendências fechadas (18/11/2026, commit 5d7f294, CI ok)
+
+- **Recepcionistas**:
+  - Focus, Habits, Goals, Música e Esportes ganharam cadeira e recepcionista no balcão. O Habits antes não tinha.
+  - O balcão genérico não põe um segundo recepcionista nos prédios que já têm o seu.
+- **Estações próprias no lugar da página do módulo**:
+  - **Library**: guardar e transferir (último backup, exportar, cópia interna). Restaurar e importar continuam no Control Room.
+  - **Notes**: notas à mão e "Nova nota à mão", com o editor de desenho na própria estação.
+  - **Academy**: resumo da matéria (professor, nota, conteúdos, sessões e avaliações).
+  - **Idiomas**: gramática para revisar, com a revisão do módulo, e as palavras com pronúncia, com botão para ouvir.
+- **Projects**: um mural de materiais na parede do 2º andar, no lugar da sala que não cabe.
+- **Conferido no navegador**:
+  - 13 prédios com recepcionista digitando no térreo (Habits incluído);
+  - `stairs:reach` ok e `stairs:check` 0 nos 13 prédios com andares medidos.
+- **Não conferido** (o 3D parou porque a janela ficou escondida):
+  - escadas do Insights nesta rodada;
+  - o mural do Projects;
+  - as quatro estações novas na tela.

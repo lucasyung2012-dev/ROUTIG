@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import type { ModuleId } from '@/app/modules';
 import type { CameraWorld, Obstacle } from '@/features/park/camera';
 import { footprint } from '@/features/park/collision';
-import { FLOOR_PLANS, levelRules, roomSlots, stairRoute, stairWays, type LevelRule, type Slot } from '@/features/park/interiors/floors';
+import { FLOOR_PLANS, levelRules, planStairReach, roomSlots, stairRoute, stairWays, type LevelRule, type Slot } from '@/features/park/interiors/floors';
 import type { Pt } from '@/features/park/outline';
 import { groundSpan } from '@/features/park/massing';
 import { stairReach, walkWorld, type ReachLevel } from '@/features/park/reach';
@@ -253,6 +253,43 @@ describe('Campus: salas dos andares fora do núcleo, do hall e do caminho até a
       }
     }
   }, 180_000);
+
+  it('as salas não fecham o corredor até a escada: da chegada do elevador se chega a pé ao pé, à chegada e a uma borda do patamar, em todo andar de todo prédio (planStairReach)', () => {
+    for (const id of FLOORS)
+      FLOOR_PLANS[id].forEach((_, i) => {
+        const L = i + 1;
+        const r = planStairReach(id, L, roomSlots(id, L));
+        if (!r) return;
+        const at = `${id} nível ${L}`;
+        // Pé e chegada da escada (os primeiros pontos do caminho), com as salas; "sem salas" diz se
+        // já a planta (regra do nível, fachada, guarda-corpo do vazio) fecha o ponto.
+        r.way.slice(0, r.ends).forEach(([x, z], g) => {
+          expect(r.rooms[g], `${at}: ponto ${g} (${x.toFixed(2)}, ${z.toFixed(2)}); sem salas: ${r.base[g]}`).toBe(true);
+        });
+        // Das bordas do patamar, basta uma (como na rota até a escada), se alguma se alcança sem salas.
+        if (r.base.slice(r.ends).some(Boolean)) expect(r.rooms.slice(r.ends).some(Boolean), `${at}: borda do patamar`).toBe(true);
+      });
+  }, 120_000);
+
+  it('a conferência das salas acusa uma sala cuja parede passa pelo pé da escada', () => {
+    const id: ModuleId = 'notes';
+    const L = 1;
+    const st = stairOf(id)!;
+    const s = stairSpots(st, L);
+    const foot = (s.up ?? s.down)!;
+    // Sala de 3 m x 3 m virada para +z: a parede do fundo passa pelo ponto.
+    const wall: Slot = { k: 0, x: foot[0], z: foot[1] + 1.5, face: 0, w: 3, d: 3, kind: 'box' };
+    const r = planStairReach(id, L, [wall])!;
+    const g = r.way.findIndex(([x, z]) => x === foot[0] && z === foot[1]);
+    expect(g).toBeGreaterThanOrEqual(0);
+    expect(r.rooms[g]).toBe(false);
+  });
+
+  it('Languages, 3º andar: a Biblioteca de vocabulário continua no andar, numa vaga que não fecha a escada', () => {
+    expect(roomSlots('languages', 3).map((sl) => sl.k)).toEqual([0]);
+    const r = planStairReach('languages', 3, roomSlots('languages', 3))!;
+    for (let g = 0; g < r.ends; g++) expect(r.rooms[g], `ponto ${g}`).toBe(true);
+  });
 
   it('a conferência diz o que trava: um obstáculo na chegada do elevador aparece entre os mais perto dela', () => {
     const id: ModuleId = 'tasks';

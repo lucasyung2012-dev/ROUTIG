@@ -500,7 +500,8 @@ export function withFloors(kit: Kit, scene: InteriorScene, id: ModuleId, label: 
     if (terr.length) drawDeck(kit, b, deckSpots(terr, edges, 0, Math.PI, false), y, style.warm, seats, obstacles);
 
     // Salas: cada planta distribui do seu jeito, dentro da planta deste andar.
-    // (roomSlots: fora do núcleo e do hall, do vão e do caminho até a escada; a que não cabe fica de fora.)
+    // (roomSlots: fora do núcleo e do hall, do vão e do caminho até a escada, sem fechar o corredor da
+    // chegada do elevador até ela; a que não cabe em nenhuma vaga fica de fora.)
     const slots = roomSlots(id, L);
     // Rota a pé da chegada do elevador até a escada, só pela planta (stairRoute): o saguão, os bancos
     // e as floreiras desviam dela, e nenhum móvel fecha o hall, a passagem entre o núcleo e a escada
@@ -1049,9 +1050,24 @@ export function stairRoute(id: ModuleId, L: number): Pt[] {
  * Salas do nível `L` (L ≥ 1) do prédio, como withFloors as desenha (sem three.js: testável): a
  * planta distribui (layout) e cada sala fica fora do núcleo dos elevadores e do hall (liftKeep), a
  * mais de 0,6 m do vão da escada e a mais de 0,9 m de cada ponto do caminho até ela; encolhe até
- * caber e, se nem assim, fica de fora.
+ * caber e, se nem assim, fica de fora. E nenhuma sala fecha o corredor até a escada (stairCheck:
+ * da chegada do elevador, a pé, ao pé, à chegada e a uma borda aberta do patamar): a que fecha
+ * procura outra vaga (mais rasa, deslizando na faixa dela, do outro lado, menor) e só fica de fora
+ * se nenhuma serve. Guardado por prédio e nível (a conferência custa).
  */
 export function roomSlots(id: ModuleId, L: number): Slot[] {
+  const ck = `${id}:${L}`;
+  const hit = slotCache.get(ck);
+  if (hit) return hit.slice();
+  const out = placeRooms(id, L);
+  slotCache.set(ck, out);
+  return out.slice();
+}
+
+/** Salas já distribuídas (prédio:nível). */
+const slotCache = new Map<string, Slot[]>();
+
+function placeRooms(id: ModuleId, L: number): Slot[] {
   const rooms = FLOOR_PLANS[id]?.[L - 1];
   const core = liftCore(id);
   if (!rooms?.length || !core) return [];
@@ -1062,8 +1078,209 @@ export function roomSlots(id: ModuleId, L: number): Slot[] {
   const zv = fp === 'side' ? sideCut(id, L) : Infinity;
   const free = (x: number, z: number, m: number) => insideAt(vols, x, z, m) && !inWell(st, x, z, m) && !inLiftCore(core, x, z, Math.min(m, 0.1));
   const keep = liftKeep(core);
-  return layout(fp, rooms.length, free, voidRadius(id), zv, sp.front, sp.back, ringGap(st), stairBox(st), stairWays(id, L), (cx, cz, face, w, d) => roomClear(keep, st, cx, cz, face, w, d), keep.x1);
+  return layout(fp, rooms.length, free, voidRadius(id), zv, sp.front, sp.back, ringGap(st), stairBox(st), stairWays(id, L), (cx, cz, face, w, d) => roomClear(keep, st, cx, cz, face, w, d), keep.x1, stairCheck(id, L) ?? undefined);
 }
+
+/* ---------- Salas x escada: o corredor da chegada do elevador até ela fica aberto ---------- */
+
+/** Células da colisão pelo desenho nos andares (footprint, engine: 0,5 m). */
+const WALL_CELL = 0.5;
+/** Uma peça marca a célula cujo centro fica a até meia diagonal dela (footprint). */
+const WALL_REACH = WALL_CELL * 0.71;
+/** Quem anda (o centro do corpo) não chega a menos disto do centro de uma célula: o raio dela (0,62 da célula) e a folga do corpo (0,3 m, com teto). */
+const WALL_STOP = WALL_CELL * 0.62 + 0.3;
+/** Quantas vagas alternativas (que cabem) se conferem para uma sala que fecha o caminho até a escada. */
+const ALT_TRIES = 80;
+
+const cellKey = (i: number, j: number) => (i + 4096) * 8192 + (j + 4096);
+
+/** Marca as células que um trecho de parede fina (de a até b) toca, vista de cima. */
+function markSeg(cells: Set<number>, ax: number, az: number, bx: number, bz: number): void {
+  const C = WALL_CELL;
+  for (let i = Math.floor((Math.min(ax, bx) - WALL_REACH) / C); i <= Math.floor((Math.max(ax, bx) + WALL_REACH) / C); i++)
+    for (let j = Math.floor((Math.min(az, bz) - WALL_REACH) / C); j <= Math.floor((Math.max(az, bz) + WALL_REACH) / C); j++)
+      if (segDist((i + 0.5) * C, (j + 0.5) * C, ax, az, bx, bz) <= WALL_REACH) cells.add(cellKey(i, j));
+}
+
+/** Marca as células que uma peça retangular toca (centro, giro `face` como o das salas, meia largura e meio fundo). */
+function markBox(cells: Set<number>, cx: number, cz: number, face: number, hw: number, hd: number): void {
+  const C = WALL_CELL;
+  const c = Math.cos(face);
+  const s = Math.sin(face);
+  const R = Math.hypot(hw, hd) + WALL_REACH;
+  for (let i = Math.floor((cx - R) / C); i <= Math.floor((cx + R) / C); i++)
+    for (let j = Math.floor((cz - R) / C); j <= Math.floor((cz + R) / C); j++) {
+      const x = (i + 0.5) * C;
+      const z = (j + 0.5) * C;
+      const lx = (x - cx) * c - (z - cz) * s;
+      const lz = (x - cx) * s + (z - cz) * c;
+      if (Math.hypot(Math.max(0, Math.abs(lx) - hw), Math.max(0, Math.abs(lz) - hd)) <= WALL_REACH) cells.add(cellKey(i, j));
+    }
+}
+
+/**
+ * Marca as paredes da sala como withFloors as desenha (na faixa do corpo): fundo, laterais, as duas
+ * partes da frente ao lado da porta de 1,8 m e os batentes; na ilha da planta livre, as estantes.
+ */
+function markRoom(cells: Set<number>, sl: Slot): void {
+  const { w, d } = sl;
+  const side = (w - 1.8) / 2;
+  // Peças: centro (x, z locais), meia largura e meio fundo.
+  const parts: ReadonlyArray<readonly [number, number, number, number]> =
+    sl.kind === 'box'
+      ? [[0, -d / 2, w / 2, 0.075], [-w / 2, 0, 0.075, d / 2], [w / 2, 0, 0.075, d / 2], [-(0.9 + side / 2), d / 2, side / 2, 0.06], [0.9 + side / 2, d / 2, side / 2, 0.06], [-0.9, d / 2, 0.04, 0.09], [0.9, d / 2, 0.04, 0.09]]
+      : [[-(w / 2 - 0.2), -0.1, 0.2, d * 0.4], [w / 2 - 0.2, -0.1, 0.2, d * 0.4]];
+  const c = Math.cos(sl.face);
+  const s = Math.sin(sl.face);
+  for (const [px, pz, hw, hd] of parts) markBox(cells, sl.x + px * c + pz * s, sl.z - px * s + pz * c, sl.face, hw, hd);
+}
+
+/**
+ * Células do que fica de pé no andar `L` antes das salas: a fachada (fora das portas do terraço) e
+ * o guarda-corpo do vazio do meio (átrio; jardim acima do 1º andar). O núcleo, a escada e o vazio
+ * em si já estão na regra do nível (levelRules).
+ */
+function levelCells(id: ModuleId, L: number): Set<number> {
+  const cells = new Set<number>();
+  const runs = wallRuns(volsAt(id, L), 1);
+  const doors = terraceDoors(runs, hasRoofTerrace(id) ? roofsAt(id, L) : []);
+  for (const r of runs) {
+    const n = Math.max(1, Math.ceil(r.len / 0.5));
+    for (let k = 0; k < n; k++) {
+      const ax = r.ax + ((r.bx - r.ax) * k) / n;
+      const az = r.az + ((r.bz - r.az) * k) / n;
+      const bx = r.ax + ((r.bx - r.ax) * (k + 1)) / n;
+      const bz = r.az + ((r.bz - r.az) * (k + 1)) / n;
+      if (doors.some((p) => Math.hypot(p.x - (ax + bx) / 2, p.z - (az + bz) / 2) < 0.9)) continue;
+      markSeg(cells, ax, az, bx, bz);
+    }
+  }
+  const fp = upperPlan(FORMS[id]);
+  const inner = voidRadius(id);
+  if (inner > 0 && (fp === 'atrium' || (fp === 'garden' && L > 1))) {
+    const ring = circle(inner, 48);
+    ring.forEach(([ax, az], k) => {
+      const [bx, bz] = ring[(k + 1) % ring.length]!;
+      markSeg(cells, ax, az, bx, bz);
+    });
+  }
+  return cells;
+}
+
+/** Perto (a menos de WALL_STOP) do centro de uma célula marcada. */
+function nearCell(cells: ReadonlySet<number>, x: number, z: number): boolean {
+  const C = WALL_CELL;
+  const i0 = Math.floor(x / C);
+  const j0 = Math.floor(z / C);
+  for (let i = i0 - 2; i <= i0 + 2; i++)
+    for (let j = j0 - 2; j <= j0 + 2; j++) if (cells.has(cellKey(i, j)) && Math.hypot(x - (i + 0.5) * C, z - (j + 0.5) * C) < WALL_STOP) return true;
+  return false;
+}
+
+/**
+ * A pé (o centro do corpo, grade de 0,25 m, como reach.ts), da chegada do elevador: quais pontos de
+ * `to` se alcançam (a até uma célula deles), pela regra do nível e longe das células marcadas.
+ */
+function planReach(rule: LevelRule, cells: ReadonlySet<number>, to: readonly Pt[]): boolean[] {
+  const G = ROUTE_CELL;
+  const got = to.map(() => false);
+  const goals = to.map(([x, z]) => [Math.round(x / G), Math.round(z / G)] as const);
+  const pass = (i: number, j: number) => {
+    const x = i * G;
+    const z = j * G;
+    return Math.hypot(x, z) <= rule.walk && !rule.blocked(x, z) && !nearCell(cells, x, z);
+  };
+  const i0 = Math.round(rule.arrive.x / G);
+  const j0 = Math.round(rule.arrive.z / G);
+  if (!pass(i0, j0)) return got;
+  const seen = new Set<number>([cellKey(i0, j0)]);
+  const q: Array<[number, number]> = [[i0, j0]];
+  let left = to.length;
+  for (let h = 0; h < q.length && left > 0; h++) {
+    const [i, j] = q[h]!;
+    goals.forEach(([gi, gj], g) => {
+      if (!got[g] && Math.abs(i - gi) <= 1 && Math.abs(j - gj) <= 1) {
+        got[g] = true;
+        left--;
+      }
+    });
+    for (const [di, dj] of STEPS) {
+      const a = i + di;
+      const c = j + dj;
+      const k = cellKey(a, c);
+      if (seen.has(k)) continue;
+      seen.add(k);
+      if (pass(a, c)) q.push([a, c]);
+    }
+  }
+  return got;
+}
+
+/** Alcance a pé até a escada num andar, sem e com salas (planStairReach). */
+export interface PlanReach {
+  way: Pt[];
+  ends: number;
+  base: boolean[];
+  rooms: boolean[];
+}
+
+/**
+ * Até onde se chega a pé no andar `L`, da chegada do elevador, aos pontos do caminho até a escada
+ * (stairWays: os `ends` primeiros são o pé e a chegada; depois, a frente das bordas do patamar),
+ * sem salas (`base`) e com as salas `slots` (`rooms`). Pela regra do nível (levelRules) e pelas
+ * células de colisão do desenho (a fachada fora das portas do terraço, o guarda-corpo do vazio do
+ * meio e as paredes das salas, com a porta aberta para o corredor). null: nível sem regra ou sem
+ * caminho até a escada.
+ */
+export function planStairReach(id: ModuleId, L: number, slots: readonly Slot[]): PlanReach | null {
+  const ctx = stairCtx(id, L);
+  return ctx ? { way: ctx.way, ends: ctx.ends, base: ctx.base, rooms: ctx.reach(slots) } : null;
+}
+
+function stairCtx(id: ModuleId, L: number): { way: Pt[]; ends: number; base: boolean[]; reach: (slots: readonly Slot[]) => boolean[] } | null {
+  const rule = levelRules(id)?.[L];
+  const way = stairWays(id, L);
+  if (!rule || !way.length) return null;
+  const st = stairOf(id);
+  const sp = st ? stairSpots(st, L) : null;
+  const ends = sp ? (sp.up ? 1 : 0) + (sp.down ? 1 : 0) : way.length;
+  const fixed = levelCells(id, L);
+  const reach = (slots: readonly Slot[]) => {
+    const cells = new Set(fixed);
+    for (const sl of slots) markRoom(cells, sl);
+    return planReach(rule, cells, way);
+  };
+  return { way, ends, base: planReach(rule, fixed, way), reach };
+}
+
+/**
+ * A conferência que layout usa no andar `L`: as salas mantêm tudo o que se alcança sem elas — o pé
+ * e a chegada da escada e, se alguma borda do patamar se alcança, pelo menos uma. null: nada a
+ * conferir (sem escada, ou nada alcançável já sem salas).
+ */
+function stairCheck(id: ModuleId, L: number): ((slots: readonly Slot[]) => boolean) | null {
+  const ctx = stairCtx(id, L);
+  if (!ctx || !ctx.base.some(Boolean)) return null;
+  const { ends, base, reach } = ctx;
+  const edge = base.slice(ends).some(Boolean);
+  return (slots) => {
+    const got = reach(slots);
+    for (let g = 0; g < ends; g++) if (base[g] && !got[g]) return false;
+    return !edge || got.slice(ends).some(Boolean);
+  };
+}
+
+/** Cantos da sala (piso crescido `grow` m para cada lado). */
+function slotPoly(sl: Slot, grow: number): Pt[] {
+  const c = Math.cos(sl.face);
+  const s = Math.sin(sl.face);
+  const hw = sl.w / 2 + grow;
+  const hd = sl.d / 2 + grow;
+  return ([[-hw, -hd], [hw, -hd], [hw, hd], [-hw, hd]] as const).map(([lx, lz]): Pt => [sl.x + lx * c + lz * s, sl.z - lx * s + lz * c]);
+}
+
+/** Duas salas se sobrepõem (paredes incluídas). */
+const slotsOverlap = (a: Slot, b: Slot) => convexOverlap(slotPoly(a, 0.1), slotPoly(b, 0.1));
 
 /**
  * A sala (centro, giro, largura e fundo; paredes incluídas) não entra no retângulo `keep` (o núcleo
@@ -1232,21 +1449,21 @@ function railing(b: Builder, glass: THREE.Material, metal: THREE.Material, pts: 
  * passa por `clear` (fora do núcleo e do hall, longe do vão: roomClear) e pelo caminho até a escada
  * (`keep`): encolhe até caber e, se nem no menor tamanho, fica de fora. No mezanino, a passagem do
  * meio vai até `mid` (a largura do núcleo e do hall); um lado sem largura para uma sala passa as
- * salas dele para o outro.
+ * salas dele para o outro. Por fim, `ok` (stairCheck) confere, sala a sala com as já postas, que o
+ * corredor da chegada do elevador até a escada continua aberto: a sala que o fecha vai para a
+ * primeira vaga alternativa que cabe, não encosta nas outras e não o fecha (no anel, mais rasa no
+ * mesmo lugar, abrindo passagem entre o fundo dela e a fachada, e depois deslizando no anel; no
+ * corredor e no mezanino, deslizando na faixa, do outro lado e mais estreita) e, se nenhuma serve,
+ * fica de fora.
  */
-function layout(plan: Plan, n: number, inside: (x: number, z: number, m: number) => boolean, inner: number, zv: number, front: number, back: number, gap: [number, number], box: StairBox | null, keep: readonly Pt[] = [], clear: (cx: number, cz: number, face: number, w: number, d: number) => boolean = () => true, mid = 1.5): Slot[] {
+function layout(plan: Plan, n: number, inside: (x: number, z: number, m: number) => boolean, inner: number, zv: number, front: number, back: number, gap: [number, number], box: StairBox | null, keep: readonly Pt[] = [], clear: (cx: number, cz: number, face: number, w: number, d: number) => boolean = () => true, mid = 1.5, ok: (slots: readonly Slot[]) => boolean = () => true): Slot[] {
   const avoid = (x: number) => !!box && x > box.x0 - 1.6 && x < box.x1 + 1.6;
-  const out: Slot[] = [];
   // A caixa cabe na planta (cantos com folga das paredes).
   const fits = (cx: number, cz: number, face: number, w: number, d: number) => {
     const c = Math.cos(face);
     const s = Math.sin(face);
     if (!clearOf(cx, cz, face, w, d) || !clear(cx, cz, face, w, d)) return false;
     return [[-w / 2, -d / 2], [w / 2, -d / 2], [-w / 2, d / 2], [w / 2, d / 2], [0, -d / 2], [-w / 2, 0], [w / 2, 0]].every(([lx, lz]) => inside(cx + lx! * c + lz! * s, cz - lx! * s + lz! * c, 0.35));
-  };
-  /** Guarda a sala só se ela fica livre do núcleo, do hall, do vão e do caminho até a escada. */
-  const put = (sl: Slot) => {
-    if (clearOf(sl.x, sl.z, sl.face, sl.w, sl.d) && clear(sl.x, sl.z, sl.face, sl.w, sl.d)) out.push(sl);
   };
   /** Nenhum ponto do caminho até a escada (`keep`) a menos de 0,9 m da sala. */
   function clearOf(cx: number, cz: number, face: number, w: number, d: number): boolean {
@@ -1258,35 +1475,92 @@ function layout(plan: Plan, n: number, inside: (x: number, z: number, m: number)
       return Math.abs(dx * c - dz * s) >= w / 2 + 0.9 || Math.abs(dx * s + dz * c) >= d / 2 + 0.9;
     });
   }
+  /**
+   * Cada sala na sua vaga (`want`) se fica livre do núcleo, do hall, do vão e do caminho até a
+   * escada (senão fica de fora, como sempre) e não fecha o corredor até ela (`ok`, com as já
+   * postas); se fecha, a primeira vaga de `alts` que cabe, não encosta nas outras salas (as postas e
+   * as que vêm depois) e não fecha (no máximo ALT_TRIES conferidas); se nenhuma, fica de fora.
+   */
+  const settle = (want: readonly Slot[], alts: (sl: Slot) => Iterable<Slot>): Slot[] => {
+    const out: Slot[] = [];
+    want.forEach((sl, j) => {
+      if (!clearOf(sl.x, sl.z, sl.face, sl.w, sl.d) || !clear(sl.x, sl.z, sl.face, sl.w, sl.d)) return;
+      if (ok([...out, sl])) {
+        out.push(sl);
+        return;
+      }
+      const others = [...out, ...want.slice(j + 1)];
+      let tries = 0;
+      for (const c of alts(sl)) {
+        if (tries >= ALT_TRIES) return;
+        if (others.some((o) => slotsOverlap(o, c)) || !fits(c.x, c.z, c.face, c.w, c.d)) continue;
+        tries++;
+        if (ok([...out, c])) {
+          out.push(c);
+          return;
+        }
+      }
+    });
+    return out;
+  };
   if (plan === 'atrium' || plan === 'garden' || plan === 'core') {
     // Anel de salas entre o corredor do meio e a fachada; os fundos ficam para o saguão.
     const ri = inner + (plan === 'core' ? 1.9 : 1.6);
     const lobby = gap[1] - gap[0];
     const span = (Math.PI * 2 - lobby) / n;
     const start = gap[1];
-    for (let k = 0; k < n; k++) {
-      const a = start + (k + 0.5) * span;
+    /** Sala `k` do anel na direção `a`: do corredor do meio até a fachada (no máximo `dMax` de fundo), encolhendo até caber. */
+    const ringAt = (k: number, a: number, dMax: number): Slot => {
       const s = Math.sin(a);
       const c = Math.cos(a);
       // Até a fachada nesta direção (no máximo 9 m de fundo).
       let ro = ri;
       while (ro < ri + 9 && inside(s * (ro + 0.1), c * (ro + 0.1), 0.35)) ro += 0.1;
-      let d = Math.max(2.4, ro - ri - 0.3);
+      let d = Math.max(2.4, Math.min(dMax, ro - ri - 0.3));
       let w = Math.max(2.4, Math.min(9, ((ri + ro) / 2) * span * 0.85, 2 * (ri + 0.3) * Math.sin(Math.min(span, Math.PI) / 2) - 0.4));
-      const mid = (dd: number) => ri + 0.15 + dd / 2;
-      while (!fits(s * mid(d), c * mid(d), a + Math.PI, w, d) && (w > 2.4 || d > 2.4)) {
+      const at = (dd: number) => ri + 0.15 + dd / 2;
+      while (!fits(s * at(d), c * at(d), a + Math.PI, w, d) && (w > 2.4 || d > 2.4)) {
         if (w > 2.4) w -= 0.25;
         if (d > 2.4) d -= 0.25;
       }
-      put({ k, x: s * mid(d), z: c * mid(d), face: a + Math.PI, w, d, kind: 'box' });
-    }
-    return out;
+      return { k, x: s * at(d), z: c * at(d), face: a + Math.PI, w, d, kind: 'box' };
+    };
+    const want: Slot[] = [];
+    for (let k = 0; k < n; k++) want.push(ringAt(k, start + (k + 0.5) * span, Infinity));
+    // Vagas de uma sala do anel que fecha o corredor: mais rasa no mesmo lugar (abre passagem entre
+    // o fundo dela e a fachada); depois deslizando no arco das salas (fora da abertura dos fundos),
+    // do fundo inteiro ao menor.
+    const ringAlts = function* (sl: Slot): Generator<Slot> {
+      const a0 = sl.face - Math.PI;
+      const half = Math.atan2(sl.w / 2, ri);
+      const depths: number[] = [];
+      for (let dd = sl.d - 0.5; dd > 2.4; dd -= 0.5) depths.push(dd);
+      depths.push(2.4);
+      for (const dm of depths) yield ringAt(sl.k, a0, dm);
+      const angles: number[] = [];
+      for (let j = 1; j * 0.15 <= Math.PI * 2 - lobby; j++)
+        for (const sg of [-1, 1]) {
+          const a = a0 + sg * j * 0.15;
+          if (a - half >= start && a + half <= start + Math.PI * 2 - lobby) angles.push(a);
+        }
+      for (const dm of [Infinity, ...depths]) for (const a of angles) yield ringAt(sl.k, a, dm);
+    };
+    return settle(want, ringAlts);
   }
   if (plan === 'corridor' || plan === 'open') {
     // Corredor reto da frente aos fundos; salas (ou ilhas) dos dois lados, de frente para ele.
     const half = plan === 'corridor' ? 1.6 : 2.4;
     const { zb, zf } = corridorBand(front, back);
     const nL = Math.ceil(n / 2);
+    /** Sala `k` de um lado do corredor, centrada em `z` com `w` de frente: tão funda quanto cabe (até 12 m). */
+    const sideAt = (k: number, left: boolean, z: number, w: number): Slot => {
+      const s = left ? -1 : 1;
+      const face = left ? Math.PI / 2 : -Math.PI / 2;
+      let d = 2.5;
+      while (d < 12 && fits(s * (half + (d + 0.25) / 2), z, face, w, d + 0.25)) d += 0.25;
+      return { k, x: s * (half + d / 2), z, face, w, d, kind: plan === 'corridor' ? 'box' : 'island' };
+    };
+    const want: Slot[] = [];
     for (let k = 0; k < n; k++) {
       const left = k < nL;
       const m = left ? nL : n - nL;
@@ -1298,15 +1572,25 @@ function layout(plan: Plan, n: number, inside: (x: number, z: number, m: number)
       const zs = Math.min(zf - 2.6, zw);
       const len = (zf - zs) / m;
       const z = zs + (j + 0.5) * len;
-      const s = left ? -1 : 1;
-      const face = left ? Math.PI / 2 : -Math.PI / 2;
       // Poucas salas num lado: a sala não vira um corredor de 15 m (no máximo 8 m de frente).
       const w = Math.max(2.4, Math.min(8, len - (plan === 'open' ? 0.8 : 0.15)));
-      let d = 2.5;
-      while (d < 12 && fits(s * (half + (d + 0.25) / 2), z, face, w, d + 0.25)) d += 0.25;
-      put({ k, x: s * (half + d / 2), z, face, w, d, kind: plan === 'corridor' ? 'box' : 'island' });
+      want.push(sideAt(k, left, z, w));
     }
-    return out;
+    // Vagas de uma sala que fecha o corredor: deslizando na faixa (passos de 0,5 m, da mais perto à
+    // mais longe), do mesmo lado e depois do outro, na largura dela e depois na menor.
+    const corridorAlts = function* (sl: Slot): Generator<Slot> {
+      const left = sl.x < 0;
+      for (const side of [left, !left])
+        for (const w of sl.w > 2.4 ? [sl.w, 2.4] : [sl.w])
+          for (let j = 0; j * 0.5 <= zf - zb; j++)
+            for (const sg of j ? [-1, 1] : [1]) {
+              const z = sl.z + sg * j * 0.5;
+              if (side === left && w === sl.w && j === 0) continue;
+              if (z - w / 2 < zb - 0.01 || z + w / 2 > zf + 0.01) continue;
+              yield sideAt(sl.k, side, z, w);
+            }
+    };
+    return settle(want, corridorAlts);
   }
   // Mezanino: salas lado a lado no fundo, de frente para a galeria sobre o pé-direito alto;
   // passagem no meio até o elevador, da largura do hall (as salas não encostam no núcleo).
@@ -1319,8 +1603,15 @@ function layout(plan: Plan, n: number, inside: (x: number, z: number, m: number)
   // Lado sem largura para uma sala (a escada ao lado do núcleo, no Projects): as salas vão para o outro.
   const okL = xl - x0 >= 2.55;
   const okR = xr - x0 >= 2.55;
-  if (!okL && !okR) return out;
+  if (!okL && !okR) return [];
   const nL = okL ? (okR ? Math.ceil(n / 2) : n) : 0;
+  /** Sala `k` do mezanino centrada em `cx` com `w` de frente: tão funda quanto cabe (até 30 m). */
+  const backAt = (k: number, cx: number, w: number): Slot => {
+    let d = 2.5;
+    while (d < 30 && fits(cx, zr1 - (d + 0.25) / 2, 0, w, d + 0.25)) d += 0.25;
+    return { k, x: cx, z: zr1 - d / 2, face: 0, w, d, kind: 'box' };
+  };
+  const want: Slot[] = [];
   for (let k = 0; k < n; k++) {
     const left = k < nL;
     const m = left ? nL : n - nL;
@@ -1329,11 +1620,23 @@ function layout(plan: Plan, n: number, inside: (x: number, z: number, m: number)
     // Sala sozinha num lado do mezanino: no máximo 7 m de frente, no meio da sua vaga.
     const w = Math.max(2.4, Math.min(7, wAll / m - 0.15));
     const cx = (left ? -1 : 1) * (x0 + (j + 0.5) * (wAll / m));
-    let d = 2.5;
-    while (d < 30 && fits(cx, zr1 - (d + 0.25) / 2, 0, w, d + 0.25)) d += 0.25;
-    put({ k, x: cx, z: zr1 - d / 2, face: 0, w, d, kind: 'box' });
+    want.push(backAt(k, cx, w));
   }
-  return out;
+  // Vagas de uma sala que fecha o caminho: deslizando no fundo (passos de 0,5 m, da mais perto à mais
+  // longe, passando para o outro lado da passagem do meio se ele tem largura), na largura dela e
+  // depois na menor.
+  const backAlts = function* (sl: Slot): Generator<Slot> {
+    for (const w of sl.w > 2.4 ? [sl.w, 2.4] : [sl.w])
+      for (let j = 0; j * 0.5 <= xl + xr; j++)
+        for (const sg of j ? [-1, 1] : [1]) {
+          const cx = sl.x + sg * j * 0.5;
+          if (w === sl.w && j === 0) continue;
+          const left = cx < 0;
+          if (!(left ? okL : okR) || Math.abs(cx) - w / 2 < x0 - 0.01 || Math.abs(cx) + w / 2 > (left ? xl : xr) + 0.01) continue;
+          yield backAt(sl.k, cx, w);
+        }
+  };
+  return settle(want, backAlts);
 }
 
 /** Saguão do elevador de cada planta (sofá, mesa, planta, luminária e a marca do prédio). */

@@ -7,7 +7,8 @@
  * dos elevadores dentro do prédio, nos fundos (uma ou duas cabines, com o hall na frente das portas,
  * botoeira e indicador em cada pavimento), e a escada principal do prédio (stairs.ts: reta, em L,
  * em U, curva ou a do núcleo, onde se anda de verdade) ligam todos os níveis, do térreo ao terraço.
- * Cada sala dos andares abre o painel real do módulo que corresponde a ela (nenhum dado novo).
+ * Cada sala dos andares abre o painel real do módulo que corresponde a ela e mostra, num quadro por
+ * cima da porta, os dados reais dela (boards.ts, pelo setData do térreo: nada inventado).
  * Nos prédios com terraço (forms.ts), a cobertura do último andar é mais um nível: a céu aberto,
  * com guarda-corpo, bancos, floreiras e árvores, ligado ao mesmo elevador (e à escada do núcleo).
  */
@@ -26,6 +27,8 @@ import { alongRun, boundOf, deckSpots, inVol, insideAt, inscribed, nearestRun, s
 import type { Thing } from './things';
 import { CIRCULATION, CORE_START, CORE_SWEEP, carve, coreDoor, coreFrom, corePath, coreSpots, coreWalk, corridorBand, inLiftCore, inLiftHall, inPoly, inWell, liftCore, liftKeep, ringGap, stairApproach, stairEdge, stairHole, stairOf, stairPath, stairSpots, stairWalk, voidRadius, type Box, type Stair, type StairWalk } from '../stairs';
 import { buildLifts, drawStair, type Lift } from '../vertical';
+import { distribute, seriesOf, type FloorBoards } from './boards';
+import { boardMesh, type BoardMesh } from './boardMesh';
 
 /** Sala de um andar: chave do nome, setor real que ela abre (null = sem tela própria), tipo de mobília. */
 export type RoomKind = 'desk' | 'shelf' | 'screen' | 'lounge' | 'studio';
@@ -62,21 +65,29 @@ export const FLOOR_PLANS: Record<ModuleId, FloorRoom[][]> = {
   // Só o térreo: sem andar, mezanino, terraço, elevador ou escada.
   habits: [],
   academy: [
-    [['classrooms', 'rooms', 'desk'], ['individual', 'plan', 'desk'], ['activities', 'hall', 'desk']],
+    // Uma sala de aula por disciplina real e as cabines de estudo (sessões de hoje).
+    [['class1', 'rooms', 'desk'], ['class2', 'rooms', 'desk'], ['class3', 'rooms', 'desk'], ['cabins', 'plan', 'desk']],
     [['practice', 'review', 'studio']],
-    [],
+    // Sala de provas e notas: as avaliações do período e as notas registradas.
+    [['exams', 'hall', 'screen']],
   ],
   languages: [
-    [['languageRooms', 'spaces', 'desk'], ['sessions', 'spaces', 'desk'], ['grammar', 'spaces', 'desk'], ['skills', 'garden', 'lounge']],
+    // Uma sala por idioma estudado e o mural de gramática do idioma escolhido.
+    [['lang1', 'spaces', 'desk'], ['lang2', 'spaces', 'desk'], ['lang3', 'spaces', 'desk'], ['grammar', 'spaces', 'desk']],
     [['conversation', 'spaces', 'lounge'], ['booths', 'spaces', 'studio']],
-    [],
+    // Biblioteca de vocabulário: as palavras para revisar hoje em cada idioma.
+    [['vocab', 'spaces', 'shelf']],
   ],
   projects: [
-    [['planning', 'studio', 'desk'], ['milestones', 'gallery', 'screen'], ['tasks', 'gallery', 'desk']],
+    // Uma sala por projeto ativo (nome, cor, próximo marco).
+    [['proj1', 'gallery', 'studio'], ['proj2', 'gallery', 'studio'], ['proj3', 'gallery', 'studio']],
     [['tracking', 'studio', 'screen'], ['materials', 'gallery', 'shelf'], ['done', 'studio', 'shelf']],
   ],
-  music: [[['individual', 'instruments', 'studio'], ['study', 'instruments', 'desk']], []],
-  sports: [[['training', 'modalities', 'studio'], ['activities', 'atrium', 'screen'], ['records', 'analysis', 'screen']]],
+  // Salas de prática por instrumento; o 2º andar é o Estúdio (piano, bateria e violão tocáveis e os
+  // murais do repertório e do tempo de prática na parede, WALL_BOARDS), sem salas.
+  music: [[['practice1', 'instruments', 'studio'], ['practice2', 'instruments', 'studio'], ['study', 'instruments', 'desk']], []],
+  // Uma sala por modalidade praticada (retrospecto e última sessão).
+  sports: [[['sport1', 'modalities', 'studio'], ['sport2', 'modalities', 'studio'], ['sport3', 'modalities', 'studio']]],
   goals: [
     [['planning', 'garden', 'desk'], ['links', 'garden', 'desk']],
     [['tracking', 'analysis', 'screen'], ['updates', 'garden', 'desk'], ['history', 'achieved', 'shelf']],
@@ -86,8 +97,9 @@ export const FLOOR_PLANS: Record<ModuleId, FloorRoom[][]> = {
     [['comparisons', 'overview', 'screen'], ['deep', 'learning', 'screen']],
   ],
   finance: [
-    [['budget', 'planning', 'desk'], ['records', 'investments', 'shelf']],
-    [['history', 'planning', 'shelf'], ['charts', 'investments', 'screen']],
+    // Orçamento do mês no 1º andar; investimentos no 2º (tudo escuro com Finanças trancado pelo PIN).
+    [['budget', 'planning', 'desk'], ['records', 'planning', 'shelf']],
+    [['history', 'investments', 'shelf'], ['charts', 'investments', 'screen']],
   ],
   settings: [
     [['devices', 'data', 'desk'], ['sync', 'data', 'screen'], ['storage', 'data', 'shelf'], ['permissions', 'privacy', 'desk'], ['integrations', 'data', 'desk']],
@@ -97,6 +109,22 @@ export const FLOOR_PLANS: Record<ModuleId, FloorRoom[][]> = {
     [['triage', 'triage', 'desk'], ['tags', 'gallery', 'desk']],
     [['flow', 'distribution', 'screen'], ['pending', 'triage', 'desk']],
   ],
+};
+
+/**
+ * Murais na parede de um andar sem salas (chave, setor real que abrem), por prédio e nível: no
+ * Estúdio da Música (2º andar), o repertório em andamento e o tempo de prática da semana.
+ */
+export const WALL_BOARDS: Partial<Record<ModuleId, Record<number, ReadonlyArray<readonly [key: string, sector: string]>>>> = {
+  music: { 2: [['repertoire', 'instruments'], ['practiceTime', 'instruments']] },
+};
+
+/** Decoração de cada sala nova pela sala equivalente de antes (furnish.ts, decorate). */
+const SERIES_DECO: Record<string, string> = { class: 'classrooms', lang: 'languageRooms', practice: 'individual', sport: 'training', proj: 'planning' };
+const ROOM_DECO: Record<string, string> = { cabins: 'study', exams: 'comparisons', vocab: 'grammar' };
+const decoKey = (key: string): string => {
+  const s = seriesOf(key);
+  return (s ? SERIES_DECO[s.name] : ROOM_DECO[key]) ?? key;
 };
 
 /**
@@ -385,6 +413,9 @@ export function withFloors(kit: Kit, scene: InteriorScene, id: ModuleId, label: 
   const inner = fp === 'atrium' || fp === 'garden' ? Math.max(3.2, M.void) : fp === 'core' ? Math.max(2.6, M.void) : 0;
   const holds = (v: Vol) => inner > 0 && inVol(v, 0, 0, inner + 0.5);
 
+  // Quadros dos andares (boards.ts): um por sala, por cima da porta, e os murais de parede (WALL_BOARDS).
+  const boardAt = new Map<string, BoardMesh>();
+
   plan.forEach((rooms, i) => {
     const L = i + 1;
     const y = H + i * STOREY;
@@ -477,7 +508,30 @@ export function withFloors(kit: Kit, scene: InteriorScene, id: ModuleId, label: 
     const route = routeOn(rules[L], ways(L));
     const onRoute = (x: number, z: number, m: number) => route.some(([px, pz]) => Math.hypot(x - px, z - pz) < m);
     const blockedHere = rules[L]?.blocked ?? (() => false);
-    const lobby = clearLobby(lobbyOf(fp, free, inner, zv, backR), (x, z, m) => inside(x, z, 0.4) && !inWell(st, x, z, m) && !inLiftCore(core, x, z, 0.6 + m) && !inLiftHall(core, x, z, 0.3 + m) && offWay(L, x, z, m + 0.6) && Math.hypot(x, z - (core.z1 + 1.6)) > m + 1.0 && !blockedHere(x, z) && !onRoute(x, z, m + 0.6));
+    const lobbyOk = (x: number, z: number, m: number) => inside(x, z, 0.4) && !inWell(st, x, z, m) && !inLiftCore(core, x, z, 0.6 + m) && !inLiftHall(core, x, z, 0.3 + m) && offWay(L, x, z, m + 0.6) && Math.hypot(x, z - (core.z1 + 1.6)) > m + 1.0 && !blockedHere(x, z) && !onRoute(x, z, m + 0.6);
+    const lobby = clearLobby(lobbyOf(fp, free, inner, zv, backR), lobbyOk);
+    // Lugares já tomados no andar (saguão, peça-assinatura e o violão ao lado dela, salas): o piano do
+    // Estúdio e os murais procuram lugar fora deles (x, z, raio).
+    const taken: Array<[number, number, number]> = [[lobby.sofa.x, lobby.sofa.z, 1.2], [lobby.table[0], lobby.table[1], 0.6], [lobby.plant[0], lobby.plant[1], 0.6], [lobby.lamp[0], lobby.lamp[1], 0.5], [lobby.sig.x, lobby.sig.z, 1.4]];
+    taken.push([lobby.sig.x + Math.cos(lobby.sig.face) * 1.5 - Math.sin(lobby.sig.face) * 1.1, lobby.sig.z - Math.sin(lobby.sig.face) * 1.5 - Math.cos(lobby.sig.face) * 1.1, 0.6]);
+    if (lobby.service) taken.push([lobby.service[0] + 1.4, lobby.service[1], 2.0]);
+    for (const sl of slots) taken.push([sl.x, sl.z, Math.hypot(sl.w, sl.d) / 2 + 0.9]);
+    /**
+     * Lugar livre de meia largura `m` mais perto de (x0, z0), em anéis de 0,5 m até 10 m: dentro da
+     * planta, fora do núcleo, do hall, da escada, do caminho e da rota até ela (a mesma regra do
+     * saguão) e longe do que já está no andar. null: não há.
+     */
+    const findSpot = (x0: number, z0: number, m: number): [number, number] | null => {
+      for (let r = 0; r <= 10; r += 0.5)
+        for (let k = 0; k < (r ? 16 : 1); k++) {
+          const x = x0 + Math.sin((k / 16) * Math.PI * 2) * r;
+          const z = z0 - Math.cos((k / 16) * Math.PI * 2) * r;
+          if (!inside(x, z, m) || !lobbyOk(x, z, m) || !taken.every(([tx, tz, tr]) => Math.hypot(x - tx, z - tz) > tr + m)) continue;
+          taken.push([x, z, m]);
+          return [x, z];
+        }
+      return null;
+    };
     slots.forEach((sl) => {
       const k = sl.k;
       const [key, sector] = rooms[k]!;
@@ -517,11 +571,23 @@ export function withFloors(kit: Kit, scene: InteriorScene, id: ModuleId, label: 
         }
       }
       const local = furnish(kit, fb, type, sl.w * (sl.kind === 'island' ? 0.75 : 1), sl.d, accent, k + L * 7);
-      decorate(kit, fb, key, sl.w, sl.d, accent, style.warm, k + L * 7);
+      decorate(kit, fb, decoKey(key), sl.w, sl.d, accent, style.warm, k + L * 7);
       g.add(fb.build());
       const sign = sectorSign(kit, label(key), sector ? accent : '#94A3B8', 2.2);
       sign.position.set(0, 2.62, sl.d / 2 + 0.25);
       g.add(sign);
+      // Quadro com os dados reais da sala (boards.ts), por cima da porta, virado para o corredor;
+      // até chegarem os dados, só o nome da sala. Preso no teto por duas hastes (na ilha sem paredes).
+      const bw = Math.min(sl.w - 0.3, 3.2);
+      const bm = boardMesh(kit, bw, 0.95, accent, label(key));
+      bm.group.position.set(0, 3.45, sl.d / 2 + 0.1);
+      g.add(bm.group);
+      for (const s of [-1, 1]) {
+        const rod = new THREE.Mesh(kit.own(new THREE.BoxGeometry(0.02, 0.14, 0.02)), dark);
+        rod.position.set(s * bw * 0.4, 3.99, sl.d / 2 + 0.1);
+        g.add(rod);
+      }
+      boardAt.set(key, bm);
       const cf = Math.cos(sl.face);
       const sf = Math.sin(sl.face);
       for (const st of local) seats.push({ x: sl.x + st.x * cf + st.z * sf, y: y + st.y, z: sl.z - st.x * sf + st.z * cf, face: st.face + sl.face });
@@ -561,7 +627,44 @@ export function withFloors(kit: Kit, scene: InteriorScene, id: ModuleId, label: 
 
     const ceiling = y + STOREY - 0.35;
     const apo = Math.max(4, inscribed(vols));
-    enrichLevel(kit, b, seats, id, L, top, y, lobby, hole ? inner : 0, apo, ceiling, accent, style.warm, thingRoot, things, (x, z) => free(x, z, 0.8) && offWay(L, x, z, 1.5), (x, z) => !onRoute(x, z, 1.2));
+    enrichLevel(kit, b, seats, id, L, top, y, lobby, hole ? inner : 0, apo, ceiling, accent, style.warm, thingRoot, things, (x, z) => free(x, z, 0.8) && offWay(L, x, z, 1.5), (x, z) => !onRoute(x, z, 1.2), findSpot);
+
+    // Murais na parede (WALL_BOARDS): rentes à fachada, de 1,55 m a 2,75 m de altura (acima da faixa
+    // de colisão), num trecho reto longe das portas do terraço, do núcleo e da escada, com um lugar
+    // livre na frente (de onde se lê e se toca). Tocar abre o painel real, como a porta de uma sala.
+    for (const [key, sector] of WALL_BOARDS[id]?.[L] ?? []) {
+      let at: { x: number; z: number; face: number; ex: number; ez: number } | null = null;
+      for (const r of runs) {
+        for (let s = 1.4; s <= r.len - 1.4 && !at; s += 0.5) {
+          const px = r.ax + ((r.bx - r.ax) * s) / r.len;
+          const pz = r.az + ((r.bz - r.az) * s) / r.len;
+          const ex = px - r.nx * 1.8;
+          const ez = pz - r.nz * 1.8;
+          const ix = px - r.nx * 0.5;
+          const iz = pz - r.nz * 0.5;
+          if (doorPts.some((d) => Math.hypot(d.x - px, d.z - pz) < 2.2)) continue;
+          if (!inside(ex, ez, 0.6) || !lobbyOk(ex, ez, 0.5) || inWell(st, ix, iz, 0.8) || inLiftCore(core, ix, iz, 1.0)) continue;
+          if (!taken.every(([tx, tz, tr]) => Math.hypot(ix - tx, iz - tz) > tr + 1.3 && Math.hypot(ex - tx, ez - tz) > tr + 0.4)) continue;
+          at = { x: px - r.nx * 0.06, z: pz - r.nz * 0.06, face: Math.atan2(-r.nx, -r.nz), ex, ez };
+        }
+        if (at) break;
+      }
+      if (!at) continue;
+      taken.push([at.x, at.z, 1.3], [at.ex, at.ez, 0.6]);
+      zones.push({ level: L, key, sector, x: at.x, z: at.z, face: at.face, ex: at.ex, ez: at.ez });
+      const zi = zones.length - 1;
+      const bm = boardMesh(kit, 2.4, 1.2, accent, label(key));
+      bm.group.position.set(at.x, y + 2.15, at.z);
+      bm.group.rotation.y = at.face;
+      bm.group.traverse((o) => {
+        o.userData.zone = zi;
+        o.userData.sector = sector;
+      });
+      scene.scene.add(bm.group);
+      scene.pickables.push(bm.group);
+      boardAt.set(key, bm);
+      things.push({ kind: 'room', level: L, x: at.ex, z: at.ez, face: at.face, zone: zi });
+    }
 
     {
       // Placa verde de saída de emergência acesa, pendurada no teto do hall dos elevadores (o nome
@@ -637,6 +740,9 @@ export function withFloors(kit: Kit, scene: InteriorScene, id: ModuleId, label: 
       sundial(kit, b, dial.x, y, dial.z);
     }
     drawDeck(kit, b, spots, y, style.warm, seats, null);
+    // Academy: as mesas redondas do terraço viram mesas de estudo ao ar livre (livros, caderno aberto
+    // e luminária em cima do tampo; os bancos e a colisão continuam os de drawDeck).
+    if (id === 'academy') studyTables(kit, b, spots.filter((s) => s.kind === 'table'), y);
     // Marquise em balanço sobre as portas dos elevadores (o núcleo sobe acima do deque), com o nome
     // do terraço pendurado na frente dela. Sem pilares: os do pórtico de antes, a 1,4 m do núcleo,
     // caíam junto da chegada da escada (no Languages, na frente da chegada ao terraço).
@@ -832,6 +938,27 @@ export function withFloors(kit: Kit, scene: InteriorScene, id: ModuleId, label: 
   // Colisão de cada andar pelo desenho (móveis, floreiras, paredes das salas); dentro da escada quem
   // decide é ela (os degraus do caracol não são parede).
   levels.forEach((lv, n) => n > 0 && lv.obstacles.push(...footprint(scene.scene, () => lv.y, 0.3, 1.45, 0.5).filter((o) => !walk?.zone(o.x, o.z, lv.y))));
+  // Dados reais nos quadros: o ParkPage manda, junto com os dados do térreo, `floors` (boards.ts);
+  // cada quadro só redesenha quando o texto muda. As salas em série ("class1", "class2"…) recebem um
+  // item cada, na ordem em que existem no prédio (sala que não coube fica de fora da contagem).
+  const seriesKeys = new Map<string, string[]>();
+  for (const z of zones) {
+    const s = seriesOf(z.key);
+    if (s) seriesKeys.set(s.name, [...(seriesKeys.get(s.name) ?? []), z.key]);
+  }
+  for (const keys of seriesKeys.values()) keys.sort((a, b) => (seriesOf(a)?.n ?? 0) - (seriesOf(b)?.n ?? 0));
+  const groundSet = scene.setData;
+  scene.setData = (d) => {
+    const { floors: fb, ...ground } = (d ?? {}) as { floors?: FloorBoards };
+    // Os dados do térreo vão para o térreo só quando já chegaram (os dos andares podem chegar antes).
+    if (Object.keys(ground).length) groundSet(d);
+    if (!fb) return;
+    for (const [key, bd] of Object.entries(fb.rooms)) boardAt.get(key)?.draw(bd);
+    for (const [name, s] of Object.entries(fb.series)) {
+      const keys = seriesKeys.get(name) ?? [];
+      distribute(s, keys.length).forEach((bd, i) => boardAt.get(keys[i]!)?.draw(bd));
+    }
+  };
   const first = lifts[0]!;
   scene.floors = { levels, ys: levels.map((lv) => lv.y), zones, elevator: tower, seats, cabin: first.cabin, doors: first.doors, things, plan: fp, lifts, climbs, walk };
   return scene;
@@ -1394,5 +1521,24 @@ function gardenCourt(kit: Kit, b: Builder, seats: Seat[], obstacles: Obstacle[],
       b.add(stone, new THREE.BoxGeometry(1.4, 0.4, 0.35), [x, y + 0.2, z], [0, a + Math.PI / 2, 0]);
       seats.push({ x, y: y + 0.45, z, face: a + Math.PI });
     }
+  }
+}
+
+/** Mesas de estudo do terraço da Academy: livros empilhados, caderno aberto e luminária no tampo das mesas do deque. */
+function studyTables(kit: Kit, b: Builder, tables: readonly DeckSpot[], y: number) {
+  const paper = kit.mat('#F8FAFC', { rough: 0.6 });
+  const lampMat = kit.mat('#2B3442', { rough: 0.5, metal: 0.3 });
+  const glow = kit.mat('#FFE8C2', { glow: true });
+  const covers = ['#B45309', '#1D4ED8', '#047857'].map((c) => kit.mat(c, { rough: 0.8 }));
+  for (const s of tables) {
+    const c = Math.cos(s.face);
+    const sn = Math.sin(s.face);
+    const top = y + 0.77;
+    // Livros empilhados de um lado do tampo, caderno aberto no meio e a luminária do outro lado.
+    covers.forEach((m, k) => b.add(m, new THREE.BoxGeometry(0.22, 0.04, 0.16), [s.x - c * 0.22, top + 0.02 + k * 0.04, s.z + sn * 0.22], [0, s.face + k * 0.25, 0]));
+    b.add(paper, new THREE.BoxGeometry(0.34, 0.01, 0.24), [s.x + sn * 0.08, top + 0.005, s.z + c * 0.08], [0, s.face, 0]);
+    b.add(lampMat, new THREE.CylinderGeometry(0.06, 0.07, 0.02, 12), [s.x + c * 0.25, top + 0.01, s.z - sn * 0.25]);
+    b.add(lampMat, new THREE.CylinderGeometry(0.012, 0.012, 0.32, 6), [s.x + c * 0.25, top + 0.17, s.z - sn * 0.25]);
+    b.add(glow, new THREE.ConeGeometry(0.09, 0.1, 14, 1, true), [s.x + c * 0.25, top + 0.34, s.z - sn * 0.25]);
   }
 }

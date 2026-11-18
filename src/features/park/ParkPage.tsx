@@ -45,6 +45,7 @@ import { useAcademyData } from '@/features/academy/useAcademyData';
 import { useLanguages } from '@/features/languages/useLanguages';
 import { receptionData } from './receptionData';
 import { ModuleCenter } from './ModuleCenter';
+import { FloorFeed } from './FloorFeed';
 import { DEFAULT_FAB, FloatingCenterButton, PlacesMenu, type FabPlace } from './ParkUi';
 import { floorNameKey, withFloors } from './interiors/floors';
 import { liftTargets, type LiftDir } from './stairs';
@@ -468,16 +469,24 @@ export default function ParkPage() {
     toast.show(t('park.restored'), 'success');
   };
   useEffect(() => engine.current?.setCamMode(camMode), [camMode]);
+  // Dados de cada prédio para o interior: os do térreo e, em `floors`, os quadros dos andares
+  // (FloorFeed). Cada envio junta o que mudou ao que o prédio já tinha (o motor guarda um objeto só).
+  const interiorData = useRef(new Map<ModuleId, Record<string, unknown>>());
+  const sendData = (id: ModuleId, patch: object) => {
+    const next = { ...(interiorData.current.get(id) ?? {}), ...patch };
+    interiorData.current.set(id, next);
+    engine.current?.setData(id, next);
+  };
   useEffect(() => {
-    if (inboxData) engine.current?.setData('inbox', inboxData);
+    if (inboxData) sendData('inbox', inboxData);
   }, [inboxData]);
   // Nomes das salas da Academy e dos quiosques de Idiomas: as disciplinas e os idiomas reais.
   const academy = useAcademyData();
   const langs = useLanguages();
   const subjectsKey = academy.subjects.map((s) => s.name).join('|');
   const langsKey = langs.languages.map((l) => l.name).join('|');
-  useEffect(() => engine.current?.setData('academy', { subjects: subjectsKey ? subjectsKey.split('|') : [] }), [subjectsKey]);
-  useEffect(() => engine.current?.setData('languages', { languages: langsKey ? langsKey.split('|') : [] }), [langsKey]);
+  useEffect(() => sendData('academy', { subjects: subjectsKey ? subjectsKey.split('|') : [] }), [subjectsKey]);
+  useEffect(() => sendData('languages', { languages: langsKey ? langsKey.split('|') : [] }), [langsKey]);
   // Mesa digital do Tasks: as tarefas reais de hoje e atrasadas; estandes do Projects: os projetos ativos.
   const tasksKey = JSON.stringify(
     cal.loading
@@ -486,12 +495,12 @@ export default function ParkPage() {
   );
   useEffect(() => {
     const list = JSON.parse(tasksKey) as string[] | null;
-    if (list) engine.current?.setData('tasks', { title: t('park.tasks.tableTitle', { count: list.length }), today: list, overdue: 0 });
+    if (list) sendData('tasks', { title: t('park.tasks.tableTitle', { count: list.length }), today: list, overdue: 0 });
   }, [tasksKey]);
   const projects = useLiveQuery(async () => (await getDb().projects.toArray()).filter((p) => !p.deletedAt && p.status !== 'archived' && p.status !== 'cancelled' && p.status !== 'done').map((p) => ({ name: p.name, color: p.color })), []);
   const projectsKey = JSON.stringify(projects ?? null);
   useEffect(() => {
-    if (projects) engine.current?.setData('projects', { projects });
+    if (projects) sendData('projects', { projects });
   }, [projectsKey]);
 
   // Placas com os nomes reais: hábitos, metas ativas, instrumentos e modalidades.
@@ -507,10 +516,10 @@ export default function ParkPage() {
   ]);
   useEffect(() => {
     const [h, g, m, sp] = JSON.parse(namesKey) as string[][];
-    engine.current?.setData('habits', { names: h ?? [] });
-    engine.current?.setData('goals', { names: g ?? [] });
-    engine.current?.setData('music', { names: m ?? [] });
-    engine.current?.setData('sports', { names: sp ?? [] });
+    sendData('habits', { names: h ?? [] });
+    sendData('goals', { names: g ?? [] });
+    sendData('music', { names: m ?? [] });
+    sendData('sports', { names: sp ?? [] });
   }, [namesKey]);
 
   // Cofre de Finanças: segue o bloqueio real de Finanças (o mesmo PIN e o mesmo desbloqueio da tela
@@ -519,8 +528,10 @@ export default function ParkPage() {
   const financePin = useLiveQuery(() => hasFinancePin(), []);
   const [financeOpen, setFinanceOpen] = useState(isFinanceUnlocked);
   const vaultState = vaultStateOf(financePin, financeOpen);
+  // Trancado para os quadros dos andares (Finanças e o Insights): com PIN e não aberto, ou ainda lendo o PIN.
+  const financeLocked = financePin === undefined || (financePin && !financeOpen);
   useEffect(() => {
-    if (inside !== 'finance') return;
+    if (inside !== 'finance' && inside !== 'insights') return;
     setFinanceOpen(isFinanceUnlocked());
     const id = window.setInterval(() => setFinanceOpen(isFinanceUnlocked()), 700);
     return () => window.clearInterval(id);
@@ -871,6 +882,8 @@ export default function ParkPage() {
         </div>
       )}
 
+      {/* Dados reais dos quadros dos andares do prédio aberto (só ele lê os dados dele). */}
+      {inside && <FloorFeed id={inside} financeLocked={financeLocked} onBoards={(fb) => sendData(inside, { floors: fb })} />}
       {instrument && inside && (
         <InstrumentPanel
           kind={instrument}

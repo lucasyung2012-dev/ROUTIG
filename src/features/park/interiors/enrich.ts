@@ -24,6 +24,8 @@ interface Ctx {
   things: Thing[];
   level: number;
   top: boolean;
+  /** Lugar livre (meia largura `m`) mais perto de (x, z) no andar, fora do caminho até a escada; null: não há. */
+  find?: (x: number, z: number, m: number) => [number, number] | null;
 }
 
 function mats(c: Ctx) {
@@ -145,7 +147,8 @@ const SIGNATURE: Partial<Record<ModuleId, (c: Ctx, x: number, y: number, z: numb
     sofa(c, x + Math.sin(face) * 1.4, y, z + Math.cos(face) * 1.4, face + Math.PI, 1.0);
   },
   music: (c, x, y, z, face) => {
-    // Os três instrumentos tocáveis: piano de cauda no 1º andar; bateria e violão no 2º; toca-discos num 3º.
+    // Os três instrumentos tocáveis: piano de cauda no 1º andar; no 2º (o Estúdio), os três juntos:
+    // bateria, violão e outro piano de cauda; toca-discos num 3º.
     if (c.level === 1) c.things.push(piano(c.kit, c.root, c.seats, c.level, x, y, z, face));
     else if (c.level === 2) {
       c.things.push(drums(c.kit, c.root, c.level, x, y, z, face));
@@ -156,6 +159,12 @@ const SIGNATURE: Partial<Record<ModuleId, (c: Ctx, x: number, y: number, z: numb
       const fx = Math.sin(face);
       const fz = Math.cos(face);
       c.things.push(guitar(c.kit, c.root, c.level, x + rx * 1.5 - fx * 1.1, y, z + rz * 1.5 - fz * 1.1, face));
+      // O piano do Estúdio: no lugar livre mais perto do outro lado do saguão, longe da bateria, do
+      // violão, da escada e da rota até ela. O piano ocupa de 1,8 m atrás do teclado a 1,03 m na
+      // frente (a banqueta) e 0,75 m para cada lado: procura-se o meio dessa caixa (raio de 1,65 m)
+      // e o piano fica 0,385 m à frente dele.
+      const p = c.find?.(-x, z, 1.65);
+      if (p) c.things.push(piano(c.kit, c.root, c.seats, c.level, p[0] + Math.sin(face) * 0.385, y, p[1] + Math.cos(face) * 0.385, face));
     } else c.things.push(record(c.kit, c.root, c.level, x, y, z, face));
   },
   sports: (c, x, y, z, face) => {
@@ -247,8 +256,8 @@ function service(c: Ctx, x: number, y: number, z: number) {
  * saguão do elevador e a marca do prédio; nas plantas com vazio no meio, bancos e floreiras ao
  * longo do guarda-corpo.
  */
-export function enrichLevel(kit: Kit, b: Builder, seats: Seat[], id: ModuleId, L: number, top: boolean, y: number, lobby: Lobby, ring: number, apo: number, ceiling: number, accent: string, warm: boolean, root: THREE.Object3D, things: Thing[], ok: (x: number, z: number) => boolean = () => true, clear: (x: number, z: number) => boolean = () => true) {
-  const c: Ctx = { kit, b, seats, accent, warm, root, things, level: L, top };
+export function enrichLevel(kit: Kit, b: Builder, seats: Seat[], id: ModuleId, L: number, top: boolean, y: number, lobby: Lobby, ring: number, apo: number, ceiling: number, accent: string, warm: boolean, root: THREE.Object3D, things: Thing[], ok: (x: number, z: number) => boolean = () => true, clear: (x: number, z: number) => boolean = () => true, find?: (x: number, z: number, m: number) => [number, number] | null) {
+  const c: Ctx = { kit, b, seats, accent, warm, root, things, level: L, top, find };
   const m = mats(c);
   const variant = L % 3;
   const r0 = ring || 1.5;

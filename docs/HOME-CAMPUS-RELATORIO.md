@@ -116,7 +116,7 @@ no site publicado.
 
 ## 8. Pendente
 
-- **Elevador dentro do prédio e escada percorrida andando** (17/11, commit f57f310): passaram no CI, com testes que sobem e descem as 13 escadas e a espiral do Insights e conferem o núcleo do elevador dentro do contorno em todos os andares. Ainda falta conferir no navegador: o `stairs:check` com o hall novo e a espiral do Insights perto do topo do primeiro lance, onde os pés podem ficar até uns 0,5 m acima do degrau desenhado.
+- **Elevador dentro do prédio, escada andando e elevadores de sobe e desce** (17/11): conferidos no navegador. Em todos os andares dos 14 prédios com andares, dá para sair do elevador, chegar ao pé e ao topo de cada lance e subir e descer andando (`stairs:reach`), sem nada no vão ou no hall (`stairs:check`). O elevador da esquerda só sobe e o da direita só desce; a tela de escolha mostra só os andares naquela direção (testado na Library: subir do térreo ao 2º e descer do 2º ao térreo). Detalhe a corrigir: no térreo, a dica perto do elevador que desce ainda diz "Chamar o elevador que desce".
 - **Algumas áreas grandes ainda abrem a tela do módulo**:
   - backup e transferência (Library);
   - escrita à mão (Notes), pelo Apple Pencil;

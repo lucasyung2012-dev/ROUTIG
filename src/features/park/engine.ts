@@ -1045,6 +1045,8 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
     }
     if (typeof cmd === 'string' && cmd.startsWith('ride:')) rideTo(Number(cmd.slice(5)));
     if (cmd === 'stairs:check') document.documentElement.dataset.stairClash = String(inside?.scene.scene.userData.stairClash ?? 'none');
+    // 'zones': as salas e os murais dos andares do prédio aberto, em data-zones: [nível, chave, x, z].
+    if (cmd === 'zones' && fl0) document.documentElement.dataset.zones = JSON.stringify(fl0.zones.map((z) => [z.level, z.key, +z.x.toFixed(2), +z.z.toFixed(2)]));
     // 'life': quem a vida do interior mostra agora (indoorLife.ts), em data-life.
     if (cmd === 'life') document.documentElement.dataset.life = JSON.stringify({ hour: shownHour, quality, people: roomInfo.people, figs: roomInfo.sources.slice(0, 40).map((f) => [Math.round(f.x * 10) / 10, Math.round(f.y * 10) / 10, Math.round(f.z * 10) / 10, f.pose]) });
     // 'stairs:reach': em cada nível, a partir da chegada do elevador (e da entrada, no térreo), até

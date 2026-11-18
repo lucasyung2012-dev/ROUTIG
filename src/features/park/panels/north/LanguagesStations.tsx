@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Play, Plus, Shuffle, Sparkles } from 'lucide-react';
+import { Play, Plus, Shuffle, Sparkles, Volume2 } from 'lucide-react';
 import { useSettings } from '@/app/SettingsProvider';
 import { getDb } from '@/data/db';
 import { createLanguages, createVocab, LanguageRuleError, saveLanguageSession } from '@/data/languagesRepo';
@@ -8,18 +8,26 @@ import { addDays, formatDateKey, todayKey } from '@/domain/dates';
 import { emptyVocabInput, LANGUAGE_ACTIVITIES, LANGUAGE_PRESETS, sessionStats, SKILLS, type Language, type LanguageActivity } from '@/domain/languages';
 import { LanguageReviewSession } from '@/features/languages/ReviewsTab';
 import { useLanguages, type LanguagesData } from '@/features/languages/useLanguages';
+import { useVocab } from '@/features/languages/VocabTab';
+import { canSpeak, displayTerm, speak, speakTextOf } from '@/features/languages/vocabUtils';
 import { Badge } from '@/ui/Badge';
 import { Button } from '@/ui/Button';
 import { Input, Select } from '@/ui/Field';
+import { IconButton } from '@/ui/IconButton';
 import { LoadingState } from '@/ui/States';
 import { useToast } from '@/ui/toast';
 import { cn } from '@/ui/cn';
 import { ControlRoomLink, Empty, Pane, Station, useStationState } from './station';
+import { grammarToReview, withPronunciation } from './stationData';
 
 /** Estações do Centro Internacional de Idiomas: os idiomas, sessões, vocabulário e revisões reais de Idiomas. */
 export type LanguagesStationId = 'garden' | 'spaces';
 
-export function LanguagesStation({ id }: { id: LanguagesStationId }) {
+/**
+ * `zone`: a sala do andar que abriu a estação. O mural de gramática ('grammar') e as cabines
+ * ('booths') abrem a estação própria delas: a gramática para revisar e a lista de pronúncia.
+ */
+export function LanguagesStation({ id, zone = null }: { id: LanguagesStationId; zone?: string | null }) {
   const { t } = useSettings();
   const toast = useToast();
   const data = useLanguages();
@@ -46,12 +54,104 @@ export function LanguagesStation({ id }: { id: LanguagesStationId }) {
       </Station>
     );
 
+  const room = current && (zone === 'grammar' || zone === 'booths') ? zone : null;
   return (
     <Station building="languages" label={label}>
-      {id === 'garden' ? <Garden data={data} current={current} onPick={setCurrentId} /> : current && <Spaces data={data} lang={current} onPick={setCurrentId} />}
-      {current && <LogSession lang={current} />}
+      {room && current ? (
+        <>
+          <LangPicker data={data} lang={current} onPick={setCurrentId} />
+          {room === 'grammar' ? <GrammarDesk key={current.id} lang={current} /> : <PronunciationDesk key={current.id} lang={current} />}
+        </>
+      ) : id === 'garden' ? (
+        <Garden data={data} current={current} onPick={setCurrentId} />
+      ) : (
+        current && <Spaces data={data} lang={current} onPick={setCurrentId} />
+      )}
+      {current && room !== 'grammar' && <LogSession lang={current} />}
       <ControlRoomLink to={current ? `/languages/${current.id}` : '/languages'} />
     </Station>
+  );
+}
+
+/* ---------- Mural de gramática: as regras do idioma para revisar hoje ---------- */
+
+function GrammarDesk({ lang }: { lang: Language }) {
+  const { t } = useSettings();
+  const [session, setSession] = useState<{ manual: boolean } | null>(null);
+  const rules = useLiveQuery(() => getDb().grammarRules.where('languageId').equals(lang.id).toArray(), [lang.id]);
+  if (!rules) return <LoadingState label={t('common.loading')} lines={2} />;
+  const { due, fresh } = grammarToReview(rules, todayKey());
+  const total = rules.filter((g) => !g.deletedAt).length;
+  const list = [...due, ...fresh].slice(0, 8);
+  return (
+    <Pane title={t('park.native.north.languages.grammarDue')}>
+      {total === 0 ? (
+        <Empty>{t('park.native.north.languages.grammarNone')}</Empty>
+      ) : (
+        <>
+          <div className="flex flex-wrap gap-1.5">
+            <Badge>{t('park.native.north.languages.grammarRules', { count: total })}</Badge>
+            {due.length > 0 && <Badge tone="warning">{t('academy.review.dueCount', { count: due.length })}</Badge>}
+            {fresh.length > 0 && <Badge tone="info">{t('academy.review.newCount', { count: fresh.length })}</Badge>}
+          </div>
+          {list.length === 0 ? (
+            <Empty>{t('park.native.north.languages.grammarNoneDue')}</Empty>
+          ) : (
+            <ul className="flex flex-col gap-1.5">
+              {list.map((g) => (
+                <li key={g.id} className="flex items-center gap-2 rounded-xl bg-surface/70 px-3 py-2 ring-1 ring-inset ring-line/50">
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-medium text-fg">{g.title}</span>
+                    {(g.topic || g.level) && <span className="block truncate text-xs text-muted">{[g.topic, g.level].filter(Boolean).join(' · ')}</span>}
+                  </span>
+                  {g.srs.due === null ? <Badge tone="info">{t('park.native.north.languages.isNew')}</Badge> : <Badge tone="warning">{t('park.native.north.languages.isDue')}</Badge>}
+                </li>
+              ))}
+            </ul>
+          )}
+          <div className="flex gap-2">
+            <Button size="sm" variant="primary" icon={<Play className="h-4 w-4" />} disabled={due.length === 0 && fresh.length === 0} onClick={() => setSession({ manual: false })}>
+              {t('academy.review.review')}
+            </Button>
+            <Button size="sm" variant="secondary" icon={<Shuffle className="h-4 w-4" />} onClick={() => setSession({ manual: true })}>
+              {t('academy.review.practice')}
+            </Button>
+          </div>
+        </>
+      )}
+      {session && <LanguageReviewSession lang={lang} deck={{ kind: 'grammar' }} manual={session.manual} direction="forward" onClose={() => setSession(null)} />}
+    </Pane>
+  );
+}
+
+/* ---------- Cabines de pronúncia: as palavras com a pronúncia anotada, na voz do aparelho ---------- */
+
+function PronunciationDesk({ lang }: { lang: Language }) {
+  const { t } = useSettings();
+  const { loading, list } = useVocab(lang.id);
+  if (loading) return <LoadingState label={t('common.loading')} lines={2} />;
+  const words = withPronunciation(list).slice(0, 12);
+  const voice = canSpeak();
+  return (
+    <Pane title={t('park.native.north.languages.pronunciation')}>
+      {words.length === 0 ? (
+        <Empty>{t('park.native.north.languages.pronNone')}</Empty>
+      ) : (
+        <ul className="flex flex-col gap-1.5">
+          {words.map((v) => (
+            <li key={v.id} className="flex items-center gap-2 rounded-xl bg-surface/70 px-3 py-2 ring-1 ring-inset ring-line/50">
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-medium text-fg">{displayTerm(v)}</span>
+                <span className="block truncate text-xs text-muted">{[v.pronunciation, v.translation].filter(Boolean).join(' · ')}</span>
+              </span>
+              {voice && <IconButton size="sm" label={t('park.native.north.languages.listenTo', { term: displayTerm(v) })} icon={<Volume2 className="h-4 w-4" />} onClick={() => speak(speakTextOf(v), lang.code)} />}
+            </li>
+          ))}
+        </ul>
+      )}
+      {!voice && <p className="text-xs text-muted">{t('languages.pron.noVoice')}</p>}
+      <p className="text-xs text-muted">{t('park.native.north.languages.recordElsewhere')}</p>
+    </Pane>
   );
 }
 

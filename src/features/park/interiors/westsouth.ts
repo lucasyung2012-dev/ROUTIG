@@ -15,7 +15,10 @@ import { MASSING, groundHeight } from '../massing';
 import { inVol } from '../outline';
 import type { Placed } from './central';
 import { nameBoard } from './north';
-import { groundSeats, placeSeats, seatAt } from './east';
+import { groundSeats, placeSeats, seatAt, staffSeats } from './east';
+import type { Obstacle } from '../camera';
+import { inLiftCore, inWell, liftCore, liftKeep, stairOf } from '../stairs';
+import { stairRoute, stairWays } from './floors';
 
 export interface NamesData {
   names: string[];
@@ -171,6 +174,63 @@ function chair(p: Spot, seat: Mat, leg: Mat, lx: number, lz: number, face: numbe
   c.seat(0, 0.45, 0, 0);
 }
 
+/**
+ * Balcão de recepção de cada prédio do oeste/sul (centro, virado para quem chega: `face`) e o
+ * recuo (m) da cadeira de quem atende, atrás dele (no -z do balcão), de frente para o visitante.
+ */
+export const RECEPTION_DESKS = {
+  focus: { x: 2.9, z: 14.5, face: -Math.PI / 2, back: 0.95 },
+  habits: { x: 2.9, z: 12.2, face: -Math.PI / 2, back: 0.95 },
+  goals: { x: 4.6, z: 11.4, face: -Math.PI / 2, back: 0.95 },
+  music: { x: 4.4, z: 9.6, face: -Math.PI / 2, back: 0.95 },
+  sports: { x: 3.3, z: 13.8, face: -Math.PI / 2, back: 0.6 },
+} as const;
+export type ReceptionId = keyof typeof RECEPTION_DESKS;
+
+/** Onde fica (no sistema do prédio) a cadeira da recepção e para onde olha quem senta nela. */
+export function receptionChairAt(id: ReceptionId): { x: number; z: number; face: number } {
+  const d = RECEPTION_DESKS[id];
+  return { x: d.x - d.back * Math.sin(d.face), z: d.z - d.back * Math.cos(d.face), face: d.face };
+}
+
+/** Folga (m) da cadeira da recepção até a chegada à escada e a rota até ela (a mesma do balcão do enrich.ts). */
+export const RECEPTION_WAY_GAP = 1.6;
+
+/**
+ * A cadeira da recepção em (x, z) do térreo não atrapalha a circulação: fora do vão da escada (com
+ * 0,9 m), do núcleo dos elevadores (0,3 m) e do retângulo livre do hall (liftKeep, mais 0,3 m), e a
+ * `RECEPTION_WAY_GAP` m ou mais de cada ponto de chegada à escada (stairWays) e da rota até ela (stairRoute).
+ */
+export function receptionChairClear(id: ModuleId, x: number, z: number): boolean {
+  const st = stairOf(id);
+  const core = liftCore(id);
+  if (inWell(st, x, z, 0.9) || inLiftCore(core, x, z, 0.3)) return false;
+  if (core) {
+    const k = liftKeep(core);
+    if (x > k.x0 - 0.3 && x < k.x1 + 0.3 && z > k.z0 - 0.3 && z < k.z1 + 0.3) return false;
+  }
+  const far = (pts: ReadonlyArray<readonly [number, number]>) => pts.every(([px, pz]) => Math.hypot(px - x, pz - z) >= RECEPTION_WAY_GAP);
+  return far(stairWays(id, 0)) && far(stairRoute(id, 0));
+}
+
+/**
+ * Cadeira de escritório de quem atende, atrás do balcão `p` (o ambiente do balcão, frente = +z), de
+ * frente para o visitante: o assento é da recepcionista (staffSeats) e entra um obstáculo pequeno.
+ * Fora dela se cair no caminho da escada (receptionChairClear).
+ */
+function receptionChair(id: ReceptionId, p: Spot, m: Pal, obs: Obstacle[]): void {
+  const c = receptionChairAt(id);
+  if (!receptionChairClear(id, c.x, c.z)) return;
+  staffSeats(() => chair(p, m.fabric, m.dark, 0, -RECEPTION_DESKS[id].back, 0));
+  obs.push({ x: c.x, z: c.z, r: 0.3, h: 0.95 });
+}
+
+/** Tampo baixo de trabalho do lado de dentro do balcão (largura `w`), com o vão das pernas aberto para a cadeira. */
+function deskTop(p: Spot, top: Mat, side: Mat, w: number) {
+  p.add(top, new THREE.BoxGeometry(w, 0.05, 0.45), 0, 0.76, -0.62);
+  for (const s of [-1, 1]) p.add(side, new THREE.BoxGeometry(0.04, 0.74, 0.45), s * (w / 2 - 0.02), 0.37, -0.62);
+}
+
 /** Banqueta (assento na altura `h`); quem senta olha para `face`. */
 function stool(p: Spot, seat: Mat, leg: Mat, lx: number, lz: number, h = 0.66, face = 0) {
   p.add(seat, new THREE.CylinderGeometry(0.2, 0.2, 0.06, 14), lx, h, lz);
@@ -307,15 +367,16 @@ export function createFocusInterior(kit: Kit, labels: Record<FocusSector, string
 
   // Recepção (vestíbulo da entrada): balcão de madeira com o livro das sessões (abre o histórico)
   // e o banco de espera do outro lado do eixo.
-  const reception: Placed = { x: 2.9, z: 14.5, face: -Math.PI / 2 };
+  const obs: Obstacle[] = [];
+  const reception: Placed = { x: RECEPTION_DESKS.focus.x, z: RECEPTION_DESKS.focus.z, face: RECEPTION_DESKS.focus.face };
   pick.push(
     sectorAt(scene, 'history', reception.x, reception.z, reception.face, (p, g) => {
       p.add(m.wood2, new THREE.BoxGeometry(2.4, 1.0, 0.6), 0, 0.5, 0);
       p.add(m.wood, new THREE.BoxGeometry(2.5, 0.05, 0.75), 0, 1.025, 0.05);
       for (let k = 0; k < 11; k++) p.add(m.wood, new THREE.BoxGeometry(0.06, 0.9, 0.03), -1.1 + k * 0.22, 0.5, 0.315);
       p.add(m.glow, new THREE.BoxGeometry(2.4, 0.03, 0.02), 0, 0.06, 0.32);
-      p.add(m.wood, new THREE.BoxGeometry(2.3, 0.05, 0.45), 0, 0.76, -0.62);
-      p.add(m.wood2, new THREE.BoxGeometry(2.3, 0.74, 0.04), 0, 0.37, -0.83);
+      deskTop(p, m.wood, m.wood2, 2.3);
+      receptionChair('focus', p, m, obs);
       p.add(m.dark, new THREE.BoxGeometry(0.44, 0.02, 0.32), 0.55, 1.06, 0.05, 0.15);
       p.add(m.paper, new THREE.BoxGeometry(0.42, 0.03, 0.3), 0.55, 1.08, 0.05, 0.15);
       p.add(m.metal, new THREE.CylinderGeometry(0.1, 0.12, 0.03, 12), -0.8, 1.065, -0.05);
@@ -560,7 +621,7 @@ export function createFocusInterior(kit: Kit, labels: Record<FocusSector, string
     sectors: FOCUS_SECTORS,
     pickables: pick,
     room: room.spec,
-    obstacles: [],
+    obstacles: obs,
     view: viewer(room, plan, overview),
     setData: () => undefined,
     tick: (t) => room.trees.tick(t),
@@ -601,15 +662,17 @@ export function createHabitsInterior(kit: Kit, labels: Record<HabitsSector, stri
   for (const x of HABITS_ARCHES) b.add(frame, new THREE.TorusGeometry(half, 0.1, 6, 32, Math.PI), [x, 0, nave.cz], [0, Math.PI / 2, 0], [1, (H - 0.6) / half, 1]);
 
   // Recepção (pavilhão de entrada): balcão com pacotes de sementes e ervas; banco e floreira de ervas.
+  const obs: Obstacle[] = [];
   {
-    const p = spot(b, 2.9, 12.2, -Math.PI / 2);
+    const D = RECEPTION_DESKS.habits;
+    const p = spot(b, D.x, D.z, D.face);
     p.add(m.wood2, new THREE.BoxGeometry(2.4, 1.0, 0.6), 0, 0.5, 0);
     p.add(m.wood, new THREE.BoxGeometry(2.5, 0.05, 0.75), 0, 1.025, 0.05);
     for (let k = 0; k < 9; k++) p.add(m.wood, new THREE.BoxGeometry(0.22, 0.9, 0.02), -1.06 + k * 0.265, 0.5, 0.31);
     for (let k = 0; k < 6; k++) p.add(flowers[k % 4]!, new THREE.BoxGeometry(0.1, 0.14, 0.02), -1.0 + k * 0.13, 1.12, 0.25, 0.1);
     for (let k = 0; k < 3; k++) potOn(p, m.clay, m.leaf2, 0.4 + k * 0.3, 1.05, -0.1, 0.8);
-    p.add(m.wood, new THREE.BoxGeometry(2.3, 0.05, 0.45), 0, 0.76, -0.62);
-    p.add(m.wood2, new THREE.BoxGeometry(2.3, 0.74, 0.04), 0, 0.37, -0.83);
+    deskTop(p, m.wood, m.wood2, 2.3);
+    receptionChair('habits', p, m, obs);
     const w = spot(b, -3.1, 12.4, Math.PI / 2);
     bench(w, m.wood, m.stone, 0, 0, 0, 2.0);
     const f = spot(b, -3.4, 10.2, Math.PI / 2);
@@ -829,7 +892,7 @@ export function createHabitsInterior(kit: Kit, labels: Record<HabitsSector, stri
     sectors: HABITS_SECTORS,
     pickables: pick,
     room: room.spec,
-    obstacles: [],
+    obstacles: obs,
     view: viewer(room, plan, overview),
     actions,
     setData: (d) => {
@@ -939,13 +1002,15 @@ export function createGoalsInterior(kit: Kit, labels: Record<GoalsSector, string
 
   // Recepção: balcão de pedra com tampo de madeira, painel de pedra com o hexágono dourado; espera
   // com duas poltronas do outro lado do eixo.
+  const obs: Obstacle[] = [];
   {
-    const p = spot(b, 4.6, 11.4, -Math.PI / 2);
+    const D = RECEPTION_DESKS.goals;
+    const p = spot(b, D.x, D.z, D.face);
     p.add(m.stone, new THREE.BoxGeometry(2.6, 1.0, 0.6), 0, 0.5, 0);
     p.add(m.wood, new THREE.BoxGeometry(2.7, 0.05, 0.75), 0, 1.025, 0.05);
     p.add(gold, new THREE.BoxGeometry(2.6, 0.03, 0.02), 0, 0.9, 0.31);
-    p.add(m.wood, new THREE.BoxGeometry(2.4, 0.05, 0.45), 0, 0.76, -0.62);
-    p.add(m.wood2, new THREE.BoxGeometry(2.4, 0.74, 0.04), 0, 0.37, -0.83);
+    deskTop(p, m.wood, m.wood2, 2.4);
+    receptionChair('goals', p, m, obs);
     potOn(p, m.white, m.leaf, -0.9, 1.05, 0.0);
     p.add(concrete, new THREE.BoxGeometry(3.0, 2.6, 0.2), 0, 1.3, -1.5);
     p.add(gold, new THREE.TorusGeometry(0.5, 0.05, 6, 6), 0, 1.8, -1.38);
@@ -1053,7 +1118,7 @@ export function createGoalsInterior(kit: Kit, labels: Record<GoalsSector, string
     sectors: GOALS_SECTORS,
     pickables: pick,
     room: room.spec,
-    obstacles: [],
+    obstacles: obs,
     view: viewer(room, plan, overview),
     setData: (d) => boards.forEach((bd, i) => bd.draw((d as NamesData).names[i] ?? '')),
     tick: (t) => room.trees.tick(t),
@@ -1093,13 +1158,15 @@ export function createMusicInterior(kit: Kit, labels: Record<MusicSector, string
 
   // Recepção: balcão de concreto com tampo de madeira e estante de partituras atrás; banco e
   // cabideiro do outro lado do eixo.
+  const obs: Obstacle[] = [];
   {
-    const p = spot(b, 4.4, 9.6, -Math.PI / 2);
+    const D = RECEPTION_DESKS.music;
+    const p = spot(b, D.x, D.z, D.face);
     p.add(concrete, new THREE.BoxGeometry(2.5, 1.0, 0.6), 0, 0.5, 0);
     p.add(m.wood, new THREE.BoxGeometry(2.6, 0.05, 0.75), 0, 1.025, 0.05);
     p.add(m.glow, new THREE.BoxGeometry(2.5, 0.03, 0.02), 0, 0.06, 0.31);
-    p.add(m.wood, new THREE.BoxGeometry(2.4, 0.05, 0.45), 0, 0.76, -0.62);
-    p.add(m.wood2, new THREE.BoxGeometry(2.4, 0.74, 0.04), 0, 0.37, -0.83);
+    deskTop(p, m.wood, m.wood2, 2.4);
+    receptionChair('music', p, m, obs);
     p.add(m.paper, new THREE.BoxGeometry(0.3, 0.02, 0.22), 0.6, 1.06, 0.05, 0.2);
     shelf(p, m.wood2, 0, -1.4, 2.4, 1.6, 0.35, 3, [m.paper, sleeves[3]!, m.paper, sleeves[5]!]);
     const w = spot(b, -3.6, 10.2, Math.PI / 2);
@@ -1232,7 +1299,7 @@ export function createMusicInterior(kit: Kit, labels: Record<MusicSector, string
     sectors: MUSIC_SECTORS,
     pickables: pick,
     room: room.spec,
-    obstacles: [],
+    obstacles: obs,
     view: viewer(room, plan, overview),
     setData: (d) => boards.forEach((bd, i) => bd.draw((d as NamesData).names[i] ?? '')),
     tick: (t) => room.trees.tick(t),
@@ -1267,11 +1334,16 @@ export function createSportsInterior(kit: Kit, labels: Record<SportsSector, stri
   const pick: THREE.Group[] = [];
 
   // Recepção (sob a marquise): balcão com prateleira de toalhas atrás; banco e bebedouro.
+  const obs: Obstacle[] = [];
   {
-    const p = spot(b, 3.3, 13.8, -Math.PI / 2);
+    const D = RECEPTION_DESKS.sports;
+    const p = spot(b, D.x, D.z, D.face);
     p.add(m.stone, new THREE.BoxGeometry(2.0, 1.0, 0.6), 0, 0.5, 0);
     p.add(m.metal, new THREE.BoxGeometry(2.1, 0.05, 0.75), 0, 1.025, 0.05);
     p.add(m.glow, new THREE.BoxGeometry(2.0, 0.03, 0.02), 0, 0.06, 0.31);
+    // Tampo de trabalho preso ao balcão, do lado de dentro, e a cadeira de quem atende (entre ele e as toalhas).
+    p.add(m.metal, new THREE.BoxGeometry(1.8, 0.04, 0.28), 0, 0.76, -0.44);
+    receptionChair('sports', p, m, obs);
     p.add(m.wood2, new THREE.BoxGeometry(1.6, 1.5, 0.3), 0, 0.75, -1.2);
     for (let r = 0; r < 3; r++) for (let k = 0; k < 5; k++) p.add(m.white, new THREE.CylinderGeometry(0.06, 0.06, 0.26, 8).rotateX(Math.PI / 2), -0.6 + k * 0.3, 0.35 + r * 0.45, -1.0);
     const w = spot(b, -3.5, 13.6, Math.PI / 2);
@@ -1440,7 +1512,7 @@ export function createSportsInterior(kit: Kit, labels: Record<SportsSector, stri
     sectors: SPORTS_SECTORS,
     pickables: pick,
     room: room.spec,
-    obstacles: [],
+    obstacles: obs,
     view: viewer(room, plan, overview),
     setData: (d) => boards.forEach((bd, i) => bd.draw((d as NamesData).names[i] ?? '')),
     tick: (t) => room.trees.tick(t),

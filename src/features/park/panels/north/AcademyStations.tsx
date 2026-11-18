@@ -1,18 +1,18 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Check, Play, Plus, Shuffle, SkipForward, Undo2 } from 'lucide-react';
+import { Check, ChevronLeft, Play, Plus, Shuffle, SkipForward, Undo2 } from 'lucide-react';
 import { useSettings } from '@/app/SettingsProvider';
 import { AcademyRuleError } from '@/data/academyRepo';
 import { getDb } from '@/data/db';
 import { createSession, setSessionStatus } from '@/data/studyPlanRepo';
-import type { Assessment, StudySession } from '@/domain/academy';
+import { contentProgress, masteryLevelsOf, type Assessment, type StudySession, type Subject } from '@/domain/academy';
 import { addDays, formatDateKey, todayKey } from '@/domain/dates';
 import { currentPeriodId } from '@/features/academy/AcademyPage';
 import { GradeBadge } from '@/features/academy/academyUi';
 import { AssessmentDialog } from '@/features/academy/dialogs';
 import { ReviewSession, useFlashcards } from '@/features/academy/flashcards';
 import { useAcademyData, type AcademyData } from '@/features/academy/useAcademyData';
+import { useSubjectExtras } from '@/features/academy/useSubjectExtras';
 import { Badge } from '@/ui/Badge';
 import { Button } from '@/ui/Button';
 import { Input, Select } from '@/ui/Field';
@@ -20,7 +20,8 @@ import { IconButton } from '@/ui/IconButton';
 import { LoadingState } from '@/ui/States';
 import { useToast } from '@/ui/toast';
 import { cn } from '@/ui/cn';
-import { ControlRoomLink, Empty, Pane, Station, Stat } from './station';
+import { ControlRoomLink, Empty, Pane, Station, Stat, useStationState } from './station';
+import { nextSessions } from './stationData';
 
 /** Estações do Centro de Aprendizagem: o ano letivo, as disciplinas, as revisões e o plano de estudos reais da Academy. */
 export type AcademyStationId = 'hall' | 'rooms' | 'review' | 'plan';
@@ -30,8 +31,11 @@ const NEW_PER_SESSION = 20;
 export function AcademyStation({ id }: { id: AcademyStationId }) {
   const { t } = useSettings();
   const data = useAcademyData();
+  // A disciplina aberta nas salas continua aberta ao sair e voltar à estação.
+  const [subjectId, setSubjectId] = useStationState<string | null>('academy.subject', null);
   const label = t(`park.academy.sectors.${id}`);
   if (data.loading) return <LoadingState label={t('common.loading')} lines={3} />;
+  const subject = id === 'rooms' && subjectId ? data.subjects.find((s) => s.id === subjectId) : undefined;
   return (
     <Station building="academy" label={label}>
       {id === 'review' ? (
@@ -41,11 +45,11 @@ export function AcademyStation({ id }: { id: AcademyStationId }) {
       ) : id === 'hall' ? (
         <Hall data={data} />
       ) : id === 'rooms' ? (
-        <Rooms data={data} />
+        subject ? <SubjectRoom key={subject.id} data={data} subject={subject} onBack={() => setSubjectId(null)} /> : <Rooms data={data} onOpen={setSubjectId} />
       ) : (
         <PlanDesk data={data} />
       )}
-      <ControlRoomLink to={id === 'review' ? '/academy/review' : id === 'plan' ? '/academy/plan' : '/academy'} />
+      <ControlRoomLink to={id === 'review' ? '/academy/review' : id === 'plan' ? '/academy/plan' : subject ? `/academy/subjects/${subject.id}` : '/academy'} />
     </Station>
   );
 }
@@ -104,7 +108,7 @@ function Hall({ data }: { data: AcademyData }) {
 
 /* ---------- Salas das Disciplinas ---------- */
 
-function Rooms({ data }: { data: AcademyData }) {
+function Rooms({ data, onOpen }: { data: AcademyData; onOpen: (subjectId: string) => void }) {
   const { t, settings } = useSettings();
   const today = todayKey();
   const dayLabel = useDayLabel();
@@ -121,10 +125,10 @@ function Rooms({ data }: { data: AcademyData }) {
           return (
             <li key={s.id} className="flex items-center gap-2 rounded-2xl bg-surface-2/70 p-3 ring-1 ring-inset ring-line/60">
               <span className="h-8 w-1.5 shrink-0 rounded-full" style={{ background: s.color }} aria-hidden />
-              <Link to={`/academy/subjects/${s.id}`} className="min-w-0 flex-1">
+              <button type="button" onClick={() => onOpen(s.id)} className="min-w-0 flex-1 text-left">
                 <span className="block truncate text-sm font-semibold text-fg hover:underline">{s.name}</span>
                 <span className="block truncate text-xs text-muted">{next ? t('academy.dash.next', { name: next.name, date: dayLabel(next.date!) }) : t('park.native.north.academy.noNext')}</span>
-              </Link>
+              </button>
               {periodId && <GradeBadge result={data.gradeOf(s, periodId)} locale={settings.locale} />}
               <IconButton size="sm" label={t('park.native.north.academy.newAssessmentFor', { name: s.name })} icon={<Plus className="h-4 w-4" />} onClick={() => setNewFor(s.id)} />
             </li>
@@ -132,6 +136,83 @@ function Rooms({ data }: { data: AcademyData }) {
         })}
       </ul>
       {newFor && <AssessmentDialog data={data} assessment={null} subjectId={newFor} periodId={periodId} onClose={() => setNewFor(null)} />}
+    </>
+  );
+}
+
+/* ---------- Sala da disciplina: o resumo real dela (a página completa fica no Control Room) ---------- */
+
+function SubjectRoom({ data, subject, onBack }: { data: AcademyData; subject: Subject; onBack: () => void }) {
+  const { t, settings } = useSettings();
+  const today = todayKey();
+  const dayLabel = useDayLabel();
+  const extras = useSubjectExtras([subject.id]);
+  const sessions = useLiveQuery(() => getDb().studySessions.where('subjectId').equals(subject.id).toArray(), [subject.id]);
+  const periodId = currentPeriodId(data.year);
+  const teacher = subject.teacherId ? data.teacherById.get(subject.teacherId) : undefined;
+  const back = (
+    <Button size="sm" variant="ghost" className="w-fit" icon={<ChevronLeft className="h-4 w-4" />} onClick={onBack}>
+      {t('park.native.north.academy.backToRooms')}
+    </Button>
+  );
+  if (extras.loading || !sessions)
+    return (
+      <>
+        {back}
+        <LoadingState label={t('common.loading')} lines={3} />
+      </>
+    );
+  const p = contentProgress(extras.contents, masteryLevelsOf(data.year).length);
+  const openDoubts = extras.doubts.filter((d) => d.status === 'open').length;
+  const upcoming = nextSessions(sessions, subject.id, today, 5);
+  const exams = data.assessments.filter((a) => a.subjectId === subject.id && a.date && a.date >= today).slice(0, 4);
+  return (
+    <>
+      {back}
+      <div className="flex items-center gap-2">
+        <span className="h-8 w-1.5 shrink-0 rounded-full" style={{ background: subject.color }} aria-hidden />
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-sm font-semibold text-fg">{subject.name}</span>
+          {teacher && <span className="block truncate text-xs text-muted">{teacher.name}</span>}
+        </span>
+        {periodId && <GradeBadge result={data.gradeOf(subject, periodId)} locale={settings.locale} />}
+      </div>
+      <div className="grid grid-cols-3 gap-2">
+        <Stat value={p.total} label={t('academy.summary.contents')} />
+        <Stat value={p.studied} label={t('academy.summary.studied')} />
+        <Stat value={p.mastered} label={t('academy.summary.mastered')} />
+        <Stat value={extras.lessons.length} label={t('academy.summary.lessons')} />
+        <Stat value={openDoubts} label={t('academy.summary.doubts')} />
+        <Stat value={extras.projects.length + extras.tasks.length} label={t('academy.summary.work')} />
+      </div>
+      <Pane title={t('park.native.north.academy.nextSessions')}>
+        {upcoming.length === 0 ? (
+          <Empty>{t('park.native.north.academy.noSessions')}</Empty>
+        ) : (
+          <ul className="flex flex-col gap-1.5">
+            {upcoming.map((s) => (
+              <li key={s.id} className="flex items-center gap-2 rounded-xl bg-surface/70 px-3 py-2 text-sm ring-1 ring-inset ring-line/50">
+                <span className="min-w-0 flex-1 truncate text-fg">{[dayLabel(s.date), s.time, t(`academy.plan.kinds.${s.kind}`)].filter(Boolean).join(' · ')}</span>
+                <span className="shrink-0 text-xs text-muted">{t('academy.plan.minutes', { min: s.durationMin })}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Pane>
+      <Pane title={t('academy.dash.upcoming')}>
+        {exams.length === 0 ? (
+          <Empty>{t('park.native.north.academy.noNext')}</Empty>
+        ) : (
+          <ul className="flex flex-col gap-1.5">
+            {exams.map((a) => (
+              <li key={a.id} className="flex items-center gap-2 rounded-xl bg-surface/70 px-3 py-2 text-sm ring-1 ring-inset ring-line/50">
+                <span className="min-w-0 flex-1 truncate text-fg">{a.name}</span>
+                <span className="shrink-0 text-xs text-muted">{dayLabel(a.date!)}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Pane>
     </>
   );
 }

@@ -82,7 +82,8 @@ export const FLOOR_PLANS: Record<ModuleId, FloorRoom[][]> = {
     // Uma sala por projeto ativo (nome, cor, próximo marco).
     [['proj1', 'gallery', 'studio'], ['proj2', 'gallery', 'studio'], ['proj3', 'gallery', 'studio']],
     // O mezanino só tem largura para duas salas (a escada fica ao lado do núcleo) e a primeira da
-    // lista é a que não cabe: o acompanhamento (parede e maquete dos projetos) vem por último.
+    // lista é a que não cabe: o acompanhamento (parede e maquete dos projetos) vem por último. Os
+    // materiais de cada projeto, sem sala, viram mural na parede desse andar (WALL_BOARDS).
     [['materials', 'gallery', 'shelf'], ['done', 'studio', 'shelf'], ['tracking', 'studio', 'screen']],
   ],
   // Salas de prática por instrumento; o 2º andar é o Estúdio (piano, bateria e violão tocáveis e os
@@ -114,11 +115,14 @@ export const FLOOR_PLANS: Record<ModuleId, FloorRoom[][]> = {
 };
 
 /**
- * Murais na parede de um andar sem salas (chave, setor real que abrem), por prédio e nível: no
- * Estúdio da Música (2º andar), o repertório em andamento e o tempo de prática da semana.
+ * Murais na parede de um andar (chave, setor real que abrem), por prédio e nível: no Estúdio da
+ * Música (2º andar, sem salas), o repertório em andamento e o tempo de prática da semana; no 2º
+ * andar do Projects, os materiais de cada projeto (a sala deles não cabe no mezanino). O mural de
+ * uma chave que ganhou sala no mesmo andar não é desenhado (o quadro fica só na porta da sala).
  */
 export const WALL_BOARDS: Partial<Record<ModuleId, Record<number, ReadonlyArray<readonly [key: string, sector: string]>>>> = {
   music: { 2: [['repertoire', 'instruments'], ['practiceTime', 'instruments']] },
+  projects: { 2: [['materials', 'gallery']] },
 };
 
 /** Decoração de cada sala nova pela sala equivalente de antes (furnish.ts, decorate). */
@@ -678,6 +682,8 @@ export function withFloors(kit: Kit, scene: InteriorScene, id: ModuleId, label: 
     // de colisão), num trecho reto longe das portas do terraço, do núcleo e da escada, com um lugar
     // livre na frente (de onde se lê e se toca). Tocar abre o painel real, como a porta de uma sala.
     for (const [key, sector] of WALL_BOARDS[id]?.[L] ?? []) {
+      // A sala da mesma chave coube neste andar: o quadro dela já está na porta.
+      if (slots.some((sl) => rooms[sl.k]?.[0] === key)) continue;
       let at: { x: number; z: number; face: number; ex: number; ez: number } | null = null;
       for (const r of runs) {
         for (let s = 1.4; s <= r.len - 1.4 && !at; s += 0.5) {
@@ -910,7 +916,9 @@ export function withFloors(kit: Kit, scene: InteriorScene, id: ModuleId, label: 
   }
   const hOf0 = (i: number) => groundHeight(id, g0[i]!);
   const ceilAt = (x: number, z: number) => g0.reduce((m, v, i) => (inVol(v, x, z) ? Math.max(m, hOf0(i)) : m), 0);
-  enrichGround(kit, b, seats, occupied, overhead, { vols: g0, runs: wallRuns(g0, 1, hOf0), front: span0.front, back: back0, ceilAt, ways: stairWays(id, 0), route: stairRoute(id, 0) }, accent, style.warm, thingRoot, things);
+  // Com a cadeira da recepção do próprio prédio (staffSeats), o balcão genérico não ganha outra.
+  const ownStaff = ((scene.scene.userData.seats as Seat[] | undefined) ?? []).some((s) => s.tag === 'staff');
+  enrichGround(kit, b, seats, occupied, overhead, { vols: g0, runs: wallRuns(g0, 1, hOf0), front: span0.front, back: back0, ceilAt, ways: stairWays(id, 0), route: stairRoute(id, 0), staff: ownStaff }, accent, style.warm, thingRoot, things);
   // O núcleo dos elevadores (do térreo ao alto, dentro do prédio): uma ou duas cabines lado a lado,
   // com as portas, a botoeira e o indicador de cada pavimento abrindo para o hall. Com terraço, o
   // núcleo passa da cobertura (a cabine para no terraço).

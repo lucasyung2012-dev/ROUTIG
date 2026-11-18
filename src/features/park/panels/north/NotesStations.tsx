@@ -1,5 +1,4 @@
 import { useState, type ReactNode } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { ChevronLeft, History, LayoutTemplate, NotebookPen, PenTool, Plus, RotateCcw, Search, Star } from 'lucide-react';
 import { useSettings } from '@/app/SettingsProvider';
@@ -15,6 +14,7 @@ import { LoadingState } from '@/ui/States';
 import { useToast } from '@/ui/toast';
 import { cn } from '@/ui/cn';
 import { ControlRoomLink, Empty, Pane, Station, useStationState } from './station';
+import { handwrittenNotes } from './stationData';
 
 /** Estações do Ateliê de Conhecimento: as mesmas notas do Notes, criadas e editadas aqui dentro. */
 export type NotesStationId = 'reception' | 'writing' | 'advanced' | 'handwriting' | 'organize' | 'versions';
@@ -25,8 +25,6 @@ function inputOf(n: Note): NoteInput {
   return { title, mode, blocks, notebookId, collectionIds, category, tags, favorite, links };
 }
 
-const hasDrawing = (n: Note) => n.blocks.some((b) => b.type === 'drawing');
-
 export function NotesStation({ id }: { id: NotesStationId }) {
   const { t } = useSettings();
   const data = useNotesData();
@@ -36,8 +34,10 @@ export function NotesStation({ id }: { id: NotesStationId }) {
   if (data.loading) return <LoadingState label={t('common.loading')} lines={3} />;
   const open = openId ? data.notes.find((n) => n.id === openId) : undefined;
 
-  // Mesa de escrita: o editor real do Notes (salvamento automático e histórico), dentro da estação.
-  if (open && id !== 'handwriting' && id !== 'versions')
+  // Mesa de escrita: o editor real do Notes (salvamento automático e histórico), dentro da estação. No
+  // Ateliê Manuscrito, o mesmo editor abre a página com o bloco de desenho (DrawingBlock: Apple Pencil,
+  // com o botão de tela cheia, que cobre o 3D enquanto se escreve).
+  if (open && id !== 'versions')
     return (
       <Station building="notes" label={label}>
         <Button size="sm" variant="ghost" className="w-fit" icon={<ChevronLeft className="h-4 w-4" />} onClick={() => setOpenId(null)}>
@@ -54,7 +54,7 @@ export function NotesStation({ id }: { id: NotesStationId }) {
       {id === 'reception' && <Reception data={data} onOpen={setOpenId} />}
       {id === 'writing' && <Writing data={data} onOpen={setOpenId} />}
       {id === 'advanced' && <Advanced data={data} onOpen={setOpenId} />}
-      {id === 'handwriting' && <Handwriting data={data} />}
+      {id === 'handwriting' && <Handwriting data={data} onOpen={setOpenId} />}
       {id === 'organize' && <Organize data={data} onOpen={setOpenId} />}
       {id === 'versions' && <Versions data={data} selected={openId} onSelect={setOpenId} />}
       <ControlRoomLink to="/notes" />
@@ -184,29 +184,19 @@ function Advanced({ data, onOpen }: { data: NotesData; onOpen: (id: string) => v
   );
 }
 
-/* ---------- Ateliê Manuscrito: Apple Pencil na tela cheia do Notes ---------- */
+/* ---------- Ateliê Manuscrito: Apple Pencil no editor do Notes, dentro da estação ---------- */
 
-function Handwriting({ data }: { data: NotesData }) {
+function Handwriting({ data, onOpen }: { data: NotesData; onOpen: (id: string) => void }) {
   const { t } = useSettings();
-  const toast = useToast();
-  const navigate = useNavigate();
-  // O desenho com Apple Pencil abre na tela do Notes, sem o 3D por trás, exatamente como hoje.
-  const openNote = (id: string) => navigate(`/notes/${id}`);
-  const newPage = async () => {
-    try {
-      const n = await createNote(emptyNoteInput({ mode: 'blocks', blocks: [newBlock('drawing')] }));
-      openNote(n.id);
-    } catch {
-      toast.show(t('errors.saveFailed'), 'error');
-    }
-  };
+  // A nota nova é a mesma do Notes (modo blocos com um bloco de desenho) e abre na mesa da estação.
+  const create = useCreateAndOpen(onOpen);
   return (
     <>
-      <Button variant="primary" size="sm" className="w-fit" icon={<PenTool className="h-4 w-4" />} onClick={() => void newPage()}>
+      <Button variant="primary" size="sm" className="w-fit" icon={<PenTool className="h-4 w-4" />} onClick={() => void create(emptyNoteInput({ mode: 'blocks', blocks: [newBlock('drawing')] }))}>
         {t('park.native.north.notes.newDrawing')}
       </Button>
       <Pane title={t('park.native.north.notes.drawings')}>
-        <NoteList notes={data.notes.filter(hasDrawing).slice(0, 8)} onOpen={openNote} empty={t('park.native.north.notes.noDrawings')} />
+        <NoteList notes={handwrittenNotes(data.notes).slice(0, 8)} onOpen={onOpen} empty={t('park.native.north.notes.noDrawings')} />
       </Pane>
     </>
   );

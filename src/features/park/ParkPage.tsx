@@ -1078,7 +1078,7 @@ export default function ParkPage() {
             {inside === 'library' && <LibraryPanel id={sector as LibrarySector} />}
             {inside === 'notes' && <NotesPanel id={sector as NotesSector} />}
             {inside === 'academy' && <AcademyPanel id={sector as AcademySector} />}
-            {inside === 'languages' && <LanguagesPanel id={sector as LanguagesSector} />}
+            {inside === 'languages' && <LanguagesPanel id={sector as LanguagesSector} zone={zoneKey} />}
             {inside === 'insights' && <InsightsPanel id={sector as InsightsSector} />}
             {inside === 'calendar' && <CalendarPanel id={sector as CalendarSector} />}
             {inside === 'tasks' && <TasksPanel id={sector as TasksSector} />}

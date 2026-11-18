@@ -49,44 +49,13 @@ type Preview =
 
 /** Settings → Importar e exportar (Etapa 5): arquivos que outros apps entendem. */
 export function TransferSection() {
-  const { t, tl } = useSettings();
+  const { t } = useSettings();
   const toast = useToast();
-  const statusName = useStatusName();
-  const counts = useLiveQuery(() => exportCounts(), []);
-  const [busy, setBusy] = useState<ExportKind | null>(null);
-  const [financeAsk, setFinanceAsk] = useState(false);
   const [preview, setPreview] = useState<Preview | null>(null);
   const [pasting, setPasting] = useState(false);
   const ics = useRef<HTMLInputElement>(null);
   const tasks = useRef<HTMLInputElement>(null);
   const notes = useRef<HTMLInputElement>(null);
-
-  const labels: ExportLabels = {
-    headers: { tasks: tl('transfer.headers.tasks'), habits: tl('transfer.headers.habits'), focus: tl('transfer.headers.focus'), finance: tl('transfer.headers.finance') },
-    statusName,
-    priority: (p) => t(`tasks.priority.${p}`),
-    yes: t('transfer.yes'),
-    no: t('transfer.no'),
-    txType: (x) => t(`finance.txTypes.${x as 'buy'}`),
-    focusKind: (k) => t(`focus.kinds.${k as 'study'}`),
-    md: { image: t('transfer.md.image'), file: t('transfer.md.file'), drawing: t('transfer.md.drawing'), untitled: t('notes.untitled') },
-  };
-
-  // Finanças trancado pelo PIN (ou o PIN ainda sendo lido): nada de Finanças sai daqui até abrir Finanças com o PIN.
-  const financeLocked = useFinanceLocked() !== false;
-
-  const doExport = async (kind: ExportKind) => {
-    if (kind === 'finance' && financeLocked) return;
-    setBusy(kind);
-    try {
-      const f = await buildExport(kind, labels);
-      if ((await saveFile(new File([f.text], f.name, { type: f.mime }))) === 'saved') toast.show(t('transfer.exported', { count: f.count }), 'success');
-    } catch {
-      toast.show(t('transfer.exportFailed'), 'error');
-    } finally {
-      setBusy(null);
-    }
-  };
 
   const open = async (kind: Preview['kind'], files: File[]) => {
     if (!files.length) return;
@@ -127,33 +96,7 @@ export function TransferSection() {
           <h2 className="font-semibold text-fg">{t('transfer.export.title')}</h2>
           <p className="text-sm text-muted">{t('transfer.export.hint')}</p>
         </div>
-        <ul className="flex flex-col divide-y divide-line/70">
-          {EXPORT_KINDS.map((k) => {
-            const locked = k === 'finance' && financeLocked;
-            return (
-              <li key={k} className="flex flex-wrap items-center gap-3 py-2.5">
-                <div className="min-w-0 flex-1 basis-52">
-                  <div className="text-sm font-medium text-fg">{t(`transfer.export.kinds.${k}`)}</div>
-                  <div className="text-xs text-muted">
-                    {t(`transfer.export.formats.${k}`)} ·{' '}
-                    {locked ? (
-                      <Link to="/finance" className="text-accent hover:underline">
-                        {t('transfer.export.financeLocked')}
-                      </Link>
-                    ) : counts ? (
-                      t('transfer.records', { count: counts[k] })
-                    ) : (
-                      '…'
-                    )}
-                  </div>
-                </div>
-                <Button size="sm" variant="secondary" icon={<Download className="h-4 w-4" />} loading={busy === k} disabled={locked || !counts || counts[k] === 0} onClick={() => (k === 'finance' ? setFinanceAsk(true) : void doExport(k))}>
-                  {t('transfer.export.button')}
-                </Button>
-              </li>
-            );
-          })}
-        </ul>
+        <TransferExports />
         <p className="text-xs text-muted">{t('transfer.export.backupNote')}</p>
       </Surface>
 
@@ -211,6 +154,89 @@ export function TransferSection() {
         </div>
       </Surface>
 
+      {pasting && (
+        <PasteDialog
+          onClose={() => setPasting(false)}
+          onRead={(text) => {
+            setPasting(false);
+            void previewTaskImport(text, '').then((rows) => setPreview({ kind: 'tasks', rows, source: t('transfer.import.pasted') }));
+          }}
+        />
+      )}
+      {preview && <PreviewDialog preview={preview} onClose={() => setPreview(null)} />}
+    </div>
+  );
+}
+
+/**
+ * Exportar (Etapa 5): um arquivo por tipo, com a contagem de registros e o botão de cada um (Finanças
+ * só com o PIN aberto e depois de confirmar). Usado no Settings e na estação de transferência da
+ * Biblioteca do Campus: os mesmos buildExport e saveFile.
+ */
+export function TransferExports() {
+  const { t, tl } = useSettings();
+  const toast = useToast();
+  const statusName = useStatusName();
+  const counts = useLiveQuery(() => exportCounts(), []);
+  const [busy, setBusy] = useState<ExportKind | null>(null);
+  const [financeAsk, setFinanceAsk] = useState(false);
+
+  const labels: ExportLabels = {
+    headers: { tasks: tl('transfer.headers.tasks'), habits: tl('transfer.headers.habits'), focus: tl('transfer.headers.focus'), finance: tl('transfer.headers.finance') },
+    statusName,
+    priority: (p) => t(`tasks.priority.${p}`),
+    yes: t('transfer.yes'),
+    no: t('transfer.no'),
+    txType: (x) => t(`finance.txTypes.${x as 'buy'}`),
+    focusKind: (k) => t(`focus.kinds.${k as 'study'}`),
+    md: { image: t('transfer.md.image'), file: t('transfer.md.file'), drawing: t('transfer.md.drawing'), untitled: t('notes.untitled') },
+  };
+
+  // Finanças trancado pelo PIN (ou o PIN ainda sendo lido): nada de Finanças sai daqui até abrir Finanças com o PIN.
+  const financeLocked = useFinanceLocked() !== false;
+
+  const doExport = async (kind: ExportKind) => {
+    if (kind === 'finance' && financeLocked) return;
+    setBusy(kind);
+    try {
+      const f = await buildExport(kind, labels);
+      if ((await saveFile(new File([f.text], f.name, { type: f.mime }))) === 'saved') toast.show(t('transfer.exported', { count: f.count }), 'success');
+    } catch {
+      toast.show(t('transfer.exportFailed'), 'error');
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <>
+      <ul className="flex flex-col divide-y divide-line/70">
+        {EXPORT_KINDS.map((k) => {
+          const locked = k === 'finance' && financeLocked;
+          return (
+            <li key={k} className="flex flex-wrap items-center gap-3 py-2.5">
+              <div className="min-w-0 flex-1 basis-52">
+                <div className="text-sm font-medium text-fg">{t(`transfer.export.kinds.${k}`)}</div>
+                <div className="text-xs text-muted">
+                  {t(`transfer.export.formats.${k}`)} ·{' '}
+                  {locked ? (
+                    <Link to="/finance" className="text-accent hover:underline">
+                      {t('transfer.export.financeLocked')}
+                    </Link>
+                  ) : counts ? (
+                    t('transfer.records', { count: counts[k] })
+                  ) : (
+                    '…'
+                  )}
+                </div>
+              </div>
+              <Button size="sm" variant="secondary" icon={<Download className="h-4 w-4" />} loading={busy === k} disabled={locked || !counts || counts[k] === 0} onClick={() => (k === 'finance' ? setFinanceAsk(true) : void doExport(k))}>
+                {t('transfer.export.button')}
+              </Button>
+            </li>
+          );
+        })}
+      </ul>
       <ConfirmDialog
         open={financeAsk}
         title={t('transfer.financeAsk.title')}
@@ -223,17 +249,7 @@ export function TransferSection() {
           void doExport('finance');
         }}
       />
-      {pasting && (
-        <PasteDialog
-          onClose={() => setPasting(false)}
-          onRead={(text) => {
-            setPasting(false);
-            void previewTaskImport(text, '').then((rows) => setPreview({ kind: 'tasks', rows, source: t('transfer.import.pasted') }));
-          }}
-        />
-      )}
-      {preview && <PreviewDialog preview={preview} onClose={() => setPreview(null)} />}
-    </div>
+    </>
   );
 }
 

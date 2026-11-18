@@ -90,6 +90,8 @@ export interface GroundPlan {
   /** Chegada à escada (stairWays) e a rota a pé até ela: a cadeira da recepção fica longe. */
   ways?: ReadonlyArray<readonly [number, number]>;
   route?: ReadonlyArray<readonly [number, number]>;
+  /** O prédio já tem a cadeira da recepção dele (assento 'staff'): o balcão genérico fica sem cadeira (uma recepcionista só). */
+  staff?: boolean;
 }
 
 /** Térreo: detalhes junto às paredes, pendentes e recepção, sem invadir o que já existe. */
@@ -140,7 +142,7 @@ export function enrichGround(kit: Kit, b: Builder, seats: Seat[], obstacles: Obs
     // Cadeira da recepcionista atrás do balcão, de frente para quem chega (longe da escada e da rota até ela).
     const sz = rz - 0.85;
     const away = (pts: ReadonlyArray<readonly [number, number]> | undefined, r: number) => (pts ?? []).every(([wx, wz]) => Math.hypot(wx - rx, wz - sz) > r);
-    if (away(g.ways, 1.6) && away(g.route, 1.6)) {
+    if (!g.staff && away(g.ways, 1.6) && away(g.route, 1.6)) {
       b.add(m.dark, new THREE.BoxGeometry(0.44, 0.05, 0.44), [rx, 0.46, sz]);
       b.add(m.dark, new THREE.BoxGeometry(0.44, 0.42, 0.05), [rx, 0.72, sz - 0.21]);
       b.add(m.metal, new THREE.CylinderGeometry(0.03, 0.03, 0.44, 6), [rx, 0.22, sz]);

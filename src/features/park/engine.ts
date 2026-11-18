@@ -1040,6 +1040,8 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOpts): Engin
     }
     if (typeof cmd === 'string' && cmd.startsWith('ride:')) rideTo(Number(cmd.slice(5)));
     if (cmd === 'stairs:check') document.documentElement.dataset.stairClash = String(inside?.scene.scene.userData.stairClash ?? 'none');
+    // 'life': quem a vida do interior mostra agora (indoorLife.ts), em data-life.
+    if (cmd === 'life') document.documentElement.dataset.life = JSON.stringify({ hour: shownHour, quality, people: roomInfo.people, figs: roomInfo.sources.slice(0, 40).map((f) => [Math.round(f.x * 10) / 10, Math.round(f.y * 10) / 10, Math.round(f.z * 10) / 10, f.pose]) });
     // 'stairs:reach': em cada nível, a partir da chegada do elevador (e da entrada, no térreo), até
     // onde se chega a pé com a colisão de verdade (reach.ts): o pé e a chegada da escada, subir e
     // descer a pé e o que bloqueia o anel em volta dela. Resultado em data-stair-reach.

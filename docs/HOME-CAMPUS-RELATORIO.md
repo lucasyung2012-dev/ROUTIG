@@ -212,3 +212,17 @@ Conferido no navegador:
 Não testado:
 - Os outros objetos só foram medidos, sem olhar na tela.
 - Nenhuma ação foi concluída, para não mexer nos dados do Lucas.
+
+### Ajustes depois da conferência (18/11/2026, commits 057660e e 84f50a4, CI ok)
+
+- **Library**: a fileira "Novos" ficou só com as lombadas reais, sem os livros decorativos atrás.
+- **Idiomas**: o baralho segue a mesma fila da revisão do módulo (primeiro as vencidas, depois as novas, até 20). Antes mostrava "Nenhuma palavra" mesmo com 2 palavras novas para revisar.
+- **Insights**: cada esfera ganhou uma plaquinha com o nome do módulo e o número da semana.
+- **Projects**: o 2º andar perdia a sala de acompanhamento, onde ficam a parede e a maquete. O mezanino só cabe duas salas; agora a que fica de fora é a de materiais. Além disso, toda sala que esbarra no caminho do elevador ou da escada procura outra vaga antes de ser descartada.
+- **Conferido no navegador**:
+  - estes objetos aparecem no lugar e com dados reais ou com o estado vazio verdadeiro: mesa do Tasks, bandeja do Inbox, caderno do Notes (lido do lado dos banquinhos), baralho de Idiomas, faixas dos Esportes, esferas do Insights, luminária do Focus, placa do Goals, maquete do Projects e estante da Library;
+  - todas as salas planejadas aparecem em todos os prédios;
+  - `stairs:reach` ok e `stairs:check` 0 nos 14 prédios.
+- **Não testado**:
+  - a parede do dia do Calendar com as horas tocáveis e o quadro de saldos no cofre (precisa do PIN);
+  - concluir qualquer ação, para não mexer nos dados do Lucas.

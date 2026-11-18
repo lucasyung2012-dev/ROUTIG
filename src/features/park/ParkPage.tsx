@@ -53,10 +53,11 @@ import { useLanguages } from '@/features/languages/useLanguages';
 import { receptionData } from './receptionData';
 import { ModuleCenter } from './ModuleCenter';
 import { FloorFeed } from './FloorFeed';
+import { LiveFeed, type WallHandler } from './LiveFeed';
 import { DEFAULT_FAB, FloatingCenterButton, PlacesMenu, type FabPlace } from './ParkUi';
 import { floorNameKey, withFloors } from './interiors/floors';
 import { withLive, type CalendarLive, type TasksLive } from './interiors/live3d';
-import { habitBeds, taskBoard, type DayItem } from './live';
+import { habitBeds, LIVE_WALL_ROOMS, taskBoard, wallBuilding, type DayItem } from './live';
 import { liftTargets, type LiftDir } from './stairs';
 import { setZoneLabels } from './interiors/common';
 import { DRUM_PADS, GUITAR_CHORDS, GUITAR_STRINGS, PIANO_KEYS, vaultStateOf, type Instrument } from './interiors/things';
@@ -608,14 +609,37 @@ export default function ParkPage() {
     const i = id.indexOf(':');
     return i < 0 ? [id, ''] : [id.slice(0, i), id.slice(i + 1)];
   };
-  /** Abre o painel de uma sala (estação inteira) sem mexer na câmera. */
-  const openRoom = (s: string, zone: string | null) => {
+  /**
+   * Abre o painel de uma sala (estação inteira) sem mexer na câmera. `fresh`: a estação já aberta é
+   * montada de novo (ela relê o que a parede deixou pronto, como a nota tocada no Notes).
+   */
+  const openRoom = (s: string, zone: string | null, fresh = false) => {
+    if (fresh && sector === s) {
+      setSector(null);
+      window.setTimeout(() => {
+        setZoneKey(zone);
+        setSector(s);
+      }, 0);
+      return;
+    }
     setZoneKey(zone);
     setSector(s);
+  };
+  // Paredes de ação dos outros prédios (LiveFeed): a ação de cada linha é da parede do prédio aberto.
+  const wallHandler = useRef<WallHandler | null>(null);
+  const wallRoomOf = (kind: string) => {
+    const b = wallBuilding(kind);
+    return b ? (LIVE_WALL_ROOMS[b] ?? null) : null;
   };
   const actionRef = useRef<(a: { building: ModuleId; id: string; long: boolean }) => void>(() => undefined);
   actionRef.current = ({ building, id, long }) => {
     const [kind, ref] = splitId(id);
+    if (wallBuilding(kind) === building) {
+      // Toque longo, o "+N" ou uma linha sem ação própria: a estação da sala da parede.
+      const room = wallRoomOf(kind);
+      if ((long || !ref || !wallHandler.current?.act(kind, ref)) && room) openRoom(room.sector, room.key);
+      return;
+    }
     if (building === 'habits' && kind === 'bed') {
       const h = habitsData.byId.get(ref);
       // Toque longo ou o canteiro do "+N": a estação de hoje inteira.
@@ -667,6 +691,7 @@ export default function ParkPage() {
       const it = todayItems.find((i) => i.key === ref);
       return it ? t('park.live.hintEvent', { title: it.title }) : '';
     }
+    if (wallBuilding(kind)) return (ref ? wallHandler.current?.title(kind, ref) : null) ?? t('park.live.openStation');
     return '';
   };
   /** Estação inteira do objeto de ação (o "abrir estação" ao lado da dica). */
@@ -675,6 +700,10 @@ export default function ParkPage() {
     if (kind === 'bed') openRoom('atrium', null);
     else if (kind === 'card' || kind === 'more') openRoom('kanban', 'organize');
     else if (kind === 'ev') openRoom('daily', 'daily');
+    else {
+      const room = wallRoomOf(kind);
+      if (room) openRoom(room.sector, room.key);
+    }
   };
 
   // Cofre de Finanças: segue o bloqueio real de Finanças (o mesmo PIN e o mesmo desbloqueio da tela
@@ -1042,6 +1071,8 @@ export default function ParkPage() {
 
       {/* Dados reais dos quadros dos andares do prédio aberto (só ele lê os dados dele). */}
       {inside && <FloorFeed id={inside} financeLocked={financeLocked} onBoards={(fb) => sendData(inside, { floors: fb })} />}
+      {/* Paredes de ação dos outros prédios (seção 28): dados reais, ações e os diálogos delas. */}
+      {inside && <LiveFeed id={inside} financeLocked={financeLocked} onWall={(w) => sendData(inside, { wall: w })} handler={wallHandler} openRoom={openRoom} />}
       {instrument && inside && (
         <InstrumentPanel
           kind={instrument}

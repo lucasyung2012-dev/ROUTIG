@@ -179,6 +179,39 @@ export interface FloorZone {
    * ação dos andares (live3d.ts) se apoiam nela.
    */
   screen?: { w: number; h: number; y: number; z: number };
+  /**
+   * Nas outras salas, a superfície livre da parede do fundo (o quadro da sala de aula e do
+   * escritório, o espelho da academia, a parede atrás dos instrumentos e dos cavaletes), no mesmo
+   * sistema de `screen`: onde a parede de ação de um prédio sem sala de dados se apoia (live3d.ts).
+   * Salas com estantes, sofá ou espuma no fundo não têm.
+   */
+  wall?: { w: number; h: number; y: number; z: number };
+}
+
+/**
+ * Superfície livre do fundo de uma sala de tipo `type` (largura de mobília `fw`, fundo `d`), pelas
+ * medidas de furnish.ts e decorate: na frente do quadro, do espelho ou das ripas, abaixo dos quadros
+ * decorativos (y ≥ 1,9 m) e acima do que fica no chão. null: o fundo já está ocupado.
+ */
+export function backWall(type: RoomType, fw: number, d: number): { w: number; h: number; y: number; z: number } | undefined {
+  const back = -d / 2 + 0.35;
+  switch (type) {
+    // Lousa da sala de aula: min(4, w/2) por 1,2 m, centro a 1,5 m, no fundo.
+    case 'classroom':
+      return { w: Math.min(4, fw * 0.5) - 0.12, h: 1.08, y: 1.5, z: back + 0.02 };
+    // Quadro branco do escritório: min(3,2, 0,4 w) por 1,2 m, centro a 1,5 m.
+    case 'office':
+      return { w: Math.min(3.2, fw * 0.4) - 0.1, h: 1.08, y: 1.5, z: back + 0.02 };
+    // Espelho da academia (fundo - 0,12, de 0,2 a 2,2 m): na metade de cima, acima dos bancos.
+    case 'gym':
+      return { w: Math.min(2.4, fw * 0.45), h: 0.85, y: 1.72, z: back - 0.1 };
+    // Sala de música e ateliê: a parede de ripas, entre os instrumentos/cavaletes e os quadros.
+    case 'music':
+    case 'studio':
+      return { w: Math.min(2.4, fw * 0.42), h: 0.85, y: 1.45, z: -d / 2 + 0.17 };
+    default:
+      return undefined;
+  }
 }
 
 export interface FloorLevel {
@@ -549,7 +582,7 @@ export function withFloors(kit: Kit, scene: InteriorScene, id: ModuleId, label: 
       // A parede de telas da sala de dados (furnish.ts: w × 0,62 por 1,7 m, centro a 1,65 m, no fundo).
       const fw = sl.w * (sl.kind === 'island' ? 0.75 : 1);
       const screen = type === 'dataviz' ? { w: fw * 0.62, h: 1.7, y: 1.65, z: -sl.d / 2 + 0.35 + 0.04 } : undefined;
-      zones.push({ level: L, key, sector, x: sl.x, z: sl.z, face: sl.face, ex, ez, screen });
+      zones.push({ level: L, key, sector, x: sl.x, z: sl.z, face: sl.face, ex, ez, screen, wall: screen ? undefined : backWall(type, fw, sl.d) });
       const zi = zones.length - 1;
       const g = new THREE.Group();
       g.position.set(sl.x, y, sl.z);

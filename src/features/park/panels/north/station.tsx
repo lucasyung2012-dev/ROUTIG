@@ -24,6 +24,11 @@ export type NorthBuilding = keyof typeof NORTH_COLORS;
  * a nota aberta na mesa, o idioma escolhido, o período do Observatório…
  */
 const memory = new Map<string, unknown>();
+/** Deixa pronto o estado de uma estação antes de ela abrir (a nota tocada na parede do Notes abre na mesa). */
+export function presetStationState(key: string, value: unknown): void {
+  memory.set(key, value);
+}
+
 export function useStationState<T>(key: string, initial: T): [T, (v: T) => void] {
   const [value, setValue] = useState<T>(() => (memory.has(key) ? (memory.get(key) as T) : initial));
   useEffect(() => {

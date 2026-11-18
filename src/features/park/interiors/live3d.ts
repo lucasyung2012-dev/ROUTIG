@@ -13,7 +13,8 @@ import type { ModuleId } from '@/app/modules';
 import type { Kit } from '../kit';
 import { canvasPlane, markAction, wrap, type ActionSpot, type InteriorScene } from './common';
 import type { Floors, FloorZone } from './floors';
-import { dayLayout, TASK_COLS, type DayItem, type DayLayout, type TaskBoard, type TaskCol } from '../live';
+import { formatClock, type FocusTimer } from '@/domain/focus';
+import { dayLayout, focusFace, LIVE_WALL_ROOMS, TASK_COLS, type DayItem, type DayLayout, type FocusFace, type TaskBoard, type TaskCol } from '../live';
 
 /** Dados do quadro de tarefas (já traduzidos): os cartões, o cabeçalho e o "+N" de cada coluna. */
 export interface TasksLive {
@@ -35,6 +36,42 @@ export interface CalendarLive {
   still: boolean;
 }
 
+/** Uma linha da parede de ação de um prédio (já traduzida). `id` vazio: só mostra. */
+export interface WallRowView {
+  id: string;
+  title: string;
+  /** Segunda linha ('' = sem). */
+  sub: string;
+  color: string;
+  /** Barra de progresso de 0 a 1 (null = sem barra). */
+  bar: number | null;
+  /** Caixinha de marcar: null = sem caixa; true/false = feito ou não. */
+  check: boolean | null;
+  /** Linha do "+N" (mais apagada; o toque abre a estação). */
+  more: boolean;
+}
+
+/** O relógio do Focus no alto da parede: o mostrador anda sozinho (conferido a cada segundo). */
+export interface WallClock {
+  id: string;
+  timer: FocusTimer | null;
+  /** Nome de cada estado e o que o toque faz agora (já traduzidos). */
+  states: Record<FocusFace['state'], string>;
+  tap: string;
+}
+
+/** Dados da parede de ação de um prédio (já traduzidos). */
+export interface WallLive {
+  title: string;
+  /** Canto direito do cabeçalho ('' = nada). */
+  side: string;
+  rows: WallRowView[];
+  /** Sem linhas: o estado vazio (honesto). */
+  empty: string;
+  accent: string;
+  clock: WallClock | null;
+}
+
 interface Live {
   set: (d: unknown) => void;
   tick: (now: number) => void;
@@ -43,17 +80,24 @@ interface Live {
 const FONT = 'Inter, system-ui, sans-serif';
 const ease = (k: number) => (k < 0.5 ? 2 * k * k : 1 - (-2 * k + 2) ** 2 / 2);
 
-/** Liga os objetos de ação dos andares do prédio `id` (Tasks e Calendar); os outros ficam como estão. */
+/**
+ * Liga os objetos de ação dos andares do prédio `id`: o quadro do Tasks e a parede do dia do Calendar
+ * (dados em `live`) e, nos outros prédios com sala para isso (LIVE_WALL_ROOMS), a parede de ação
+ * (dados em `wall`); os demais ficam como estão.
+ */
 export function withLive(kit: Kit, scene: InteriorScene, id: ModuleId): InteriorScene {
   const fl = scene.floors;
   if (!fl) return scene;
-  const live = id === 'tasks' ? tasksWall(kit, scene, fl, 'organize') : id === 'calendar' ? dayWall(kit, scene, fl, 'daily') : null;
+  const wallKey = LIVE_WALL_ROOMS[id]?.key;
+  const pilot = id === 'tasks' || id === 'calendar';
+  const live = id === 'tasks' ? tasksWall(kit, scene, fl, 'organize') : id === 'calendar' ? dayWall(kit, scene, fl, 'daily') : wallKey ? listWall(kit, scene, fl, wallKey) : null;
   if (!live) return scene;
   const set0 = scene.setData;
   const tick0 = scene.tick;
   scene.setData = (d) => {
     set0(d);
-    const v = (d as { live?: unknown } | null | undefined)?.live;
+    const box = d as { live?: unknown; wall?: unknown } | null | undefined;
+    const v = pilot ? box?.live : box?.wall;
     if (v) live.set(v);
   };
   scene.tick = (t, cam) => {
@@ -519,6 +563,239 @@ function dayWall(kit: Kit, scene: InteriorScene, fl: Floors, key: string): Live 
     const m = minuteNow();
     if (m === nowMin) return;
     nowMin = m;
+    draw();
+  };
+  return { set, tick };
+}
+
+/* =====================================================================
+ * Parede de ação dos outros prédios (Goals, Projects, Focus, Inbox…): uma lista de linhas reais
+ * num só canvas, na parede de telas da sala de dados ou na superfície livre do fundo da sala
+ * (floors.ts: `screen` ou `wall`); caixas invisíveis sobre cada linha levam o toque e o olhar à
+ * ação (o mesmo jeito da parede do dia). Tocar fora das linhas abre a sala.
+ * ===================================================================== */
+
+const WALL_HITS = 7;
+
+/** A sala `key` com superfície para a parede (telas ou fundo livre), o grupo dela e o sistema do prédio. */
+function wallRoom(scene: InteriorScene, fl: Floors, key: string) {
+  const zi = fl.zones.findIndex((z) => z.key === key && !!(z.screen ?? z.wall));
+  const zone: FloorZone | undefined = fl.zones[zi];
+  const mount = zone ? (zone.screen ?? zone.wall) : undefined;
+  const lv = zone ? fl.levels[zone.level] : undefined;
+  if (!zone || !mount || !lv) return null;
+  const root = new THREE.Group();
+  root.position.set(zone.x, lv.y, zone.z);
+  root.rotation.y = zone.face;
+  scene.scene.add(root);
+  const c = Math.cos(zone.face);
+  const s = Math.sin(zone.face);
+  const zx = zone.x;
+  const zz = zone.z;
+  const toBuilding = (lx: number, lz: number): [number, number] => [zx + lx * c + lz * s, zz - lx * s + lz * c];
+  return { zi, zone, mount, root, toBuilding };
+}
+
+function listWall(kit: Kit, scene: InteriorScene, fl: Floors, key: string): Live | null {
+  const room = wallRoom(scene, fl, key);
+  if (!room) return null;
+  const { mount, root, zone, zi, toBuilding } = room;
+  const W = mount.w;
+  const H = mount.h;
+  const z0 = mount.z + 0.035;
+  const wall = canvasPlane(kit, W, H, H >= 1.4 ? 420 : 300, true);
+  wall.mesh.position.set(0, mount.y, z0);
+  // Fora das linhas: a sala (o painel dela), como o fundo do quadro de tarefas.
+  wall.mesh.userData.zone = zi;
+  wall.mesh.userData.sector = zone.sector;
+  root.add(wall.mesh);
+  scene.pickables.push(wall.mesh);
+  const ctx = wall.ctx;
+  const PW = ctx.canvas.width;
+  const PH = ctx.canvas.height;
+
+  const actions = (scene.actions ??= []);
+  const hitGeo = kit.own(new THREE.PlaneGeometry(1, 1));
+  const hitMat = kit.own(new THREE.MeshBasicMaterial({ visible: false }));
+  const hits: ActionSpot[] = [];
+  for (let i = 0; i < WALL_HITS; i++) {
+    const m = new THREE.Mesh(hitGeo, hitMat);
+    m.visible = false;
+    m.userData.hitbox = false;
+    m.position.set(0, mount.y, z0 + 0.01);
+    markAction(m, '');
+    root.add(m);
+    scene.pickables.push(m);
+    const spot: ActionSpot = { id: '', level: zone.level, obj: m, x: 0, z: 0, r: 0, active: false };
+    actions.push(spot);
+    hits.push(spot);
+  }
+  /** Caixa `i` sobre o retângulo (px, py, pw, ph) do canvas, ligada à ação `id`. */
+  const hitAt = (i: number, id: string, px: number, py: number, pw: number, ph: number) => {
+    const sp = hits[i];
+    if (!sp) return;
+    const m = sp.obj;
+    const lx = -W / 2 + ((px + pw / 2) / PW) * W;
+    const ly = mount.y + H / 2 - ((py + ph / 2) / PH) * H;
+    m.position.x = lx;
+    m.position.y = ly;
+    m.scale.set(Math.max(0.05, (pw / PW) * W), Math.max(0.05, (ph / PH) * H), 1);
+    sp.id = id;
+    sp.active = true;
+    m.userData.hitbox = true;
+    markAction(m, id);
+    const [bx, bz] = toBuilding(lx, z0 + 1.3);
+    sp.x = bx;
+    sp.z = bz;
+  };
+
+  let data: WallLive | null = null;
+  let dataKey = '';
+  let drawnKey = '';
+  let checkAt = 0;
+  const face = () => (data?.clock ? focusFace(data.clock.timer, Date.now()) : null);
+
+  const draw = () => {
+    if (!data) return;
+    const f = face();
+    const clockText = f ? `${f.state}|${formatClock(f.ms)}|${f.progress === null ? '' : Math.round(f.progress * 200)}` : '';
+    const key = `${dataKey}|${clockText}`;
+    if (key === drawnKey) return;
+    drawnKey = key;
+    const d = data;
+    const pad = Math.round(PW * 0.018);
+    ctx.fillStyle = '#0B1424';
+    ctx.fillRect(0, 0, PW, PH);
+    // Cabeçalho: o nome da parede e, à direita, o resumo.
+    const head = Math.round(PH * (H >= 1.4 ? 0.13 : 0.17));
+    ctx.fillStyle = d.accent;
+    ctx.fillRect(pad, head - 5, PW - pad * 2, 3);
+    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#E2E8F0';
+    ctx.font = `700 ${Math.round(head * 0.5)}px ${FONT}`;
+    ctx.fillText(d.title, pad + 4, head / 2, PW * 0.62);
+    if (d.side) {
+      ctx.textAlign = 'right';
+      ctx.fillStyle = '#94A3B8';
+      ctx.font = `600 ${Math.round(head * 0.38)}px ${FONT}`;
+      ctx.fillText(d.side, PW - pad - 4, head / 2, PW * 0.34);
+      ctx.textAlign = 'left';
+    }
+    let hi = 0;
+    let top = head + 6;
+    // Relógio do Focus: o mostrador grande, o estado e o que o toque faz.
+    if (d.clock && f) {
+      const ch = Math.round(PH * 0.36);
+      const x = pad;
+      const w = PW - pad * 2;
+      ctx.fillStyle = '#13203A';
+      ctx.fillRect(x, top, w, ch - 6);
+      if (f.progress !== null) {
+        ctx.fillStyle = d.accent;
+        ctx.globalAlpha = 0.35;
+        ctx.fillRect(x, top + ch - 12, w * f.progress, 6);
+        ctx.globalAlpha = 1;
+      }
+      ctx.fillStyle = f.state === 'running' ? '#F8FAFC' : '#94A3B8';
+      ctx.font = `700 ${Math.round(ch * 0.5)}px ${FONT}`;
+      ctx.fillText(f.state === 'idle' ? '--:--' : formatClock(f.ms), x + 16, top + ch * 0.45, w * 0.5);
+      ctx.fillStyle = '#CBD5E1';
+      ctx.font = `600 ${Math.round(ch * 0.17)}px ${FONT}`;
+      ctx.fillText(d.clock.states[f.state], x + w * 0.52, top + ch * 0.3, w * 0.46);
+      // O "botão": o que o toque faz agora.
+      const bh = Math.round(ch * 0.3);
+      const by = top + ch * 0.48;
+      ctx.fillStyle = d.accent;
+      ctx.fillRect(x + w * 0.52, by, w * 0.44, bh);
+      ctx.fillStyle = '#0B1220';
+      ctx.font = `700 ${Math.round(bh * 0.5)}px ${FONT}`;
+      ctx.fillText(d.clock.tap, x + w * 0.52 + 12, by + bh / 2, w * 0.44 - 24);
+      hitAt(hi++, d.clock.id, x, top, w, ch - 6);
+      top += ch;
+    }
+    // Linhas reais: cor, caixinha (quando marca), título, segunda linha e barra de progresso.
+    const bottom = PH - pad;
+    const slots = Math.max(d.rows.length, d.clock ? 3 : 4);
+    const rowH = (bottom - top) / slots;
+    d.rows.forEach((r, i) => {
+      const y = top + i * rowH + 3;
+      const h = rowH - 6;
+      const x = pad;
+      const w = PW - pad * 2;
+      ctx.fillStyle = r.more ? '#1E293B' : '#13203A';
+      ctx.fillRect(x, y, w, h);
+      ctx.fillStyle = r.color;
+      ctx.fillRect(x, y, 7, h);
+      let tx = x + 20;
+      if (r.check !== null) {
+        const bs = Math.round(h * 0.42);
+        ctx.strokeStyle = r.check ? '#4ADE80' : '#E2E8F0';
+        ctx.lineWidth = 3;
+        ctx.strokeRect(tx, y + h / 2 - bs / 2, bs, bs);
+        if (r.check) {
+          ctx.beginPath();
+          ctx.moveTo(tx + bs * 0.2, y + h / 2);
+          ctx.lineTo(tx + bs * 0.45, y + h / 2 + bs * 0.28);
+          ctx.lineTo(tx + bs * 0.85, y + h / 2 - bs * 0.3);
+          ctx.stroke();
+        }
+        tx += bs + 14;
+      }
+      const barW = r.bar !== null ? w * 0.24 : 0;
+      const textW = w - (tx - x) - barW - 24;
+      const fs = Math.round(h * (r.sub ? 0.34 : 0.4));
+      ctx.fillStyle = r.more ? '#CBD5E1' : r.check ? '#A7B4C2' : '#F1F5F9';
+      ctx.font = `600 ${fs}px ${FONT}`;
+      const ty = r.sub ? y + h * 0.34 : y + h / 2;
+      ctx.fillText(r.title, tx, ty, textW);
+      if (r.check) ctx.fillRect(tx, ty, Math.min(textW, ctx.measureText(r.title).width), 2);
+      if (r.sub) {
+        ctx.fillStyle = '#94A3B8';
+        ctx.font = `500 ${Math.round(h * 0.25)}px ${FONT}`;
+        ctx.fillText(r.sub, tx, y + h * 0.72, textW);
+      }
+      if (r.bar !== null) {
+        const bx = x + w - barW - 12;
+        const bh = Math.max(6, Math.round(h * 0.16));
+        ctx.fillStyle = 'rgba(148,163,184,0.25)';
+        ctx.fillRect(bx, y + h / 2 - bh / 2, barW, bh);
+        ctx.fillStyle = r.color;
+        ctx.fillRect(bx, y + h / 2 - bh / 2, barW * Math.max(0, Math.min(1, r.bar)), bh);
+      }
+      if (r.id) hitAt(hi++, r.id, x, y, w, h);
+    });
+    if (d.rows.length === 0) {
+      ctx.fillStyle = '#94A3B8';
+      ctx.font = `italic 500 ${Math.round(Math.min(rowH * 0.45, PH * 0.08))}px ${FONT}`;
+      ctx.textAlign = 'center';
+      ctx.fillText(d.empty, PW / 2, (top + bottom) / 2, PW - pad * 4);
+      ctx.textAlign = 'left';
+    }
+    // Caixas que sobraram: desligadas.
+    for (let i = hi; i < WALL_HITS; i++) {
+      const sp = hits[i]!;
+      sp.active = false;
+      sp.id = '';
+      sp.obj.userData.hitbox = false;
+      markAction(sp.obj, '');
+    }
+    wall.tex.needsUpdate = true;
+  };
+
+  const set = (raw: unknown) => {
+    const d = raw as WallLive;
+    if (!d?.rows) return;
+    const k = JSON.stringify(d);
+    if (k === dataKey) return;
+    dataKey = k;
+    data = d;
+    draw();
+  };
+  // O relógio do Focus anda: confere a cada segundo e só redesenha quando o mostrador muda.
+  const tick = (now: number) => {
+    if (!data?.clock || now < checkAt) return;
+    checkAt = now + 1000;
     draw();
   };
   return { set, tick };

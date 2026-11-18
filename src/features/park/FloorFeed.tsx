@@ -8,7 +8,7 @@ import { loadPlanPrefs } from '@/data/financePlanRepo';
 import { loadPrivacy } from '@/data/privacyRepo';
 import { addDays, addMonths, capitalizeFirst, startOfWeek, toDateKey, todayKey, type DateKey } from '@/domain/dates';
 import { budgetMonth, CURRENCIES } from '@/domain/finance';
-import { goalProgress, isOpenGoal, type GoalProgress } from '@/domain/goals';
+import { goalProgress, isOpenGoal } from '@/domain/goals';
 import { extractTags, type InboxItem } from '@/domain/inbox';
 import { academyInsights, financeInsights, focusInsights, goalsInsights, habitsInsights, languagesInsights, musicInsights, previousRange, projectsInsights, rangeFor, sportsInsights, tasksInsights } from '@/domain/insights';
 import { sessionStats } from '@/domain/languages';
@@ -52,6 +52,7 @@ import {
   type InsightMetric,
   type InsightMod,
 } from './interiors/boards';
+import { goalShare, nextMilestone } from './live';
 
 /**
  * Dados reais dos andares do prédio em que se está (V2.1): lê o mesmo que as estações do prédio
@@ -368,7 +369,7 @@ function ProjectsFeed({ onBoards }: FeedProps) {
     return projectsBoards(
       {
         active: active.map((p) => {
-          const next = p.milestones.filter((m) => !m.done).sort((a, b) => (a.date ?? '9999').localeCompare(b.date ?? '9999'))[0];
+          const next = nextMilestone(p);
           return { name: p.name, color: p.color, next: next ? { title: next.title, date: next.date } : null, done: p.milestones.filter((m) => m.done).length, total: p.milestones.length, refs: p.references.length };
         }),
         done: data.projects.filter((p) => p.status === 'done').map((p) => ({ name: p.name, date: dayOfIso(p.updatedAt) })),
@@ -382,14 +383,6 @@ function ProjectsFeed({ onBoards }: FeedProps) {
 
 /* ---------- Goals ---------- */
 
-/** Altura do pilar: o progresso real (0 a 1); qualitativo ou sem como medir: null. */
-function pillar(p: GoalProgress): number | null {
-  if (p.kind === 'percent') return p.percent / 100;
-  if (p.kind === 'stages') return p.percent === null ? null : p.percent / 100;
-  if (p.kind === 'level') return p.current !== null && p.target ? Math.min(1, p.current / p.target) : null;
-  return null;
-}
-
 function GoalsFeed({ onBoards }: FeedProps) {
   const c = useBoardCtx();
   const data = useGoals();
@@ -398,7 +391,7 @@ function GoalsFeed({ onBoards }: FeedProps) {
     const checkins = data.goals.flatMap((g) => data.checkinsOf(g.id).map((k) => ({ goal: g.name, date: k.date })));
     return goalsBoards(
       {
-        active: data.goals.filter(isOpenGoal).map((g) => ({ name: g.name, progress: pillar(goalProgress(g, data.checkinsOf(g.id))), deadline: g.deadline })),
+        active: data.goals.filter(isOpenGoal).map((g) => ({ name: g.name, progress: goalShare(goalProgress(g, data.checkinsOf(g.id))), deadline: g.deadline })),
         achieved: data.goals
           .filter((g) => g.status === 'done')
           .map((g) => ({ name: g.name, date: g.doneAt ? dayOfIso(g.doneAt) : null }))
@@ -417,9 +410,22 @@ function GoalsFeed({ onBoards }: FeedProps) {
 
 function InsightsFeed({ onBoards, financeLocked }: FeedProps & { financeLocked: boolean }) {
   const c = useBoardCtx();
+  const metrics = useInsightMetrics(financeLocked);
+  const fb = useMemo(() => (metrics ? insightsBoards(metrics, c) : null), [metrics, c.today, c.locale, c.t]);
+  useSend(fb, onBoards);
+  return null;
+}
+
+/**
+ * O indicador principal de cada módulo nesta semana e na anterior, como na estação (domain/insights),
+ * sem os módulos escondidos na privacidade; Finanças trancado pelo PIN nem é calculado. null: lendo.
+ * (Os quadros dos andares e a parede de indicadores usam a mesma conta.)
+ */
+export function useInsightMetrics(financeLocked: boolean): InsightMetric[] | null {
+  const c = useBoardCtx();
   const raw = useInsightsData();
   const privacy = useLiveQuery(() => loadPrivacy(), []);
-  const fb = useMemo(() => {
+  return useMemo(() => {
     if (!raw || !privacy) return null;
     const { t } = c;
     const ws = c.weekStartsOn;
@@ -482,16 +488,13 @@ function InsightsFeed({ onBoards, financeLocked }: FeedProps & { financeLocked: 
       sports: t('insights.activities'),
       finance: t('park.floorBoards.insights.transactions'),
     };
-    const metrics: InsightMetric[] = INSIGHT_MODS.filter((m) => !privacy.insightsHidden.includes(m)).map((mod) => {
+    return INSIGHT_MODS.filter((m) => !privacy.insightsHidden.includes(m)).map((mod): InsightMetric => {
       // Finanças trancado pelo PIN: nem a conta é feita.
       if (mod === 'finance' && financeLocked) return { mod, label: LABEL[mod], now: 0, before: 0, has: false, locked: true };
       const now = one(mod, week);
       return { mod, label: LABEL[mod], now: now.value, before: one(mod, prev).value, has: now.has };
     });
-    return insightsBoards(metrics, c);
   }, [raw, privacy, financeLocked, c.today, c.weekStartsOn, c.locale, c.t]);
-  useSend(fb, onBoards);
-  return null;
 }
 
 /* ---------- Música ---------- */

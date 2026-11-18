@@ -123,14 +123,14 @@ describe('Focus: luminária', () => {
 
 describe('Idiomas: baralho de hoje', () => {
   const word = (id: string, languageId: string, due: string | null, over: Partial<VocabEntry> = {}): VocabEntry => ({ ...base, id, languageId, term: id, translation: `t-${id}`, srs: { ...newSrsState(), due }, ...over }) as unknown as VocabEntry;
-  it('só as vencidas até hoje, dos idiomas que existem, as mais atrasadas primeiro', () => {
+  it('vencidas até hoje primeiro (as mais atrasadas antes), depois as novas, dos idiomas que existem', () => {
     const langs = [{ id: 'de', deletedAt: null }, { id: 'fr', deletedAt: '2026-11-01T00:00:00Z' }];
     const q = deckQueue(
       [word('hoje', 'de', TODAY), word('antiga', 'de', '2026-11-01'), word('amanha', 'de', '2026-11-19'), word('nova', 'de', null), word('apagada', 'de', TODAY, { deletedAt: '2026-11-02T00:00:00Z' }), word('frances', 'fr', TODAY), word('semIdioma', 'xx', TODAY)],
       langs,
       TODAY,
     );
-    expect(q.map((v) => v.id)).toEqual(['antiga', 'hoje']);
+    expect(q.map((v) => v.id)).toEqual(['antiga', 'hoje', 'nova']);
   });
 
   it('sem nada vencido, o baralho fica vazio', () => {

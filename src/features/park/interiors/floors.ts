@@ -1519,15 +1519,17 @@ function layout(plan: Plan, n: number, inside: (x: number, z: number, m: number)
   }
   /**
    * Cada sala na sua vaga (`want`) se fica livre do núcleo, do hall, do vão e do caminho até a
-   * escada (senão fica de fora, como sempre) e não fecha o corredor até ela (`ok`, com as já
-   * postas); se fecha, a primeira vaga de `alts` que cabe, não encosta nas outras salas (as postas e
-   * as que vêm depois) e não fecha (no máximo ALT_TRIES conferidas); se nenhuma, fica de fora.
+   * escada e não fecha o corredor até ela (`ok`, com as já postas); se esbarra num deles ou fecha o
+   * corredor, a primeira vaga de `alts` que cabe (`fits` confere núcleo, hall, vão e caminho), não
+   * encosta nas outras salas (as postas e as que vêm depois) e não fecha (no máximo ALT_TRIES
+   * conferidas); se nenhuma, fica de fora. (Antes, a sala que esbarrava ficava de fora sem procurar
+   * outra vaga: era assim que o 2º andar do Projects perdia a sala de acompanhamento.)
    */
   const settle = (want: readonly Slot[], alts: (sl: Slot) => Iterable<Slot>): Slot[] => {
     const out: Slot[] = [];
     want.forEach((sl, j) => {
-      if (!clearOf(sl.x, sl.z, sl.face, sl.w, sl.d) || !clear(sl.x, sl.z, sl.face, sl.w, sl.d)) return;
-      if (ok([...out, sl])) {
+      const free = clearOf(sl.x, sl.z, sl.face, sl.w, sl.d) && clear(sl.x, sl.z, sl.face, sl.w, sl.d);
+      if (free && ok([...out, sl])) {
         out.push(sl);
         return;
       }

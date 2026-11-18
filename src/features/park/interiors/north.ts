@@ -606,7 +606,8 @@ export function createLibraryInterior(kit: Kit, labels: Record<LibrarySector, st
       p(M.wood, B(4.4, 2.2, 0.3), 0, 1.1, -2.2);
       for (let r = 0; r < 4; r++) {
         p(M.stone, B(4.2, 0.04, 0.2), 0, 0.4 + r * 0.46, -1.96);
-        for (let k = 0; k < 6; k++) p(M.books[(r + k) % M.books.length]!, B(0.34, 0.42, 0.03), -1.75 + k * 0.7, 0.63 + r * 0.46, -1.98, 0, -0.12);
+        // A 3ª fileira (r = 2) é a dos novos (lombadas reais em objects3d.ts): sem capas decorativas.
+        if (r !== 2) for (let k = 0; k < 6; k++) p(M.books[(r + k) % M.books.length]!, B(0.34, 0.42, 0.03), -1.75 + k * 0.7, 0.63 + r * 0.46, -1.98, 0, -0.12);
       }
       plant(p, M, 2.6, -2.0, 0.8);
     }, { x: 0, y: 2.6, z: -2.2 }, [at(zoneSign(kit, 'newMaterials', accent, 2.8), 0, 3.3, -2.2)]),

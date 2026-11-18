@@ -80,7 +80,8 @@ export interface CourtObj {
 }
 
 export interface OrbObj {
-  orbs: Array<{ id: string; color: string; has: boolean; locked: boolean }>;
+  /** `name` = nome do módulo; `value` = o número desta semana com o rótulo (vazio quando trancado). */
+  orbs: Array<{ id: string; color: string; has: boolean; locked: boolean; name: string; value: string }>;
   still: boolean;
 }
 
@@ -873,9 +874,13 @@ function orbs(kit: Kit, scene: InteriorScene, a: Anchor): Live {
     m.visible = false;
     markAction(m, '');
     root.add(m);
+    // Plaquinha embaixo da esfera (nome do módulo e o número da semana), virada para fora do núcleo.
+    const tag = canvasPlane(kit, 1.5, 0.42, 128, false);
+    tag.mesh.visible = false;
+    root.add(tag.mesh);
     const sp: ActionSpot = { id: '', level: 0, obj: m, x: a.x, z: a.z, r: 0, active: false };
     actions.push(sp);
-    return { m, mat, ring, sp, y: 0 };
+    return { m, mat, ring, sp, y: 0, tag };
   });
   noCollide(root);
   let still = false;
@@ -892,6 +897,7 @@ function orbs(kit: Kit, scene: InteriorScene, a: Anchor): Live {
       const o = list[i];
       if (!o) {
         it.m.visible = false;
+        it.tag.mesh.visible = false;
         it.sp.active = false;
         it.sp.id = '';
         markAction(it.m, '');
@@ -913,6 +919,28 @@ function orbs(kit: Kit, scene: InteriorScene, a: Anchor): Live {
       it.sp.id = `orb:${o.id}`;
       it.sp.active = true;
       markAction(it.m, it.sp.id);
+      // Plaquinha: abaixo da esfera, virada para fora (quem está no átrio lê).
+      const { ctx, tex, mesh } = it.tag;
+      const cw = ctx.canvas.width;
+      const ch = ctx.canvas.height;
+      ctx.clearRect(0, 0, cw, ch);
+      ctx.fillStyle = 'rgba(2,6,23,0.78)';
+      rounded(ctx, 2, 2, cw - 4, ch - 4, 18);
+      ctx.fill();
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = o.color;
+      ctx.font = `700 ${Math.round(ch * 0.34)}px ${FONT}`;
+      ctx.fillText(o.name, cw / 2, ch * (o.value ? 0.33 : 0.5), cw - 24);
+      if (o.value) {
+        ctx.fillStyle = '#E2E8F0';
+        ctx.font = `500 ${Math.round(ch * 0.26)}px ${FONT}`;
+        ctx.fillText(o.value, cw / 2, ch * 0.72, cw - 24);
+      }
+      tex.needsUpdate = true;
+      mesh.position.set(Math.sin(t) * R, it.y - 0.62, Math.cos(t) * R);
+      mesh.rotation.y = t;
+      mesh.visible = true;
     });
   };
   // Flutuam devagar (parado com movimento reduzido).

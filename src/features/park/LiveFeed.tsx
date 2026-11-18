@@ -598,7 +598,7 @@ function InsightsWall({ onWall, handler, financeLocked, onObj, objHandler, proje
   });
   // Esferas em volta do núcleo: uma por indicador real (os escondidos já ficam de fora; Finanças
   // trancado aparece trancado, sem número); tocar mostra o detalhe.
-  const orbObj = useMemo((): OrbObj | null => (metrics ? { orbs: metrics.map((x) => ({ id: x.mod, color: accentOf(x.mod), has: !x.locked && x.has, locked: !!x.locked })), still: c.settings.reduceMotion } : null), [metrics, c.settings.reduceMotion]);
+  const orbObj = useMemo((): OrbObj | null => (metrics ? { orbs: metrics.map((x) => ({ id: x.mod, color: accentOf(x.mod), has: !x.locked && x.has, locked: !!x.locked, name: t(`modules.${x.mod}`), value: x.locked ? '' : x.has ? `${x.now} ${x.label}` : '—' })), still: c.settings.reduceMotion } : null), [metrics, c.settings.reduceMotion, t]);
   useObjSend(orbObj, onObj, !!orbObj);
   useObjHandler(objHandler, {
     act: (k, ref) => {

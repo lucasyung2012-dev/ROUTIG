@@ -13,6 +13,7 @@ import { compareGoals, goalProgress, isGoalOverdue, isOpenGoal, type Goal, type 
 import { logMeets, openPause, scheduleAt, todayStatus, type Habit, type HabitLog } from '@/domain/habits';
 import type { InboxItem } from '@/domain/inbox';
 import { sessionStats, type Language, type LanguageSession, type VocabEntry } from '@/domain/languages';
+import { sessionQueue } from '@/domain/srs';
 import type { LibraryItem } from '@/domain/library';
 import type { Instrument, PracticeSession } from '@/domain/music';
 import type { Currency, FinAsset, Position } from '@/domain/finance';
@@ -568,17 +569,22 @@ export function lampTap(timer: Pick<FocusTimer, 'waiting' | 'runningSince'> | nu
   return !timer ? 'start' : focusTap(timer, ended);
 }
 
-/* ---------- Idiomas: o baralho de hoje (as palavras com revisão vencida) ---------- */
+/* ---------- Idiomas: o baralho de hoje (a mesma fila da revisão do módulo) ---------- */
+
+/** Palavras novas por sessão: o mesmo limite da revisão do módulo Idiomas (ReviewsTab). */
+export const DECK_NEW_LIMIT = 20;
 
 /**
- * As palavras de hoje, na ordem em que o baralho mostra: vencidas até hoje (as mais atrasadas
- * primeiro), dos idiomas estudados que existem; apagadas e de idioma apagado ficam fora.
+ * As palavras de hoje, na ordem da revisão do módulo (sessionQueue): primeiro as vencidas até hoje
+ * (as mais atrasadas primeiro), depois as novas, nunca revisadas (até DECK_NEW_LIMIT), dos idiomas
+ * que existem; apagadas e de idioma apagado ficam fora.
  */
 export function deckQueue(vocab: readonly VocabEntry[], languages: readonly Pick<Language, 'id' | 'deletedAt'>[], today: DateKey): VocabEntry[] {
   const live = new Set(languages.filter((l) => !l.deletedAt).map((l) => l.id));
-  return vocab
-    .filter((v) => !v.deletedAt && live.has(v.languageId) && v.srs.due !== null && v.srs.due <= today)
-    .sort((a, b) => (a.srs.due ?? '').localeCompare(b.srs.due ?? '') || a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id));
+  const words = vocab
+    .filter((v) => !v.deletedAt && live.has(v.languageId))
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id));
+  return sessionQueue(words, today, { newLimit: DECK_NEW_LIMIT, reviewLimit: 200 });
 }
 
 /* ---------- Música: quanto se tocou de verdade no instrumento ---------- */

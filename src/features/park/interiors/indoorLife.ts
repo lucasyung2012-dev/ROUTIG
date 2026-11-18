@@ -68,7 +68,10 @@ export function occupancy(kind: LifeKind, hour: number): number {
   for (let i = 0; i + 1 < c.length; i++) {
     const [h0, v0] = c[i]!;
     const [h1, v1] = c[i + 1]!;
-    if (h >= h0 && h <= h1) return h1 > h0 ? v0 + ((v1 - v0) * (h - h0)) / (h1 - h0) : v0;
+    if (h >= h0 && h <= h1) {
+      const v = h1 > h0 ? v0 + ((v1 - v0) * (h - h0)) / (h1 - h0) : v0;
+      return Math.min(1, Math.max(0, v));
+    }
   }
   return c[0]![1];
 }

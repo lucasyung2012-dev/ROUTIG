@@ -178,3 +178,37 @@ Revisadas com o Lucas em 17/11/2026: as três primeiras foram aprovadas como est
   - tocar nas paredes, porque mexeria nos dados do Lucas;
   - a luz e o som à noite;
   - as paredes que têm dados, como Library e Notes.
+
+## 11. Objetos 3D aprovados (18/11/2026)
+
+Aprovados pelo Lucas no chat. Cada objeto faz a ação no próprio mundo 3D, com os mesmos repositórios do Control Room. Commit e7dba2e, CI ok.
+
+| Prédio | Objeto | O que faz |
+|---|---|---|
+| Tasks | tela da mesa de criação rápida | cria a tarefa (título e prazo) |
+| Calendar | horas cheias da parede do dia | cria o evento naquela hora |
+| Goals | placa "Novo objetivo" | cria objetivo (o check-in na parede continua) |
+| Projects | maquete | blocos com o progresso real; tocar mostra e conclui os marcos |
+| Focus | luminária de cada sala e cabine | inicia, pausa e retoma a sessão |
+| Inbox | bandeja de cartões | Tarefa, Nota, Arquivar ou Guardar na Library |
+| Notes | caderno aberto | nota rápida |
+| Library | estante "Novos" | lombadas com os itens reais; tocar abre o item |
+| Academy | nome da matéria na lousa | abre a matéria |
+| Idiomas | baralho | revisão das palavras do dia (Lembrei / Não lembrei) |
+| Música | piano, bateria e violão | ao sair, "Registrar prática" com os minutos tocados |
+| Esportes | faixas das modalidades | registram a atividade do dia |
+| Insights | esferas em volta do núcleo | um indicador real em cada; Finanças trancada sem o PIN |
+| Finanças | quadro dentro do cofre | saldos só para ler, e só com o PIN |
+
+Mudanças em relação ao combinado:
+- No Inbox é tocar e escolher, sem arrastar.
+- No Calendar ficou na parede do dia, e não no relógio de sol.
+
+Conferido no navegador:
+- `stairs:reach` ok e `stairs:check` 0 nos 14 prédios com andares.
+- Mesa do Tasks: a caixa "Nova tarefa" abre presa à mesa e foi cancelada sem criar nada.
+- Estante "Novos" da Library: mostra os 2 itens reais. As lombadas novas ficam na frente dos livros decorativos, ajuste visual pendente.
+
+Não testado:
+- Os outros objetos só foram medidos, sem olhar na tela.
+- Nenhuma ação foi concluída, para não mexer nos dados do Lucas.
